@@ -1,0 +1,117 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+pip-wheel-metadata/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Virtual Environments
+.env
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+.poetry/
+
+# IDEs
+.vscode/launch.json
+.vscode/*.code-workspace
+!.vscode/settings.json
+!.vscode/extensions.json
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.hypothesis/
+
+# Type checking
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# Node / Next.js (dashboard)
+dashboard/node_modules/
+dashboard/.next/
+dashboard/out/
+dashboard/.vercel/
+dashboard/.turbo/
+dashboard/.swc/
+
+# Playwright (E2E tests)
+dashboard/playwright-report/
+dashboard/test-results/
+dashboard/playwright/.cache/
+dashboard/blob-report/
+dashboard/.playwright/
+
+# Package managers
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+.pnpm-store/
+
+# Jupyter
+.ipynb_checkpoints/
+*.ipynb
+
+# Logs
+*.log
+
+# Environment variables
+.env
+.env.local
+
+# DataDr specific
+.chainlit/
+chainlit.md
+.datadr/
+.deepeval/
+investigations/
+*.investigation.json
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+# Project Specific
+all_code*
+all_code
+data/
+output/
+output*
+!src/datadr/core/nodes/output_formatters.py
+.coverage*
+create
+errors.txt
+
+# Helm
+deploy/helm/datadr/charts/*.tgz
+deploy/helm/datadr/Chart.lock

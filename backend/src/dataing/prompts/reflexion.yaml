@@ -1,0 +1,27 @@
+system: |
+  You are debugging a failed SQL query. Analyze the error and fix the query.
+
+  AVAILABLE SCHEMA:
+  {{ schema_context }}
+
+  COMMON FIXES:
+  - "column does not exist": Check column name spelling, use correct table
+  - "relation does not exist": Use fully qualified name (schema.table)
+  - "type mismatch": Cast values appropriately
+  - "syntax error": Check SQL syntax for the target database
+
+  CRITICAL: Only use tables and columns from the schema above.
+
+user: |
+  ORIGINAL QUERY:
+  ```sql
+  {{ previous_query }}
+  ```
+
+  ERROR MESSAGE:
+  {{ error_message }}
+
+  HYPOTHESIS BEING TESTED:
+  {{ hypothesis.title }}
+
+  Generate a corrected SQL query. Return ONLY the SQL wrapped in ```sql``` code blocks, no explanation.

@@ -1,0 +1,52 @@
+system: |
+  You are a data quality investigator. Given an anomaly alert and database context,
+  generate {{ num_hypotheses }} hypotheses about what could have caused the anomaly.
+
+  HYPOTHESIS CATEGORIES:
+  - upstream_dependency: Source table missing data, late arrival, schema change
+  - transformation_bug: ETL logic error, incorrect aggregation, wrong join
+  - data_quality: Nulls, duplicates, invalid values, schema drift
+  - infrastructure: Job failure, timeout, resource exhaustion
+  - expected_variance: Seasonality, holiday, known business event
+
+  Each hypothesis MUST:
+  1. Have a clear, specific title
+  2. Include reasoning for why this could be the cause
+  3. Suggest a SQL query to investigate (using ONLY the provided schema)
+
+  CRITICAL RULES:
+  - Use ONLY tables and columns from the schema below
+  - DO NOT invent tables or columns
+  - Include LIMIT clause in all queries
+  - Use the exact anomaly date: {{ alert.anomaly_date }}
+
+user: |
+  ## Anomaly Alert
+  - Dataset: {{ alert.dataset_id }}
+  - Metric: {{ alert.metric_name }}
+  - Expected: {{ alert.expected_value }}
+  - Actual: {{ alert.actual_value }}
+  - Deviation: {{ alert.deviation_pct }}%
+  - Anomaly Date: {{ alert.anomaly_date }}
+  - Severity: {{ alert.severity }}
+
+  ## Available Schema
+  {{ schema_context }}
+
+  {% if lineage_context %}
+  ## Data Lineage
+  {{ lineage_context }}
+  {% endif %}
+
+  Generate {{ num_hypotheses }} diverse hypotheses as JSON:
+  ```json
+  [
+    {
+      "id": "h1",
+      "title": "...",
+      "category": "upstream_dependency|transformation_bug|data_quality|infrastructure|expected_variance",
+      "reasoning": "...",
+      "suggested_query": "SELECT ... LIMIT 1000"
+    }
+  ]
+  ```

@@ -1,0 +1,78 @@
+site_name: dataing
+site_description: Autonomous Data Quality Investigation
+site_url: https://dataing.dev
+
+theme:
+  name: material
+  palette:
+    - scheme: default
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - scheme: slate
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+  features:
+    - navigation.instant
+    - navigation.tracking
+    - navigation.sections
+    - navigation.expand
+    - search.suggest
+    - search.highlight
+    - content.code.copy
+
+plugins:
+  - search
+  - mkdocstrings:
+      handlers:
+        python:
+          paths: [../backend/src]
+          options:
+            docstring_style: google
+            show_source: true
+  - mermaid2
+
+markdown_extensions:
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:mermaid2.fence_mermaid_custom
+  - pymdownx.tabbed:
+      alternate_style: true
+  - admonition
+  - pymdownx.details
+  - def_list
+  - attr_list
+  - md_in_html
+
+nav:
+  - Home: index.md
+  - Architecture:
+      - Overview: architecture/overview.md
+      - ADRs:
+          - 001 - Monorepo Structure: architecture/adr-001-monorepo.md
+          - 002 - No LangGraph: architecture/adr-002-no-langgraph.md
+          - 003 - SQLGlot Safety: architecture/adr-003-sqlglot-safety.md
+          - 004 - Event Sourcing: architecture/adr-004-event-sourcing.md
+          - 005 - Fail Fast Schema: architecture/adr-005-fail-fast-schema.md
+  - API Reference:
+      - Core: api-reference/core.md
+      - Safety: api-reference/safety.md
+      - Adapters: api-reference/adapters.md
+  - User Guide:
+      - Getting Started: user-guide/getting-started.md
+      - Configuration: user-guide/configuration.md
+      - MCP Integration: user-guide/mcp-integration.md
+
+extra:
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/dataing/dataing

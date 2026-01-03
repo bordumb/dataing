@@ -1,0 +1,41 @@
+system: |
+  You are synthesizing investigation findings to determine root cause.
+
+  Review all evidence and determine:
+  1. The most likely root cause
+  2. Confidence level
+  3. Recommended actions
+
+  Be conservative with confidence scores:
+  - 0.9+: Strong evidence with clear causation
+  - 0.7-0.9: Good evidence, likely correct
+  - 0.5-0.7: Some evidence, but uncertain
+  - <0.5: Weak evidence, inconclusive
+
+user: |
+  ## Original Anomaly
+  - Dataset: {{ alert.dataset_id }}
+  - Metric: {{ alert.metric_name }} deviated by {{ alert.deviation_pct }}%
+  - Expected: {{ alert.expected_value }}
+  - Actual: {{ alert.actual_value }}
+  - Date: {{ alert.anomaly_date }}
+
+  ## Investigation Findings
+  {% for e in evidence %}
+  ### Hypothesis: {{ e.hypothesis_id }}
+  - Query: {{ e.query[:200] }}...
+  - Interpretation: {{ e.interpretation }}
+  - Confidence: {{ e.confidence }}
+  - Supports hypothesis: {{ e.supports_hypothesis }}
+
+  {% endfor %}
+
+  Respond as JSON:
+  ```json
+  {
+    "root_cause": "Concise description of the root cause, or null if inconclusive",
+    "confidence": 0.0-1.0,
+    "supporting_evidence": ["List of key evidence points"],
+    "recommendations": ["Actionable recommendations to fix or prevent"]
+  }
+  ```

@@ -124,11 +124,14 @@ class TestWebhookNotifier:
         """Test signature verification with valid signature."""
         body = b'{"test": "data"}'
         secret = "test_secret"
-        signature = "sha256=" + hmac.new(
-            secret.encode(),
-            body,
-            hashlib.sha256,
-        ).hexdigest()
+        signature = (
+            "sha256="
+            + hmac.new(
+                secret.encode(),
+                body,
+                hashlib.sha256,
+            ).hexdigest()
+        )
 
         result = WebhookNotifier.verify_signature(body, signature, secret)
 

@@ -1,75 +1,73 @@
+############################
+# OS / Editor / IDE
+############################
+
+.DS_Store
+Thumbs.db
+
+.idea/
+.vscode/*
+!.vscode/settings.json
+!.vscode/extensions.json
+*.swp
+*.swo
+*~
+*.tmp
+
+############################
 # Python
+############################
+
 __pycache__/
 *.py[cod]
-*$py.class
 *.so
 .Python
-build/
-develop-eggs/
-dist/
-downloads/
-eggs/
-.eggs/
-lib/
-lib64/
-parts/
-sdist/
-var/
-wheels/
-pip-wheel-metadata/
-share/python-wheels/
-*.egg-info/
-.installed.cfg
-*.egg
-MANIFEST
 
-# Virtual Environments
+# Virtual environments
 .env
-.venv
-env/
+.env.*
+.venv/
 venv/
 ENV/
+env/
 env.bak/
 venv.bak/
 .poetry/
 
-# IDEs
-.vscode/launch.json
-.vscode/*.code-workspace
-!.vscode/settings.json
-!.vscode/extensions.json
-.idea/
-*.swp
-*.swo
-*~
-.DS_Store
+# Packaging / build
+build/
+dist/
+sdist/
+eggs/
+.eggs/
+*.egg-info/
+.installed.cfg
+MANIFEST
+pip-wheel-metadata/
+wheels/
 
-# Testing
+# Testing / coverage
 .pytest_cache/
 .coverage
+.coverage.*
 htmlcov/
 .tox/
 .hypothesis/
+.nox/
 
 # Type checking
 .mypy_cache/
 .dmypy.json
 dmypy.json
+.pyright/
 
-# Node / Next.js (dashboard)
-dashboard/node_modules/
-dashboard/.next/
-dashboard/out/
-dashboard/.vercel/
-dashboard/.turbo/
-dashboard/.swc/
+############################
+# Node / Frontend (GLOBAL)
+############################
 
-# Playwright (E2E tests)
-dashboard/playwright-report/
-dashboard/test-results/
-dashboard/playwright/.cache/
-dashboard/blob-report/
-dashboard/.playwright/
+# Dependencies
+node_modules/
+**/node_modules/
 
 # Package managers
 npm-debug.log*
@@ -77,19 +75,89 @@ yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 .pnpm-store/
+.pnpm/
 
-# Jupyter
+# Build outputs
+dist/
+build/
+out/
+
+# Frameworks
+.next/
+.nuxt/
+.svelte-kit/
+.angular/
+.vite/
+.cache/
+.parcel-cache/
+.turbo/
+.swc/
+
+# Storybook / docs builds
+storybook-static/
+site/
+
+############################
+# Frontend tooling
+############################
+
+.eslintcache
+.stylelintcache
+.prettiercache
+
+############################
+# Containers / Devcontainers
+############################
+
+.devcontainer/.env
+docker-compose.override.yml
+
+############################
+# CI / GitHub
+############################
+
+# (Usually nothing here, but placeholders are fine)
+
+############################
+# Jupyter / Data Science
+############################
+
 .ipynb_checkpoints/
 *.ipynb
 
+############################
 # Logs
-*.log
+############################
 
-# Environment variables
+*.log
+logs/
+
+############################
+# Secrets / Env
+############################
+
 .env
 .env.local
+.env.development
+.env.test
+.env.production
 
-# DataDr specific
+############################
+# Project-specific
+############################
+
+# Generated / outputs
+output/
+output*
+data/
+tmp/
+temp/
+
+# LLM / tooling artifacts
+all_code*
+errors.txt
+
+# Chainlit / Project artifacts
 .chainlit/
 chainlit.md
 .datadr/
@@ -97,21 +165,17 @@ chainlit.md
 investigations/
 *.investigation.json
 
-# Temporary files
-tmp/
-temp/
-*.tmp
-# Project Specific
-all_code*
-all_code
-data/
-output/
-output*
-!src/datadr/core/nodes/output_formatters.py
-.coverage*
-create
-errors.txt
+############################
+# Helm / Kubernetes
+############################
 
-# Helm
-deploy/helm/datadr/charts/*.tgz
-deploy/helm/datadr/Chart.lock
+deploy/**/charts/*.tgz
+deploy/**/Chart.lock
+
+############################
+# Misc
+############################
+
+coverage.xml
+reports/
+.cache/

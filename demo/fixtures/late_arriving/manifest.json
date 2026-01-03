@@ -1,0 +1,53 @@
+{
+  "name": "late_arriving",
+  "description": "Mobile app queues events offline, batch uploaded later",
+  "created_at": "2026-01-03T15:36:18.477614Z",
+  "simulation_period": {
+    "start": "2024-01-08",
+    "end": "2024-01-14"
+  },
+  "tables": {
+    "categories": {
+      "row_count": 50,
+      "file": "categories.parquet"
+    },
+    "products": {
+      "row_count": 500,
+      "file": "products.parquet"
+    },
+    "users": {
+      "row_count": 10000,
+      "file": "users.parquet"
+    },
+    "orders": {
+      "row_count": 3032,
+      "file": "orders.parquet"
+    },
+    "order_items": {
+      "row_count": 4600,
+      "file": "order_items.parquet"
+    },
+    "events": {
+      "row_count": 277617,
+      "file": "events.parquet"
+    }
+  },
+  "anomalies": [
+    {
+      "type": "late_arriving",
+      "table": "events",
+      "column": "created_at vs inserted_at",
+      "source_day": 2,
+      "arrival_day": 5,
+      "severity": 0.03,
+      "root_cause": "Mobile app queues events offline",
+      "expected_detection": {
+        "pattern_type": "LATE_ARRIVING",
+        "confidence": 0.85
+      }
+    }
+  ],
+  "ground_truth": {
+    "late_event_count": 1006
+  }
+}

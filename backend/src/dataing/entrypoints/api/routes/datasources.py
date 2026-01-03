@@ -4,14 +4,15 @@ from __future__ import annotations
 
 import os
 from datetime import datetime
-from typing import Any
+from typing import Annotated, Any
 from uuid import UUID
 
 from cryptography.fernet import Fernet
-from fastapi import APIRouter, Depends, HTTPException, Request, Response
+from fastapi import APIRouter, Depends, HTTPException, Response
 from pydantic import BaseModel, Field
 
 from dataing.adapters.db.app_db import AppDatabase
+from dataing.adapters.db.duckdb import DuckDBAdapter
 from dataing.adapters.db.postgres import PostgresAdapter
 from dataing.adapters.db.trino import TrinoAdapter
 from dataing.entrypoints.api.deps import get_app_db
@@ -19,6 +20,11 @@ from dataing.entrypoints.api.middleware.auth import ApiKeyContext, require_scope
 from dataing.models.data_source import DataSourceType
 
 router = APIRouter(prefix="/datasources", tags=["datasources"])
+
+# Annotated types for dependency injection
+AppDbDep = Annotated[AppDatabase, Depends(get_app_db)]
+AuthDep = Annotated[ApiKeyContext, Depends(verify_api_key)]
+WriteScopeDep = Annotated[ApiKeyContext, Depends(require_scope("write"))]
 
 
 def get_encryption_key() -> bytes:
@@ -112,7 +118,9 @@ def _build_connection_string(config: ConnectionConfig, ds_type: DataSourceType) 
         )
 
 
-def _create_adapter(config: ConnectionConfig, ds_type: DataSourceType) -> PostgresAdapter | TrinoAdapter:
+def _create_adapter(
+    config: ConnectionConfig, ds_type: DataSourceType
+) -> PostgresAdapter | TrinoAdapter:
     """Create a database adapter from config."""
     if ds_type == DataSourceType.POSTGRES:
         connection_string = _build_connection_string(config, ds_type)
@@ -136,7 +144,9 @@ def _create_adapter(config: ConnectionConfig, ds_type: DataSourceType) -> Postgr
         raise ValueError(f"Data source type '{ds_type}' is not yet supported")
 
 
-async def _test_connection(config: ConnectionConfig, ds_type: DataSourceType) -> tuple[bool, str, int]:
+async def _test_connection(
+    config: ConnectionConfig, ds_type: DataSourceType
+) -> tuple[bool, str, int]:
     """Test a database connection.
 
     Returns:
@@ -178,8 +188,8 @@ def _decrypt_config(encrypted: str, key: bytes) -> ConnectionConfig:
 @router.post("/", response_model=DataSourceResponse, status_code=201)
 async def create_datasource(
     request: CreateDataSourceRequest,
-    auth: ApiKeyContext = Depends(require_scope("write")),
-    app_db: AppDatabase = Depends(get_app_db),
+    auth: WriteScopeDep,
+    app_db: AppDbDep,
 ) -> DataSourceResponse:
     """Create a new data source connection.
 
@@ -220,8 +230,8 @@ async def create_datasource(
 
 @router.get("/", response_model=DataSourceListResponse)
 async def list_datasources(
-    auth: ApiKeyContext = Depends(verify_api_key),
-    app_db: AppDatabase = Depends(get_app_db),
+    auth: AuthDep,
+    app_db: AppDbDep,
 ) -> DataSourceListResponse:
     """List all data sources for the current tenant."""
     data_sources = await app_db.list_data_sources(auth.tenant_id)
@@ -247,8 +257,8 @@ async def list_datasources(
 @router.get("/{datasource_id}", response_model=DataSourceResponse)
 async def get_datasource(
     datasource_id: UUID,
-    auth: ApiKeyContext = Depends(verify_api_key),
-    app_db: AppDatabase = Depends(get_app_db),
+    auth: AuthDep,
+    app_db: AppDbDep,
 ) -> DataSourceResponse:
     """Get a specific data source."""
     ds = await app_db.get_data_source(datasource_id, auth.tenant_id)
@@ -271,8 +281,8 @@ async def get_datasource(
 @router.delete("/{datasource_id}", status_code=204, response_class=Response)
 async def delete_datasource(
     datasource_id: UUID,
-    auth: ApiKeyContext = Depends(require_scope("write")),
-    app_db: AppDatabase = Depends(get_app_db),
+    auth: WriteScopeDep,
+    app_db: AppDbDep,
 ) -> Response:
     """Delete a data source (soft delete)."""
     success = await app_db.delete_data_source(datasource_id, auth.tenant_id)
@@ -286,8 +296,8 @@ async def delete_datasource(
 @router.post("/{datasource_id}/test", response_model=TestConnectionResponse)
 async def test_datasource(
     datasource_id: UUID,
-    auth: ApiKeyContext = Depends(verify_api_key),
-    app_db: AppDatabase = Depends(get_app_db),
+    auth: AuthDep,
+    app_db: AppDbDep,
 ) -> TestConnectionResponse:
     """Test data source connectivity."""
     ds = await app_db.get_data_source(datasource_id, auth.tenant_id)
@@ -323,14 +333,16 @@ async def test_datasource(
 @router.get("/{datasource_id}/schema", response_model=SchemaResponse)
 async def get_schema(
     datasource_id: UUID,
+    auth: AuthDep,
+    app_db: AppDbDep,
     table_pattern: str | None = None,
-    auth: ApiKeyContext = Depends(verify_api_key),
-    app_db: AppDatabase = Depends(get_app_db),
 ) -> SchemaResponse:
     """Get schema from data source.
 
     Args:
         datasource_id: The data source ID.
+        auth: Authentication context (injected).
+        app_db: Application database (injected).
         table_pattern: Optional pattern to filter tables.
     """
     ds = await app_db.get_data_source(datasource_id, auth.tenant_id)
@@ -338,20 +350,42 @@ async def get_schema(
     if not ds:
         raise HTTPException(status_code=404, detail="Data source not found")
 
-    # Decrypt connection config
-    encryption_key = get_encryption_key()
-    try:
-        config = _decrypt_config(ds["connection_config_encrypted"], encryption_key)
-    except Exception as e:
-        raise HTTPException(
-            status_code=500,
-            detail=f"Failed to decrypt connection config: {str(e)}",
-        )
-
     ds_type = DataSourceType(ds["type"])
+    encryption_key = get_encryption_key()
 
     try:
-        if ds_type in (DataSourceType.POSTGRES, DataSourceType.TRINO):
+        if ds_type == DataSourceType.DUCKDB:
+            # DuckDB uses raw config dict, not ConnectionConfig
+            import json
+
+            raw_config = json.loads(
+                Fernet(encryption_key).decrypt(ds["connection_config_encrypted"].encode()).decode()
+            )
+            adapter = DuckDBAdapter(raw_config["path"], raw_config.get("read_only", True))
+            await adapter.connect()
+            try:
+                schema = await adapter.get_schema(table_pattern)
+                return SchemaResponse(
+                    tables=[
+                        {
+                            "table_name": t.table_name,
+                            "columns": list(t.columns),
+                            "column_types": t.column_types,
+                        }
+                        for t in schema.tables
+                    ]
+                )
+            finally:
+                await adapter.close()
+        elif ds_type in (DataSourceType.POSTGRES, DataSourceType.TRINO):
+            # Decrypt connection config for traditional databases
+            try:
+                config = _decrypt_config(ds["connection_config_encrypted"], encryption_key)
+            except Exception as e:
+                raise HTTPException(
+                    status_code=500,
+                    detail=f"Failed to decrypt connection config: {str(e)}",
+                ) from e
             adapter = _create_adapter(config, ds_type)
             await adapter.connect()
             try:
@@ -379,4 +413,4 @@ async def get_schema(
         raise HTTPException(
             status_code=500,
             detail=f"Failed to fetch schema: {str(e)}",
-        )
+        ) from e

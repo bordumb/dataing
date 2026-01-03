@@ -1,0 +1,105 @@
+{
+  "name": "duplicates",
+  "description": "Retry logic creates duplicate order_items",
+  "created_at": "2026-01-03T15:36:17.165173Z",
+  "simulation_period": {
+    "start": "2024-01-08",
+    "end": "2024-01-14"
+  },
+  "tables": {
+    "categories": {
+      "row_count": 50,
+      "file": "categories.parquet"
+    },
+    "products": {
+      "row_count": 500,
+      "file": "products.parquet"
+    },
+    "users": {
+      "row_count": 10000,
+      "file": "users.parquet"
+    },
+    "orders": {
+      "row_count": 3032,
+      "file": "orders.parquet"
+    },
+    "order_items": {
+      "row_count": 4709,
+      "file": "order_items.parquet"
+    },
+    "events": {
+      "row_count": 277617,
+      "file": "events.parquet"
+    }
+  },
+  "anomalies": [
+    {
+      "type": "duplicates",
+      "table": "order_items",
+      "column": "(order_id, product_id)",
+      "day": 6,
+      "severity": 0.15,
+      "root_cause": "Retry logic doesn't check for idempotency",
+      "expected_detection": {
+        "pattern_type": "DUPLICATES",
+        "confidence": 0.95
+      }
+    }
+  ],
+  "ground_truth": {
+    "affected_order_ids": [
+      "dd57da15-fbd8-47e3-b741-b020da9f6195",
+      "71dedd8c-b502-4cdc-9841-7e933737ab2f",
+      "954dac73-76e1-42ff-94bd-0ed276556820",
+      "5d12c92c-7b7b-4ff1-84ce-f562397df015",
+      "6fee71bd-57fe-4bd2-9d35-574f53b2f02c",
+      "2e8a51b5-3e24-4e50-86fd-1d22b2a90b02",
+      "c5e03a41-6df1-4cdc-82e5-c384379dda3a",
+      "9baec2e4-ac8f-4618-83de-a20f84021513",
+      "38480dac-1754-46ed-8f1e-ac6727a51fa2",
+      "168cf9b6-fa0f-4817-9175-601cfd7951a3",
+      "3c146d58-1ccd-4144-bfca-2662c701da24",
+      "1d05df2a-e4ce-42a7-89eb-7153df4c4d14",
+      "6be95a49-ee15-47e9-aa67-6aa8830ecd38",
+      "ac22dcfd-16bc-45c4-a775-7325ab2c423e",
+      "17e2ad83-ad15-4335-b91a-893e307cebdb",
+      "736952e6-7693-4650-a1a7-2127f2793593",
+      "c49a9f0e-ff05-49aa-b12e-50885fd5d2e7",
+      "aca1b144-bd45-45c3-b7b2-adf8b38b08b2",
+      "c78b0c38-6596-4838-b9af-557c4dc4e40e",
+      "bd294720-d61b-4cf8-b210-b1aff73ecf16",
+      "023862ff-d677-43aa-ace5-c30991974953",
+      "2d086f7d-cac5-45f5-a5db-35c523df729a",
+      "c9ea1887-6c47-4847-8fee-4507dedc8f8d",
+      "efa314cc-2eb7-4f09-b272-2b81b4bcf911",
+      "048517d0-7aa0-4164-a500-b94352eef274",
+      "9815db68-10ac-439e-b952-153baab4127c",
+      "fe0f93b6-8744-4a3c-8d40-eff62e449d00",
+      "0deb6e59-1b40-41b6-ac93-1ca452596b58",
+      "61477745-b45a-430e-b467-e20acd44501c",
+      "8af64d7b-b14c-4bb1-9d59-7680728085c3",
+      "e2722981-45c7-4e4f-822b-3a2e6070fe50",
+      "6649ed62-e8fd-4a62-95b6-2ad93391d913",
+      "48005776-ca46-4bfd-84a1-a5cd6f019f0d",
+      "989899db-46c3-4ae0-a4cd-e9a1ffb60ae3",
+      "44df333f-50ca-4851-9188-c17350ea1312",
+      "0ebe1905-05cf-420b-928f-d4c9dd53b643",
+      "62efa9b4-1c36-4bbf-b24b-0060dff43f0c",
+      "a0b6143c-b979-4b5b-9ffd-d64b7ccf169a",
+      "741155a4-77fb-4fb6-bb3e-bc6e078a1db1",
+      "5c118c7a-6f3a-4783-ae07-0eba047e70f3",
+      "b6566bfd-3b39-49fc-aebd-8673f0faa746",
+      "09eeb6be-4889-4b73-87d2-8452690232d7",
+      "b5294d50-7702-4834-9290-68c80fd6cc8f",
+      "67c5163c-832b-4447-9acc-7d9761cdb71d",
+      "66e52aaf-acb7-4efe-82c0-651dc2b9cbdf",
+      "59a2bbb3-9f7d-498a-9a01-57cf87290621",
+      "125d8cac-9135-4bb2-ae96-8fdf3b851328",
+      "029d18c1-8a94-4002-945b-c3ba9e329861",
+      "b6c4cfeb-0735-451f-a14b-716a12bed549",
+      "f0603505-b716-4557-8033-800239bc8cd5"
+    ],
+    "affected_order_count": 100,
+    "duplicate_items": 109
+  }
+}

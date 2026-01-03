@@ -4,20 +4,31 @@ from __future__ import annotations
 
 import asyncio
 import uuid
-from datetime import datetime, timezone
-from typing import Any, AsyncIterator
+from collections.abc import AsyncIterator
+from datetime import UTC, datetime
+from typing import Annotated, Any
 
+import structlog
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
+from dataing.adapters.context import DatabaseContext
 from dataing.core.domain_types import AnomalyAlert
 from dataing.core.orchestrator import InvestigationOrchestrator
 from dataing.core.state import InvestigationState
-from dataing.entrypoints.api.deps import get_investigations, get_orchestrator
+from dataing.entrypoints.api.deps import get_database_context, get_investigations, get_orchestrator
 from dataing.entrypoints.api.middleware.auth import ApiKeyContext, verify_api_key
 
 router = APIRouter(prefix="/investigations", tags=["investigations"])
+
+logger = structlog.get_logger()
+
+# Annotated types for dependency injection
+AuthDep = Annotated[ApiKeyContext, Depends(verify_api_key)]
+OrchestratorDep = Annotated[InvestigationOrchestrator, Depends(get_orchestrator)]
+DatabaseContextDep = Annotated[DatabaseContext, Depends(get_database_context)]
+InvestigationsDep = Annotated[dict[str, dict[str, Any]], Depends(get_investigations)]
 
 
 class CreateInvestigationRequest(BaseModel):
@@ -54,14 +65,18 @@ class InvestigationStatusResponse(BaseModel):
 async def create_investigation(
     request: CreateInvestigationRequest,
     background_tasks: BackgroundTasks,
-    auth: ApiKeyContext = Depends(verify_api_key),
-    orchestrator: InvestigationOrchestrator = Depends(get_orchestrator),
-    investigations: dict = Depends(get_investigations),
+    auth: AuthDep,
+    orchestrator: OrchestratorDep,
+    database_context: DatabaseContextDep,
+    investigations: InvestigationsDep,
 ) -> InvestigationResponse:
     """Start a new investigation.
 
     This endpoint starts an investigation in the background
     and returns immediately with the investigation ID.
+
+    The investigation will query the tenant's actual data source
+    (e.g., DuckDB with parquet files) instead of just metadata.
     """
     investigation_id = str(uuid.uuid4())
 
@@ -83,17 +98,24 @@ async def create_investigation(
         "state": state,
         "finding": None,
         "status": "started",
-        "created_at": datetime.now(timezone.utc),
+        "created_at": datetime.now(UTC),
         "tenant_id": str(auth.tenant_id),
     }
 
-    # Run investigation in background
+    # Run investigation in background with tenant's data source
     async def run_investigation() -> None:
         try:
-            finding = await orchestrator.run_investigation(state)
+            # Resolve tenant's data source adapter
+            data_adapter = await database_context.get_default_adapter(auth.tenant_id)
+
+            # Run investigation against tenant's actual data
+            finding = await orchestrator.run_investigation(state, data_adapter)
             investigations[investigation_id]["finding"] = finding.model_dump()
             investigations[investigation_id]["status"] = "completed"
         except Exception as e:
+            import traceback
+
+            logger.error("investigation_failed", error=str(e), traceback=traceback.format_exc())
             investigations[investigation_id]["status"] = "failed"
             investigations[investigation_id]["error"] = str(e)
 
@@ -102,15 +124,15 @@ async def create_investigation(
     return InvestigationResponse(
         investigation_id=investigation_id,
         status="started",
-        created_at=datetime.now(timezone.utc),
+        created_at=datetime.now(UTC),
     )
 
 
 @router.get("/{investigation_id}")
 async def get_investigation(
     investigation_id: str,
-    auth: ApiKeyContext = Depends(verify_api_key),
-    investigations: dict = Depends(get_investigations),
+    auth: AuthDep,
+    investigations: InvestigationsDep,
 ) -> InvestigationStatusResponse:
     """Get investigation status and results."""
     if investigation_id not in investigations:
@@ -142,8 +164,8 @@ async def get_investigation(
 @router.get("/{investigation_id}/events")
 async def stream_events(
     investigation_id: str,
-    auth: ApiKeyContext = Depends(verify_api_key),
-    investigations: dict = Depends(get_investigations),
+    auth: AuthDep,
+    investigations: InvestigationsDep,
 ) -> StreamingResponse:
     """SSE stream of investigation events.
 
@@ -184,7 +206,7 @@ async def stream_events(
 
             # Check if investigation is complete
             if inv["status"] in ("completed", "failed"):
-                yield f"data: {{\"type\": \"investigation_ended\", \"status\": \"{inv['status']}\"}}\n\n"
+                yield f'data: {{"type": "investigation_ended", "status": "{inv["status"]}"}}\n\n'
                 break
 
             await asyncio.sleep(0.5)
@@ -197,8 +219,8 @@ async def stream_events(
 
 @router.get("/")
 async def list_investigations(
-    auth: ApiKeyContext = Depends(verify_api_key),
-    investigations: dict = Depends(get_investigations),
+    auth: AuthDep,
+    investigations: InvestigationsDep,
 ) -> list[dict[str, Any]]:
     """List all investigations for the current tenant."""
     tenant_id = str(auth.tenant_id)

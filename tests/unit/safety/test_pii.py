@@ -65,9 +65,7 @@ class TestScanForPII:
 
     def test_detect_multiple_pii(self) -> None:
         """Test detecting multiple PII types."""
-        result = scan_for_pii(
-            "Email: test@example.com, SSN: 123-45-6789, Phone: 555-123-4567"
-        )
+        result = scan_for_pii("Email: test@example.com, SSN: 123-45-6789, Phone: 555-123-4567")
 
         assert "email" in result
         assert "ssn" in result
@@ -138,9 +136,7 @@ class TestRedactPII:
 
     def test_redact_multiple(self) -> None:
         """Test redacting multiple PII types."""
-        result = redact_pii(
-            "Email: test@example.com, SSN: 123-45-6789"
-        )
+        result = redact_pii("Email: test@example.com, SSN: 123-45-6789")
 
         assert "[REDACTED_EMAIL]" in result
         assert "[REDACTED_SSN]" in result

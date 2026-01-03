@@ -16,7 +16,7 @@ from typing import Any
 
 from mcp.server import Server
 from mcp.server.stdio import stdio_server
-from mcp.types import Tool, TextContent
+from mcp.types import TextContent, Tool
 
 from dataing.adapters.context.engine import DefaultContextEngine
 from dataing.adapters.db.postgres import PostgresAdapter
@@ -176,7 +176,7 @@ async def _investigate_anomaly(
 =====================
 
 **Status:** {finding.status}
-**Root Cause:** {finding.root_cause or 'Not determined'}
+**Root Cause:** {finding.root_cause or "Not determined"}
 **Confidence:** {finding.confidence:.0%}
 **Duration:** {finding.duration_seconds:.1f}s
 

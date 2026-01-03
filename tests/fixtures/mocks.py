@@ -84,7 +84,9 @@ def mock_llm_client() -> AsyncMock:
     ]
 
     # Mock generate_query
-    mock.generate_query.return_value = "SELECT COUNT(*) FROM orders WHERE created_at >= '2024-01-15' LIMIT 100"
+    mock.generate_query.return_value = (
+        "SELECT COUNT(*) FROM orders WHERE created_at >= '2024-01-15' LIMIT 100"
+    )
 
     # Mock interpret_evidence
     mock.interpret_evidence.return_value = Evidence(

@@ -37,6 +37,7 @@ SORT_ENTRIES = True
 # IMPLEMENTATION
 # ─────────────────────────────────────────────────────────────
 
+
 def should_include(path: Path) -> bool:
     if not INCLUDE_HIDDEN and path.name.startswith("."):
         return False

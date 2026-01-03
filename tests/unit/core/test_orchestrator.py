@@ -213,9 +213,7 @@ class TestInvestigationOrchestrator:
     ) -> None:
         """Test investigation handles circuit breaker trip."""
         # Create circuit breaker with very low limits
-        circuit_breaker = CircuitBreaker(
-            CircuitBreakerConfig(max_total_queries=1)
-        )
+        circuit_breaker = CircuitBreaker(CircuitBreakerConfig(max_total_queries=1))
 
         orchestrator = InvestigationOrchestrator(
             db=mock_db,

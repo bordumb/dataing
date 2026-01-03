@@ -1,6 +1,8 @@
 """Usage and cost tracking service."""
+
 from dataclasses import dataclass
 from datetime import datetime
+from typing import Any
 from uuid import UUID
 
 import structlog
@@ -33,6 +35,11 @@ class UsageTracker:
     """Track usage for billing and quotas."""
 
     def __init__(self, db: AppDatabase):
+        """Initialize the usage tracker.
+
+        Args:
+            db: Application database instance.
+        """
         self.db = db
 
     async def record_llm_usage(
@@ -176,16 +183,17 @@ class UsageTracker:
         self,
         tenant_id: UUID,
         days: int = 30,
-    ) -> list[dict]:
+    ) -> list[dict[str, Any]]:
         """Get daily usage trend for the last N days."""
-        return await self.db.fetch_all(
-            """SELECT DATE(timestamp) as date,
+        result: list[dict[str, Any]] = await self.db.fetch_all(
+            f"""SELECT DATE(timestamp) as date,
                       SUM(quantity) as quantity,
                       SUM(unit_cost) as cost
                FROM usage_records
                WHERE tenant_id = $1
-                 AND timestamp >= NOW() - INTERVAL '%s days'
+                 AND timestamp >= NOW() - INTERVAL '{days} days'
                GROUP BY DATE(timestamp)
-               ORDER BY date DESC""" % days,
+               ORDER BY date DESC""",
             tenant_id,
         )
+        return result

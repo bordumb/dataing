@@ -1,0 +1,53 @@
+{
+  "name": "schema_drift",
+  "description": "New product import job inserts price as string with currency",
+  "created_at": "2026-01-03T15:36:16.303476Z",
+  "simulation_period": {
+    "start": "2024-01-08",
+    "end": "2024-01-14"
+  },
+  "tables": {
+    "categories": {
+      "row_count": 50,
+      "file": "categories.parquet"
+    },
+    "products": {
+      "row_count": 500,
+      "file": "products.parquet"
+    },
+    "users": {
+      "row_count": 10000,
+      "file": "users.parquet"
+    },
+    "orders": {
+      "row_count": 3032,
+      "file": "orders.parquet"
+    },
+    "order_items": {
+      "row_count": 4600,
+      "file": "order_items.parquet"
+    },
+    "events": {
+      "row_count": 277617,
+      "file": "events.parquet"
+    }
+  },
+  "anomalies": [
+    {
+      "type": "schema_drift",
+      "table": "products",
+      "column": "price",
+      "start_day": 4,
+      "severity": 0.28,
+      "root_cause": "New product import job doesn't cast types properly",
+      "expected_detection": {
+        "pattern_type": "SCHEMA_DRIFT",
+        "confidence": 0.9
+      }
+    }
+  ],
+  "ground_truth": {
+    "string_price_count": 146,
+    "total_products": 500
+  }
+}

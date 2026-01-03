@@ -15,7 +15,7 @@ from __future__ import annotations
 import asyncio
 import time
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
 import structlog
@@ -25,8 +25,8 @@ from .exceptions import CircuitBreakerTripped, SchemaDiscoveryError
 from .state import Event, InvestigationState
 
 if TYPE_CHECKING:
-    from .interfaces import ContextEngine, DatabaseAdapter, LLMClient
     from ..safety.circuit_breaker import CircuitBreaker
+    from .interfaces import ContextEngine, DatabaseAdapter, LLMClient
 
 logger = structlog.get_logger()
 
@@ -70,7 +70,7 @@ class InvestigationOrchestrator:
         """Initialize the orchestrator.
 
         Args:
-            db: Database adapter for executing queries.
+            db: Database adapter for executing queries (fallback).
             llm: LLM client for generating hypotheses and queries.
             context_engine: Engine for gathering investigation context.
             circuit_breaker: Safety circuit breaker.
@@ -81,12 +81,21 @@ class InvestigationOrchestrator:
         self.context_engine = context_engine
         self.circuit_breaker = circuit_breaker
         self.config = config or OrchestratorConfig()
+        # Will be set per-investigation when using tenant data source
+        self._current_adapter: DatabaseAdapter | None = None
 
-    async def run_investigation(self, state: InvestigationState) -> Finding:
+    async def run_investigation(
+        self,
+        state: InvestigationState,
+        data_adapter: DatabaseAdapter | None = None,
+    ) -> Finding:
         """Execute a complete investigation.
 
         Args:
             state: Initial investigation state with alert.
+            data_adapter: Optional adapter for tenant's data source.
+                         If provided, queries run against this adapter
+                         instead of the default self.db.
 
         Returns:
             Finding with root cause and recommendations.
@@ -97,10 +106,14 @@ class InvestigationOrchestrator:
         """
         start_time = time.time()
 
+        # Use provided adapter or fall back to default
+        self._current_adapter = data_adapter or self.db
+
         log = logger.bind(
             investigation_id=state.id,
             dataset=state.alert.dataset_id,
             metric=state.alert.metric_name,
+            using_tenant_adapter=data_adapter is not None,
         )
         log.info("Starting investigation")
 
@@ -108,7 +121,7 @@ class InvestigationOrchestrator:
         state = state.append_event(
             Event(
                 type="investigation_started",
-                timestamp=datetime.now(timezone.utc),
+                timestamp=datetime.now(UTC),
                 data={"dataset_id": state.alert.dataset_id},
             )
         )
@@ -116,6 +129,8 @@ class InvestigationOrchestrator:
         try:
             # 1. Gather Context (FAIL FAST if schema empty)
             state = await self._gather_context(state)
+            if state.schema_context is None:
+                raise SchemaDiscoveryError("Schema context is None after gathering")
             log.info("Context gathered", tables_found=len(state.schema_context.tables))
 
             # 2. Generate Hypotheses
@@ -158,7 +173,7 @@ class InvestigationOrchestrator:
             state = state.append_event(
                 Event(
                     type="investigation_failed",
-                    timestamp=datetime.now(timezone.utc),
+                    timestamp=datetime.now(UTC),
                     data={"error": str(e)},
                 )
             )
@@ -177,12 +192,18 @@ class InvestigationOrchestrator:
             SchemaDiscoveryError: If schema is empty.
         """
         try:
-            context = await self.context_engine.gather(state.alert)
+            # Pass the current adapter to context engine
+            # The adapter is guaranteed to be set at this point (set in run_investigation)
+            assert self._current_adapter is not None
+            context = await self.context_engine.gather(
+                state.alert,
+                self._current_adapter,
+            )
         except Exception as e:
             state = state.append_event(
                 Event(
                     type="schema_discovery_failed",
-                    timestamp=datetime.now(timezone.utc),
+                    timestamp=datetime.now(UTC),
                     data={"error": str(e)},
                 )
             )
@@ -193,7 +214,7 @@ class InvestigationOrchestrator:
             state = state.append_event(
                 Event(
                     type="schema_discovery_failed",
-                    timestamp=datetime.now(timezone.utc),
+                    timestamp=datetime.now(UTC),
                     data={"error": "No tables discovered"},
                 )
             )
@@ -210,7 +231,7 @@ class InvestigationOrchestrator:
         state = state.append_event(
             Event(
                 type="context_gathered",
-                timestamp=datetime.now(timezone.utc),
+                timestamp=datetime.now(UTC),
                 data={
                     "tables_found": len(context.schema.tables),
                     "has_lineage": context.lineage is not None,
@@ -232,6 +253,8 @@ class InvestigationOrchestrator:
         Returns:
             Tuple of updated state and list of hypotheses.
         """
+        # schema_context is guaranteed to be set after _gather_context
+        assert state.schema_context is not None
         context = InvestigationContext(
             schema=state.schema_context,
             lineage=state.lineage_context,
@@ -247,7 +270,7 @@ class InvestigationOrchestrator:
             state = state.append_event(
                 Event(
                     type="hypothesis_generated",
-                    timestamp=datetime.now(timezone.utc),
+                    timestamp=datetime.now(UTC),
                     data={
                         "hypothesis_id": h.id,
                         "title": h.title,
@@ -277,7 +300,7 @@ class InvestigationOrchestrator:
 
         evidence: list[Evidence] = []
         for result in results:
-            if isinstance(result, Exception):
+            if isinstance(result, BaseException):
                 # Log but don't fail entire investigation
                 logger.warning("Hypothesis investigation failed", error=str(result))
                 continue
@@ -299,6 +322,10 @@ class InvestigationOrchestrator:
         Returns:
             List of evidence collected for this hypothesis.
         """
+        # schema_context and _current_adapter are guaranteed to be set
+        assert state.schema_context is not None
+        assert self._current_adapter is not None
+
         evidence: list[Evidence] = []
         max_queries = self.config.max_queries_per_hypothesis
 
@@ -329,13 +356,13 @@ class InvestigationOrchestrator:
             state = state.append_event(
                 Event(
                     type="query_submitted",
-                    timestamp=datetime.now(timezone.utc),
+                    timestamp=datetime.now(UTC),
                     data={"hypothesis_id": hypothesis.id, "query": query},
                 )
             )
 
             try:
-                result = await self.db.execute_query(
+                result = await self._current_adapter.execute_query(
                     query,
                     timeout_seconds=self.config.query_timeout_seconds,
                 )
@@ -343,7 +370,7 @@ class InvestigationOrchestrator:
                 state = state.append_event(
                     Event(
                         type="query_succeeded",
-                        timestamp=datetime.now(timezone.utc),
+                        timestamp=datetime.now(UTC),
                         data={"hypothesis_id": hypothesis.id, "row_count": result.row_count},
                     )
                 )
@@ -367,7 +394,7 @@ class InvestigationOrchestrator:
                 state = state.append_event(
                     Event(
                         type="query_failed",
-                        timestamp=datetime.now(timezone.utc),
+                        timestamp=datetime.now(UTC),
                         data={
                             "hypothesis_id": hypothesis.id,
                             "query": query,
@@ -387,7 +414,7 @@ class InvestigationOrchestrator:
                 state = state.append_event(
                     Event(
                         type="reflexion_attempted",
-                        timestamp=datetime.now(timezone.utc),
+                        timestamp=datetime.now(UTC),
                         data={"hypothesis_id": hypothesis.id, "retry_number": retry_count + 1},
                     )
                 )
@@ -430,7 +457,7 @@ class InvestigationOrchestrator:
         state.append_event(
             Event(
                 type="synthesis_completed",
-                timestamp=datetime.now(timezone.utc),
+                timestamp=datetime.now(UTC),
                 data={"root_cause": finding.root_cause, "confidence": finding.confidence},
             )
         )

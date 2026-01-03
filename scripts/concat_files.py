@@ -86,6 +86,7 @@ JOIN_WITH = "\n\n" + BANNER_CHAR * BANNER_WIDTH + "\n"
 # HELPERS
 # ─────────────────────────────────────────────────────────────
 
+
 def is_excluded_path(path: Path) -> bool:
     return any(part in EXCLUDE for part in path.parts)
 
@@ -121,12 +122,13 @@ def read_file(path: Path) -> str:
 # TREE + FILE COLLECTION
 # ─────────────────────────────────────────────────────────────
 
+
 def print_tree(root: Path, prefix: str = "") -> None:
     try:
         entries = [
-            p for p in root.iterdir()
-            if not is_excluded_path(p)
-            and (p.is_dir() or should_include_file(p))
+            p
+            for p in root.iterdir()
+            if not is_excluded_path(p) and (p.is_dir() or should_include_file(p))
         ]
     except PermissionError:
         return
@@ -156,6 +158,7 @@ def collect_files(root: Path) -> list[Path]:
 # ─────────────────────────────────────────────────────────────
 # MAIN
 # ─────────────────────────────────────────────────────────────
+
 
 def main() -> None:
     root = ROOT_DIR.resolve()

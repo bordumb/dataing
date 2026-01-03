@@ -83,9 +83,7 @@ def validate_query(sql: str, dialect: str = "postgres") -> None:
 
     # 2. Check statement type - must be SELECT
     if not isinstance(parsed, exp.Select):
-        raise QueryValidationError(
-            f"Only SELECT statements allowed, got: {type(parsed).__name__}"
-        )
+        raise QueryValidationError(f"Only SELECT statements allowed, got: {type(parsed).__name__}")
 
     # 3. Walk the AST and check for forbidden statement types
     for node in parsed.walk():
@@ -129,7 +127,7 @@ def add_limit_if_missing(sql: str, limit: int = 10000, dialect: str = "postgres"
     """
     try:
         parsed = sqlglot.parse_one(sql, dialect=dialect)
-        if not parsed.find(exp.Limit):
+        if isinstance(parsed, exp.Select) and not parsed.find(exp.Limit):
             parsed = parsed.limit(limit)
         return parsed.sql(dialect=dialect)
     except Exception:

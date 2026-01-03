@@ -110,10 +110,7 @@ class TestSlackNotifier:
         message = notifier._build_message("investigation.failed", payload)
 
         assert message["attachments"][0]["color"] == "#dc3545"  # Red
-        assert any(
-            f["title"] == "Error"
-            for f in message["attachments"][0]["fields"]
-        )
+        assert any(f["title"] == "Error" for f in message["attachments"][0]["fields"])
 
     def test_build_message_approval_required(
         self,

@@ -7,7 +7,7 @@ requires-python = ">=3.11"
 license = { text = "MIT" }
 authors = [{ name = "dataing team" }]
 dependencies = [
-    "fastapi>=0.109.0",
+    "fastapi[standard]>=0.109.0",
     "uvicorn[standard]>=0.27.0",
     "pydantic[email]>=2.5.0",
     "sqlalchemy>=2.0.0",
@@ -23,6 +23,8 @@ dependencies = [
     "jinja2>=3.1.3",
     "httpx>=0.26.0",
     "mcp>=1.0.0",
+    "duckdb>=0.9.0",
+    "cryptography>=41.0.0",
 ]
 
 [project.optional-dependencies]
@@ -40,6 +42,12 @@ docs = [
     "mkdocstrings[python]>=0.24.0",
     "mkdocs-mermaid2-plugin>=1.1.0",
 ]
+demo = [
+    "polars>=0.20.0",
+    "faker>=22.0.0",
+    "pyarrow>=15.0.0",
+    "duckdb>=0.9.0",
+]
 
 [build-system]
 requires = ["hatchling"]
@@ -50,12 +58,41 @@ packages = ["backend/src/dataing"]
 
 [tool.mypy]
 python_version = "3.11"
-strict = true
-disallow_untyped_defs = true
-disallow_any_generics = true
-warn_return_any = true
+files = ["backend/src/dataing"]
+# Strict mode flags (equivalent to --strict but with SQLAlchemy-compatible settings)
 warn_unused_configs = true
-plugins = ["pydantic.mypy"]
+disallow_untyped_calls = true
+disallow_untyped_defs = true
+disallow_incomplete_defs = true
+check_untyped_defs = true
+disallow_untyped_decorators = true
+warn_redundant_casts = true
+warn_unused_ignores = true
+warn_return_any = true
+no_implicit_reexport = true
+strict_equality = true
+extra_checks = true
+# SQLAlchemy requires allowing subclassing from DeclarativeBase (typed as Any)
+disallow_subclassing_any = false
+disallow_any_generics = true
+ignore_missing_imports = true
+plugins = ["pydantic.mypy", "sqlalchemy.ext.mypy.plugin"]
+
+[[tool.mypy.overrides]]
+module = ["dataing.models", "dataing.models.*"]
+# SQLAlchemy models need relaxed generic constraints for JSONB columns
+disallow_any_generics = false
+
+[[tool.mypy.overrides]]
+module = [
+    "dataing.entrypoints.mcp.*",
+    "dataing.entrypoints.mcp.server",
+    "*.entrypoints.mcp.server",
+    "*.mcp.server",
+]
+# MCP library decorators don't have type stubs
+disallow_untyped_decorators = false
+disallow_untyped_calls = false
 
 [tool.ruff]
 target-version = "py311"

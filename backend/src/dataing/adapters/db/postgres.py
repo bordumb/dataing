@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import asyncio
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import asyncpg
 
@@ -112,8 +112,8 @@ class PostgresAdapter:
         async with self._pool.acquire() as conn:
             rows = await conn.fetch(query)
 
-        # Group by table
-        tables_dict: dict[str, dict[str, list[str] | dict[str, str]]] = {}
+        # Group by table - use dict[str, Any] for mixed value types
+        tables_dict: dict[str, dict[str, Any]] = {}
         for row in rows:
             full_name = f"{row['table_schema']}.{row['table_name']}"
 

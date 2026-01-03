@@ -134,13 +134,16 @@ export function NewInvestigation() {
 
               <div>
                 <label className="block text-sm font-medium mb-1">
-                  Anomaly Date
+                  Anomaly Date (YYYY-MM-DD)
                 </label>
                 <Input
                   name="anomaly_date"
-                  type="date"
+                  type="text"
                   value={formData.anomaly_date}
                   onChange={handleChange}
+                  placeholder="2024-01-10"
+                  pattern="\d{4}-\d{2}-\d{2}"
+                  title="Date format: YYYY-MM-DD"
                   required
                 />
               </div>

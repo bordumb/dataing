@@ -51,7 +51,9 @@ class TestPostgresAdapter:
         async def mock_create_pool(*args, **kwargs):
             return mock_pool
 
-        with patch("dataing.adapters.db.postgres.asyncpg.create_pool", side_effect=mock_create_pool):
+        with patch(
+            "dataing.adapters.db.postgres.asyncpg.create_pool", side_effect=mock_create_pool
+        ):
             await adapter.connect()
 
             assert adapter._pool == mock_pool
@@ -109,6 +111,7 @@ class TestPostgresAdapter:
         mock_conn: AsyncMock,
     ) -> None:
         """Test that execute_query handles empty result."""
+
         async def mock_fetch(sql):
             return []
 

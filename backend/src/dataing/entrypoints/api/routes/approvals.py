@@ -3,10 +3,10 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Any
+from typing import Annotated, Any
 from uuid import UUID
 
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from pydantic import BaseModel, Field
 
 from dataing.adapters.db.app_db import AppDatabase
@@ -14,6 +14,11 @@ from dataing.entrypoints.api.deps import get_app_db
 from dataing.entrypoints.api.middleware.auth import ApiKeyContext, require_scope, verify_api_key
 
 router = APIRouter(prefix="/approvals", tags=["approvals"])
+
+# Annotated types for dependency injection
+AppDbDep = Annotated[AppDatabase, Depends(get_app_db)]
+AuthDep = Annotated[ApiKeyContext, Depends(verify_api_key)]
+WriteScopeDep = Annotated[ApiKeyContext, Depends(require_scope("write"))]
 
 
 class ApprovalRequestResponse(BaseModel):
@@ -83,8 +88,8 @@ class CreateApprovalRequest(BaseModel):
 
 @router.get("/pending", response_model=PendingApprovalsResponse)
 async def list_pending_approvals(
-    auth: ApiKeyContext = Depends(verify_api_key),
-    app_db: AppDatabase = Depends(get_app_db),
+    auth: AuthDep,
+    app_db: AppDbDep,
 ) -> PendingApprovalsResponse:
     """List all pending approval requests for this tenant."""
     approvals = await app_db.get_pending_approvals(auth.tenant_id)
@@ -116,8 +121,8 @@ async def list_pending_approvals(
 @router.get("/{approval_id}", response_model=ApprovalRequestResponse)
 async def get_approval_request(
     approval_id: UUID,
-    auth: ApiKeyContext = Depends(verify_api_key),
-    app_db: AppDatabase = Depends(get_app_db),
+    auth: AuthDep,
+    app_db: AppDbDep,
 ) -> ApprovalRequestResponse:
     """Get approval request details including context to review."""
     # Get all pending approvals and find the one with matching ID
@@ -161,8 +166,8 @@ async def approve_request(
     approval_id: UUID,
     request: ApproveRequest,
     background_tasks: BackgroundTasks,
-    auth: ApiKeyContext = Depends(require_scope("write")),
-    app_db: AppDatabase = Depends(get_app_db),
+    auth: WriteScopeDep,
+    app_db: AppDbDep,
 ) -> ApprovalDecisionResponse:
     """Approve an investigation to proceed."""
     user_id = auth.user_id or auth.key_id
@@ -195,8 +200,8 @@ async def approve_request(
 async def reject_request(
     approval_id: UUID,
     request: RejectRequest,
-    auth: ApiKeyContext = Depends(require_scope("write")),
-    app_db: AppDatabase = Depends(get_app_db),
+    auth: WriteScopeDep,
+    app_db: AppDbDep,
 ) -> ApprovalDecisionResponse:
     """Reject an investigation."""
     user_id = auth.user_id or auth.key_id
@@ -233,8 +238,8 @@ async def modify_and_approve(
     approval_id: UUID,
     request: ModifyRequest,
     background_tasks: BackgroundTasks,
-    auth: ApiKeyContext = Depends(require_scope("write")),
-    app_db: AppDatabase = Depends(get_app_db),
+    auth: WriteScopeDep,
+    app_db: AppDbDep,
 ) -> ApprovalDecisionResponse:
     """Approve with modifications.
 
@@ -256,7 +261,8 @@ async def modify_and_approve(
         raise HTTPException(status_code=404, detail="Approval request not found")
 
     # TODO: Resume investigation with modifications
-    # background_tasks.add_task(resume_investigation, result["investigation_id"], request.modifications)
+    # investigation_id = result["investigation_id"]
+    # background_tasks.add_task(resume_investigation, investigation_id, request.modifications)
 
     return ApprovalDecisionResponse(
         id=str(result["id"]),
@@ -271,8 +277,8 @@ async def modify_and_approve(
 @router.post("/", response_model=ApprovalRequestResponse, status_code=201)
 async def create_approval_request(
     request: CreateApprovalRequest,
-    auth: ApiKeyContext = Depends(require_scope("write")),
-    app_db: AppDatabase = Depends(get_app_db),
+    auth: WriteScopeDep,
+    app_db: AppDbDep,
 ) -> ApprovalRequestResponse:
     """Create a new approval request.
 
@@ -308,8 +314,8 @@ async def create_approval_request(
 @router.get("/investigation/{investigation_id}", response_model=list[ApprovalRequestResponse])
 async def get_investigation_approvals(
     investigation_id: UUID,
-    auth: ApiKeyContext = Depends(verify_api_key),
-    app_db: AppDatabase = Depends(get_app_db),
+    auth: AuthDep,
+    app_db: AppDbDep,
 ) -> list[ApprovalRequestResponse]:
     """Get all approval requests for a specific investigation."""
     # Verify investigation exists and belongs to tenant

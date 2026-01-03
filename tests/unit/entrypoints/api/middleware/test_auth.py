@@ -76,12 +76,8 @@ class TestVerifyApiKey:
         sample_api_key_record: dict,
     ) -> None:
         """Test that expired API key raises 401."""
-        sample_api_key_record["expires_at"] = datetime.now(timezone.utc) - timedelta(
-            days=1
-        )
-        mock_request.app.state.db.get_api_key_by_hash.return_value = (
-            sample_api_key_record
-        )
+        sample_api_key_record["expires_at"] = datetime.now(timezone.utc) - timedelta(days=1)
+        mock_request.app.state.db.get_api_key_by_hash.return_value = sample_api_key_record
 
         with pytest.raises(HTTPException) as exc_info:
             await verify_api_key(mock_request, api_key=sample_api_key)
@@ -96,9 +92,7 @@ class TestVerifyApiKey:
         sample_api_key_record: dict,
     ) -> None:
         """Test that valid API key returns context."""
-        mock_request.app.state.db.get_api_key_by_hash.return_value = (
-            sample_api_key_record
-        )
+        mock_request.app.state.db.get_api_key_by_hash.return_value = sample_api_key_record
         mock_request.app.state.db.update_api_key_last_used.return_value = None
 
         result = await verify_api_key(mock_request, api_key=sample_api_key)
@@ -115,9 +109,7 @@ class TestVerifyApiKey:
         sample_api_key_record: dict,
     ) -> None:
         """Test that context is stored in request state."""
-        mock_request.app.state.db.get_api_key_by_hash.return_value = (
-            sample_api_key_record
-        )
+        mock_request.app.state.db.get_api_key_by_hash.return_value = sample_api_key_record
         mock_request.state = MagicMock()
 
         result = await verify_api_key(mock_request, api_key=sample_api_key)
@@ -131,9 +123,7 @@ class TestVerifyApiKey:
         sample_api_key_record: dict,
     ) -> None:
         """Test that last_used_at is updated."""
-        mock_request.app.state.db.get_api_key_by_hash.return_value = (
-            sample_api_key_record
-        )
+        mock_request.app.state.db.get_api_key_by_hash.return_value = sample_api_key_record
 
         await verify_api_key(mock_request, api_key=sample_api_key)
 
@@ -148,12 +138,8 @@ class TestVerifyApiKey:
         sample_api_key_record: dict,
     ) -> None:
         """Test that last_used update failure doesn't fail auth."""
-        mock_request.app.state.db.get_api_key_by_hash.return_value = (
-            sample_api_key_record
-        )
-        mock_request.app.state.db.update_api_key_last_used.side_effect = Exception(
-            "DB error"
-        )
+        mock_request.app.state.db.get_api_key_by_hash.return_value = sample_api_key_record
+        mock_request.app.state.db.update_api_key_last_used.side_effect = Exception("DB error")
 
         # Should not raise
         result = await verify_api_key(mock_request, api_key=sample_api_key)

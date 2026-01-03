@@ -167,11 +167,12 @@ class ContextEngine(Protocol):
     - Data lineage (OPTIONAL - graceful degradation)
     """
 
-    async def gather(self, alert: AnomalyAlert) -> InvestigationContext:
+    async def gather(self, alert: AnomalyAlert, adapter: DatabaseAdapter) -> InvestigationContext:
         """Gather all context needed for investigation.
 
         Args:
             alert: The anomaly alert being investigated.
+            adapter: Connected database adapter.
 
         Returns:
             InvestigationContext with schema and optional lineage.
@@ -192,7 +193,7 @@ class LineageClient(Protocol):
     - Custom lineage stores
     """
 
-    async def get_lineage(self, dataset_id: str) -> "LineageContext":
+    async def get_lineage(self, dataset_id: str) -> LineageContext:
         """Get lineage information for a dataset.
 
         Args:

@@ -4,8 +4,9 @@ from __future__ import annotations
 
 import asyncio
 import uuid
-from datetime import datetime, timezone
-from typing import Any, AsyncIterator
+from collections.abc import AsyncIterator
+from datetime import UTC, datetime
+from typing import Annotated, Any
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from fastapi.responses import StreamingResponse
@@ -18,6 +19,10 @@ from dataing.core.state import InvestigationState
 from .deps import get_investigations, get_orchestrator
 
 router = APIRouter()
+
+# Annotated types for dependency injection
+OrchestratorDep = Annotated[InvestigationOrchestrator, Depends(get_orchestrator)]
+InvestigationsDep = Annotated[dict, Depends(get_investigations)]
 
 
 class CreateInvestigationRequest(BaseModel):
@@ -54,8 +59,8 @@ class InvestigationStatusResponse(BaseModel):
 async def create_investigation(
     request: CreateInvestigationRequest,
     background_tasks: BackgroundTasks,
-    orchestrator: InvestigationOrchestrator = Depends(get_orchestrator),
-    investigations: dict = Depends(get_investigations),
+    orchestrator: OrchestratorDep,
+    investigations: InvestigationsDep,
 ) -> InvestigationResponse:
     """Start a new investigation.
 
@@ -82,7 +87,7 @@ async def create_investigation(
         "state": state,
         "finding": None,
         "status": "started",
-        "created_at": datetime.now(timezone.utc),
+        "created_at": datetime.now(UTC),
     }
 
     # Run investigation in background
@@ -100,14 +105,14 @@ async def create_investigation(
     return InvestigationResponse(
         investigation_id=investigation_id,
         status="started",
-        created_at=datetime.now(timezone.utc),
+        created_at=datetime.now(UTC),
     )
 
 
 @router.get("/investigations/{investigation_id}")
 async def get_investigation(
     investigation_id: str,
-    investigations: dict = Depends(get_investigations),
+    investigations: InvestigationsDep,
 ) -> InvestigationStatusResponse:
     """Get investigation status and results."""
     if investigation_id not in investigations:
@@ -134,7 +139,7 @@ async def get_investigation(
 @router.get("/investigations/{investigation_id}/events")
 async def stream_events(
     investigation_id: str,
-    investigations: dict = Depends(get_investigations),
+    investigations: InvestigationsDep,
 ) -> StreamingResponse:
     """SSE stream of investigation events.
 
@@ -169,7 +174,7 @@ async def stream_events(
 
             # Check if investigation is complete
             if inv["status"] in ("completed", "failed"):
-                yield f"data: {{\"type\": \"investigation_ended\", \"status\": \"{inv['status']}\"}}\n\n"
+                yield f'data: {{"type": "investigation_ended", "status": "{inv["status"]}"}}\n\n'
                 break
 
             await asyncio.sleep(0.5)
@@ -182,7 +187,7 @@ async def stream_events(
 
 @router.get("/investigations")
 async def list_investigations(
-    investigations: dict = Depends(get_investigations),
+    investigations: InvestigationsDep,
 ) -> list[dict[str, Any]]:
     """List all investigations."""
     return [

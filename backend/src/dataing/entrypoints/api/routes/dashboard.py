@@ -3,9 +3,9 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Any
+from typing import Annotated
 
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 
 from dataing.adapters.db.app_db import AppDatabase
@@ -13,6 +13,10 @@ from dataing.entrypoints.api.deps import get_app_db
 from dataing.entrypoints.api.middleware.auth import ApiKeyContext, verify_api_key
 
 router = APIRouter(prefix="/dashboard", tags=["dashboard"])
+
+# Annotated types for dependency injection
+AppDbDep = Annotated[AppDatabase, Depends(get_app_db)]
+AuthDep = Annotated[ApiKeyContext, Depends(verify_api_key)]
 
 
 class DashboardStats(BaseModel):
@@ -44,8 +48,8 @@ class DashboardResponse(BaseModel):
 
 @router.get("/", response_model=DashboardResponse)
 async def get_dashboard(
-    auth: ApiKeyContext = Depends(verify_api_key),
-    app_db: AppDatabase = Depends(get_app_db),
+    auth: AuthDep,
+    app_db: AppDbDep,
 ) -> DashboardResponse:
     """Get dashboard overview for the current tenant."""
     # Get stats
@@ -77,8 +81,8 @@ async def get_dashboard(
 
 @router.get("/stats", response_model=DashboardStats)
 async def get_stats(
-    auth: ApiKeyContext = Depends(verify_api_key),
-    app_db: AppDatabase = Depends(get_app_db),
+    auth: AuthDep,
+    app_db: AppDbDep,
 ) -> DashboardStats:
     """Get just the dashboard statistics."""
     stats = await app_db.get_dashboard_stats(auth.tenant_id)

@@ -4,10 +4,10 @@ from __future__ import annotations
 
 import json
 import secrets
-from typing import Any
+from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Request, Response
+from fastapi import APIRouter, Depends, HTTPException, Response
 from pydantic import BaseModel, Field, HttpUrl
 
 from dataing.adapters.db.app_db import AppDatabase
@@ -15,6 +15,12 @@ from dataing.entrypoints.api.deps import get_app_db
 from dataing.entrypoints.api.middleware.auth import ApiKeyContext, require_scope, verify_api_key
 
 router = APIRouter(prefix="/settings", tags=["settings"])
+
+# Annotated types for dependency injection
+AppDbDep = Annotated[AppDatabase, Depends(get_app_db)]
+AuthDep = Annotated[ApiKeyContext, Depends(verify_api_key)]
+WriteScopeDep = Annotated[ApiKeyContext, Depends(require_scope("write"))]
+AdminScopeDep = Annotated[ApiKeyContext, Depends(require_scope("admin"))]
 
 
 # --- Tenant Settings ---
@@ -43,8 +49,8 @@ class UpdateTenantSettingsRequest(BaseModel):
 
 @router.get("/tenant", response_model=TenantSettings)
 async def get_tenant_settings(
-    auth: ApiKeyContext = Depends(verify_api_key),
-    app_db: AppDatabase = Depends(get_app_db),
+    auth: AuthDep,
+    app_db: AppDbDep,
 ) -> TenantSettings:
     """Get current tenant settings."""
     tenant = await app_db.get_tenant(auth.tenant_id)
@@ -69,8 +75,8 @@ async def get_tenant_settings(
 @router.patch("/tenant", response_model=TenantSettings)
 async def update_tenant_settings(
     request: UpdateTenantSettingsRequest,
-    auth: ApiKeyContext = Depends(require_scope("admin")),
-    app_db: AppDatabase = Depends(get_app_db),
+    auth: AdminScopeDep,
+    app_db: AppDbDep,
 ) -> TenantSettings:
     """Update tenant settings."""
     tenant = await app_db.get_tenant(auth.tenant_id)
@@ -144,8 +150,8 @@ class WebhookCreatedResponse(BaseModel):
 
 @router.get("/webhooks", response_model=list[WebhookResponse])
 async def list_webhooks(
-    auth: ApiKeyContext = Depends(verify_api_key),
-    app_db: AppDatabase = Depends(get_app_db),
+    auth: AuthDep,
+    app_db: AppDbDep,
 ) -> list[WebhookResponse]:
     """List all webhooks for the tenant."""
     webhooks = await app_db.list_webhooks(auth.tenant_id)
@@ -156,7 +162,9 @@ async def list_webhooks(
             url=w["url"],
             events=w["events"] if isinstance(w["events"], list) else json.loads(w["events"]),
             is_active=w["is_active"],
-            last_triggered_at=w["last_triggered_at"].isoformat() if w.get("last_triggered_at") else None,
+            last_triggered_at=w["last_triggered_at"].isoformat()
+            if w.get("last_triggered_at")
+            else None,
             last_status=w.get("last_status"),
             created_at=w["created_at"].isoformat(),
         )
@@ -167,8 +175,8 @@ async def list_webhooks(
 @router.post("/webhooks", response_model=WebhookCreatedResponse, status_code=201)
 async def create_webhook(
     request: CreateWebhookRequest,
-    auth: ApiKeyContext = Depends(require_scope("write")),
-    app_db: AppDatabase = Depends(get_app_db),
+    auth: WriteScopeDep,
+    app_db: AppDbDep,
 ) -> WebhookCreatedResponse:
     """Create a new webhook.
 
@@ -195,8 +203,8 @@ async def create_webhook(
 @router.delete("/webhooks/{webhook_id}", status_code=204, response_class=Response)
 async def delete_webhook(
     webhook_id: UUID,
-    auth: ApiKeyContext = Depends(require_scope("write")),
-    app_db: AppDatabase = Depends(get_app_db),
+    auth: WriteScopeDep,
+    app_db: AppDbDep,
 ) -> Response:
     """Delete a webhook."""
     result = await app_db.execute(
@@ -248,8 +256,8 @@ class ApiKeyCreatedResponse(BaseModel):
 
 @router.get("/api-keys", response_model=list[ApiKeyResponse])
 async def list_api_keys(
-    auth: ApiKeyContext = Depends(verify_api_key),
-    app_db: AppDatabase = Depends(get_app_db),
+    auth: AuthDep,
+    app_db: AppDbDep,
 ) -> list[ApiKeyResponse]:
     """List all API keys for the tenant."""
     keys = await app_db.list_api_keys(auth.tenant_id)
@@ -272,8 +280,8 @@ async def list_api_keys(
 @router.post("/api-keys", response_model=ApiKeyCreatedResponse, status_code=201)
 async def create_api_key(
     request: CreateApiKeyRequest,
-    auth: ApiKeyContext = Depends(require_scope("admin")),
-    app_db: AppDatabase = Depends(get_app_db),
+    auth: AdminScopeDep,
+    app_db: AppDbDep,
 ) -> ApiKeyCreatedResponse:
     """Create a new API key.
 
@@ -302,8 +310,8 @@ async def create_api_key(
 @router.delete("/api-keys/{key_id}", status_code=204, response_class=Response)
 async def revoke_api_key(
     key_id: UUID,
-    auth: ApiKeyContext = Depends(require_scope("admin")),
-    app_db: AppDatabase = Depends(get_app_db),
+    auth: AdminScopeDep,
+    app_db: AppDbDep,
 ) -> Response:
     """Revoke an API key."""
     from dataing.services.auth import AuthService

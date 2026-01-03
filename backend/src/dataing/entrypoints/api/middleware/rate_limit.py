@@ -1,12 +1,14 @@
 """Rate limiting middleware."""
+
 import time
 from collections import defaultdict
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 import structlog
-from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
 from starlette.requests import Request
-from starlette.responses import JSONResponse
+from starlette.responses import JSONResponse, Response
+from starlette.types import ASGIApp
 
 logger = structlog.get_logger()
 
@@ -49,10 +51,17 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
 
     def __init__(
         self,
-        app,
+        app: ASGIApp,
         config: RateLimitConfig | None = None,
         enabled: bool = True,
-    ):
+    ) -> None:
+        """Initialize rate limit middleware.
+
+        Args:
+            app: The ASGI application.
+            config: Rate limiting configuration.
+            enabled: Whether rate limiting is enabled.
+        """
         super().__init__(app)
         self.config = config or RateLimitConfig()
         self.enabled = enabled
@@ -80,7 +89,7 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         client_ip = request.client.host if request.client else "unknown"
         return f"ip:{client_ip}"
 
-    async def dispatch(self, request: Request, call_next):
+    async def dispatch(self, request: Request, call_next: RequestResponseEndpoint) -> Response:
         """Process the request with rate limiting."""
         if not self.enabled:
             return await call_next(request)

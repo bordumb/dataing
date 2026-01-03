@@ -143,7 +143,7 @@ export type Hook = (task: Task, mode: "warmup" | "run") => void | Promise<void>;
 ```
 
 - `async run()`: run the added tasks that were registered using the `add` method
-- `async runConcurrently(threshold: number = Infinity, mode: "bench" | "task" = "bench")`: similar to the `run` method but runs concurrently rather than sequentially. See the [Concurrency](#Concurrency) section. 
+- `async runConcurrently(threshold: number = Infinity, mode: "bench" | "task" = "bench")`: similar to the `run` method but runs concurrently rather than sequentially. See the [Concurrency](#Concurrency) section.
 - `async warmup()`: warm up the benchmark tasks
 - `async warmupConcurrently(threshold: number = Infinity, mode: "bench" | "task" = "bench")`: warm up the benchmark tasks concurrently
 - `reset()`: reset each task and remove its result
@@ -382,7 +382,7 @@ It may make your benchmarks slower, check #42.
 ```ts
 // options way (recommended)
 bench.threshold = 10 // The maximum number of concurrent tasks to run. Defaults to Infinity.
-bench.concurrency = "task" // The concurrency mode to determine how tasks are run.  
+bench.concurrency = "task" // The concurrency mode to determine how tasks are run.
 // await bench.warmup()
 await bench.run()
 

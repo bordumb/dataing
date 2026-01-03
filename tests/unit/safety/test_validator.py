@@ -35,9 +35,7 @@ class TestValidateQuery:
 
     def test_valid_select_with_subquery(self) -> None:
         """Test valid SELECT with subquery."""
-        validate_query(
-            "SELECT * FROM users WHERE id IN (SELECT user_id FROM orders) LIMIT 10"
-        )
+        validate_query("SELECT * FROM users WHERE id IN (SELECT user_id FROM orders) LIMIT 10")
 
     def test_valid_select_with_cte(self) -> None:
         """Test valid SELECT with CTE."""

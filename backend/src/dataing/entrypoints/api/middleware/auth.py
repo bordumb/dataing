@@ -1,10 +1,11 @@
 """API Key authentication middleware."""
+
 import hashlib
 import json
+from collections.abc import Callable
 from dataclasses import dataclass
-from datetime import datetime, timezone
-from functools import wraps
-from typing import Callable
+from datetime import UTC, datetime
+from typing import Annotated, Any
 from uuid import UUID
 
 import structlog
@@ -42,11 +43,11 @@ async def verify_api_key(
     # Hash the key to look it up
     key_hash = hashlib.sha256(api_key.encode()).hexdigest()
 
-    # Get database from app state
-    db = request.app.state.db
+    # Get app database from app state (not the data warehouse)
+    app_db = request.app.state.app_db
 
     # Look up the API key
-    api_key_record = await db.get_api_key_by_hash(key_hash)
+    api_key_record = await app_db.get_api_key_by_hash(key_hash)
 
     if not api_key_record:
         logger.warning("invalid_api_key", key_prefix=api_key[:8] if len(api_key) >= 8 else api_key)
@@ -55,12 +56,12 @@ async def verify_api_key(
     # Check expiration
     if api_key_record.get("expires_at"):
         expires_at = api_key_record["expires_at"]
-        if isinstance(expires_at, datetime) and expires_at < datetime.now(timezone.utc):
+        if isinstance(expires_at, datetime) and expires_at < datetime.now(UTC):
             raise HTTPException(status_code=401, detail="API key expired")
 
     # Update last_used_at (fire and forget)
     try:
-        await db.update_api_key_last_used(api_key_record["id"])
+        await app_db.update_api_key_last_used(api_key_record["id"])
     except Exception:
         pass  # Don't fail auth if we can't update last_used
 
@@ -90,19 +91,19 @@ async def verify_api_key(
     return context
 
 
-def require_scope(required_scope: str) -> Callable:
+def require_scope(required_scope: str) -> Callable[..., Any]:
     """Dependency to require a specific scope.
 
     Usage:
         @router.post("/")
         async def create_item(
-            auth: ApiKeyContext = Depends(require_scope("write")),
+            auth: Annotated[ApiKeyContext, Depends(require_scope("write"))],
         ):
             ...
     """
 
     async def scope_checker(
-        auth: ApiKeyContext = Depends(verify_api_key),
+        auth: Annotated[ApiKeyContext, Depends(verify_api_key)],
     ) -> ApiKeyContext:
         if required_scope not in auth.scopes and "*" not in auth.scopes:
             raise HTTPException(

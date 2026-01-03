@@ -1,8 +1,10 @@
 """Authentication service."""
+
 import hashlib
 import secrets
 from dataclasses import dataclass
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
+from typing import Any
 from uuid import UUID
 
 import structlog
@@ -28,6 +30,11 @@ class AuthService:
     """Service for authentication operations."""
 
     def __init__(self, db: AppDatabase):
+        """Initialize the authentication service.
+
+        Args:
+            db: Application database instance.
+        """
         self.db = db
 
     async def create_api_key(
@@ -51,7 +58,7 @@ class AuthService:
 
         expires_at = None
         if expires_in_days:
-            expires_at = datetime.now(timezone.utc) + timedelta(days=expires_in_days)
+            expires_at = datetime.now(UTC) + timedelta(days=expires_in_days)
 
         result = await self.db.create_api_key(
             tenant_id=tenant_id,
@@ -79,13 +86,14 @@ class AuthService:
             expires_at=expires_at,
         )
 
-    async def list_api_keys(self, tenant_id: UUID) -> list[dict]:
+    async def list_api_keys(self, tenant_id: UUID) -> list[dict[str, Any]]:
         """List all API keys for a tenant (without revealing key values)."""
-        return await self.db.list_api_keys(tenant_id)
+        result: list[dict[str, Any]] = await self.db.list_api_keys(tenant_id)
+        return result
 
     async def revoke_api_key(self, key_id: UUID, tenant_id: UUID) -> bool:
         """Revoke an API key."""
-        success = await self.db.revoke_api_key(key_id, tenant_id)
+        success: bool = await self.db.revoke_api_key(key_id, tenant_id)
 
         if success:
             logger.info(

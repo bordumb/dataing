@@ -1,5 +1,7 @@
 """Application database adapter using asyncpg."""
+
 import json
+from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from typing import Any
 from uuid import UUID
@@ -16,7 +18,7 @@ class AppDatabase:
     def __init__(self, dsn: str):
         """Initialize the app database adapter."""
         self.dsn = dsn
-        self.pool: asyncpg.Pool | None = None
+        self.pool: asyncpg.Pool[asyncpg.Connection[asyncpg.Record]] | None = None
 
     async def connect(self) -> None:
         """Create connection pool."""
@@ -35,12 +37,14 @@ class AppDatabase:
             logger.info("app_database_disconnected")
 
     @asynccontextmanager
-    async def acquire(self):
+    async def acquire(self) -> AsyncIterator[asyncpg.Connection[asyncpg.Record]]:
         """Acquire a connection from the pool."""
+        if self.pool is None:
+            raise RuntimeError("Database pool not initialized")
         async with self.pool.acquire() as conn:
             yield conn
 
-    async def fetch_one(self, query: str, *args) -> dict | None:
+    async def fetch_one(self, query: str, *args: Any) -> dict[str, Any] | None:
         """Fetch a single row."""
         async with self.acquire() as conn:
             row = await conn.fetchrow(query, *args)
@@ -48,18 +52,19 @@ class AppDatabase:
                 return dict(row)
             return None
 
-    async def fetch_all(self, query: str, *args) -> list[dict]:
+    async def fetch_all(self, query: str, *args: Any) -> list[dict[str, Any]]:
         """Fetch all rows."""
         async with self.acquire() as conn:
             rows = await conn.fetch(query, *args)
             return [dict(row) for row in rows]
 
-    async def execute(self, query: str, *args) -> str:
+    async def execute(self, query: str, *args: Any) -> str:
         """Execute a query and return status."""
         async with self.acquire() as conn:
-            return await conn.execute(query, *args)
+            result: str = await conn.execute(query, *args)
+            return result
 
-    async def execute_returning(self, query: str, *args) -> dict | None:
+    async def execute_returning(self, query: str, *args: Any) -> dict[str, Any] | None:
         """Execute a query with RETURNING clause."""
         async with self.acquire() as conn:
             row = await conn.fetchrow(query, *args)
@@ -68,23 +73,25 @@ class AppDatabase:
             return None
 
     # Tenant operations
-    async def get_tenant(self, tenant_id: UUID) -> dict | None:
+    async def get_tenant(self, tenant_id: UUID) -> dict[str, Any] | None:
         """Get tenant by ID."""
         return await self.fetch_one(
             "SELECT * FROM tenants WHERE id = $1",
             tenant_id,
         )
 
-    async def get_tenant_by_slug(self, slug: str) -> dict | None:
+    async def get_tenant_by_slug(self, slug: str) -> dict[str, Any] | None:
         """Get tenant by slug."""
         return await self.fetch_one(
             "SELECT * FROM tenants WHERE slug = $1",
             slug,
         )
 
-    async def create_tenant(self, name: str, slug: str, settings: dict | None = None) -> dict:
+    async def create_tenant(
+        self, name: str, slug: str, settings: dict[str, Any] | None = None
+    ) -> dict[str, Any]:
         """Create a new tenant."""
-        return await self.execute_returning(
+        result = await self.execute_returning(
             """INSERT INTO tenants (name, slug, settings)
                VALUES ($1, $2, $3)
                RETURNING *""",
@@ -92,9 +99,12 @@ class AppDatabase:
             slug,
             json.dumps(settings or {}),
         )
+        if result is None:
+            raise RuntimeError("Failed to create tenant")
+        return result
 
     # API Key operations
-    async def get_api_key_by_hash(self, key_hash: str) -> dict | None:
+    async def get_api_key_by_hash(self, key_hash: str) -> dict[str, Any] | None:
         """Get API key by hash."""
         return await self.fetch_one(
             """SELECT ak.*, t.slug as tenant_slug, t.name as tenant_name
@@ -120,10 +130,11 @@ class AppDatabase:
         scopes: list[str],
         user_id: UUID | None = None,
         expires_at: Any = None,
-    ) -> dict:
+    ) -> dict[str, Any]:
         """Create a new API key."""
-        return await self.execute_returning(
-            """INSERT INTO api_keys (tenant_id, user_id, key_hash, key_prefix, name, scopes, expires_at)
+        result = await self.execute_returning(
+            """INSERT INTO api_keys
+            (tenant_id, user_id, key_hash, key_prefix, name, scopes, expires_at)
                VALUES ($1, $2, $3, $4, $5, $6, $7)
                RETURNING *""",
             tenant_id,
@@ -134,8 +145,11 @@ class AppDatabase:
             json.dumps(scopes),
             expires_at,
         )
+        if result is None:
+            raise RuntimeError("Failed to create API key")
+        return result
 
-    async def list_api_keys(self, tenant_id: UUID) -> list[dict]:
+    async def list_api_keys(self, tenant_id: UUID) -> list[dict[str, Any]]:
         """List all API keys for a tenant."""
         return await self.fetch_all(
             """SELECT id, key_prefix, name, scopes, is_active, last_used_at, expires_at, created_at
@@ -155,7 +169,7 @@ class AppDatabase:
         return "UPDATE 1" in result
 
     # Data Source operations
-    async def list_data_sources(self, tenant_id: UUID) -> list[dict]:
+    async def list_data_sources(self, tenant_id: UUID) -> list[dict[str, Any]]:
         """List all data sources for a tenant."""
         return await self.fetch_all(
             """SELECT id, name, type, is_default, is_active,
@@ -166,7 +180,7 @@ class AppDatabase:
             tenant_id,
         )
 
-    async def get_data_source(self, data_source_id: UUID, tenant_id: UUID) -> dict | None:
+    async def get_data_source(self, data_source_id: UUID, tenant_id: UUID) -> dict[str, Any] | None:
         """Get a data source by ID."""
         return await self.fetch_one(
             "SELECT * FROM data_sources WHERE id = $1 AND tenant_id = $2",
@@ -181,10 +195,11 @@ class AppDatabase:
         type: str,
         connection_config_encrypted: str,
         is_default: bool = False,
-    ) -> dict:
+    ) -> dict[str, Any]:
         """Create a new data source."""
-        return await self.execute_returning(
-            """INSERT INTO data_sources (tenant_id, name, type, connection_config_encrypted, is_default)
+        result = await self.execute_returning(
+            """INSERT INTO data_sources
+                (tenant_id, name, type, connection_config_encrypted, is_default)
                VALUES ($1, $2, $3, $4, $5)
                RETURNING *""",
             tenant_id,
@@ -193,6 +208,9 @@ class AppDatabase:
             connection_config_encrypted,
             is_default,
         )
+        if result is None:
+            raise RuntimeError("Failed to create data source")
+        return result
 
     async def update_data_source_health(
         self,
@@ -230,10 +248,10 @@ class AppDatabase:
         deviation_pct: float | None = None,
         anomaly_date: str | None = None,
         severity: str | None = None,
-        metadata: dict | None = None,
-    ) -> dict:
+        metadata: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
         """Create a new investigation."""
-        return await self.execute_returning(
+        result = await self.execute_returning(
             """INSERT INTO investigations
                (tenant_id, data_source_id, created_by, dataset_id, metric_name,
                 expected_value, actual_value, deviation_pct, anomaly_date, severity, metadata)
@@ -251,8 +269,13 @@ class AppDatabase:
             severity,
             json.dumps(metadata or {}),
         )
+        if result is None:
+            raise RuntimeError("Failed to create investigation")
+        return result
 
-    async def get_investigation(self, investigation_id: UUID, tenant_id: UUID) -> dict | None:
+    async def get_investigation(
+        self, investigation_id: UUID, tenant_id: UUID
+    ) -> dict[str, Any] | None:
         """Get an investigation by ID."""
         return await self.fetch_one(
             "SELECT * FROM investigations WHERE id = $1 AND tenant_id = $2",
@@ -266,7 +289,7 @@ class AppDatabase:
         status: str | None = None,
         limit: int = 50,
         offset: int = 0,
-    ) -> list[dict]:
+    ) -> list[dict[str, Any]]:
         """List investigations for a tenant."""
         if status:
             return await self.fetch_all(
@@ -293,15 +316,15 @@ class AppDatabase:
         self,
         investigation_id: UUID,
         status: str,
-        events: list | None = None,
-        finding: dict | None = None,
+        events: list[Any] | None = None,
+        finding: dict[str, Any] | None = None,
         started_at: Any = None,
         completed_at: Any = None,
         duration_seconds: float | None = None,
-    ) -> dict | None:
+    ) -> dict[str, Any] | None:
         """Update investigation status and optionally other fields."""
         updates = ["status = $2"]
-        args = [investigation_id, status]
+        args: list[Any] = [investigation_id, status]
         idx = 3
 
         if events is not None:
@@ -329,7 +352,7 @@ class AppDatabase:
             args.append(duration_seconds)
             idx += 1
 
-        query = f"""UPDATE investigations SET {', '.join(updates)}
+        query = f"""UPDATE investigations SET {", ".join(updates)}
                     WHERE id = $1 RETURNING *"""
 
         return await self.execute_returning(query, *args)
@@ -346,7 +369,7 @@ class AppDatabase:
         request_id: str | None = None,
         ip_address: str | None = None,
         user_agent: str | None = None,
-        request_body: dict | None = None,
+        request_body: dict[str, Any] | None = None,
         response_status: int | None = None,
     ) -> None:
         """Create an audit log entry."""
@@ -369,14 +392,16 @@ class AppDatabase:
         )
 
     # Webhook operations
-    async def list_webhooks(self, tenant_id: UUID) -> list[dict]:
+    async def list_webhooks(self, tenant_id: UUID) -> list[dict[str, Any]]:
         """List all webhooks for a tenant."""
         return await self.fetch_all(
             """SELECT * FROM webhooks WHERE tenant_id = $1 ORDER BY created_at DESC""",
             tenant_id,
         )
 
-    async def get_webhooks_for_event(self, tenant_id: UUID, event_type: str) -> list[dict]:
+    async def get_webhooks_for_event(
+        self, tenant_id: UUID, event_type: str
+    ) -> list[dict[str, Any]]:
         """Get active webhooks that subscribe to an event type."""
         return await self.fetch_all(
             """SELECT * FROM webhooks
@@ -391,9 +416,9 @@ class AppDatabase:
         url: str,
         events: list[str],
         secret: str | None = None,
-    ) -> dict:
+    ) -> dict[str, Any]:
         """Create a new webhook."""
-        return await self.execute_returning(
+        result = await self.execute_returning(
             """INSERT INTO webhooks (tenant_id, url, secret, events)
                VALUES ($1, $2, $3, $4)
                RETURNING *""",
@@ -402,6 +427,9 @@ class AppDatabase:
             secret,
             json.dumps(events),
         )
+        if result is None:
+            raise RuntimeError("Failed to create webhook")
+        return result
 
     async def update_webhook_status(
         self,
@@ -423,7 +451,7 @@ class AppDatabase:
         resource_type: str,
         quantity: int,
         unit_cost: float,
-        metadata: dict | None = None,
+        metadata: dict[str, Any] | None = None,
     ) -> None:
         """Record a usage event."""
         await self.execute(
@@ -436,7 +464,9 @@ class AppDatabase:
             json.dumps(metadata or {}),
         )
 
-    async def get_monthly_usage(self, tenant_id: UUID, year: int, month: int) -> list[dict]:
+    async def get_monthly_usage(
+        self, tenant_id: UUID, year: int, month: int
+    ) -> list[dict[str, Any]]:
         """Get usage summary for a specific month."""
         return await self.fetch_all(
             """SELECT resource_type, SUM(quantity) as total_quantity, SUM(unit_cost) as total_cost
@@ -456,12 +486,13 @@ class AppDatabase:
         investigation_id: UUID,
         tenant_id: UUID,
         request_type: str,
-        context: dict,
+        context: dict[str, Any],
         requested_by: str = "system",
-    ) -> dict:
+    ) -> dict[str, Any]:
         """Create an approval request."""
-        return await self.execute_returning(
-            """INSERT INTO approval_requests (investigation_id, tenant_id, request_type, context, requested_by)
+        result = await self.execute_returning(
+            """INSERT INTO approval_requests
+                (investigation_id, tenant_id, request_type, context, requested_by)
                VALUES ($1, $2, $3, $4, $5)
                RETURNING *""",
             investigation_id,
@@ -470,8 +501,11 @@ class AppDatabase:
             json.dumps(context),
             requested_by,
         )
+        if result is None:
+            raise RuntimeError("Failed to create approval request")
+        return result
 
-    async def get_pending_approvals(self, tenant_id: UUID) -> list[dict]:
+    async def get_pending_approvals(self, tenant_id: UUID) -> list[dict[str, Any]]:
         """Get all pending approval requests for a tenant."""
         return await self.fetch_all(
             """SELECT ar.*, i.dataset_id, i.metric_name, i.severity
@@ -489,8 +523,8 @@ class AppDatabase:
         decision: str,
         decided_by: UUID,
         comment: str | None = None,
-        modifications: dict | None = None,
-    ) -> dict | None:
+        modifications: dict[str, Any] | None = None,
+    ) -> dict[str, Any] | None:
         """Record an approval decision."""
         return await self.execute_returning(
             """UPDATE approval_requests
@@ -507,7 +541,7 @@ class AppDatabase:
         )
 
     # Dashboard stats
-    async def get_dashboard_stats(self, tenant_id: UUID) -> dict:
+    async def get_dashboard_stats(self, tenant_id: UUID) -> dict[str, Any]:
         """Get dashboard statistics for a tenant."""
         # Active investigations
         active_result = await self.fetch_one(

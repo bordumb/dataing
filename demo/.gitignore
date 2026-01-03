@@ -1,0 +1,9 @@
+# Parquet files are large and binary - regenerate from generate.py
+fixtures/**/*.parquet
+
+# Keep manifest.json files (small, useful for CI verification)
+!fixtures/**/manifest.json
+
+# DuckDB databases
+*.db
+*.duckdb

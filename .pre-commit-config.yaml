@@ -1,0 +1,124 @@
+# Pre-commit configuration for dataing
+# Install: pip install pre-commit && pre-commit install
+# Run manually: pre-commit run --all-files
+
+default_language_version:
+  python: python3
+
+repos:
+  # Standard pre-commit hooks
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.5.0
+    hooks:
+      - id: trailing-whitespace
+        exclude: ^(demo/fixtures/|\.lock$|frontend/node_modules/)
+      - id: end-of-file-fixer
+        exclude: ^(demo/fixtures/|\.lock$|frontend/node_modules/)
+      - id: check-yaml
+        args: [--unsafe]  # Allow custom tags
+      - id: check-json
+        exclude: ^(demo/fixtures/|frontend/node_modules/)
+      - id: check-toml
+      - id: check-added-large-files
+        args: [--maxkb=1000]
+        exclude: ^demo/fixtures/
+      - id: check-merge-conflict
+      - id: check-case-conflict
+      - id: detect-private-key
+      - id: debug-statements
+      - id: check-executables-have-shebangs
+        exclude: ^frontend/node_modules/
+      - id: check-shebang-scripts-are-executable
+        exclude: ^frontend/node_modules/
+
+  # Python: Ruff for linting and formatting
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.3.0
+    hooks:
+      # Linting
+      - id: ruff
+        args: [--fix]
+        files: ^backend/
+      # Formatting
+      - id: ruff-format
+        files: ^backend/
+
+  # Python: mypy for type checking
+  - repo: local
+    hooks:
+      - id: mypy
+        name: mypy (backend)
+        entry: bash -c 'cd backend && uv run mypy src/'
+        language: system
+        files: ^backend/src/.*\.py$
+        pass_filenames: false
+        types: [python]
+
+  # Frontend: ESLint and Prettier
+  - repo: local
+    hooks:
+      - id: eslint
+        name: eslint (frontend)
+        entry: bash -c 'cd frontend && pnpm lint --fix'
+        language: system
+        files: ^frontend/src/.*\.(ts|tsx|js|jsx)$
+        pass_filenames: false
+
+      - id: prettier
+        name: prettier (frontend)
+        entry: bash -c 'cd frontend && pnpm exec prettier --write --ignore-unknown'
+        language: system
+        files: ^frontend/src/.*\.(ts|tsx|js|jsx|json|css|scss|md)$
+        pass_filenames: true
+
+  # SQL formatting (optional - comment out if not using)
+  # - repo: https://github.com/sqlfluff/sqlfluff
+  #   rev: 3.0.0
+  #   hooks:
+  #     - id: sqlfluff-lint
+  #       files: ^backend/migrations/.*\.sql$
+
+  # Security checks
+  - repo: https://github.com/Yelp/detect-secrets
+    rev: v1.5.0
+    hooks:
+      - id: detect-secrets
+        args: [--baseline, .secrets.baseline]
+        exclude: |
+          (?x)^(
+            node_modules/.*|
+            demo/fixtures/.*|
+            .*\.lock$|
+            uv\.lock$|
+            pnpm-lock\.yaml$|
+            package-lock\.json$|
+            dist/.*|
+            \.next/.*|
+            \.venv/.*
+          )$
+
+  # Dockerfile linting
+  - repo: https://github.com/hadolint/hadolint
+    rev: v2.12.0
+    hooks:
+      - id: hadolint-docker
+        files: Dockerfile
+
+  # Shell script linting
+  - repo: https://github.com/shellcheck-py/shellcheck-py
+    rev: v0.9.0.6
+    hooks:
+      - id: shellcheck
+        files: \.(sh|bash)$
+        exclude: ^demo/fixtures/
+
+# CI configuration
+ci:
+  autofix_commit_msg: |
+    [pre-commit.ci] auto fixes from pre-commit hooks
+  autofix_prs: true
+  autoupdate_branch: ''
+  autoupdate_commit_msg: '[pre-commit.ci] pre-commit autoupdate'
+  autoupdate_schedule: weekly
+  skip: [mypy, eslint, prettier]  # Skip hooks that need full project context in CI
+  submodules: false

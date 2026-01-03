@@ -81,7 +81,7 @@ class PromptManager:
 
     def render_messages(
         self, template_name: str, **context: Any
-    ) -> list[dict[str, str]]:
+    ) -> tuple[list[dict[str, str]], str]:
         """Render template as separate message dicts for Claude API.
 
         Args:
@@ -89,7 +89,7 @@ class PromptManager:
             **context: Variables to substitute.
 
         Returns:
-            List of message dicts with 'role' and 'content'.
+            Tuple of (messages list, system prompt string).
         """
         template_data = self._load_template(template_name)
 

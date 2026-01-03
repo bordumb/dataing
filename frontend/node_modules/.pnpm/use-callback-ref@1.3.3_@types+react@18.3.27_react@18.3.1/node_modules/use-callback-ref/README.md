@@ -11,7 +11,7 @@
     </a>
     <a href="https://bundlephobia.com/result?p=use-callback-ref">
       <img src="https://img.shields.io/bundlephobia/minzip/use-callback-ref.svg" alt="bundle size">
-    </a> 
+    </a>
 </div>
 
 ---

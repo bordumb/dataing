@@ -97,7 +97,7 @@ class TrinoAdapter:
             rows = cursor.fetchall()
             columns = tuple(desc[0] for desc in cursor.description) if cursor.description else ()
 
-            result_rows = tuple(dict(zip(columns, row)) for row in rows)
+            result_rows = tuple(dict(zip(columns, row, strict=False)) for row in rows)
 
             return QueryResult(
                 columns=columns,
@@ -128,8 +128,8 @@ class TrinoAdapter:
             self._executor, self._fetch_schema_sync, query
         )
 
-        # Group by table
-        tables_dict: dict[str, dict[str, list[str] | dict[str, str]]] = {}
+        # Group by table - use TypedDict-like structure
+        tables_dict: dict[str, dict[str, Any]] = {}
         for row in rows:
             full_name = f"{row['table_schema']}.{row['table_name']}"
 
@@ -178,6 +178,6 @@ class TrinoAdapter:
             cursor.execute(query)
             rows = cursor.fetchall()
             columns = [desc[0] for desc in cursor.description] if cursor.description else []
-            return [dict(zip(columns, row)) for row in rows]
+            return [dict(zip(columns, row, strict=False)) for row in rows]
         finally:
             conn.close()

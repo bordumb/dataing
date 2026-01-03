@@ -1,12 +1,13 @@
 """API route modules."""
+
 from fastapi import APIRouter
 
-from dataing.entrypoints.api.routes.investigations import router as investigations_router
-from dataing.entrypoints.api.routes.datasources import router as datasources_router
 from dataing.entrypoints.api.routes.approvals import router as approvals_router
+from dataing.entrypoints.api.routes.dashboard import router as dashboard_router
+from dataing.entrypoints.api.routes.datasources import router as datasources_router
+from dataing.entrypoints.api.routes.investigations import router as investigations_router
 from dataing.entrypoints.api.routes.settings import router as settings_router
 from dataing.entrypoints.api.routes.users import router as users_router
-from dataing.entrypoints.api.routes.dashboard import router as dashboard_router
 
 # Create main API router
 api_router = APIRouter()

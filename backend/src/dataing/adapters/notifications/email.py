@@ -1,8 +1,10 @@
 """Email notification adapter."""
+
 import smtplib
 from dataclasses import dataclass
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
+from typing import Any
 
 import structlog
 
@@ -26,6 +28,11 @@ class EmailNotifier:
     """Delivers notifications via email (SMTP)."""
 
     def __init__(self, config: EmailConfig):
+        """Initialize the email notifier.
+
+        Args:
+            config: Email configuration settings.
+        """
         self.config = config
 
     def send(
@@ -89,7 +96,7 @@ class EmailNotifier:
         self,
         to_emails: list[str],
         investigation_id: str,
-        finding: dict,
+        finding: dict[str, Any],
     ) -> bool:
         """Send investigation completed email."""
         subject = f"Investigation Completed: {investigation_id}"
@@ -144,7 +151,7 @@ This email was sent by DataDr. Please do not reply to this email.
         to_emails: list[str],
         investigation_id: str,
         approval_url: str,
-        context: dict,
+        context: dict[str, Any],
     ) -> bool:
         """Send approval request email."""
         subject = f"Approval Required: Investigation {investigation_id}"
@@ -164,7 +171,8 @@ This email was sent by DataDr. Please do not reply to this email.
             </div>
 
             <p style="text-align: center; margin: 30px 0;">
-                <a href="{approval_url}" style="background: #007bff; color: white; padding: 12px 24px; text-decoration: none; border-radius: 5px; font-weight: bold;">
+                <a href="{approval_url}" style="background: #007bff; color: white;
+                padding: 12px 24px; text-decoration: none; border-radius: 5px; font-weight: bold;">
                     Review and Approve
                 </a>
             </p>

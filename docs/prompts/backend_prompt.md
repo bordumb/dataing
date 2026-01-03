@@ -152,20 +152,20 @@ class DataSourceType(str, enum.Enum):
 class DataSource(BaseModel):
     """Configured data source for investigations."""
     __tablename__ = "data_sources"
-    
+
     tenant_id = Column(UUID(as_uuid=True), ForeignKey("tenants.id"), nullable=False)
     name = Column(String(100), nullable=False)
     type = Column(Enum(DataSourceType), nullable=False)
-    
+
     # Connection details (encrypted)
     connection_config_encrypted = Column(String, nullable=False)  # Fernet encrypted JSON
-    
+
     # Metadata
     is_default = Column(Boolean, default=False)
     is_active = Column(Boolean, default=True)
     last_health_check_at = Column(DateTime(timezone=True))
     last_health_check_status = Column(String)  # "healthy" | "unhealthy"
-    
+
     def get_connection_config(self, encryption_key: bytes) -> dict:
         """Decrypt and return connection config."""
         f = Fernet(encryption_key)
@@ -204,7 +204,7 @@ async def create_datasource(
     """Create a new data source connection."""
     # Encrypt connection config
     encrypted = encrypt_config(request.connection_config)
-    
+
     # Test connection first
     adapter = create_adapter(request.type, request.connection_config)
     try:
@@ -213,14 +213,14 @@ async def create_datasource(
         await adapter.close()
     except Exception as e:
         raise HTTPException(400, f"Connection test failed: {e}")
-    
+
     # Save to database
     datasource = await db.execute(
         """INSERT INTO data_sources (tenant_id, name, type, connection_config_encrypted)
            VALUES ($1, $2, $3, $4) RETURNING *""",
         auth.tenant_id, request.name, request.type, encrypted
     )
-    
+
     return DataSourceResponse(**datasource)
 
 @router.post("/{datasource_id}/test")
@@ -242,17 +242,17 @@ async def get_schema(datasource_id: str, ...):
 class ApprovalRequest(BaseModel):
     """Request for human approval before proceeding."""
     model_config = ConfigDict(frozen=True)
-    
+
     investigation_id: str
     request_type: str  # "context_review" | "query_approval"
     context: dict  # What needs approval
     requested_at: datetime
     requested_by: str  # System or user
-    
+
 class ApprovalDecision(BaseModel):
     """Human decision on approval request."""
     model_config = ConfigDict(frozen=True)
-    
+
     request_id: str
     decision: str  # "approved" | "rejected" | "modified"
     decided_by: str

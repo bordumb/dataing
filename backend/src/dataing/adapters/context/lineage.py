@@ -2,16 +2,14 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
-from typing import Any
+from typing import Any, TypeAlias
 
 import httpx
 
 from dataing.core.domain_types import LineageContext as CoreLineageContext
 
-
-# Re-export for convenience
-LineageContext = CoreLineageContext
+# Re-export for convenience - use TypeAlias for proper type checking
+LineageContext: TypeAlias = CoreLineageContext
 
 
 class OpenLineageClient:
@@ -65,9 +63,7 @@ class OpenLineageClient:
             downstream_response = await client.get(
                 f"{self.base_url}/api/v1/lineage/datasets/{namespace}/{name}/downstream"
             )
-            downstream_data = (
-                downstream_response.json() if downstream_response.is_success else {}
-            )
+            downstream_data = downstream_response.json() if downstream_response.is_success else {}
 
         return LineageContext(
             target=dataset_id,

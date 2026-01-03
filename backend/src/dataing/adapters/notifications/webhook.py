@@ -1,9 +1,11 @@
 """Webhook notification adapter."""
+
 import hashlib
 import hmac
 import json
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
+from typing import Any
 
 import httpx
 import structlog
@@ -24,9 +26,14 @@ class WebhookNotifier:
     """Delivers notifications via HTTP webhooks."""
 
     def __init__(self, config: WebhookConfig):
+        """Initialize the webhook notifier.
+
+        Args:
+            config: Webhook configuration settings.
+        """
         self.config = config
 
-    async def send(self, event_type: str, payload: dict) -> bool:
+    async def send(self, event_type: str, payload: dict[str, Any]) -> bool:
         """Send webhook notification.
 
         Returns True if the webhook was delivered successfully (2xx response).
@@ -34,7 +41,7 @@ class WebhookNotifier:
         body = json.dumps(
             {
                 "event_type": event_type,
-                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "timestamp": datetime.now(UTC).isoformat(),
                 "payload": payload,
             },
             default=str,
@@ -53,7 +60,7 @@ class WebhookNotifier:
                 hashlib.sha256,
             ).hexdigest()
             headers["X-Webhook-Signature"] = f"sha256={signature}"
-            headers["X-Webhook-Timestamp"] = datetime.now(timezone.utc).isoformat()
+            headers["X-Webhook-Timestamp"] = datetime.now(UTC).isoformat()
 
         try:
             async with httpx.AsyncClient() as client:

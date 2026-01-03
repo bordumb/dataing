@@ -210,7 +210,7 @@ css@tailwind base;
     --input: 240 5.9% 90%;
     --ring: 240 5.9% 10%;
     --radius: 0.5rem;
-    
+
     /* Sidebar */
     --sidebar: 0 0% 98%;
     --sidebar-foreground: 240 5.3% 26.1%;
@@ -242,7 +242,7 @@ css@tailwind base;
     --border: 240 3.7% 15.9%;
     --input: 240 3.7% 15.9%;
     --ring: 240 4.9% 83.9%;
-    
+
     /* Sidebar dark */
     --sidebar: 240 5.9% 10%;
     --sidebar-foreground: 240 4.8% 95.9%;

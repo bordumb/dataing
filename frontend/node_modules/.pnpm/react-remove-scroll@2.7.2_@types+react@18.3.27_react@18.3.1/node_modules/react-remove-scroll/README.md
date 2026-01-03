@@ -3,22 +3,22 @@
   <br/>
    dont even scroll
   <br/>
-  
+
   <a href="https://www.npmjs.com/package/react-remove-scroll">
     <img src="https://img.shields.io/npm/v/react-remove-scroll.svg?style=flat-square" />
   </a>
-    
+
   <a href="https://travis-ci.org/theKashey/react-remove-scroll">
    <img src="https://img.shields.io/travis/theKashey/react-remove-scroll.svg?style=flat-square" alt="Build status">
-  </a> 
+  </a>
 
   <a href="https://www.npmjs.com/package/react-remove-scroll">
    <img src="https://img.shields.io/npm/dm/react-remove-scroll.svg" alt="npm downloads">
-  </a> 
+  </a>
 
   <a href="https://bundlephobia.com/result?p=react-remove-scroll">
    <img src="https://img.shields.io/bundlephobia/minzip/react-remove-scroll.svg" alt="bundle size">
-  </a>   
+  </a>
   <br/>
 </div>
 
@@ -36,13 +36,13 @@ Disables scroll outside of `children` node.
 - ☠️ it could block literally any scroll anywhere
 
 # Usage
-Just wrap content, which should be scrollable, and everything else would not. 
+Just wrap content, which should be scrollable, and everything else would not.
 ```js
 import {RemoveScroll} from 'react-remove-scroll';
 
 <RemoveScroll>
   Only this content would be scrollable
-</RemoveScroll>  
+</RemoveScroll>
 ```
 
 `RemoveScroll` accept following props
@@ -52,8 +52,8 @@ import {RemoveScroll} from 'react-remove-scroll';
 - `[noRelative=false]` - prevents setting `position: relative` on the body.
 - `[noIsolation=false]` - disables outer event capturing. Event capturing is React friendly and unlikely be a problem.
 But if you are using _shadowbox_ of some sort - you dont need it.
-- `[inert=false]` - ☠️(be careful) disables events the rest of page completely using `pointer-events` except the Lock(+shards). 
-React portals not friendly, might lead to production issues. Enable only for __rare__ cases, when you have to disable scrollbars somewhere on the page(except body, Lock and shards).  
+- `[inert=false]` - ☠️(be careful) disables events the rest of page completely using `pointer-events` except the Lock(+shards).
+React portals not friendly, might lead to production issues. Enable only for __rare__ cases, when you have to disable scrollbars somewhere on the page(except body, Lock and shards).
 - `[forwardProps]` - will forward all props to the `children`
 - `[className]` - className for an internal div
 - `[removeScrollBar]` - to control scroll bar removal. Set to false, if you prefer to keep it (wheel and touch scroll is still disabled).
@@ -71,7 +71,7 @@ const sidecar = sidecar(() => import('react-remove-scroll/sidecar'));
 
 <RemoveScroll sideCar={sidecar}>
   Will load logic from a sidecar when needed
-</RemoveScroll>  
+</RemoveScroll>
 ```
 
 > Consider setting `-webkit-overflow-scrolling: touch;` on a document level for a proper mobile experience.
@@ -92,7 +92,7 @@ The following code samples will produce the same output
   <div className="scroll"> //RemoveScroll will inject props to this div
     Only this content would be scrollable
   </div>
-</RemoveScroll> 
+</RemoveScroll>
 ```
 Pick the first one if you don't need a second.
 
@@ -113,8 +113,8 @@ See [react-remove-scroll-bar](https://github.com/theKashey/react-remove-scroll-b
 When stacked more is active (default) only one (last) component would be active.
 
 ## Over isolation
-That could happen - 
-you disable scroll on the body, 
+That could happen -
+you disable scroll on the body,
 you are suppressing all scroll and wheel events,
 and you are ghosting the rest of the page by the `inert` prop.
 
@@ -122,10 +122,10 @@ Only something inside Lock does exists for the browser, and that might be less t
 
 Dont forget about `shard`, dont forget - `inert` is not portals friendly, dont forget - you dont need over isolation in most of the cases.
 
-> just be careful! 
+> just be careful!
 
 # Performance
-To do the job this library setup _non_ passive event listener. Chrome dev tools would complain about it, as a 
+To do the job this library setup _non_ passive event listener. Chrome dev tools would complain about it, as a
 performance no-op.
 
 We have to use synchronous scroll/touch handler, and it may affect scrolling performance.
@@ -146,8 +146,8 @@ to make package smaller and more react-portals friendly.
  - [react-scrolllock](https://github.com/jossmac/react-scrolllock) - React scroll lock
  - [scroll-lock](https://github.com/FL3NKEY/scroll-lock) - DOM scroll lock
  - [body-scroll-lock](https://github.com/willmcpo/body-scroll-lock) - DOM scroll lock
- 
- > This package is relative smaller(1), more react friendly(2), works with non zero body margins(3), and has a better "overscroll" management. 
+
+ > This package is relative smaller(1), more react friendly(2), works with non zero body margins(3), and has a better "overscroll" management.
 
 # License
 MIT

@@ -2,9 +2,6 @@
 
 from __future__ import annotations
 
-import re
-from typing import Any
-
 from dataing.core.domain_types import QueryResult, SchemaContext, TableSchema
 
 

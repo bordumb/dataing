@@ -152,9 +152,7 @@ class CircuitBreaker:
         if consecutive >= self.config.max_consecutive_failures:
             raise CircuitBreakerTripped(f"Consecutive failure limit reached: {consecutive}")
 
-    def _check_duplicate_queries(
-        self, events: list[Event], hypothesis_id: str | None
-    ) -> None:
+    def _check_duplicate_queries(self, events: list[Event], hypothesis_id: str | None) -> None:
         """Detect if same query is being generated repeatedly (stall).
 
         This catches situations where the LLM keeps generating

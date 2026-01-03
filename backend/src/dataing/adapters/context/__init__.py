@@ -1,6 +1,42 @@
-"""Context gathering adapters."""
+"""Context gathering adapters.
 
-from .engine import DefaultContextEngine
-from .lineage import LineageContext, OpenLineageClient
+This package provides modular context gathering for investigations:
+- DatabaseContext: Resolves tenant data source adapters
+- SchemaContextBuilder: Builds and formats schema context
+- QueryContext: Executes queries and formats results
+- AnomalyContext: Confirms anomalies in data
+- CorrelationContext: Finds cross-table patterns
+- ContextEngine: Thin coordinator for all modules
+"""
 
-__all__ = ["DefaultContextEngine", "OpenLineageClient", "LineageContext"]
+from .anomaly_context import AnomalyConfirmation, AnomalyContext, ColumnProfile
+from .correlation_context import Correlation, CorrelationContext, TimeSeriesPattern
+from .database_context import DatabaseContext
+from .engine import ContextEngine, DefaultContextEngine, EnrichedContext
+from .lineage import OpenLineageClient
+from .query_context import QueryContext, QueryExecutionError
+from .schema_context import SchemaContextBuilder
+
+__all__ = [
+    # Core engine
+    "ContextEngine",
+    "DefaultContextEngine",
+    "EnrichedContext",
+    # Database resolution
+    "DatabaseContext",
+    # Schema
+    "SchemaContextBuilder",
+    # Query execution
+    "QueryContext",
+    "QueryExecutionError",
+    # Anomaly confirmation
+    "AnomalyContext",
+    "AnomalyConfirmation",
+    "ColumnProfile",
+    # Correlation analysis
+    "CorrelationContext",
+    "Correlation",
+    "TimeSeriesPattern",
+    # Lineage
+    "OpenLineageClient",
+]

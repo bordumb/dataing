@@ -1,11 +1,15 @@
 """Audit logging middleware."""
+
 import asyncio
 import json
 import uuid
+from typing import Any
 
 import structlog
-from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
 from starlette.requests import Request
+from starlette.responses import Response
+from starlette.types import ASGIApp
 
 logger = structlog.get_logger()
 
@@ -16,11 +20,17 @@ SENSITIVE_FIELDS = {"password", "api_key", "secret", "token", "credential", "key
 class AuditMiddleware(BaseHTTPMiddleware):
     """Log all API requests for audit trail."""
 
-    def __init__(self, app, enabled: bool = True):
+    def __init__(self, app: ASGIApp, enabled: bool = True) -> None:
+        """Initialize audit middleware.
+
+        Args:
+            app: The ASGI application.
+            enabled: Whether audit logging is enabled.
+        """
         super().__init__(app)
         self.enabled = enabled
 
-    async def dispatch(self, request: Request, call_next):
+    async def dispatch(self, request: Request, call_next: RequestResponseEndpoint) -> Response:
         """Process request and log audit entry."""
         # Generate request ID
         request_id = str(uuid.uuid4())
@@ -161,7 +171,7 @@ class AuditMiddleware(BaseHTTPMiddleware):
 
         return resource_type, resource_id
 
-    def _sanitize_body(self, body: bytes | None) -> dict | None:
+    def _sanitize_body(self, body: bytes | None) -> dict[str, Any] | None:
         """Remove sensitive fields from request body."""
         if not body:
             return None
@@ -172,17 +182,17 @@ class AuditMiddleware(BaseHTTPMiddleware):
             if isinstance(data, dict):
                 return self._redact_dict(data)
 
-            return data
+            return None
 
         except (json.JSONDecodeError, UnicodeDecodeError):
             return None
 
-    def _redact_dict(self, data: dict, depth: int = 0) -> dict:
+    def _redact_dict(self, data: dict[str, Any], depth: int = 0) -> dict[str, Any]:
         """Recursively redact sensitive fields."""
         if depth > 5:  # Prevent infinite recursion
             return {"_redacted": True}
 
-        result = {}
+        result: dict[str, Any] = {}
         for key, value in data.items():
             key_lower = key.lower()
 

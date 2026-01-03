@@ -1,6 +1,8 @@
 """Slack notification adapter."""
+
 import json
 from dataclasses import dataclass
+from typing import Any
 
 import httpx
 import structlog
@@ -23,12 +25,17 @@ class SlackNotifier:
     """Delivers notifications to Slack via incoming webhooks."""
 
     def __init__(self, config: SlackConfig):
+        """Initialize the Slack notifier.
+
+        Args:
+            config: Slack webhook configuration.
+        """
         self.config = config
 
     async def send(
         self,
         event_type: str,
-        payload: dict,
+        payload: dict[str, Any],
         color: str | None = None,
     ) -> bool:
         """Send Slack notification.
@@ -67,79 +74,94 @@ class SlackNotifier:
     def _build_message(
         self,
         event_type: str,
-        payload: dict,
+        payload: dict[str, Any],
         color: str | None = None,
-    ) -> dict:
+    ) -> dict[str, Any]:
         """Build Slack message payload."""
         # Determine color based on event type
         if color is None:
             color = self._get_color_for_event(event_type)
 
-        # Build the attachment
-        attachment = {
+        # Build the attachment with proper typing
+        fields: list[dict[str, Any]] = []
+        attachment: dict[str, Any] = {
             "color": color,
             "fallback": f"DataDr: {event_type}",
-            "fields": [],
+            "fields": fields,
         }
 
         # Add fields based on event type
         if event_type == "investigation.completed":
             attachment["pretext"] = ":white_check_mark: Investigation Completed"
             investigation_id = payload.get("investigation_id", "Unknown")
-            attachment["fields"].append({
-                "title": "Investigation ID",
-                "value": investigation_id,
-                "short": True,
-            })
+            fields.append(
+                {
+                    "title": "Investigation ID",
+                    "value": investigation_id,
+                    "short": True,
+                }
+            )
 
             finding = payload.get("finding", {})
             if finding:
-                attachment["fields"].append({
-                    "title": "Root Cause",
-                    "value": finding.get("root_cause", "Unknown"),
-                    "short": False,
-                })
+                fields.append(
+                    {
+                        "title": "Root Cause",
+                        "value": finding.get("root_cause", "Unknown"),
+                        "short": False,
+                    }
+                )
 
         elif event_type == "investigation.failed":
             attachment["pretext"] = ":x: Investigation Failed"
-            attachment["fields"].append({
-                "title": "Investigation ID",
-                "value": payload.get("investigation_id", "Unknown"),
-                "short": True,
-            })
-            attachment["fields"].append({
-                "title": "Error",
-                "value": payload.get("error", "Unknown error"),
-                "short": False,
-            })
+            fields.append(
+                {
+                    "title": "Investigation ID",
+                    "value": payload.get("investigation_id", "Unknown"),
+                    "short": True,
+                }
+            )
+            fields.append(
+                {
+                    "title": "Error",
+                    "value": payload.get("error", "Unknown error"),
+                    "short": False,
+                }
+            )
 
         elif event_type == "approval.required":
             attachment["pretext"] = ":eyes: Approval Required"
-            attachment["fields"].append({
-                "title": "Investigation ID",
-                "value": payload.get("investigation_id", "Unknown"),
-                "short": True,
-            })
+            fields.append(
+                {
+                    "title": "Investigation ID",
+                    "value": payload.get("investigation_id", "Unknown"),
+                    "short": True,
+                }
+            )
             context = payload.get("context", {})
             if context:
-                attachment["fields"].append({
-                    "title": "Context",
-                    "value": json.dumps(context, indent=2)[:500],
-                    "short": False,
-                })
+                fields.append(
+                    {
+                        "title": "Context",
+                        "value": json.dumps(context, indent=2)[:500],
+                        "short": False,
+                    }
+                )
 
         else:
             # Generic event
             attachment["pretext"] = f":bell: {event_type}"
             for key, value in payload.items():
-                if isinstance(value, (str, int, float, bool)):
-                    attachment["fields"].append({
-                        "title": key.replace("_", " ").title(),
-                        "value": str(value),
-                        "short": True,
-                    })
+                if isinstance(value, (str | int | float | bool)):
+                    fields.append(
+                        {
+                            "title": key.replace("_", " ").title(),
+                            "value": str(value),
+                            "short": True,
+                        }
+                    )
 
-        message = {
+        message: dict[str, Any] = {
             "username": self.config.username,
             "icon_emoji": self.config.icon_emoji,
             "attachments": [attachment],

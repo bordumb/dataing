@@ -1,12 +1,14 @@
 """Notification orchestration service."""
+
 import asyncio
 from dataclasses import dataclass
+from typing import Any
 from uuid import UUID
 
 import structlog
 
 from dataing.adapters.db.app_db import AppDatabase
-from dataing.adapters.notifications.webhook import WebhookNotifier, WebhookConfig
+from dataing.adapters.notifications.webhook import WebhookConfig, WebhookNotifier
 
 logger = structlog.get_logger()
 
@@ -16,7 +18,7 @@ class NotificationEvent:
     """An event to be notified."""
 
     event_type: str
-    payload: dict
+    payload: dict[str, Any]
     tenant_id: UUID
 
 
@@ -24,14 +26,19 @@ class NotificationService:
     """Orchestrates sending notifications through multiple channels."""
 
     def __init__(self, db: AppDatabase):
+        """Initialize the notification service.
+
+        Args:
+            db: Application database instance.
+        """
         self.db = db
 
-    async def notify(self, event: NotificationEvent) -> dict:
+    async def notify(self, event: NotificationEvent) -> dict[str, Any]:
         """Send notification through all configured channels.
 
         Returns a dict with results for each channel.
         """
-        results = {}
+        results: dict[str, Any] = {}
 
         # Get webhooks configured for this event
         webhooks = await self.db.get_webhooks_for_event(
@@ -56,9 +63,9 @@ class NotificationService:
 
     async def _send_webhooks(
         self,
-        webhooks: list[dict],
+        webhooks: list[dict[str, Any]],
         event: NotificationEvent,
-    ) -> list[dict]:
+    ) -> list[dict[str, Any]]:
         """Send notifications to all configured webhooks."""
         results = []
 
@@ -74,19 +81,17 @@ class NotificationService:
             tasks.append(self._send_single_webhook(notifier, webhook, event))
 
         if tasks:
-            results = await asyncio.gather(*tasks, return_exceptions=True)
+            gathered = await asyncio.gather(*tasks, return_exceptions=True)
+            results = [r if isinstance(r, dict) else {"error": str(r)} for r in gathered]
 
-        return [
-            r if not isinstance(r, Exception) else {"error": str(r)}
-            for r in results
-        ]
+        return results
 
     async def _send_single_webhook(
         self,
         notifier: WebhookNotifier,
-        webhook: dict,
+        webhook: dict[str, Any],
         event: NotificationEvent,
-    ) -> dict:
+    ) -> dict[str, Any]:
         """Send a single webhook notification."""
         try:
             success = await notifier.send(event.event_type, event.payload)
@@ -121,8 +126,8 @@ class NotificationService:
         self,
         tenant_id: UUID,
         investigation_id: UUID,
-        finding: dict,
-    ) -> dict:
+        finding: dict[str, Any],
+    ) -> dict[str, Any]:
         """Convenience method for investigation completion notifications."""
         return await self.notify(
             NotificationEvent(
@@ -140,7 +145,7 @@ class NotificationService:
         tenant_id: UUID,
         investigation_id: UUID,
         error: str,
-    ) -> dict:
+    ) -> dict[str, Any]:
         """Convenience method for investigation failure notifications."""
         return await self.notify(
             NotificationEvent(
@@ -158,8 +163,8 @@ class NotificationService:
         tenant_id: UUID,
         investigation_id: UUID,
         approval_request_id: UUID,
-        context: dict,
-    ) -> dict:
+        context: dict[str, Any],
+    ) -> dict[str, Any]:
         """Convenience method for approval request notifications."""
         return await self.notify(
             NotificationEvent(

@@ -3,35 +3,35 @@
   <br/>
    Alternative way to code splitting
   <br/>
-  
+
   <a href="https://www.npmjs.com/package/use-sidecar">
     <img src="https://img.shields.io/npm/v/use-sidecar.svg?style=flat-square" />
   </a>
-    
+
   <a href="https://travis-ci.org/theKashey/use-sidecar">
    <img src="https://img.shields.io/travis/theKashey/use-sidecar.svg?style=flat-square" alt="Build status">
-  </a> 
+  </a>
 
   <a href="https://www.npmjs.com/package/use-sidecar">
    <img src="https://img.shields.io/npm/dm/use-sidecar.svg" alt="npm downloads">
-  </a> 
+  </a>
 
   <a href="https://bundlephobia.com/result?p=use-sidecar">
    <img src="https://img.shields.io/bundlephobia/minzip/use-sidecar.svg" alt="bundle size">
-  </a>   
+  </a>
   <br/>
 </div>
 
 UI/Effects code splitting pattern
  - [read the original article](https://dev.to/thekashey/sidecar-for-a-code-splitting-1o8g) to understand concepts behind.
  - [read how Google](https://medium.com/@cramforce/designing-very-large-javascript-applications-6e013a3291a3) split view and logic.
- - [watch how Facebook](https://developers.facebook.com/videos/2019/building-the-new-facebookcom-with-react-graphql-and-relay/) defers "interactivity" effects. 
+ - [watch how Facebook](https://developers.facebook.com/videos/2019/building-the-new-facebookcom-with-react-graphql-and-relay/) defers "interactivity" effects.
 
-## Terminology: 
+## Terminology:
 - `sidecar` - non UI component, which may carry effects for a paired UI component.
 - `UI` - UI component, which interactivity is moved to a `sidecar`.
 
-`UI` is a _view_, `sidecar` is the _logic_ for it. Like Batman(UI) and his sidekick Robin(effects). 
+`UI` is a _view_, `sidecar` is the _logic_ for it. Like Batman(UI) and his sidekick Robin(effects).
 
 ## Concept
 - a `package` exposes __3 entry points__ using a [nested `package.json` format](https://github.com/theKashey/multiple-entry-points-example):
@@ -39,16 +39,16 @@ UI/Effects code splitting pattern
   - `UI`, with only UI part
   - `sidecar`, with all the logic
   - > `UI` + `sidecar` === `combination`. The size of `UI+sidecar` might a bit bigger than size of their `combination`.
-  Use [size-limit](https://github.com/ai/size-limit) to control their size independently. 
-  
+  Use [size-limit](https://github.com/ai/size-limit) to control their size independently.
+
 
 - package uses a `medium` to talk with own sidecar, breaking explicit dependency.
- 
+
 - if package depends on another _sidecar_ package:
   - it shall export dependency side car among own sidecar.
-  - package imports own sidecar via `medium`, thus able to export multiple sidecars via one export. 
+  - package imports own sidecar via `medium`, thus able to export multiple sidecars via one export.
 
-- final consumer uses `sidecar` or `useSidecar` to combine pieces together.  
+- final consumer uses `sidecar` or `useSidecar` to combine pieces together.
 
 ## Rules
 - `UI` components might use/import any other `UI` components
@@ -58,15 +58,15 @@ That would form two different code branches, you may load separately - UI first,
 That also leads to a obvious consequence - __one sidecar may export all sidecars__.
 - to decouple `sidecars` from module exports, and be able to pick "the right" one at any point
 you have to use `exportSidecar(medium, component)` to export it, and use the same `medium` to import it back.
-- this limitation is for __libraries only__, as long as in the usercode you might 
-dynamically import whatever and whenever you want. 
+- this limitation is for __libraries only__, as long as in the usercode you might
+dynamically import whatever and whenever you want.
 
 - `useMedium` is always async - action would be executed in a next tick, or on the logic load.
-- `sidecar` is always async - is does not matter have you loaded logic or not - component would be 
+- `sidecar` is always async - is does not matter have you loaded logic or not - component would be
 rendered at least in the next tick.
 
-> except `medium.read`, which synchronously read the data from a medium, 
-and `medium.assingSyncMedium` which changes `useMedium` to be sync. 
+> except `medium.read`, which synchronously read the data from a medium,
+and `medium.assingSyncMedium` which changes `useMedium` to be sync.
 
 ## SSR and usage tracking
 Sidecar pattern is clear:
@@ -128,7 +128,7 @@ const Sidecar =  sidecar(() => import('./sidecar'), <span>on fail</span>);
 <>
  <Sidecar />
  <UI />
-</> 
+</>
 ```
 ### Importing `exportedSidecar`
 Would require additional prop to be set - ```<Sidecar sideCar={effectCar} />```
@@ -147,7 +147,7 @@ return (
     {Car ? <Car {...props} /> : null}
     <UIComponent {...props}>
   </>
-); 
+);
 ```
 ### Importing `exportedSideCar`
 You have to specify __effect medium__ to read data from, as long as __export itself is empty__.
@@ -157,7 +157,7 @@ import {useSidecar} from 'use-sidecar';
 /* medium.js: */ export const effectCar = useMedium({});
 /* sideCar.js: */export default exportSidecar(effectCar, EffectComponent);
 
-const [Car, error] = useSidecar(() => import('./sideCar'), effectCar); 
+const [Car, error] = useSidecar(() => import('./sideCar'), effectCar);
 return (
   <>
     {Car ? <Car {...props} /> : null}
@@ -177,7 +177,7 @@ const RenderCar = renderCar(
   // will move side car to a side channel
   sidecar(() => import('react-powerplug').then(imports => imports.Value)),
   // default render props
-  [{value: 0}]  
+  [{value: 0}]
 );
 
 <RenderCar>
@@ -217,7 +217,7 @@ const onFocus = event => focusMedium.useMedium(event);
 // in a sidecar
 
 // we are setting handler for the effect medium
-// effect is complicated - we are skipping event "bubbling", 
+// effect is complicated - we are skipping event "bubbling",
 // and focusing some button inside a parent
 focusMedium.assignMedium(event => {
   if (event.currentTarget === event.target) {
@@ -228,9 +228,9 @@ focusMedium.assignMedium(event => {
 ```
 1. Create medium
 Having these constrains - we have to clone `event`, as long as React would eventually reuse SyntheticEvent, thus not
-preserve `target` and `currentTarget`. 
+preserve `target` and `currentTarget`.
 ```js
-// 
+//
 const focusMedium = createMedium(null, event => ({...event}));
 ```
 Now medium side effect is ok to be async
@@ -281,9 +281,9 @@ useEffect(() => {
 - Hint: there is a easy way to type it
 ```js
 const utilMedium = createMedium<(cb: typeof import('./utils')) => void>();
-``` 
+```
 
-__Example__: [Callback API for react-focus-lock](https://github.com/theKashey/react-focus-lock/blob/8c69c644ecfeed2ec9dc0dc4b5b30e896a366738/src/MoveFocusInside.js#L12) 
+__Example__: [Callback API for react-focus-lock](https://github.com/theKashey/react-focus-lock/blob/8c69c644ecfeed2ec9dc0dc4b5b30e896a366738/src/MoveFocusInside.js#L12)
 
 ### Split effects
 Lets take an example from a Google - Calendar app, with view and logic separated.
@@ -291,10 +291,10 @@ To be honest - it's not easy to extract logic from application like calendar - u
 
 #### Original code
 ```js
-const CalendarUI = () => { 
+const CalendarUI = () => {
   const [date, setDate] = useState();
   const onButtonClick = useCallback(() => setDate(Date.now), []);
-  
+
   return (
     <>
      <input type="date" onChange={setDate} value={date} />
@@ -309,7 +309,7 @@ const CalendarUI = () => {
 const CalendarUI = () => {
   const [events, setEvents] = useState({});
   const [date, setDate] = useState();
-  
+
   return (
     <>
      <Sidecar setDate={setDate} setEvents={setEvents}/>
@@ -332,10 +332,10 @@ const Sidecar = ({setDate, setEvents}) => {
       onDateChange:setDate,
       onButtonClick: () => setDate(Date.now),
   }), []);
-  
+
   return null;
 }
-```  
+```
 
 While in this example this looks a bit, you know, strange - there are 3 times more code
 that in the original example - that would make a sense for a real Calendar, especially
@@ -346,4 +346,3 @@ __Example__: [Effect for react-remove-scroll](https://github.com/theKashey/react
 # Licence
 
 MIT
-

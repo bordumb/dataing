@@ -1,6 +1,8 @@
 """Multi-tenancy service."""
+
 import re
 from dataclasses import dataclass
+from typing import Any
 from uuid import UUID
 
 import structlog
@@ -17,20 +19,25 @@ class TenantInfo:
     id: UUID
     name: str
     slug: str
-    settings: dict
+    settings: dict[str, Any]
 
 
 class TenantService:
     """Service for multi-tenant operations."""
 
     def __init__(self, db: AppDatabase):
+        """Initialize the tenant service.
+
+        Args:
+            db: Application database instance.
+        """
         self.db = db
 
     async def create_tenant(
         self,
         name: str,
         slug: str | None = None,
-        settings: dict | None = None,
+        settings: dict[str, Any] | None = None,
     ) -> TenantInfo:
         """Create a new tenant."""
         # Generate slug from name if not provided
@@ -96,7 +103,7 @@ class TenantService:
     async def update_tenant_settings(
         self,
         tenant_id: UUID,
-        settings: dict,
+        settings: dict[str, Any],
     ) -> TenantInfo | None:
         """Update tenant settings."""
         result = await self.db.execute_returning(

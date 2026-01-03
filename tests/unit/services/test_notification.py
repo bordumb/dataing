@@ -69,9 +69,7 @@ class TestNotificationService:
             tenant_id=tenant_id,
         )
 
-        with patch(
-            "dataing.services.notification.WebhookNotifier"
-        ) as mock_notifier_class:
+        with patch("dataing.services.notification.WebhookNotifier") as mock_notifier_class:
             mock_notifier = AsyncMock()
             mock_notifier.send.return_value = True
             mock_notifier_class.return_value = mock_notifier
@@ -103,9 +101,7 @@ class TestNotificationService:
             tenant_id=tenant_id,
         )
 
-        with patch(
-            "dataing.services.notification.WebhookNotifier"
-        ) as mock_notifier_class:
+        with patch("dataing.services.notification.WebhookNotifier") as mock_notifier_class:
             mock_notifier = AsyncMock()
             mock_notifier.send.return_value = False
             mock_notifier_class.return_value = mock_notifier

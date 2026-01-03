@@ -3,10 +3,10 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Literal
+from typing import Annotated, Literal
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Request, Response
+from fastapi import APIRouter, Depends, HTTPException, Response
 from pydantic import BaseModel, EmailStr, Field
 
 from dataing.adapters.db.app_db import AppDatabase
@@ -14,6 +14,11 @@ from dataing.entrypoints.api.deps import get_app_db
 from dataing.entrypoints.api.middleware.auth import ApiKeyContext, require_scope, verify_api_key
 
 router = APIRouter(prefix="/users", tags=["users"])
+
+# Annotated types for dependency injection
+AppDbDep = Annotated[AppDatabase, Depends(get_app_db)]
+AuthDep = Annotated[ApiKeyContext, Depends(verify_api_key)]
+AdminScopeDep = Annotated[ApiKeyContext, Depends(require_scope("admin"))]
 
 
 UserRole = Literal["admin", "member", "viewer"]
@@ -55,8 +60,8 @@ class UpdateUserRequest(BaseModel):
 
 @router.get("/", response_model=UserListResponse)
 async def list_users(
-    auth: ApiKeyContext = Depends(verify_api_key),
-    app_db: AppDatabase = Depends(get_app_db),
+    auth: AuthDep,
+    app_db: AppDbDep,
 ) -> UserListResponse:
     """List all users for the tenant."""
     users = await app_db.fetch_all(
@@ -85,8 +90,8 @@ async def list_users(
 
 @router.get("/me", response_model=UserResponse)
 async def get_current_user(
-    auth: ApiKeyContext = Depends(verify_api_key),
-    app_db: AppDatabase = Depends(get_app_db),
+    auth: AuthDep,
+    app_db: AppDbDep,
 ) -> UserResponse:
     """Get the current authenticated user's profile."""
     if not auth.user_id:
@@ -117,8 +122,8 @@ async def get_current_user(
 @router.get("/{user_id}", response_model=UserResponse)
 async def get_user(
     user_id: UUID,
-    auth: ApiKeyContext = Depends(verify_api_key),
-    app_db: AppDatabase = Depends(get_app_db),
+    auth: AuthDep,
+    app_db: AppDbDep,
 ) -> UserResponse:
     """Get a specific user."""
     user = await app_db.fetch_one(
@@ -143,8 +148,8 @@ async def get_user(
 @router.post("/", response_model=UserResponse, status_code=201)
 async def create_user(
     request: CreateUserRequest,
-    auth: ApiKeyContext = Depends(require_scope("admin")),
-    app_db: AppDatabase = Depends(get_app_db),
+    auth: AdminScopeDep,
+    app_db: AppDbDep,
 ) -> UserResponse:
     """Create a new user.
 
@@ -187,8 +192,8 @@ async def create_user(
 async def update_user(
     user_id: UUID,
     request: UpdateUserRequest,
-    auth: ApiKeyContext = Depends(require_scope("admin")),
-    app_db: AppDatabase = Depends(get_app_db),
+    auth: AdminScopeDep,
+    app_db: AppDbDep,
 ) -> UserResponse:
     """Update a user.
 
@@ -217,7 +222,7 @@ async def update_user(
     if not updates:
         raise HTTPException(status_code=400, detail="No fields to update")
 
-    query = f"""UPDATE users SET {', '.join(updates)}
+    query = f"""UPDATE users SET {", ".join(updates)}
                 WHERE id = $1 AND tenant_id = $2
                 RETURNING *"""
 
@@ -239,8 +244,8 @@ async def update_user(
 @router.delete("/{user_id}", status_code=204, response_class=Response)
 async def deactivate_user(
     user_id: UUID,
-    auth: ApiKeyContext = Depends(require_scope("admin")),
-    app_db: AppDatabase = Depends(get_app_db),
+    auth: AdminScopeDep,
+    app_db: AppDbDep,
 ) -> Response:
     """Deactivate a user (soft delete).
 

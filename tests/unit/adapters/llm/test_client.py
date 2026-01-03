@@ -73,7 +73,7 @@ class TestAnthropicClient:
 
     def test_parse_hypotheses_from_json(self, client: AnthropicClient) -> None:
         """Test parsing hypotheses from JSON response."""
-        response = '''
+        response = """
         Here are the hypotheses:
         ```json
         [
@@ -86,7 +86,7 @@ class TestAnthropicClient:
             }
         ]
         ```
-        '''
+        """
 
         result = client._parse_hypotheses(response)
 
@@ -97,7 +97,7 @@ class TestAnthropicClient:
 
     def test_parse_hypotheses_from_raw_json(self, client: AnthropicClient) -> None:
         """Test parsing hypotheses from raw JSON response."""
-        response = '''
+        response = """
         [
             {
                 "id": "h1",
@@ -107,7 +107,7 @@ class TestAnthropicClient:
                 "suggested_query": "SELECT 1"
             }
         ]
-        '''
+        """
 
         result = client._parse_hypotheses(response)
 
@@ -119,9 +119,9 @@ class TestAnthropicClient:
         client: AnthropicClient,
     ) -> None:
         """Test that invalid categories default to DATA_QUALITY."""
-        response = '''
+        response = """
         [{"id": "h1", "title": "Test", "category": "invalid_cat", "reasoning": "R", "suggested_query": "S"}]
-        '''
+        """
 
         result = client._parse_hypotheses(response)
 
@@ -153,12 +153,12 @@ class TestAnthropicClient:
 
     def test_extract_sql_from_code_block(self, client: AnthropicClient) -> None:
         """Test extracting SQL from code block."""
-        response = '''
+        response = """
         Here is the query:
         ```sql
         SELECT * FROM users LIMIT 10
         ```
-        '''
+        """
 
         result = client._extract_sql(response)
 
@@ -169,11 +169,11 @@ class TestAnthropicClient:
         client: AnthropicClient,
     ) -> None:
         """Test extracting SQL from generic code block."""
-        response = '''
+        response = """
         ```
         SELECT COUNT(*) FROM orders
         ```
-        '''
+        """
 
         result = client._extract_sql(response)
 
@@ -189,7 +189,7 @@ class TestAnthropicClient:
 
     def test_parse_interpretation_from_json(self, client: AnthropicClient) -> None:
         """Test parsing interpretation from JSON response."""
-        response = '''
+        response = """
         ```json
         {
             "supports_hypothesis": true,
@@ -197,7 +197,7 @@ class TestAnthropicClient:
             "interpretation": "Evidence supports the hypothesis"
         }
         ```
-        '''
+        """
 
         result = client._parse_interpretation(response)
 
@@ -210,7 +210,9 @@ class TestAnthropicClient:
         client: AnthropicClient,
     ) -> None:
         """Test parsing interpretation from raw JSON."""
-        response = '{"supports_hypothesis": false, "confidence": 0.2, "interpretation": "Not supported"}'
+        response = (
+            '{"supports_hypothesis": false, "confidence": 0.2, "interpretation": "Not supported"}'
+        )
 
         result = client._parse_interpretation(response)
 
@@ -232,7 +234,7 @@ class TestAnthropicClient:
 
     def test_parse_synthesis_from_json(self, client: AnthropicClient) -> None:
         """Test parsing synthesis from JSON response."""
-        response = '''
+        response = """
         ```json
         {
             "root_cause": "ETL job failed",
@@ -240,7 +242,7 @@ class TestAnthropicClient:
             "recommendations": ["Restart job", "Add monitoring"]
         }
         ```
-        '''
+        """
 
         result = client._parse_synthesis(response)
 

@@ -56,9 +56,7 @@ class TestAuditMiddleware:
 
     def test_parse_resource_with_id(self, middleware: AuditMiddleware) -> None:
         """Test parsing resource with ID."""
-        resource_type, resource_id = middleware._parse_resource(
-            "/api/v1/investigations/123"
-        )
+        resource_type, resource_id = middleware._parse_resource("/api/v1/investigations/123")
 
         assert resource_type == "investigations"
         assert resource_id == "123"

@@ -132,7 +132,7 @@ Replace with shadcn/ui CSS variables (oklch color format for modern browsers):
     --input: 240 5.9% 90%;
     --ring: 240 5.9% 10%;
     --radius: 0.5rem;
-    
+
     /* Sidebar specific */
     --sidebar: 0 0% 98%;
     --sidebar-foreground: 240 5.3% 26.1%;
@@ -142,7 +142,7 @@ Replace with shadcn/ui CSS variables (oklch color format for modern browsers):
     --sidebar-accent-foreground: 240 5.9% 10%;
     --sidebar-border: 220 13% 91%;
     --sidebar-ring: 240 5.9% 10%;
-    
+
     /* Chart colors */
     --chart-1: 12 76% 61%;
     --chart-2: 173 58% 39%;
@@ -171,7 +171,7 @@ Replace with shadcn/ui CSS variables (oklch color format for modern browsers):
     --border: 240 3.7% 15.9%;
     --input: 240 3.7% 15.9%;
     --ring: 240 4.9% 83.9%;
-    
+
     /* Sidebar dark */
     --sidebar: 240 5.9% 10%;
     --sidebar-foreground: 240 4.8% 95.9%;
@@ -1915,7 +1915,7 @@ const DATA_SOURCE_TYPES = [
 
 export function DataSourceForm({ open, onOpenChange }: DataSourceFormProps) {
   const queryClient = useQueryClient()
-  
+
   const [formData, setFormData] = useState({
     name: '',
     type: 'postgres',

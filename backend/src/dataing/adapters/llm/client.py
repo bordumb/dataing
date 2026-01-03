@@ -6,9 +6,10 @@ import asyncio
 import json
 import re
 import uuid
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, cast
 
 import anthropic
+from anthropic.types import MessageParam
 
 from dataing.core.domain_types import (
     AnomalyAlert,
@@ -235,14 +236,14 @@ class AnthropicClient:
                     model=self.model,
                     max_tokens=4096,
                     system=system,
-                    messages=messages,
+                    messages=cast(list[MessageParam], messages),
                 )
                 return response.content[0].text
-            except anthropic.RateLimitError:
+            except anthropic.RateLimitError as e:
                 if attempt < max_retries - 1:
                     await asyncio.sleep(2**attempt)
                 else:
-                    raise LLMError("Rate limit exceeded after retries", retryable=True)
+                    raise LLMError("Rate limit exceeded after retries", retryable=True) from e
             except anthropic.APIError as e:
                 raise LLMError(f"API error: {e}", retryable=True) from e
             except Exception as e:
@@ -325,7 +326,7 @@ class AnthropicClient:
         # (LLM was asked to return only SQL)
         return response.strip()
 
-    def _parse_interpretation(self, response: str) -> dict[str, bool | float | str]:
+    def _parse_interpretation(self, response: str) -> dict[str, Any]:
         """Parse interpretation JSON from LLM response.
 
         Args:
@@ -337,12 +338,14 @@ class AnthropicClient:
         try:
             json_match = re.search(r"```json\s*(.*?)\s*```", response, re.DOTALL)
             if json_match:
-                return json.loads(json_match.group(1))
+                result: dict[str, Any] = json.loads(json_match.group(1))
+                return result
 
             # Try raw JSON
             json_match = re.search(r"\{.*\}", response, re.DOTALL)
             if json_match:
-                return json.loads(json_match.group(0))
+                result = json.loads(json_match.group(0))
+                return result
 
         except json.JSONDecodeError:
             pass
@@ -354,7 +357,7 @@ class AnthropicClient:
             "interpretation": response,
         }
 
-    def _parse_synthesis(self, response: str) -> dict[str, str | float | list[str]]:
+    def _parse_synthesis(self, response: str) -> dict[str, Any]:
         """Parse synthesis JSON from LLM response.
 
         Args:
@@ -366,12 +369,14 @@ class AnthropicClient:
         try:
             json_match = re.search(r"```json\s*(.*?)\s*```", response, re.DOTALL)
             if json_match:
-                return json.loads(json_match.group(1))
+                result: dict[str, Any] = json.loads(json_match.group(1))
+                return result
 
             # Try raw JSON
             json_match = re.search(r"\{.*\}", response, re.DOTALL)
             if json_match:
-                return json.loads(json_match.group(0))
+                result = json.loads(json_match.group(0))
+                return result
 
         except json.JSONDecodeError:
             pass

@@ -179,3 +179,9 @@ deploy/**/Chart.lock
 coverage.xml
 reports/
 .cache/
+
+############################
+# Git Worktrees
+############################
+
+.worktrees/

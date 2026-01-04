@@ -20,49 +20,42 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { createDataSource, testDataSourceConnection } from '@/lib/api/datasources'
+import { useDynamicForm, getSchemaForType } from '@/components/forms'
+import { DynamicField } from '@/components/forms/dynamic-field'
+import { createDataSource, testDataSourceConnection, useSourceTypes } from '@/lib/api/datasources'
+import { queryKeys } from '@/lib/api/query-keys'
 
 interface DataSourceFormProps {
   open: boolean
   onOpenChange: (open: boolean) => void
 }
 
-const DATA_SOURCE_TYPES = [
-  { value: 'postgres', label: 'PostgreSQL', defaultPort: '5432' },
-  { value: 'trino', label: 'Trino', defaultPort: '8080' },
-  { value: 'snowflake', label: 'Snowflake', defaultPort: '443' },
-  { value: 'bigquery', label: 'BigQuery', defaultPort: '' },
-  { value: 'redshift', label: 'Redshift', defaultPort: '5439' },
-]
-
 export function DataSourceForm({ open, onOpenChange }: DataSourceFormProps) {
   const queryClient = useQueryClient()
+  const { data: sourceTypes } = useSourceTypes()
 
-  const [formData, setFormData] = React.useState({
-    name: '',
-    type: 'postgres',
-    host: '',
-    port: '5432',
-    database: '',
-    username: '',
-    password: '',
-  })
+  const [name, setName] = React.useState('')
+  const [selectedType, setSelectedType] = React.useState('postgresql')
+
+  // Get schema for the selected type
+  const schema = React.useMemo(() => getSchemaForType(selectedType), [selectedType])
+  const form = useDynamicForm(schema)
+
+  // Reset form when type changes
+  React.useEffect(() => {
+    form.reset()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedType])
 
   const createMutation = useMutation({
     mutationFn: createDataSource,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['datasources'] })
+      queryClient.invalidateQueries({ queryKey: queryKeys.datasources.all })
       onOpenChange(false)
       toast.success('Data source created successfully')
-      setFormData({
-        name: '',
-        type: 'postgres',
-        host: '',
-        port: '5432',
-        database: '',
-        username: '',
-        password: '',
-      })
+      setName('')
+      setSelectedType('postgresql')
+      form.reset()
     },
     onError: (error) => {
       toast.error(`Failed to create: ${error.message}`)
@@ -79,46 +72,58 @@ export function DataSourceForm({ open, onOpenChange }: DataSourceFormProps) {
     },
   })
 
-  const handleTypeChange = (type: string) => {
-    const typeConfig = DATA_SOURCE_TYPES.find((t) => t.value === type)
-    setFormData({
-      ...formData,
-      type,
-      port: typeConfig?.defaultPort ?? '',
-    })
-  }
-
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
+
+    if (!form.validate()) {
+      toast.error('Please fill in all required fields')
+      return
+    }
+
     createMutation.mutate({
-      name: formData.name,
-      type: formData.type,
-      connection_config: {
-        host: formData.host,
-        port: parseInt(formData.port) || undefined,
-        database: formData.database,
-        username: formData.username,
-        password: formData.password,
-      },
+      name,
+      type: selectedType,
+      config: form.getConfigObject(),
     })
   }
 
   const handleTest = () => {
+    if (!form.validate()) {
+      toast.error('Please fill in all required fields')
+      return
+    }
+
     testMutation.mutate({
-      type: formData.type,
-      connection_config: {
-        host: formData.host,
-        port: parseInt(formData.port) || undefined,
-        database: formData.database,
-        username: formData.username,
-        password: formData.password,
-      },
+      type: selectedType,
+      config: form.getConfigObject(),
     })
   }
 
+  // Build type options from API or fallback
+  const typeOptions = React.useMemo(() => {
+    if (sourceTypes) {
+      return sourceTypes.map((t) => ({
+        value: t.type,
+        label: t.display_name,
+      }))
+    }
+    // Fallback options
+    return [
+      { value: 'postgresql', label: 'PostgreSQL' },
+      { value: 'mysql', label: 'MySQL' },
+      { value: 'snowflake', label: 'Snowflake' },
+      { value: 'bigquery', label: 'BigQuery' },
+      { value: 'redshift', label: 'Redshift' },
+      { value: 'trino', label: 'Trino' },
+      { value: 'duckdb', label: 'DuckDB' },
+      { value: 'mongodb', label: 'MongoDB' },
+      { value: 's3', label: 'Amazon S3' },
+    ]
+  }, [sourceTypes])
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[500px]">
+      <DialogContent className="sm:max-w-[500px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Add Data Source</DialogTitle>
           <DialogDescription>
@@ -129,26 +134,28 @@ export function DataSourceForm({ open, onOpenChange }: DataSourceFormProps) {
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="grid gap-4">
             <div className="grid gap-2">
-              <Label htmlFor="name">Name</Label>
+              <Label htmlFor="name">
+                Name <span className="text-destructive">*</span>
+              </Label>
               <Input
                 id="name"
-                value={formData.name}
-                onChange={(e) =>
-                  setFormData({ ...formData, name: e.target.value })
-                }
+                value={name}
+                onChange={(e) => setName(e.target.value)}
                 placeholder="Production Warehouse"
                 required
               />
             </div>
 
             <div className="grid gap-2">
-              <Label htmlFor="type">Type</Label>
-              <Select value={formData.type} onValueChange={handleTypeChange}>
+              <Label htmlFor="type">
+                Type <span className="text-destructive">*</span>
+              </Label>
+              <Select value={selectedType} onValueChange={setSelectedType}>
                 <SelectTrigger>
                   <SelectValue placeholder="Select type" />
                 </SelectTrigger>
                 <SelectContent>
-                  {DATA_SOURCE_TYPES.map((type) => (
+                  {typeOptions.map((type) => (
                     <SelectItem key={type.value} value={type.value}>
                       {type.label}
                     </SelectItem>
@@ -157,71 +164,16 @@ export function DataSourceForm({ open, onOpenChange }: DataSourceFormProps) {
               </Select>
             </div>
 
-            <div className="grid grid-cols-3 gap-4">
-              <div className="col-span-2 grid gap-2">
-                <Label htmlFor="host">Host</Label>
-                <Input
-                  id="host"
-                  value={formData.host}
-                  onChange={(e) =>
-                    setFormData({ ...formData, host: e.target.value })
-                  }
-                  placeholder="localhost"
-                  required
-                />
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor="port">Port</Label>
-                <Input
-                  id="port"
-                  value={formData.port}
-                  onChange={(e) =>
-                    setFormData({ ...formData, port: e.target.value })
-                  }
-                  placeholder="5432"
-                />
-              </div>
-            </div>
-
-            <div className="grid gap-2">
-              <Label htmlFor="database">Database</Label>
-              <Input
-                id="database"
-                value={formData.database}
-                onChange={(e) =>
-                  setFormData({ ...formData, database: e.target.value })
-                }
-                placeholder="analytics"
-                required
+            {/* Dynamic fields based on selected type */}
+            {schema.fields.map((field) => (
+              <DynamicField
+                key={field.name}
+                field={field}
+                value={form.values[field.name]}
+                onChange={form.setValue}
+                error={form.touched[field.name] ? form.errors[field.name] : undefined}
               />
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div className="grid gap-2">
-                <Label htmlFor="username">Username</Label>
-                <Input
-                  id="username"
-                  value={formData.username}
-                  onChange={(e) =>
-                    setFormData({ ...formData, username: e.target.value })
-                  }
-                  placeholder="dataing"
-                  required
-                />
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor="password">Password</Label>
-                <Input
-                  id="password"
-                  type="password"
-                  value={formData.password}
-                  onChange={(e) =>
-                    setFormData({ ...formData, password: e.target.value })
-                  }
-                  required
-                />
-              </div>
-            </div>
+            ))}
           </div>
 
           <DialogFooter className="flex gap-2">

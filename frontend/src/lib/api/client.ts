@@ -1,25 +1,32 @@
-const API_BASE = '/api/v1'
 const API_KEY_STORAGE_KEY = 'dataing_api_key' // pragma: allowlist secret
 
 export interface RequestConfig {
   url: string
   method: 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH'
-  params?: Record<string, string>
+  params?: Record<string, unknown>
   data?: unknown
   headers?: Record<string, string>
+  signal?: AbortSignal
 }
 
 export const customInstance = async <T>(config: RequestConfig): Promise<T> => {
-  const { url, method, params, data, headers } = config
+  const { url, method, params, data, headers, signal } = config
 
+  // Convert params to string, filtering out null/undefined
   const queryString = params
-    ? '?' + new URLSearchParams(params).toString()
+    ? '?' +
+      new URLSearchParams(
+        Object.entries(params)
+          .filter(([, v]) => v != null)
+          .map(([k, v]) => [k, String(v)])
+      ).toString()
     : ''
 
   // Get API key from storage
   const apiKey = localStorage.getItem(API_KEY_STORAGE_KEY)
 
-  const response = await fetch(`${API_BASE}${url}${queryString}`, {
+  // URL already includes /api/v1 prefix from generated code
+  const response = await fetch(`${url}${queryString}`, {
     method,
     headers: {
       'Content-Type': 'application/json',
@@ -27,6 +34,7 @@ export const customInstance = async <T>(config: RequestConfig): Promise<T> => {
       ...headers,
     },
     body: data ? JSON.stringify(data) : undefined,
+    signal,
   })
 
   if (!response.ok) {

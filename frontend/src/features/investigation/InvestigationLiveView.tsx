@@ -1,6 +1,6 @@
 import { cn } from '@/lib/utils'
 import { formatDate } from '@/lib/utils'
-import type { InvestigationEvent } from '@/lib/api/types'
+import type { InvestigationEvent } from '@/lib/api/investigations'
 import {
   CheckCircle2,
   XCircle,

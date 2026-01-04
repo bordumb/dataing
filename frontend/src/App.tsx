@@ -4,6 +4,7 @@ import { SidebarProvider, SidebarInset, SidebarTrigger } from '@/components/ui/s
 import { AppSidebar } from '@/components/layout/app-sidebar'
 import { Separator } from '@/components/ui/separator'
 import { ModeToggle } from '@/components/mode-toggle'
+import { ErrorBoundary, FeatureErrorBoundary } from '@/components/error-boundary'
 
 // Pages
 import { DashboardPage } from '@/features/dashboard/dashboard-page'
@@ -39,33 +40,84 @@ function AppLayout({ children }: { children: React.ReactNode }) {
 
 function App() {
   return (
-    <AuthProvider>
-      <Routes>
-        {/* Public routes */}
-        <Route path="/login" element={<LoginPage />} />
+    <ErrorBoundary>
+      <AuthProvider>
+        <Routes>
+          {/* Public routes */}
+          <Route path="/login" element={<LoginPage />} />
 
-        {/* Protected routes */}
-        <Route
-          path="/*"
-          element={
-            <RequireAuth>
-              <AppLayout>
-                <Routes>
-                  <Route index element={<DashboardPage />} />
-                  <Route path="investigations" element={<InvestigationList />} />
-                  <Route path="investigations/new" element={<NewInvestigation />} />
-                  <Route path="investigations/:id" element={<InvestigationDetail />} />
-                  <Route path="datasources" element={<DataSourcePage />} />
-                  <Route path="settings/*" element={<SettingsPage />} />
-                  <Route path="usage" element={<UsagePage />} />
-                </Routes>
-              </AppLayout>
-            </RequireAuth>
-          }
-        />
-      </Routes>
-      <Toaster />
-    </AuthProvider>
+          {/* Protected routes */}
+          <Route
+            path="/*"
+            element={
+              <RequireAuth>
+                <AppLayout>
+                  <Routes>
+                    <Route
+                      index
+                      element={
+                        <FeatureErrorBoundary feature="dashboard">
+                          <DashboardPage />
+                        </FeatureErrorBoundary>
+                      }
+                    />
+                    <Route
+                      path="investigations"
+                      element={
+                        <FeatureErrorBoundary feature="investigations">
+                          <InvestigationList />
+                        </FeatureErrorBoundary>
+                      }
+                    />
+                    <Route
+                      path="investigations/new"
+                      element={
+                        <FeatureErrorBoundary feature="new investigation">
+                          <NewInvestigation />
+                        </FeatureErrorBoundary>
+                      }
+                    />
+                    <Route
+                      path="investigations/:id"
+                      element={
+                        <FeatureErrorBoundary feature="investigation details">
+                          <InvestigationDetail />
+                        </FeatureErrorBoundary>
+                      }
+                    />
+                    <Route
+                      path="datasources"
+                      element={
+                        <FeatureErrorBoundary feature="data sources">
+                          <DataSourcePage />
+                        </FeatureErrorBoundary>
+                      }
+                    />
+                    <Route
+                      path="settings/*"
+                      element={
+                        <FeatureErrorBoundary feature="settings">
+                          <SettingsPage />
+                        </FeatureErrorBoundary>
+                      }
+                    />
+                    <Route
+                      path="usage"
+                      element={
+                        <FeatureErrorBoundary feature="usage">
+                          <UsagePage />
+                        </FeatureErrorBoundary>
+                      }
+                    />
+                  </Routes>
+                </AppLayout>
+              </RequireAuth>
+            }
+          />
+        </Routes>
+        <Toaster />
+      </AuthProvider>
+    </ErrorBoundary>
   )
 }
 

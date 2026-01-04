@@ -6,11 +6,12 @@ import asyncio
 import json
 import re
 import uuid
-from typing import TYPE_CHECKING, Any, cast
+from typing import Any, cast
 
 import anthropic
 from anthropic.types import MessageParam
 
+from dataing.adapters.datasource.types import QueryResult, SchemaResponse
 from dataing.core.domain_types import (
     AnomalyAlert,
     Evidence,
@@ -18,15 +19,10 @@ from dataing.core.domain_types import (
     Hypothesis,
     HypothesisCategory,
     InvestigationContext,
-    QueryResult,
-    SchemaContext,
 )
 from dataing.core.exceptions import LLMError
 
 from .prompt_manager import PromptManager
-
-if TYPE_CHECKING:
-    pass
 
 
 class AnthropicClient:
@@ -92,7 +88,7 @@ class AnthropicClient:
     async def generate_query(
         self,
         hypothesis: Hypothesis,
-        schema: SchemaContext,
+        schema: SchemaResponse,
         previous_error: str | None = None,
     ) -> str:
         """Generate SQL query to test a hypothesis.
@@ -115,7 +111,7 @@ class AnthropicClient:
             template,
             hypothesis=hypothesis,
             schema_context=schema.to_prompt_string(),
-            available_tables=[t.table_name for t in schema.tables],
+            available_tables=schema.get_table_names(),
             previous_error=previous_error,
             previous_query=hypothesis.suggested_query if previous_error else None,
             error_message=previous_error,

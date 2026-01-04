@@ -12,14 +12,14 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Protocol, runtime_checkable
 
 if TYPE_CHECKING:
+    from dataing.adapters.datasource.types import QueryResult, SchemaResponse
+
     from .domain_types import (
         AnomalyAlert,
         Evidence,
         Finding,
         Hypothesis,
         InvestigationContext,
-        QueryResult,
-        SchemaContext,
     )
 
 
@@ -50,14 +50,14 @@ class DatabaseAdapter(Protocol):
         """
         ...
 
-    async def get_schema(self, table_pattern: str | None = None) -> SchemaContext:
+    async def get_schema(self, table_pattern: str | None = None) -> SchemaResponse:
         """Discover available tables and columns.
 
         Args:
             table_pattern: Optional pattern to filter tables.
 
         Returns:
-            SchemaContext with all discovered tables.
+            SchemaResponse with all discovered tables.
         """
         ...
 
@@ -99,7 +99,7 @@ class LLMClient(Protocol):
     async def generate_query(
         self,
         hypothesis: Hypothesis,
-        schema: SchemaContext,
+        schema: SchemaResponse,
         previous_error: str | None = None,
     ) -> str:
         """Generate SQL query to test a hypothesis.

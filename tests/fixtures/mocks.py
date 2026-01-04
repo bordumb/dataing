@@ -7,7 +7,6 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from dataing.adapters.db.mock import MockDatabaseAdapter
 from dataing.core.domain_types import (
     Evidence,
     Finding,
@@ -22,8 +21,10 @@ from dataing.core.domain_types import (
 
 
 @pytest.fixture
-def mock_database_adapter() -> MockDatabaseAdapter:
+def mock_database_adapter() -> AsyncMock:
     """Return a configured mock database adapter."""
+    mock = AsyncMock()
+
     schema = SchemaContext(
         tables=(
             TableSchema(
@@ -49,15 +50,14 @@ def mock_database_adapter() -> MockDatabaseAdapter:
         )
     )
 
-    responses = {
-        "SELECT COUNT": QueryResult(
-            columns=("count",),
-            rows=({"count": 500},),
-            row_count=1,
-        ),
-    }
+    mock.get_schema.return_value = schema
+    mock.execute.return_value = QueryResult(
+        columns=("count",),
+        rows=({"count": 500},),
+        row_count=1,
+    )
 
-    return MockDatabaseAdapter(responses=responses, schema=schema)
+    return mock
 
 
 @pytest.fixture

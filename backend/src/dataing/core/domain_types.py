@@ -7,12 +7,15 @@ data integrity and thread safety.
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime
 from enum import Enum
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from pydantic import BaseModel, ConfigDict
+
+if TYPE_CHECKING:
+    from dataing.adapters.datasource.types import SchemaResponse
 
 
 class AnomalyAlert(BaseModel):
@@ -120,71 +123,6 @@ class Finding(BaseModel):
 
 
 @dataclass(frozen=True)
-class TableSchema:
-    """Schema information for a single table.
-
-    Attributes:
-        table_name: Fully qualified table name (schema.table).
-        columns: List of column names.
-        column_types: Mapping of column names to data types.
-    """
-
-    table_name: str
-    columns: tuple[str, ...]
-    column_types: dict[str, str] = field(default_factory=dict)
-
-
-@dataclass(frozen=True)
-class SchemaContext:
-    """Container for discovered database schema.
-
-    Attributes:
-        tables: List of discovered tables with their schemas.
-    """
-
-    tables: tuple[TableSchema, ...]
-
-    def get_table(self, name: str) -> TableSchema | None:
-        """Get table by name (case-insensitive).
-
-        Args:
-            name: Table name to look up.
-
-        Returns:
-            TableSchema if found, None otherwise.
-        """
-        name_lower = name.lower()
-        for table in self.tables:
-            if table.table_name.lower() == name_lower:
-                return table
-        return None
-
-    def to_prompt_string(self) -> str:
-        """Format schema for LLM prompt.
-
-        Returns:
-            Formatted string representation of the schema.
-        """
-        lines = ["AVAILABLE TABLES AND COLUMNS (USE ONLY THESE):"]
-
-        for table in self.tables[:10]:
-            lines.append(f"\n{table.table_name}")
-            for col in table.columns[:15]:
-                col_type = table.column_types.get(col, "")
-                if col_type:
-                    lines.append(f"   - {col} ({col_type})")
-                else:
-                    lines.append(f"   - {col}")
-            if len(table.columns) > 15:
-                lines.append(f"   ... and {len(table.columns) - 15} more columns")
-
-        lines.append("\nCRITICAL: Use ONLY the tables and columns listed above.")
-        lines.append("DO NOT invent tables or columns.")
-
-        return "\n".join(lines)
-
-
-@dataclass(frozen=True)
 class LineageContext:
     """Upstream and downstream dependencies for a dataset.
 
@@ -224,52 +162,12 @@ class InvestigationContext:
     """Combined context for an investigation.
 
     Attributes:
-        schema: Database schema context.
+        schema: Database schema from the unified datasource layer.
         lineage: Optional lineage context.
     """
 
-    schema: SchemaContext
+    schema: SchemaResponse
     lineage: LineageContext | None = None
-
-
-@dataclass(frozen=True)
-class QueryResult:
-    """Result of executing a SQL query.
-
-    Attributes:
-        columns: List of column names in the result.
-        rows: List of row dictionaries.
-        row_count: Total number of rows returned.
-    """
-
-    columns: tuple[str, ...]
-    rows: tuple[dict[str, str | int | float | bool | None], ...]
-    row_count: int
-
-    def to_summary(self, max_rows: int = 5) -> str:
-        """Create a summary of the query results.
-
-        Args:
-            max_rows: Maximum number of rows to include.
-
-        Returns:
-            Formatted summary string.
-        """
-        if not self.rows:
-            return "No rows returned"
-
-        lines = [f"Columns: {', '.join(self.columns)}"]
-        lines.append(f"Total rows: {self.row_count}")
-        lines.append("\nSample rows:")
-
-        for row in self.rows[:max_rows]:
-            row_str = ", ".join(f"{k}={v}" for k, v in row.items())
-            lines.append(f"  {row_str}")
-
-        if self.row_count > max_rows:
-            lines.append(f"  ... and {self.row_count - max_rows} more rows")
-
-        return "\n".join(lines)
 
 
 class ApprovalRequestType(str, Enum):

@@ -1,7 +1,12 @@
-"""Data source management routes."""
+"""Data source management routes using the new unified adapter architecture.
+
+This module provides API endpoints for managing data sources using the
+pluggable adapter architecture defined in the data_context specification.
+"""
 
 from __future__ import annotations
 
+import json
 import os
 from datetime import datetime
 from typing import Annotated, Any
@@ -11,13 +16,18 @@ from cryptography.fernet import Fernet
 from fastapi import APIRouter, Depends, HTTPException, Response
 from pydantic import BaseModel, Field
 
+from dataing.adapters.datasource import (
+    SchemaFilter,
+    SourceType,
+    get_registry,
+)
 from dataing.adapters.db.app_db import AppDatabase
-from dataing.adapters.db.duckdb import DuckDBAdapter
-from dataing.adapters.db.postgres import PostgresAdapter
-from dataing.adapters.db.trino import TrinoAdapter
 from dataing.entrypoints.api.deps import get_app_db
-from dataing.entrypoints.api.middleware.auth import ApiKeyContext, require_scope, verify_api_key
-from dataing.models.data_source import DataSourceType
+from dataing.entrypoints.api.middleware.auth import (
+    ApiKeyContext,
+    require_scope,
+    verify_api_key,
+)
 
 router = APIRouter(prefix="/datasources", tags=["datasources"])
 
@@ -30,37 +40,24 @@ WriteScopeDep = Annotated[ApiKeyContext, Depends(require_scope("write"))]
 def get_encryption_key() -> bytes:
     """Get the encryption key for data source configs.
 
-    Returns:
-        Encryption key as bytes.
-
-    Raises:
-        RuntimeError: If ENCRYPTION_KEY is not set.
+    Checks DATADR_ENCRYPTION_KEY first (used by demo), then ENCRYPTION_KEY.
     """
-    key = os.getenv("ENCRYPTION_KEY")
+    key = os.getenv("DATADR_ENCRYPTION_KEY") or os.getenv("ENCRYPTION_KEY")
     if not key:
-        # For development, use a default key (NOT FOR PRODUCTION)
         key = Fernet.generate_key().decode()
         os.environ["ENCRYPTION_KEY"] = key
     return key.encode() if isinstance(key, str) else key
 
 
-class ConnectionConfig(BaseModel):
-    """Database connection configuration."""
-
-    host: str
-    port: int = 5432
-    database: str
-    username: str
-    password: str
-    ssl_mode: str = "prefer"
+# Request/Response Models
 
 
 class CreateDataSourceRequest(BaseModel):
     """Request to create a new data source."""
 
     name: str = Field(..., min_length=1, max_length=100)
-    type: DataSourceType
-    connection_config: ConnectionConfig
+    type: str = Field(..., description="Source type (e.g., 'postgresql', 'mongodb')")
+    config: dict[str, Any] = Field(..., description="Configuration for the adapter")
     is_default: bool = False
 
 
@@ -68,7 +65,7 @@ class UpdateDataSourceRequest(BaseModel):
     """Request to update a data source."""
 
     name: str | None = Field(None, min_length=1, max_length=100)
-    connection_config: ConnectionConfig | None = None
+    config: dict[str, Any] | None = None
     is_default: bool | None = None
 
 
@@ -78,10 +75,11 @@ class DataSourceResponse(BaseModel):
     id: str
     name: str
     type: str
+    category: str
     is_default: bool
     is_active: bool
+    status: str
     last_health_check_at: datetime | None = None
-    last_health_check_status: str | None = None
     created_at: datetime
 
 
@@ -92,97 +90,176 @@ class DataSourceListResponse(BaseModel):
     total: int
 
 
+class TestConnectionRequest(BaseModel):
+    """Request to test a connection."""
+
+    type: str
+    config: dict[str, Any]
+
+
 class TestConnectionResponse(BaseModel):
     """Response for testing a connection."""
 
     success: bool
     message: str
-    tables_found: int | None = None
+    latency_ms: int | None = None
+    server_version: str | None = None
 
 
-class SchemaResponse(BaseModel):
+class SourceTypeResponse(BaseModel):
+    """Response for a source type definition."""
+
+    type: str
+    display_name: str
+    category: str
+    icon: str
+    description: str
+    capabilities: dict[str, Any]
+    config_schema: dict[str, Any]
+
+
+class SourceTypesResponse(BaseModel):
+    """Response for listing source types."""
+
+    types: list[SourceTypeResponse]
+
+
+class SchemaTableResponse(BaseModel):
+    """Response for a table in the schema."""
+
+    name: str
+    table_type: str
+    native_type: str
+    native_path: str
+    columns: list[dict[str, Any]]
+    row_count: int | None = None
+    size_bytes: int | None = None
+
+
+class SchemaResponseModel(BaseModel):
     """Response for schema discovery."""
 
-    tables: list[dict[str, Any]]
+    source_id: str
+    source_type: str
+    source_category: str
+    fetched_at: datetime
+    catalogs: list[dict[str, Any]]
 
 
-def _build_connection_string(config: ConnectionConfig, ds_type: DataSourceType) -> str:
-    """Build a connection string from config."""
-    if ds_type == DataSourceType.POSTGRES:
-        ssl_suffix = f"?sslmode={config.ssl_mode}" if config.ssl_mode else ""
-        return f"postgresql://{config.username}:{config.password}@{config.host}:{config.port}/{config.database}{ssl_suffix}"
-    else:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Data source type '{ds_type}' is not yet supported for connection strings",
-        )
+class QueryRequest(BaseModel):
+    """Request to execute a query."""
+
+    query: str
+    timeout_seconds: int = 30
 
 
-def _create_adapter(
-    config: ConnectionConfig, ds_type: DataSourceType
-) -> PostgresAdapter | TrinoAdapter:
-    """Create a database adapter from config."""
-    if ds_type == DataSourceType.POSTGRES:
-        connection_string = _build_connection_string(config, ds_type)
-        return PostgresAdapter(connection_string)
-    elif ds_type == DataSourceType.TRINO:
-        # Parse database as catalog.schema for Trino
-        parts = config.database.split(".")
-        if len(parts) == 2:
-            catalog, schema = parts
-        else:
-            catalog = config.database
-            schema = "default"
-        return TrinoAdapter(
-            host=config.host,
-            port=config.port,
-            catalog=catalog,
-            schema=schema,
-            user=config.username,
-        )
-    else:
-        raise ValueError(f"Data source type '{ds_type}' is not yet supported")
+class QueryResponse(BaseModel):
+    """Response for query execution."""
+
+    columns: list[dict[str, Any]]
+    rows: list[dict[str, Any]]
+    row_count: int
+    truncated: bool = False
+    execution_time_ms: int | None = None
 
 
-async def _test_connection(
-    config: ConnectionConfig, ds_type: DataSourceType
-) -> tuple[bool, str, int]:
-    """Test a database connection.
+class StatsRequest(BaseModel):
+    """Request for column statistics."""
 
-    Returns:
-        Tuple of (success, message, table_count)
-    """
-    try:
-        if ds_type in (DataSourceType.POSTGRES, DataSourceType.TRINO):
-            adapter = _create_adapter(config, ds_type)
-            await adapter.connect()
-            try:
-                schema = await adapter.get_schema()
-                return True, "Connection successful", len(schema.tables)
-            finally:
-                await adapter.close()
-        else:
-            return False, f"Data source type '{ds_type}' is not yet supported", 0
-    except Exception as e:
-        return False, f"Connection failed: {str(e)}", 0
+    table: str
+    columns: list[str]
 
 
-def _encrypt_config(config: ConnectionConfig, key: bytes) -> str:
-    """Encrypt connection configuration."""
-    import json
+class StatsResponse(BaseModel):
+    """Response for column statistics."""
 
+    table: str
+    row_count: int | None = None
+    columns: dict[str, dict[str, Any]]
+
+
+def _encrypt_config(config: dict[str, Any], key: bytes) -> str:
+    """Encrypt configuration."""
     f = Fernet(key)
-    encrypted = f.encrypt(json.dumps(config.model_dump()).encode())
+    encrypted = f.encrypt(json.dumps(config).encode())
     return encrypted.decode()
 
 
-def _decrypt_config(encrypted: str, key: bytes) -> ConnectionConfig:
-    """Decrypt connection configuration."""
-    import json
-
+def _decrypt_config(encrypted: str, key: bytes) -> dict[str, Any]:
+    """Decrypt configuration."""
     f = Fernet(key)
     decrypted = f.decrypt(encrypted.encode())
-    return ConnectionConfig(**json.loads(decrypted.decode()))
+    result: dict[str, Any] = json.loads(decrypted.decode())
+    return result
+
+
+@router.get("/types", response_model=SourceTypesResponse)
+async def list_source_types() -> SourceTypesResponse:
+    """List all supported data source types.
+
+    Returns the configuration schema for each type, which can be used
+    to dynamically generate connection forms in the frontend.
+    """
+    registry = get_registry()
+    types_list = []
+
+    for type_def in registry.list_types():
+        types_list.append(
+            SourceTypeResponse(
+                type=type_def.type.value,
+                display_name=type_def.display_name,
+                category=type_def.category.value,
+                icon=type_def.icon,
+                description=type_def.description,
+                capabilities=type_def.capabilities.model_dump(),
+                config_schema=type_def.config_schema.model_dump(),
+            )
+        )
+
+    return SourceTypesResponse(types=types_list)
+
+
+@router.post("/test", response_model=TestConnectionResponse)
+async def test_connection(
+    request: TestConnectionRequest,
+) -> TestConnectionResponse:
+    """Test a connection without saving it.
+
+    Use this endpoint to validate connection settings before creating
+    a data source.
+    """
+    registry = get_registry()
+
+    try:
+        source_type = SourceType(request.type)
+    except ValueError:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Unsupported source type: {request.type}",
+        ) from None
+
+    if not registry.is_registered(source_type):
+        raise HTTPException(
+            status_code=400,
+            detail=f"Source type not available: {request.type}",
+        )
+
+    try:
+        adapter = registry.create(source_type, request.config)
+        async with adapter:
+            result = await adapter.test_connection()
+
+        return TestConnectionResponse(
+            success=result.success,
+            message=result.message,
+            latency_ms=result.latency_ms,
+            server_version=result.server_version,
+        )
+    except Exception as e:
+        return TestConnectionResponse(
+            success=False,
+            message=str(e),
+        )
 
 
 @router.post("/", response_model=DataSourceResponse, status_code=201)
@@ -191,40 +268,68 @@ async def create_datasource(
     auth: WriteScopeDep,
     app_db: AppDbDep,
 ) -> DataSourceResponse:
-    """Create a new data source connection.
+    """Create a new data source.
 
     Tests the connection before saving. Returns 400 if connection test fails.
     """
-    # Test connection first
-    success, message, tables = await _test_connection(request.connection_config, request.type)
-    if not success:
-        raise HTTPException(status_code=400, detail=message)
+    registry = get_registry()
 
-    # Encrypt connection config
+    try:
+        source_type = SourceType(request.type)
+    except ValueError:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Unsupported source type: {request.type}",
+        ) from None
+
+    if not registry.is_registered(source_type):
+        raise HTTPException(
+            status_code=400,
+            detail=f"Source type not available: {request.type}",
+        )
+
+    # Test connection first
+    try:
+        adapter = registry.create(source_type, request.config)
+        async with adapter:
+            result = await adapter.test_connection()
+            if not result.success:
+                raise HTTPException(status_code=400, detail=result.message)
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Connection failed: {str(e)}") from e
+
+    # Get type definition for category
+    type_def = registry.get_definition(source_type)
+    category = type_def.category.value if type_def else "database"
+
+    # Encrypt config
     encryption_key = get_encryption_key()
-    encrypted_config = _encrypt_config(request.connection_config, encryption_key)
+    encrypted_config = _encrypt_config(request.config, encryption_key)
 
     # Save to database
-    result = await app_db.create_data_source(
+    db_result = await app_db.create_data_source(
         tenant_id=auth.tenant_id,
         name=request.name,
-        type=request.type.value,
+        type=request.type,
         connection_config_encrypted=encrypted_config,
         is_default=request.is_default,
     )
 
     # Update health check status
-    await app_db.update_data_source_health(result["id"], "healthy")
+    await app_db.update_data_source_health(db_result["id"], "healthy")
 
     return DataSourceResponse(
-        id=str(result["id"]),
-        name=result["name"],
-        type=result["type"],
-        is_default=result["is_default"],
-        is_active=result["is_active"],
+        id=str(db_result["id"]),
+        name=db_result["name"],
+        type=db_result["type"],
+        category=category,
+        is_default=db_result["is_default"],
+        is_active=db_result["is_active"],
+        status="connected",
         last_health_check_at=datetime.now(),
-        last_health_check_status="healthy",
-        created_at=result["created_at"],
+        created_at=db_result["created_at"],
     )
 
 
@@ -235,22 +340,43 @@ async def list_datasources(
 ) -> DataSourceListResponse:
     """List all data sources for the current tenant."""
     data_sources = await app_db.list_data_sources(auth.tenant_id)
+    registry = get_registry()
 
-    return DataSourceListResponse(
-        data_sources=[
+    responses = []
+    for ds in data_sources:
+        # Get category from registry
+        try:
+            source_type = SourceType(ds["type"])
+            type_def = registry.get_definition(source_type)
+            category = type_def.category.value if type_def else "database"
+        except ValueError:
+            category = "database"
+
+        status = ds.get("last_health_check_status", "unknown")
+        if status == "healthy":
+            status = "connected"
+        elif status == "unhealthy":
+            status = "error"
+        else:
+            status = "disconnected"
+
+        responses.append(
             DataSourceResponse(
                 id=str(ds["id"]),
                 name=ds["name"],
                 type=ds["type"],
+                category=category,
                 is_default=ds["is_default"],
                 is_active=ds["is_active"],
+                status=status,
                 last_health_check_at=ds.get("last_health_check_at"),
-                last_health_check_status=ds.get("last_health_check_status"),
                 created_at=ds["created_at"],
             )
-            for ds in data_sources
-        ],
-        total=len(data_sources),
+        )
+
+    return DataSourceListResponse(
+        data_sources=responses,
+        total=len(responses),
     )
 
 
@@ -266,14 +392,31 @@ async def get_datasource(
     if not ds:
         raise HTTPException(status_code=404, detail="Data source not found")
 
+    registry = get_registry()
+    try:
+        source_type = SourceType(ds["type"])
+        type_def = registry.get_definition(source_type)
+        category = type_def.category.value if type_def else "database"
+    except ValueError:
+        category = "database"
+
+    status = ds.get("last_health_check_status", "unknown")
+    if status == "healthy":
+        status = "connected"
+    elif status == "unhealthy":
+        status = "error"
+    else:
+        status = "disconnected"
+
     return DataSourceResponse(
         id=str(ds["id"]),
         name=ds["name"],
         type=ds["type"],
+        category=category,
         is_default=ds["is_default"],
         is_active=ds["is_active"],
+        status=status,
         last_health_check_at=ds.get("last_health_check_at"),
-        last_health_check_status=ds.get("last_health_check_status"),
         created_at=ds["created_at"],
     )
 
@@ -294,123 +437,290 @@ async def delete_datasource(
 
 
 @router.post("/{datasource_id}/test", response_model=TestConnectionResponse)
-async def test_datasource(
+async def test_datasource_connection(
     datasource_id: UUID,
     auth: AuthDep,
     app_db: AppDbDep,
 ) -> TestConnectionResponse:
-    """Test data source connectivity."""
+    """Test connectivity for an existing data source."""
     ds = await app_db.get_data_source(datasource_id, auth.tenant_id)
 
     if not ds:
         raise HTTPException(status_code=404, detail="Data source not found")
 
-    # Decrypt connection config
+    registry = get_registry()
+
+    try:
+        source_type = SourceType(ds["type"])
+    except ValueError:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Unsupported source type: {ds['type']}",
+        ) from None
+
+    if not registry.is_registered(source_type):
+        raise HTTPException(
+            status_code=400,
+            detail=f"Source type not available: {ds['type']}",
+        )
+
+    # Decrypt config
     encryption_key = get_encryption_key()
     try:
         config = _decrypt_config(ds["connection_config_encrypted"], encryption_key)
     except Exception as e:
         return TestConnectionResponse(
             success=False,
-            message=f"Failed to decrypt connection config: {str(e)}",
+            message=f"Failed to decrypt configuration: {str(e)}",
         )
 
     # Test connection
-    ds_type = DataSourceType(ds["type"])
-    success, message, tables = await _test_connection(config, ds_type)
+    try:
+        adapter = registry.create(source_type, config)
+        async with adapter:
+            result = await adapter.test_connection()
 
-    # Update health check status
-    status = "healthy" if success else "unhealthy"
-    await app_db.update_data_source_health(datasource_id, status)
+        # Update health check status
+        status = "healthy" if result.success else "unhealthy"
+        await app_db.update_data_source_health(datasource_id, status)
 
-    return TestConnectionResponse(
-        success=success,
-        message=message,
-        tables_found=tables if success else None,
-    )
+        return TestConnectionResponse(
+            success=result.success,
+            message=result.message,
+            latency_ms=result.latency_ms,
+            server_version=result.server_version,
+        )
+    except Exception as e:
+        await app_db.update_data_source_health(datasource_id, "unhealthy")
+        return TestConnectionResponse(
+            success=False,
+            message=str(e),
+        )
 
 
-@router.get("/{datasource_id}/schema", response_model=SchemaResponse)
-async def get_schema(
+@router.get("/{datasource_id}/schema", response_model=SchemaResponseModel)
+async def get_datasource_schema(
     datasource_id: UUID,
     auth: AuthDep,
     app_db: AppDbDep,
     table_pattern: str | None = None,
-) -> SchemaResponse:
-    """Get schema from data source.
+    include_views: bool = True,
+    max_tables: int = 1000,
+) -> SchemaResponseModel:
+    """Get schema from a data source.
 
-    Args:
-        datasource_id: The data source ID.
-        auth: Authentication context (injected).
-        app_db: Application database (injected).
-        table_pattern: Optional pattern to filter tables.
+    Returns unified schema with catalogs, schemas, and tables.
     """
     ds = await app_db.get_data_source(datasource_id, auth.tenant_id)
 
     if not ds:
         raise HTTPException(status_code=404, detail="Data source not found")
 
-    ds_type = DataSourceType(ds["type"])
-    encryption_key = get_encryption_key()
+    registry = get_registry()
 
     try:
-        if ds_type == DataSourceType.DUCKDB:
-            # DuckDB uses raw config dict, not ConnectionConfig
-            import json
+        source_type = SourceType(ds["type"])
+    except ValueError:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Unsupported source type: {ds['type']}",
+        ) from None
 
-            raw_config = json.loads(
-                Fernet(encryption_key).decrypt(ds["connection_config_encrypted"].encode()).decode()
-            )
-            adapter = DuckDBAdapter(raw_config["path"], raw_config.get("read_only", True))
-            await adapter.connect()
-            try:
-                schema = await adapter.get_schema(table_pattern)
-                return SchemaResponse(
-                    tables=[
-                        {
-                            "table_name": t.table_name,
-                            "columns": list(t.columns),
-                            "column_types": t.column_types,
-                        }
-                        for t in schema.tables
-                    ]
-                )
-            finally:
-                await adapter.close()
-        elif ds_type in (DataSourceType.POSTGRES, DataSourceType.TRINO):
-            # Decrypt connection config for traditional databases
-            try:
-                config = _decrypt_config(ds["connection_config_encrypted"], encryption_key)
-            except Exception as e:
+    if not registry.is_registered(source_type):
+        raise HTTPException(
+            status_code=400,
+            detail=f"Source type not available: {ds['type']}",
+        )
+
+    # Decrypt config
+    encryption_key = get_encryption_key()
+    try:
+        config = _decrypt_config(ds["connection_config_encrypted"], encryption_key)
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to decrypt configuration: {str(e)}",
+        ) from e
+
+    # Build filter
+    schema_filter = SchemaFilter(
+        table_pattern=table_pattern,
+        include_views=include_views,
+        max_tables=max_tables,
+    )
+
+    # Get schema
+    try:
+        adapter = registry.create(source_type, config)
+        async with adapter:
+            schema = await adapter.get_schema(schema_filter)
+
+        return SchemaResponseModel(
+            source_id=str(datasource_id),
+            source_type=schema.source_type.value,
+            source_category=schema.source_category.value,
+            fetched_at=schema.fetched_at,
+            catalogs=[cat.model_dump() for cat in schema.catalogs],
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to fetch schema: {str(e)}",
+        ) from e
+
+
+@router.post("/{datasource_id}/query", response_model=QueryResponse)
+async def execute_query(
+    datasource_id: UUID,
+    request: QueryRequest,
+    auth: AuthDep,
+    app_db: AppDbDep,
+) -> QueryResponse:
+    """Execute a query against a data source.
+
+    Only works for sources that support SQL or similar query languages.
+    """
+    ds = await app_db.get_data_source(datasource_id, auth.tenant_id)
+
+    if not ds:
+        raise HTTPException(status_code=404, detail="Data source not found")
+
+    registry = get_registry()
+
+    try:
+        source_type = SourceType(ds["type"])
+    except ValueError:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Unsupported source type: {ds['type']}",
+        ) from None
+
+    type_def = registry.get_definition(source_type)
+    if not type_def or not type_def.capabilities.supports_sql:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Source type {ds['type']} does not support SQL queries",
+        )
+
+    # Decrypt config
+    encryption_key = get_encryption_key()
+    try:
+        config = _decrypt_config(ds["connection_config_encrypted"], encryption_key)
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to decrypt configuration: {str(e)}",
+        ) from e
+
+    # Execute query
+    try:
+        adapter = registry.create(source_type, config)
+        async with adapter:
+            # Check if adapter has execute_query method
+            if not hasattr(adapter, "execute_query"):
                 raise HTTPException(
-                    status_code=500,
-                    detail=f"Failed to decrypt connection config: {str(e)}",
-                ) from e
-            adapter = _create_adapter(config, ds_type)
-            await adapter.connect()
-            try:
-                schema = await adapter.get_schema(table_pattern)
-                return SchemaResponse(
-                    tables=[
-                        {
-                            "table_name": t.table_name,
-                            "columns": list(t.columns),
-                            "column_types": t.column_types,
-                        }
-                        for t in schema.tables
-                    ]
+                    status_code=400,
+                    detail=f"Source type {ds['type']} does not support query execution",
                 )
-            finally:
-                await adapter.close()
-        else:
-            raise HTTPException(
-                status_code=400,
-                detail=f"Schema discovery not supported for '{ds_type}'",
+            result = await adapter.execute_query(
+                request.query,
+                timeout_seconds=request.timeout_seconds,
             )
+
+        return QueryResponse(
+            columns=result.columns,
+            rows=result.rows,
+            row_count=result.row_count,
+            truncated=result.truncated,
+            execution_time_ms=result.execution_time_ms,
+        )
     except HTTPException:
         raise
     except Exception as e:
         raise HTTPException(
             status_code=500,
-            detail=f"Failed to fetch schema: {str(e)}",
+            detail=f"Query execution failed: {str(e)}",
+        ) from e
+
+
+@router.post("/{datasource_id}/stats", response_model=StatsResponse)
+async def get_column_stats(
+    datasource_id: UUID,
+    request: StatsRequest,
+    auth: AuthDep,
+    app_db: AppDbDep,
+) -> StatsResponse:
+    """Get statistics for columns in a table.
+
+    Only works for sources that support column statistics.
+    """
+    ds = await app_db.get_data_source(datasource_id, auth.tenant_id)
+
+    if not ds:
+        raise HTTPException(status_code=404, detail="Data source not found")
+
+    registry = get_registry()
+
+    try:
+        source_type = SourceType(ds["type"])
+    except ValueError:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Unsupported source type: {ds['type']}",
+        ) from None
+
+    type_def = registry.get_definition(source_type)
+    if not type_def or not type_def.capabilities.supports_column_stats:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Source type {ds['type']} does not support column statistics",
+        )
+
+    # Decrypt config
+    encryption_key = get_encryption_key()
+    try:
+        config = _decrypt_config(ds["connection_config_encrypted"], encryption_key)
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to decrypt configuration: {str(e)}",
+        ) from e
+
+    # Get stats
+    try:
+        adapter = registry.create(source_type, config)
+        async with adapter:
+            # Check if adapter has get_column_stats method
+            if not hasattr(adapter, "get_column_stats"):
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Source type {ds['type']} does not support column statistics",
+                )
+
+            # Parse table name
+            parts = request.table.split(".")
+            if len(parts) == 2:
+                schema, table = parts
+            else:
+                schema = None
+                table = request.table
+
+            stats = await adapter.get_column_stats(table, request.columns, schema)
+
+            # Try to get row count
+            row_count = None
+            if hasattr(adapter, "count_rows"):
+                row_count = await adapter.count_rows(table, schema)
+
+        return StatsResponse(
+            table=request.table,
+            row_count=row_count,
+            columns=stats,
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to get column statistics: {str(e)}",
         ) from e

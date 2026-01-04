@@ -205,7 +205,7 @@ export function DataSourceForm({ open, onOpenChange }: DataSourceFormProps) {
                   onChange={(e) =>
                     setFormData({ ...formData, username: e.target.value })
                   }
-                  placeholder="datadr"
+                  placeholder="dataing"
                   required
                 />
               </div>

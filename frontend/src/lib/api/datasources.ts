@@ -36,37 +36,28 @@ export interface TestConnectionRequest {
 
 const DATASOURCES_KEY = 'datasources'
 
+interface DataSourceListResponse {
+  data_sources: DataSource[]
+  total: number
+}
+
 export function useDataSources() {
   return useQuery({
     queryKey: [DATASOURCES_KEY],
     queryFn: async () => {
       try {
-        return await customInstance<DataSource[]>({
+        const response = await customInstance<DataSourceListResponse>({
           url: '/datasources',
           method: 'GET',
         })
-      } catch {
-        // Return mock data if endpoint doesn't exist
-        return [
-          {
-            id: '1',
-            name: 'Production PostgreSQL',
-            type: 'postgres',
-            status: 'connected' as const,
-            created_at: new Date().toISOString(),
-            last_synced_at: new Date().toISOString(),
-          },
-          {
-            id: '2',
-            name: 'Analytics Trino',
-            type: 'trino',
-            status: 'connected' as const,
-            created_at: new Date().toISOString(),
-            last_synced_at: new Date().toISOString(),
-          },
-        ]
+        return response.data_sources
+      } catch (error) {
+        console.error('Failed to fetch datasources:', error)
+        throw error
       }
     },
+    retry: 1,
+    staleTime: 30000,
   })
 }
 
@@ -131,4 +122,129 @@ export async function testDataSourceConnection(data: TestConnectionRequest): Pro
   } catch {
     throw new Error('Connection test failed')
   }
+}
+
+// Schema types
+export interface SchemaColumn {
+  name: string
+  data_type: string
+  native_type: string
+  nullable: boolean
+  is_primary_key: boolean
+  description?: string
+}
+
+export interface SchemaTable {
+  name: string
+  table_type: string
+  native_type: string
+  native_path: string
+  columns: SchemaColumn[]
+  row_count?: number
+}
+
+export interface SchemaSchema {
+  name: string
+  tables: SchemaTable[]
+}
+
+export interface SchemaCatalog {
+  name: string
+  schemas: SchemaSchema[]
+}
+
+export interface SchemaResponse {
+  source_id: string
+  source_type: string
+  source_category: string
+  fetched_at: string
+  catalogs: SchemaCatalog[]
+}
+
+export interface LineageResponse {
+  target: string
+  upstream: string[]
+  downstream: string[]
+}
+
+export function useDataSourceSchema(datasourceId: string | null) {
+  return useQuery({
+    queryKey: ['datasource-schema', datasourceId],
+    queryFn: async () => {
+      if (!datasourceId) return null
+      return customInstance<SchemaResponse>({
+        url: `/datasources/${datasourceId}/schema`,
+        method: 'GET',
+      })
+    },
+    enabled: !!datasourceId,
+  })
+}
+
+export function useTableSearch(datasourceId: string | null, searchTerm: string) {
+  return useQuery({
+    queryKey: ['table-search', datasourceId, searchTerm],
+    queryFn: async () => {
+      if (!datasourceId) return []
+      const schema = await customInstance<SchemaResponse>({
+        url: `/datasources/${datasourceId}/schema`,
+        method: 'GET',
+        params: searchTerm ? { table_pattern: `%${searchTerm}%` } : undefined,
+      })
+      // Flatten tables from nested structure
+      const tables: SchemaTable[] = []
+      for (const catalog of schema.catalogs) {
+        for (const schemaObj of catalog.schemas) {
+          tables.push(...schemaObj.tables)
+        }
+      }
+      // Filter by search term if provided
+      if (searchTerm) {
+        const term = searchTerm.toLowerCase()
+        return tables.filter(t =>
+          t.name.toLowerCase().includes(term) ||
+          t.native_path.toLowerCase().includes(term)
+        )
+      }
+      return tables
+    },
+    enabled: !!datasourceId,
+    staleTime: 30000, // Cache for 30 seconds
+  })
+}
+
+export function useSourceTypes() {
+  return useQuery({
+    queryKey: ['source-types'],
+    queryFn: async () => {
+      try {
+        const response = await customInstance<{ types: SourceTypeInfo[] }>({
+          url: '/datasources/types',
+          method: 'GET',
+        })
+        return response.types
+      } catch {
+        // Fallback source types
+        return [
+          { type: 'postgresql', display_name: 'PostgreSQL', category: 'database', icon: '🐘' },
+          { type: 'mysql', display_name: 'MySQL', category: 'database', icon: '🐬' },
+          { type: 'trino', display_name: 'Trino', category: 'database', icon: '⚡' },
+          { type: 'snowflake', display_name: 'Snowflake', category: 'database', icon: '❄️' },
+          { type: 'bigquery', display_name: 'BigQuery', category: 'database', icon: '📊' },
+          { type: 'redshift', display_name: 'Redshift', category: 'database', icon: '🔴' },
+          { type: 'duckdb', display_name: 'DuckDB', category: 'database', icon: '🦆' },
+          { type: 'mongodb', display_name: 'MongoDB', category: 'database', icon: '🍃' },
+          { type: 's3', display_name: 'Amazon S3', category: 'filesystem', icon: '📦' },
+        ] as SourceTypeInfo[]
+      }
+    },
+  })
+}
+
+export interface SourceTypeInfo {
+  type: string
+  display_name: string
+  category: string
+  icon: string
+  description?: string
 }

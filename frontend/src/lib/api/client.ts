@@ -1,5 +1,5 @@
 const API_BASE = '/api/v1'
-const API_KEY_STORAGE_KEY = 'datadr_api_key' // pragma: allowlist secret
+const API_KEY_STORAGE_KEY = 'dataing_api_key' // pragma: allowlist secret
 
 export interface RequestConfig {
   url: string

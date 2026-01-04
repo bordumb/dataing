@@ -1,6 +1,42 @@
-# DataDr Demo Fixtures
+# Dataing Demo Fixtures
 
-Realistic e-commerce data with pre-baked anomalies for demonstrating DataDr's detection capabilities.
+Realistic e-commerce data with pre-baked anomalies for demonstrating Dataing's detection capabilities.
+
+## Happy Path Demo (NewInvestigation Form)
+
+After running `just demo`, navigate to http://localhost:3000 and click "New Investigation". Use these values for a working demo:
+
+### Scenario: NULL Spike in Orders
+
+| Field | Value |
+|-------|-------|
+| **Dataset** | Select "E-Commerce Demo" → search for `orders` → select `public.orders` |
+| **Anomaly Date** | `2024-01-10` (middle of the anomaly window) |
+| **Metric Name** | `null_count` |
+| **Expected Value** | `5` |
+| **Actual Value** | `200` |
+| **Deviation %** | `3900` |
+| **Severity** | High |
+| **Description** | "Spike in NULL user_id values in the orders table. Started around Jan 9th. Possibly related to mobile app deployment." |
+
+### Scenario: Volume Drop in Events
+
+| Field | Value |
+|-------|-------|
+| **Dataset** | Select "E-Commerce Demo" → search for `events` → select `public.events` |
+| **Anomaly Date** | `2024-01-12` |
+| **Metric Name** | `row_count` |
+| **Expected Value** | `70000` |
+| **Actual Value** | `14000` |
+| **Deviation %** | `-80` |
+| **Severity** | Critical |
+| **Description** | "Significant drop in EU event volume. Non-EU traffic appears normal." |
+
+### Tips for Demo
+- The AI will query the database, discover the anomaly pattern, and generate hypotheses
+- For NULL spike: it should find that ~40% of orders on days 3-5 have NULL user_id
+- For volume drop: it should find that EU events dropped 80% on days 5-6
+- The investigation typically takes 30-60 seconds to complete
 
 ## Quick Start
 

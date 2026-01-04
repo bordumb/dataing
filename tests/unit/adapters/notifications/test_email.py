@@ -21,7 +21,7 @@ class TestEmailNotifier:
             smtp_user="test@example.com",
             smtp_password="password",
             from_email="noreply@example.com",
-            from_name="DataDr Test",
+            from_name="Dataing Test",
             use_tls=True,
         )
 
@@ -161,6 +161,6 @@ class TestEmailConfig:
         assert config.smtp_port == 587
         assert config.smtp_user is None
         assert config.smtp_password is None
-        assert config.from_email == "datadr@example.com"
-        assert config.from_name == "DataDr"
+        assert config.from_email == "dataing@example.com"
+        assert config.from_name == "Dataing"
         assert config.use_tls is True

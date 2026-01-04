@@ -9,15 +9,18 @@ from datetime import UTC, datetime
 from typing import Annotated, Any
 
 import structlog
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
-from dataing.adapters.context import DatabaseContext
 from dataing.core.domain_types import AnomalyAlert
 from dataing.core.orchestrator import InvestigationOrchestrator
 from dataing.core.state import InvestigationState
-from dataing.entrypoints.api.deps import get_database_context, get_investigations, get_orchestrator
+from dataing.entrypoints.api.deps import (
+    get_default_tenant_adapter,
+    get_investigations,
+    get_orchestrator,
+)
 from dataing.entrypoints.api.middleware.auth import ApiKeyContext, verify_api_key
 
 router = APIRouter(prefix="/investigations", tags=["investigations"])
@@ -27,7 +30,6 @@ logger = structlog.get_logger()
 # Annotated types for dependency injection
 AuthDep = Annotated[ApiKeyContext, Depends(verify_api_key)]
 OrchestratorDep = Annotated[InvestigationOrchestrator, Depends(get_orchestrator)]
-DatabaseContextDep = Annotated[DatabaseContext, Depends(get_database_context)]
 InvestigationsDep = Annotated[dict[str, dict[str, Any]], Depends(get_investigations)]
 
 
@@ -59,15 +61,16 @@ class InvestigationStatusResponse(BaseModel):
     status: str
     events: list[dict[str, Any]]
     finding: dict[str, Any] | None = None
+    error: str | None = None
 
 
 @router.post("/", response_model=InvestigationResponse)
 async def create_investigation(
+    http_request: Request,
     request: CreateInvestigationRequest,
     background_tasks: BackgroundTasks,
     auth: AuthDep,
     orchestrator: OrchestratorDep,
-    database_context: DatabaseContextDep,
     investigations: InvestigationsDep,
 ) -> InvestigationResponse:
     """Start a new investigation.
@@ -105,8 +108,8 @@ async def create_investigation(
     # Run investigation in background with tenant's data source
     async def run_investigation() -> None:
         try:
-            # Resolve tenant's data source adapter
-            data_adapter = await database_context.get_default_adapter(auth.tenant_id)
+            # Resolve tenant's data source adapter using AdapterRegistry
+            data_adapter = await get_default_tenant_adapter(http_request, auth.tenant_id)
 
             # Run investigation against tenant's actual data
             finding = await orchestrator.run_investigation(state, data_adapter)
@@ -158,6 +161,7 @@ async def get_investigation(
             for e in state.events
         ],
         finding=inv.get("finding"),
+        error=inv.get("error"),
     )
 
 

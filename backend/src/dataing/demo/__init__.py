@@ -1,4 +1,4 @@
-"""Demo module for DataDr demo mode."""
+"""Demo module for Dataing demo mode."""
 
 from .seed import seed_demo_data
 

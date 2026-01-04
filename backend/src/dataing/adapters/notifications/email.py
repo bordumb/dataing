@@ -19,8 +19,8 @@ class EmailConfig:
     smtp_port: int = 587
     smtp_user: str | None = None
     smtp_password: str | None = None
-    from_email: str = "datadr@example.com"
-    from_name: str = "DataDr"
+    from_email: str = "dataing@example.com"
+    from_name: str = "Dataing"
     use_tls: bool = True
 
 
@@ -123,7 +123,7 @@ class EmailNotifier:
 
             <hr style="border: none; border-top: 1px solid #ddd; margin: 30px 0;">
             <p style="color: #666; font-size: 12px;">
-                This email was sent by DataDr. Please do not reply to this email.
+                This email was sent by Dataing. Please do not reply to this email.
             </p>
         </body>
         </html>
@@ -141,7 +141,7 @@ Summary:
 {summary}
 
 ---
-This email was sent by DataDr. Please do not reply to this email.
+This email was sent by Dataing. Please do not reply to this email.
         """
 
         return self.send(to_emails, subject, body_html, body_text)
@@ -179,7 +179,7 @@ This email was sent by DataDr. Please do not reply to this email.
 
             <hr style="border: none; border-top: 1px solid #ddd; margin: 30px 0;">
             <p style="color: #666; font-size: 12px;">
-                This email was sent by DataDr. Please do not reply to this email.
+                This email was sent by Dataing. Please do not reply to this email.
             </p>
         </body>
         </html>
@@ -195,7 +195,7 @@ Investigation ID: {investigation_id}
 Please review and approve at: {approval_url}
 
 ---
-This email was sent by DataDr. Please do not reply to this email.
+This email was sent by Dataing. Please do not reply to this email.
         """
 
         return self.send(to_emails, subject, body_html, body_text)

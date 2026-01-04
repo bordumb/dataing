@@ -1,4 +1,4 @@
--- DataDr v2 Initial Schema Migration
+-- Dataing v2 Initial Schema Migration
 -- This migration creates all tables for the application database
 
 -- Tenants

@@ -12,9 +12,11 @@ from typing import TYPE_CHECKING, Any
 
 import structlog
 
+from dataing.adapters.datasource.types import SchemaResponse, Table
+
 if TYPE_CHECKING:
-    from dataing.core.domain_types import AnomalyAlert, SchemaContext
-    from dataing.core.interfaces import DatabaseAdapter
+    from dataing.adapters.datasource.base import BaseAdapter
+    from dataing.core.domain_types import AnomalyAlert
 
 logger = structlog.get_logger()
 
@@ -84,16 +86,16 @@ class CorrelationContext:
 
     async def find_correlations(
         self,
-        adapter: DatabaseAdapter,
+        adapter: BaseAdapter,
         anomaly: AnomalyAlert,
-        schema: SchemaContext,
+        schema: SchemaResponse,
     ) -> list[Correlation]:
         """Find correlations between the anomaly and related tables.
 
         Args:
-            adapter: Connected database adapter.
+            adapter: Connected data source adapter.
             anomaly: The anomaly to investigate.
-            schema: Schema context with table information.
+            schema: SchemaResponse with table information.
 
         Returns:
             List of detected correlations.
@@ -106,8 +108,8 @@ class CorrelationContext:
 
         correlations: list[Correlation] = []
 
-        # Get the target table schema
-        target_table = schema.get_table(anomaly.dataset_id)
+        # Get the target table from schema
+        target_table = self._get_table(schema, anomaly.dataset_id)
         if not target_table:
             logger.warning("target_table_not_found", table=anomaly.dataset_id)
             return correlations
@@ -138,7 +140,7 @@ class CorrelationContext:
 
     async def analyze_time_series(
         self,
-        adapter: DatabaseAdapter,
+        adapter: BaseAdapter,
         table_name: str,
         column_name: str,
         center_date: str,
@@ -205,9 +207,9 @@ class CorrelationContext:
 
     async def find_upstream_anomalies(
         self,
-        adapter: DatabaseAdapter,
+        adapter: BaseAdapter,
         anomaly: AnomalyAlert,
-        schema: SchemaContext,
+        schema: SchemaResponse,
     ) -> list[dict[str, Any]]:
         """Find anomalies in upstream/related tables.
 
@@ -252,32 +254,51 @@ class CorrelationContext:
 
         return upstream_anomalies
 
+    def _get_all_tables(self, schema: SchemaResponse) -> list[Table]:
+        """Extract all tables from the nested schema structure."""
+        tables = []
+        for catalog in schema.catalogs:
+            for db_schema in catalog.schemas:
+                tables.extend(db_schema.tables)
+        return tables
+
+    def _get_table(self, schema: SchemaResponse, table_name: str) -> Table | None:
+        """Get a table by name from the schema."""
+        table_name_lower = table_name.lower()
+        for table in self._get_all_tables(schema):
+            if (
+                table.native_path.lower() == table_name_lower
+                or table.name.lower() == table_name_lower
+            ):
+                return table
+        return None
+
     def _find_related_tables(
         self,
-        schema: SchemaContext,
+        schema: SchemaResponse,
         target_table: str,
     ) -> list[dict[str, str]]:
         """Find tables related to the target table.
 
         Args:
-            schema: Schema context.
+            schema: SchemaResponse.
             target_table: The target table name.
 
         Returns:
             List of related table info with join columns.
         """
-        target = schema.get_table(target_table)
+        target = self._get_table(schema, target_table)
         if not target:
             return []
 
-        target_cols = set(target.columns)
+        target_cols = {col.name for col in target.columns}
         related = []
 
-        for table in schema.tables:
-            if table.table_name == target_table:
+        for table in self._get_all_tables(schema):
+            if table.name == target.name:
                 continue
 
-            table_cols = set(table.columns)
+            table_cols = {col.name for col in table.columns}
             shared = target_cols & table_cols
 
             # Look for ID columns that could be join keys
@@ -285,7 +306,7 @@ class CorrelationContext:
                 if col.endswith("_id") or col == "id":
                     related.append(
                         {
-                            "table": table.table_name,
+                            "table": table.native_path,
                             "join_column": col,
                         }
                     )
@@ -295,7 +316,7 @@ class CorrelationContext:
 
     async def _analyze_table_correlation(
         self,
-        adapter: DatabaseAdapter,
+        adapter: BaseAdapter,
         anomaly: AnomalyAlert,
         source_table: str,
         related_table: str,

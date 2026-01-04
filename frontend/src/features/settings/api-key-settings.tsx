@@ -73,7 +73,7 @@ export function ApiKeySettings() {
         <CardHeader>
           <CardTitle>API Keys</CardTitle>
           <CardDescription>
-            Manage API keys for programmatic access to the DataDr API.
+            Manage API keys for programmatic access to the Dataing API.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -81,7 +81,7 @@ export function ApiKeySettings() {
             <EmptyState
               icon={Key}
               title="No API keys"
-              description="Create an API key to access the DataDr API."
+              description="Create an API key to access the Dataing API."
               action={
                 <Button onClick={() => setShowDialog(true)}>
                   <Plus className="mr-2 h-4 w-4" />

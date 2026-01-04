@@ -19,7 +19,7 @@ from mcp.server.stdio import stdio_server
 from mcp.types import TextContent, Tool
 
 from dataing.adapters.context.engine import DefaultContextEngine
-from dataing.adapters.db.postgres import PostgresAdapter
+from dataing.adapters.datasource import BaseAdapter, get_registry
 from dataing.adapters.llm.client import AnthropicClient
 from dataing.core.domain_types import AnomalyAlert
 from dataing.core.orchestrator import InvestigationOrchestrator, OrchestratorConfig
@@ -29,7 +29,7 @@ from dataing.safety.validator import validate_query
 
 
 def create_server(
-    db: PostgresAdapter,
+    db: BaseAdapter,
     llm: AnthropicClient,
 ) -> Server:
     """Create and configure the MCP server.
@@ -43,7 +43,7 @@ def create_server(
     """
     server = Server("dataing")
 
-    context_engine = DefaultContextEngine(db=db)
+    context_engine = DefaultContextEngine()
     circuit_breaker = CircuitBreaker(CircuitBreakerConfig())
 
     orchestrator = InvestigationOrchestrator(
@@ -196,7 +196,7 @@ async def _investigate_anomaly(
 
 
 async def _query_dataset(
-    db: PostgresAdapter,
+    db: BaseAdapter,
     args: dict[str, Any],
 ) -> list[TextContent]:
     """Execute a read-only query.
@@ -214,7 +214,7 @@ async def _query_dataset(
         # Validate query for safety
         validate_query(sql)
 
-        result = await db.execute_query(sql)
+        result = await db.execute(sql)
 
         # Format results
         if not result.rows:
@@ -238,7 +238,7 @@ async def _query_dataset(
 
 
 async def _get_table_schema(
-    db: PostgresAdapter,
+    db: BaseAdapter,
     args: dict[str, Any],
 ) -> list[TextContent]:
     """Get schema for a table.
@@ -251,19 +251,34 @@ async def _get_table_schema(
         List of TextContent with schema information.
     """
     table_name = args["table_name"]
+    table_name_lower = table_name.lower()
 
     try:
-        schema = await db.get_schema(table_pattern=table_name)
-        table = schema.get_table(table_name)
+        schema = await db.get_schema()
 
-        if not table:
+        # Find the table in the nested structure
+        found_table = None
+        for catalog in schema.catalogs:
+            for db_schema in catalog.schemas:
+                for table in db_schema.tables:
+                    if (
+                        table.native_path.lower() == table_name_lower
+                        or table.name.lower() == table_name_lower
+                    ):
+                        found_table = table
+                        break
+                if found_table:
+                    break
+            if found_table:
+                break
+
+        if not found_table:
             return [TextContent(type="text", text=f"Table not found: {table_name}")]
 
-        lines = [f"Table: {table.table_name}", ""]
+        lines = [f"Table: {found_table.native_path}", ""]
         lines.append("Columns:")
-        for col in table.columns:
-            col_type = table.column_types.get(col, "unknown")
-            lines.append(f"  - {col}: {col_type}")
+        for col in found_table.columns:
+            lines.append(f"  - {col.name}: {col.data_type.value}")
 
         return [TextContent(type="text", text="\n".join(lines))]
 
@@ -278,7 +293,8 @@ async def run_server(database_url: str, anthropic_api_key: str) -> None:
         database_url: PostgreSQL connection URL.
         anthropic_api_key: Anthropic API key.
     """
-    db = PostgresAdapter(database_url)
+    registry = get_registry()
+    db = registry.create("postgres", {"dsn": database_url})
     await db.connect()
 
     llm = AnthropicClient(api_key=anthropic_api_key)
@@ -288,4 +304,4 @@ async def run_server(database_url: str, anthropic_api_key: str) -> None:
     async with stdio_server() as (read_stream, write_stream):
         await server.run(read_stream, write_stream, server.create_initialization_options())
 
-    await db.close()
+    await db.disconnect()

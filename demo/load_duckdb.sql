@@ -1,4 +1,4 @@
--- DataDr Demo Fixtures: DuckDB Loading Script
+-- Dataing Demo Fixtures: DuckDB Loading Script
 -- Usage: duckdb demo.db < load_duckdb.sql
 -- Or: duckdb -c ".read load_duckdb.sql"
 

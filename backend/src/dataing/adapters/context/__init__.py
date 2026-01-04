@@ -1,18 +1,19 @@
 """Context gathering adapters.
 
 This package provides modular context gathering for investigations:
-- DatabaseContext: Resolves tenant data source adapters
 - SchemaContextBuilder: Builds and formats schema context
 - QueryContext: Executes queries and formats results
 - AnomalyContext: Confirms anomalies in data
 - CorrelationContext: Finds cross-table patterns
 - ContextEngine: Thin coordinator for all modules
+
+Note: For resolving tenant data source adapters, use AdapterRegistry
+from dataing.adapters.datasource instead of the old DatabaseContext.
 """
 
 from .anomaly_context import AnomalyConfirmation, AnomalyContext, ColumnProfile
 from .correlation_context import Correlation, CorrelationContext, TimeSeriesPattern
-from .database_context import DatabaseContext
-from .engine import ContextEngine, DefaultContextEngine, EnrichedContext
+from .engine import ContextEngine, DefaultContextEngine, EnrichedContext, InvestigationContext
 from .lineage import OpenLineageClient
 from .query_context import QueryContext, QueryExecutionError
 from .schema_context import SchemaContextBuilder
@@ -22,8 +23,7 @@ __all__ = [
     "ContextEngine",
     "DefaultContextEngine",
     "EnrichedContext",
-    # Database resolution
-    "DatabaseContext",
+    "InvestigationContext",
     # Schema
     "SchemaContextBuilder",
     # Query execution

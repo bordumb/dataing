@@ -1,4 +1,4 @@
-DataDr Privacy Layer: Technical SpecificationImplementation Directive for Engineering TeamCRITICAL INSTRUCTION: This specification must be implemented in its entirety. Every component, interface, and security measure described herein is required for production deployment. Do not skip sections. Do not implement partial solutions. Do not defer security measures to "later." The privacy guarantees we advertise to customers depend on complete implementation of this architecture.This document covers:
+Dataing Privacy Layer: Technical SpecificationImplementation Directive for Engineering TeamCRITICAL INSTRUCTION: This specification must be implemented in its entirety. Every component, interface, and security measure described herein is required for production deployment. Do not skip sections. Do not implement partial solutions. Do not defer security measures to "later." The privacy guarantees we advertise to customers depend on complete implementation of this architecture.This document covers:
 
 Customer-side data collection agent
 Privacy-preserving transformation layer
@@ -24,7 +24,7 @@ Deployment Configuration
 │                                                                              │
 │  ┌──────────────┐    ┌──────────────────┐    ┌────────────────────────────┐ │
 │  │              │    │                  │    │                            │ │
-│  │  Customer's  │───▶│  DataDr Agent    │───▶│  Local Privacy Transform  │ │
+│  │  Customer's  │───▶│  Dataing Agent    │───▶│  Local Privacy Transform  │ │
 │  │  Data        │    │  (Collector)     │    │  (DP + ZKP Generation)    │ │
 │  │  Warehouse   │    │                  │    │                            │ │
 │  └──────────────┘    └──────────────────┘    └─────────────┬──────────────┘ │
@@ -73,7 +73,7 @@ Deployment Configuration
 │  │                                                                       │  │
 │  └───────────────────────────────────────────────────────────────────────┘  │
 │                                                                              │
-└──────────────────────────────────────────────────────────────────────────────┘1.2 Data Flow SummaryStageLocationWhat ExistsPrivacy Mechanism1. CollectionCustomerRaw query logs, schemas, metricsNone yet (customer's data)2. Local TransformCustomerAggregated patterns, statisticsLocal DP applied3. ZKP GenerationCustomerValidity proofsCryptographic hiding4. TransmissionNetworkEncrypted packagemTLS, certificate pinning5. StorageDataDrEncrypted contributionsAES-256-GCM, tenant isolation6. AggregationDataDrCross-tenant aggregatesSecure aggregation protocol7. ComputationDataDrGlobal patternsDP with formal (ε,δ) guarantees1.3 Privacy GuaranteesThis system provides the following formally provable guarantees:
+└──────────────────────────────────────────────────────────────────────────────┘1.2 Data Flow SummaryStageLocationWhat ExistsPrivacy Mechanism1. CollectionCustomerRaw query logs, schemas, metricsNone yet (customer's data)2. Local TransformCustomerAggregated patterns, statisticsLocal DP applied3. ZKP GenerationCustomerValidity proofsCryptographic hiding4. TransmissionNetworkEncrypted packagemTLS, certificate pinning5. StorageDataingEncrypted contributionsAES-256-GCM, tenant isolation6. AggregationDataingCross-tenant aggregatesSecure aggregation protocol7. ComputationDataingGlobal patternsDP with formal (ε,δ) guarantees1.3 Privacy GuaranteesThis system provides the following formally provable guarantees:
 Differential Privacy (ε,δ)-guarantee: For ε=1.0, δ=1e-8, the probability of any inference about a single record changes by at most e^ε ≈ 2.718x whether that record is included or not.
 
 Zero-Knowledge: The ZKP system reveals nothing about the underlying data beyond the validity of the contribution.
@@ -81,8 +81,8 @@ Zero-Knowledge: The ZKP system reveals nothing about the underlying data beyond 
 Forward Secrecy: Compromise of current keys does not compromise historical data.
 
 Tenant Isolation: One customer's data cannot leak to another customer even with server compromise.
-2. Customer-Side Agent2.1 Agent ArchitectureThe DataDr Agent runs within the customer's infrastructure. It MUST be deployed as a containerized service with minimal privileges.┌─────────────────────────────────────────────────────────────┐
-│                    DataDr Agent Container                    │
+2. Customer-Side Agent2.1 Agent ArchitectureThe Dataing Agent runs within the customer's infrastructure. It MUST be deployed as a containerized service with minimal privileges.┌─────────────────────────────────────────────────────────────┐
+│                    Dataing Agent Container                    │
 │                                                              │
 │  ┌─────────────────┐  ┌─────────────────┐  ┌─────────────┐ │
 │  │                 │  │                 │  │             │ │
@@ -108,7 +108,7 @@ Snowflake
 BigQuery
 Redshift
 Databricks
-CRITICAL: Connectors MUST be read-only. The agent MUST NOT have write access to customer data.2.2.1 Connector Interfacepython# datadr_agent/connectors/base.py
+CRITICAL: Connectors MUST be read-only. The agent MUST NOT have write access to customer data.2.2.1 Connector Interfacepython# dataing_agent/connectors/base.py
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
@@ -207,7 +207,7 @@ class BaseConnector(ABC):
         This is the PRIMARY data collection mechanism.
         Query logs contain metadata about queries, not the data itself.
         """
-        ...2.2.2 PostgreSQL Connector Implementationpython# datadr_agent/connectors/postgres.py
+        ...2.2.2 PostgreSQL Connector Implementationpython# dataing_agent/connectors/postgres.py
 
 import asyncpg
 from datetime import datetime
@@ -260,12 +260,12 @@ class PostgresConnector(BaseConnector):
             # This query should fail if we have write access (good!)
             try:
                 await conn.execute(
-                    "CREATE TEMP TABLE _datadr_write_test (id int)"
+                    "CREATE TEMP TABLE _dataing_write_test (id int)"
                 )
-                await conn.execute("DROP TABLE _datadr_write_test")
+                await conn.execute("DROP TABLE _dataing_write_test")
                 # If we get here, we have write access - this is a configuration error
                 raise SecurityError(
-                    "DataDr agent has write access to database. "
+                    "Dataing agent has write access to database. "
                     "Please configure read-only credentials."
                 )
             except asyncpg.InsufficientPrivilegeError:
@@ -342,7 +342,7 @@ class PostgresConnector(BaseConnector):
             return tuple(sorted(tables))
         except Exception:
             # If parsing fails, return empty (don't crash)
-            return ()2.3 Pattern ExtractorThe Pattern Extractor processes query logs and schema metadata to identify data quality patterns.python# datadr_agent/extraction/pattern_extractor.py
+            return ()2.3 Pattern ExtractorThe Pattern Extractor processes query logs and schema metadata to identify data quality patterns.python# dataing_agent/extraction/pattern_extractor.py
 
 from dataclasses import dataclass
 from enum import Enum
@@ -552,7 +552,7 @@ class PatternExtractor:
         elif count < 1000000000:
             return "large"
         else:
-            return "huge"3. Local Privacy Transformation3.1 Differential Privacy EngineThe DP Engine applies differential privacy to extracted patterns BEFORE they leave the customer's infrastructure.python# datadr_agent/privacy/dp_engine.py
+            return "huge"3. Local Privacy Transformation3.1 Differential Privacy EngineThe DP Engine applies differential privacy to extracted patterns BEFORE they leave the customer's infrastructure.python# dataing_agent/privacy/dp_engine.py
 
 from dataclasses import dataclass
 from typing import TypeVar, Generic
@@ -584,7 +584,7 @@ class LocalDPEngine:
 
     "Local" means noise is added on the customer's machine,
     before data is transmitted. This provides the strongest
-    privacy guarantee - even DataDr cannot see true values.
+    privacy guarantee - even Dataing cannot see true values.
 
     We use the Laplace mechanism for numeric values and
     randomized response for categorical values.
@@ -695,7 +695,7 @@ class PrivatizedPattern:
     """
     A pattern after differential privacy has been applied.
 
-    This is safe to transmit to DataDr servers.
+    This is safe to transmit to Dataing servers.
     """
     pattern_type: PatternType
     schema_fingerprint: str
@@ -706,7 +706,7 @@ class PrivatizedPattern:
 
     # Privacy accounting
     epsilon_spent: float
-    delta: float3.2 Privacy Budget ManagerTracks privacy budget consumption to prevent exceeding guarantees.python# datadr_agent/privacy/budget_manager.py
+    delta: float3.2 Privacy Budget ManagerTracks privacy budget consumption to prevent exceeding guarantees.python# dataing_agent/privacy/budget_manager.py
 
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
@@ -741,7 +741,7 @@ class PrivacyBudgetManager:
         epsilon_per_period: float = 1.0,
         delta_per_period: float = 1e-8,
         period_duration: timedelta = timedelta(days=7),
-        state_path: Path = Path("/var/lib/datadr/privacy_budget.json"),
+        state_path: Path = Path("/var/lib/dataing/privacy_budget.json"),
     ):
         self._epsilon_per_period = epsilon_per_period
         self._delta_per_period = delta_per_period
@@ -874,7 +874,7 @@ class PrivacyBudgetManager:
         }
 
         with open(self._state_path, "w") as f:
-            json.dump(data, f, indent=2)4. Secure Transmission Layer4.1 Transport SecurityAll communication between customer agents and DataDr servers uses mTLS with certificate pinning.python# datadr_agent/transport/secure_client.py
+            json.dump(data, f, indent=2)4. Secure Transmission Layer4.1 Transport SecurityAll communication between customer agents and Dataing servers uses mTLS with certificate pinning.python# dataing_agent/transport/secure_client.py
 
 import ssl
 import aiohttp
@@ -890,15 +890,15 @@ class TransportConfig:
 
     All certificates should be rotated at least annually.
     """
-    # DataDr server endpoint
-    server_url: str = "https://ingest.datadr.io"
+    # Dataing server endpoint
+    server_url: str = "https://ingest.dataing.io"
 
     # Client certificate (for mTLS)
-    client_cert_path: Path = Path("/etc/datadr/client.crt")
-    client_key_path: Path = Path("/etc/datadr/client.key")
+    client_cert_path: Path = Path("/etc/dataing/client.crt")
+    client_key_path: Path = Path("/etc/dataing/client.key")
 
     # Server certificate pinning
-    # This is the SHA-256 fingerprint of DataDr's server certificate
+    # This is the SHA-256 fingerprint of Dataing's server certificate
     # If this doesn't match, connection is refused (prevents MITM)
     server_cert_fingerprint: str = "sha256//AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="
 
@@ -912,7 +912,7 @@ class TransportConfig:
 
 class SecureTransportClient:
     """
-    Secure HTTP client for transmitting privatized data to DataDr.
+    Secure HTTP client for transmitting privatized data to Dataing.
 
     Security features:
     - mTLS (mutual TLS) - both client and server authenticate
@@ -968,7 +968,7 @@ class SecureTransportClient:
         contribution: "ContributionPackage",
     ) -> "SubmissionReceipt":
         """
-        Submit a privatized contribution to DataDr.
+        Submit a privatized contribution to Dataing.
 
         The contribution is encrypted before transmission
         (defense in depth - TLS + application-layer encryption).
@@ -981,9 +981,9 @@ class SecureTransportClient:
 
         headers = {
             "Content-Type": "application/octet-stream",
-            "X-DataDr-Tenant": self._tenant_id,
-            "X-DataDr-Signature": signature,
-            "X-DataDr-Algorithm": "Ed25519",
+            "X-Dataing-Tenant": self._tenant_id,
+            "X-Dataing-Signature": signature,
+            "X-Dataing-Algorithm": "Ed25519",
         }
 
         # Submit with retries
@@ -1023,11 +1023,11 @@ class SecureTransportClient:
         contribution: "ContributionPackage"
     ) -> bytes:
         """
-        Encrypt contribution using DataDr's public key.
+        Encrypt contribution using Dataing's public key.
 
         Uses hybrid encryption:
         - Generate ephemeral X25519 key pair
-        - Derive shared secret with DataDr's public key
+        - Derive shared secret with Dataing's public key
         - Encrypt payload with AES-256-GCM using derived key
         - Send ephemeral public key + ciphertext
         """
@@ -1037,7 +1037,7 @@ class SecureTransportClient:
         from cryptography.hazmat.primitives.kdf.hkdf import HKDF
         import os
 
-        # Load DataDr's public key (embedded in agent)
+        # Load Dataing's public key (embedded in agent)
         server_public_key = self._load_server_public_key()
 
         # Generate ephemeral key pair
@@ -1052,7 +1052,7 @@ class SecureTransportClient:
             algorithm=hashes.SHA256(),
             length=32,
             salt=None,
-            info=b"datadr-contribution-encryption",
+            info=b"dataing-contribution-encryption",
         )
         encryption_key = kdf.derive(shared_secret)
 
@@ -1084,7 +1084,7 @@ class SecureTransportClient:
         # Sign the payload
         signature = signing_key.sign(payload)
 
-        return base64.b64encode(signature).decode()4.2 Contribution Package Formatpython# datadr_agent/transport/contribution.py
+        return base64.b64encode(signature).decode()4.2 Contribution Package Formatpython# dataing_agent/transport/contribution.py
 
 from dataclasses import dataclass
 from datetime import datetime
@@ -1149,7 +1149,7 @@ class ContributionPackage:
             "upstream_correlations": pattern.upstream_correlations,
             "epsilon_spent": pattern.epsilon_spent,
             "delta": pattern.delta,
-        }5. Server-Side Secure Storage5.1 Storage ArchitectureDataDr stores contributions in an encrypted, tenant-isolated storage layer.┌─────────────────────────────────────────────────────────────────────────────┐
+        }5. Server-Side Secure Storage5.1 Storage ArchitectureDataing stores contributions in an encrypted, tenant-isolated storage layer.┌─────────────────────────────────────────────────────────────────────────────┐
 │                          Storage Architecture                                │
 │                                                                              │
 │  ┌───────────────────────────────────────────────────────────────────────┐  │
@@ -1194,7 +1194,7 @@ class ContributionPackage:
 │  │    └─────────────────────────────────────────────────────────────────┘ │  │
 │  └─────────────────────────────────────────────────────────────────────────┘  │
 │                                                                              │
-└──────────────────────────────────────────────────────────────────────────────┘5.2 Storage Service Implementationpython# datadr_server/storage/contribution_store.py
+└──────────────────────────────────────────────────────────────────────────────┘5.2 Storage Service Implementationpython# dataing_server/storage/contribution_store.py
 
 from dataclasses import dataclass
 from datetime import datetime, date
@@ -1207,9 +1207,9 @@ import os
 @dataclass(frozen=True)
 class StorageConfig:
     """Storage configuration."""
-    bucket_prefix: str = "datadr-contributions"
+    bucket_prefix: str = "dataing-contributions"
     region: str = "us-east-1"
-    kms_key_alias: str = "alias/datadr-master"
+    kms_key_alias: str = "alias/dataing-master"
 
 class ContributionStore:
     """
@@ -1261,10 +1261,10 @@ class ContributionStore:
                 Key=s3_key,
                 Body=nonce + ciphertext,
                 Metadata={
-                    "x-datadr-tenant": tenant_id,
-                    "x-datadr-contribution-id": contribution_id,
-                    "x-datadr-created-at": contribution.created_at.isoformat(),
-                    "x-datadr-epsilon": str(contribution.total_epsilon_spent),
+                    "x-dataing-tenant": tenant_id,
+                    "x-dataing-contribution-id": contribution_id,
+                    "x-dataing-created-at": contribution.created_at.isoformat(),
+                    "x-dataing-epsilon": str(contribution.total_epsilon_spent),
                 },
                 ServerSideEncryption="aws:kms",
                 SSEKMSKeyId=self._config.kms_key_alias,
@@ -1420,7 +1420,7 @@ class ContributionStore:
     ) -> None:
         """Log access for audit trail."""
         # Implementation depends on audit system (CloudWatch, Splunk, etc.)
-        pass5.3 Tenant Isolation Verificationpython# datadr_server/storage/isolation_verifier.py
+        pass5.3 Tenant Isolation Verificationpython# dataing_server/storage/isolation_verifier.py
 
 class TenantIsolationVerifier:
     """
@@ -1448,7 +1448,7 @@ class TenantIsolationVerifier:
         results = []
 
         for tenant_id in await self._list_tenants():
-            bucket_name = f"datadr-contributions-{tenant_id}"
+            bucket_name = f"dataing-contributions-{tenant_id}"
 
             # Check bucket policy
             policy = await self._get_bucket_policy(bucket_name)
@@ -1485,7 +1485,7 @@ class TenantIsolationVerifier:
         - Privacy budget is tracked
         """
         # Implementation
-        pass6. Differential Privacy Computation Engine6.1 Server-Side DP AggregatorThe server aggregates contributions from multiple tenants while maintaining DP guarantees.python# datadr_server/dp/aggregator.py
+        pass6. Differential Privacy Computation Engine6.1 Server-Side DP AggregatorThe server aggregates contributions from multiple tenants while maintaining DP guarantees.python# dataing_server/dp/aggregator.py
 
 from dataclasses import dataclass
 from typing import Sequence, Dict
@@ -1685,7 +1685,7 @@ class AggregatedPatternStats:
     contributor_count: int
     mean_severity: float
     metric_means: Dict[str, float]
-    epsilon_spent: float6.2 Global Privacy Budget Accountingpython# datadr_server/dp/global_budget.py
+    epsilon_spent: float6.2 Global Privacy Budget Accountingpython# dataing_server/dp/global_budget.py
 
 from dataclasses import dataclass
 from datetime import datetime
@@ -1775,10 +1775,10 @@ class GlobalPrivacyBudgetManager:
             return (
                 state.total_epsilon_budget - state.total_epsilon_spent,
                 self._delta_per_period,  # Delta doesn't compose the same way
-            )7. Zero-Knowledge Proof System7.1 ZKP Circuit DesignWe use zero-knowledge proofs to verify contribution validity without revealing the underlying data.python# datadr_agent/zkp/circuits.py
+            )7. Zero-Knowledge Proof System7.1 ZKP Circuit DesignWe use zero-knowledge proofs to verify contribution validity without revealing the underlying data.python# dataing_agent/zkp/circuits.py
 
 """
-Zero-Knowledge Proof Circuits for DataDr
+Zero-Knowledge Proof Circuits for Dataing
 
 We use RISC Zero (https://risczero.com) for ZK proof generation.
 RISC Zero allows writing circuits in Rust that compile to a ZK-provable VM.
@@ -1792,7 +1792,7 @@ We chose RISC Zero because:
 1. Write circuits in standard Rust (no DSL)
 2. Good performance for our proof sizes
 3. Active development and support
-"""7.1.1 Contribution Validity Circuit (Rust)This circuit proves that a contribution is valid without revealing the underlying data.rust// datadr_agent/zkp/circuits/contribution_validity/src/main.rs
+"""7.1.1 Contribution Validity Circuit (Rust)This circuit proves that a contribution is valid without revealing the underlying data.rust// dataing_agent/zkp/circuits/contribution_validity/src/main.rs
 
 //! Zero-Knowledge Proof Circuit for Contribution Validity
 //!
@@ -1807,7 +1807,7 @@ We chose RISC Zero because:
 //! - Private inputs: raw query logs, schema metadata
 //! - Public inputs: contribution hash, tenant_id
 //!
-//! The verifier (DataDr server) learns only:
+//! The verifier (Dataing server) learns only:
 //! - The contribution is valid (all checks pass)
 //! - Nothing about the underlying data
 
@@ -2043,7 +2043,7 @@ fn compute_contribution_hash(patterns: &[PrivatizedPattern]) -> [u8; 32] {
         hasher.update(&pattern.severity.to_le_bytes());
     }
     hasher.finalize().into()
-}7.2 Proof Generation (Agent Side)python# datadr_agent/zkp/prover.py
+}7.2 Proof Generation (Agent Side)python# dataing_agent/zkp/prover.py
 
 from dataclasses import dataclass
 from pathlib import Path
@@ -2054,8 +2054,8 @@ import tempfile
 @dataclass(frozen=True)
 class ZKProofConfig:
     """Configuration for ZK proof generation."""
-    circuit_path: Path = Path("/opt/datadr/circuits/contribution_validity")
-    risc0_path: Path = Path("/opt/datadr/risc0")
+    circuit_path: Path = Path("/opt/dataing/circuits/contribution_validity")
+    risc0_path: Path = Path("/opt/dataing/risc0")
     proof_timeout_seconds: int = 300
 
 class ContributionProver:
@@ -2164,7 +2164,7 @@ class ContributionProver:
             hasher.update(bytes.fromhex(pattern.schema_fingerprint))
             hasher.update(pattern.severity.to_bytes(8, 'little'))
 
-        return hasher.digest()7.3 Proof Verification (Server Side)python# datadr_server/zkp/verifier.py
+        return hasher.digest()7.3 Proof Verification (Server Side)python# dataing_server/zkp/verifier.py
 
 from dataclasses import dataclass
 from pathlib import Path
@@ -2176,7 +2176,7 @@ import tempfile
 class ZKVerifyConfig:
     """Configuration for ZK proof verification."""
     circuit_image_id: str  # The expected RISC Zero image ID
-    risc0_path: Path = Path("/opt/datadr/risc0")
+    risc0_path: Path = Path("/opt/dataing/risc0")
     verify_timeout_seconds: int = 30
 
 class ContributionVerifier:
@@ -2261,7 +2261,7 @@ class VerificationResult:
     """Result of ZK proof verification."""
     valid: bool
     public_inputs: dict
-    error: str | None8. Privacy Budget Management8.1 Multi-Level Budget Trackingpython# datadr_server/privacy/budget_tracker.py
+    error: str | None8. Privacy Budget Management8.1 Multi-Level Budget Trackingpython# dataing_server/privacy/budget_tracker.py
 
 from dataclasses import dataclass
 from datetime import datetime, timedelta
@@ -2357,7 +2357,7 @@ class MultiLevelBudgetTracker:
                 await self._spen
 
 
-# DataDr Privacy Layer: Technical Specification (Part 2)
+# Dataing Privacy Layer: Technical Specification (Part 2)
 
 ## Continuation from Part 1
 
@@ -2457,7 +2457,7 @@ When budget is exhausted:
 
 ### 9.1 Protocol Overview
 
-DataDr uses federated learning to build models from distributed data without centralizing raw data.
+Dataing uses federated learning to build models from distributed data without centralizing raw data.
 
 ```
 ┌──────────────────────────────────────────────────────────────────────────────┐
@@ -2811,12 +2811,12 @@ This test verifies that aggregates don't reveal individual records.
 **Docker Compose (Customer Side):**
 
 ```yaml
-# docker-compose.yml for DataDr Agent
+# docker-compose.yml for Dataing Agent
 version: '3.8'
 
 services:
-  datadr-agent:
-    image: datadr/agent:${VERSION}
+  dataing-agent:
+    image: dataing/agent:${VERSION}
     restart: unless-stopped
 
     # Security: Run as non-root
@@ -2835,13 +2835,13 @@ services:
 
     volumes:
       # Configuration (read-only)
-      - ./config:/etc/datadr:ro
+      - ./config:/etc/dataing:ro
 
       # Certificates (read-only)
-      - ./certs:/etc/datadr/certs:ro
+      - ./certs:/etc/dataing/certs:ro
 
       # State directory (read-write, for budget tracking)
-      - datadr-state:/var/lib/datadr
+      - dataing-state:/var/lib/dataing
 
       # Temp directory for ZKP computation
       - type: tmpfs
@@ -2856,9 +2856,9 @@ services:
       - DATADR_DP_DELTA=1e-8
       - DATADR_MIN_SAMPLE_SIZE=100
 
-    # Network: Only outbound to DataDr servers
+    # Network: Only outbound to Dataing servers
     networks:
-      - datadr-net
+      - dataing-net
 
     # Resource limits
     deploy:
@@ -2871,17 +2871,17 @@ services:
           memory: 1G
 
 volumes:
-  datadr-state:
+  dataing-state:
     driver: local
 
 networks:
-  datadr-net:
+  dataing-net:
     driver: bridge
 ```
 
 ### 12.2 Server Infrastructure
 
-**Kubernetes Deployment (DataDr Side):**
+**Kubernetes Deployment (Dataing Side):**
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
@@ -3002,7 +3002,7 @@ networks:
 │  │  AGENT CERTIFICATES (mTLS)                              ││
 │  │                                                          ││
 │  │  • One certificate per tenant                           ││
-│  │  • Issued by DataDr CA                                  ││
+│  │  • Issued by Dataing CA                                  ││
 │  │  • Rotated annually                                     ││
 │  │  • Revocable via CRL/OCSP                              ││
 │  └─────────────────────────────────────────────────────────┘│
@@ -3013,7 +3013,7 @@ networks:
 │  │                                                          ││
 │  │  • Ed25519 key pair per tenant                          ││
 │  │  • Used to sign contribution proofs                     ││
-│  │  • Public key registered with DataDr                    ││
+│  │  • Public key registered with Dataing                    ││
 │  └─────────────────────────────────────────────────────────┘│
 │                                                              │
 └─────────────────────────────────────────────────────────────┘

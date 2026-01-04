@@ -2,7 +2,19 @@
 
 from __future__ import annotations
 
-from dataing.core.domain_types import QueryResult, SchemaContext, TableSchema
+from datetime import UTC, datetime
+
+from dataing.adapters.datasource.types import (
+    Catalog,
+    Column,
+    NormalizedType,
+    QueryResult,
+    Schema,
+    SchemaResponse,
+    SourceCategory,
+    SourceType,
+    Table,
+)
 
 
 class MockDatabaseAdapter:
@@ -21,7 +33,7 @@ class MockDatabaseAdapter:
     def __init__(
         self,
         responses: dict[str, QueryResult] | None = None,
-        schema: SchemaContext | None = None,
+        schema: SchemaResponse | None = None,
     ) -> None:
         """Initialize the mock adapter.
 
@@ -33,42 +45,114 @@ class MockDatabaseAdapter:
         self._mock_schema = schema or self._default_schema()
         self.executed_queries: list[str] = []
 
-    def _default_schema(self) -> SchemaContext:
+    def _default_schema(self) -> SchemaResponse:
         """Create a default mock schema for testing."""
-        return SchemaContext(
-            tables=(
-                TableSchema(
-                    table_name="public.users",
-                    columns=("id", "email", "created_at", "updated_at"),
-                    column_types={
-                        "id": "integer",
-                        "email": "varchar",
-                        "created_at": "timestamp",
-                        "updated_at": "timestamp",
-                    },
-                ),
-                TableSchema(
-                    table_name="public.orders",
-                    columns=("id", "user_id", "total", "status", "created_at"),
-                    column_types={
-                        "id": "integer",
-                        "user_id": "integer",
-                        "total": "numeric",
-                        "status": "varchar",
-                        "created_at": "timestamp",
-                    },
-                ),
-                TableSchema(
-                    table_name="public.products",
-                    columns=("id", "name", "price", "category"),
-                    column_types={
-                        "id": "integer",
-                        "name": "varchar",
-                        "price": "numeric",
-                        "category": "varchar",
-                    },
-                ),
-            )
+        return SchemaResponse(
+            source_id="mock",
+            source_type=SourceType.POSTGRESQL,
+            source_category=SourceCategory.DATABASE,
+            fetched_at=datetime.now(UTC),
+            catalogs=[
+                Catalog(
+                    name="main",
+                    schemas=[
+                        Schema(
+                            name="public",
+                            tables=[
+                                Table(
+                                    name="users",
+                                    table_type="table",
+                                    native_type="table",
+                                    native_path="public.users",
+                                    columns=[
+                                        Column(
+                                            name="id",
+                                            data_type=NormalizedType.INTEGER,
+                                            native_type="integer",
+                                        ),
+                                        Column(
+                                            name="email",
+                                            data_type=NormalizedType.STRING,
+                                            native_type="varchar",
+                                        ),
+                                        Column(
+                                            name="created_at",
+                                            data_type=NormalizedType.TIMESTAMP,
+                                            native_type="timestamp",
+                                        ),
+                                        Column(
+                                            name="updated_at",
+                                            data_type=NormalizedType.TIMESTAMP,
+                                            native_type="timestamp",
+                                        ),
+                                    ],
+                                ),
+                                Table(
+                                    name="orders",
+                                    table_type="table",
+                                    native_type="table",
+                                    native_path="public.orders",
+                                    columns=[
+                                        Column(
+                                            name="id",
+                                            data_type=NormalizedType.INTEGER,
+                                            native_type="integer",
+                                        ),
+                                        Column(
+                                            name="user_id",
+                                            data_type=NormalizedType.INTEGER,
+                                            native_type="integer",
+                                        ),
+                                        Column(
+                                            name="total",
+                                            data_type=NormalizedType.DECIMAL,
+                                            native_type="numeric",
+                                        ),
+                                        Column(
+                                            name="status",
+                                            data_type=NormalizedType.STRING,
+                                            native_type="varchar",
+                                        ),
+                                        Column(
+                                            name="created_at",
+                                            data_type=NormalizedType.TIMESTAMP,
+                                            native_type="timestamp",
+                                        ),
+                                    ],
+                                ),
+                                Table(
+                                    name="products",
+                                    table_type="table",
+                                    native_type="table",
+                                    native_path="public.products",
+                                    columns=[
+                                        Column(
+                                            name="id",
+                                            data_type=NormalizedType.INTEGER,
+                                            native_type="integer",
+                                        ),
+                                        Column(
+                                            name="name",
+                                            data_type=NormalizedType.STRING,
+                                            native_type="varchar",
+                                        ),
+                                        Column(
+                                            name="price",
+                                            data_type=NormalizedType.DECIMAL,
+                                            native_type="numeric",
+                                        ),
+                                        Column(
+                                            name="category",
+                                            data_type=NormalizedType.STRING,
+                                            native_type="varchar",
+                                        ),
+                                    ],
+                                ),
+                            ],
+                        )
+                    ],
+                )
+            ],
         )
 
     async def connect(self) -> None:
@@ -100,22 +184,38 @@ class MockDatabaseAdapter:
                 return response
 
         # Default empty response
-        return QueryResult(columns=(), rows=(), row_count=0)
+        return QueryResult(columns=[], rows=[], row_count=0)
 
-    async def get_schema(self, table_pattern: str | None = None) -> SchemaContext:
+    async def get_schema(self, table_pattern: str | None = None) -> SchemaResponse:
         """Return mock schema.
 
         Args:
             table_pattern: Optional filter pattern.
 
         Returns:
-            Mock SchemaContext.
+            Mock SchemaResponse.
         """
         if table_pattern:
-            filtered_tables = tuple(
-                t for t in self._mock_schema.tables if table_pattern.lower() in t.table_name.lower()
+            # Filter tables by pattern
+            filtered_catalogs = []
+            for catalog in self._mock_schema.catalogs:
+                filtered_schemas = []
+                for schema in catalog.schemas:
+                    filtered_tables = [
+                        t for t in schema.tables if table_pattern.lower() in t.native_path.lower()
+                    ]
+                    if filtered_tables:
+                        filtered_schemas.append(Schema(name=schema.name, tables=filtered_tables))
+                if filtered_schemas:
+                    filtered_catalogs.append(Catalog(name=catalog.name, schemas=filtered_schemas))
+
+            return SchemaResponse(
+                source_id=self._mock_schema.source_id,
+                source_type=self._mock_schema.source_type,
+                source_category=self._mock_schema.source_category,
+                fetched_at=self._mock_schema.fetched_at,
+                catalogs=filtered_catalogs,
             )
-            return SchemaContext(tables=filtered_tables)
         return self._mock_schema
 
     def add_response(self, pattern: str, response: QueryResult) -> None:
@@ -139,8 +239,8 @@ class MockDatabaseAdapter:
             count: Row count to return.
         """
         self.responses[pattern] = QueryResult(
-            columns=("count",),
-            rows=({"count": count},),
+            columns=[{"name": "count", "data_type": "integer"}],
+            rows=[{"count": count}],
             row_count=1,
         )
 

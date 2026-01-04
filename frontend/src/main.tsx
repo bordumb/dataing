@@ -19,7 +19,7 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <QueryClientProvider client={queryClient}>
       <BrowserRouter>
-        <ThemeProvider defaultTheme="system" storageKey="datadr-ui-theme">
+        <ThemeProvider defaultTheme="system" storageKey="dataing-ui-theme">
           <App />
         </ThemeProvider>
       </BrowserRouter>

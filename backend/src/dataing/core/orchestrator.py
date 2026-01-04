@@ -131,7 +131,7 @@ class InvestigationOrchestrator:
             state = await self._gather_context(state)
             if state.schema_context is None:
                 raise SchemaDiscoveryError("Schema context is None after gathering")
-            log.info("Context gathered", tables_found=len(state.schema_context.tables))
+            log.info("Context gathered", tables_found=state.schema_context.table_count())
 
             # 2. Generate Hypotheses
             state, hypotheses = await self._generate_hypotheses(state)
@@ -210,7 +210,7 @@ class InvestigationOrchestrator:
             raise SchemaDiscoveryError(f"Context gathering failed: {e}") from e
 
         # FAIL FAST: Empty schema means DB connectivity issue or permissions problem
-        if not context.schema.tables:
+        if context.schema.is_empty():
             state = state.append_event(
                 Event(
                     type="schema_discovery_failed",
@@ -233,7 +233,7 @@ class InvestigationOrchestrator:
                 type="context_gathered",
                 timestamp=datetime.now(UTC),
                 data={
-                    "tables_found": len(context.schema.tables),
+                    "tables_found": context.schema.table_count(),
                     "has_lineage": context.lineage is not None,
                 },
             )

@@ -7,9 +7,7 @@ from .domain_types import (
     Hypothesis,
     HypothesisCategory,
     InvestigationContext,
-    QueryResult,
-    SchemaContext,
-    TableSchema,
+    LineageContext,
 )
 from .exceptions import (
     CircuitBreakerTripped,
@@ -31,9 +29,7 @@ __all__ = [
     "Hypothesis",
     "HypothesisCategory",
     "InvestigationContext",
-    "QueryResult",
-    "SchemaContext",
-    "TableSchema",
+    "LineageContext",
     # Exceptions
     "DataingError",
     "SchemaDiscoveryError",

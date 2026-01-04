@@ -1,9 +1,9 @@
 ## Frontend Implementation Details
-# DataDr v2 Frontend Implementation Guide
+# Dataing v2 Frontend Implementation Guide
 
 ## Using shadcn/ui (Manual Installation)
 
-This document provides a complete implementation prompt for building the DataDr v2 frontend using shadcn/ui components with manual installation, following best practices for React + Vite + TypeScript.
+This document provides a complete implementation prompt for building the Dataing v2 frontend using shadcn/ui components with manual installation, following best practices for React + Vite + TypeScript.
 
 ---
 
@@ -774,7 +774,7 @@ export function AppSidebar() {
                   <Search className="size-4" />
                 </div>
                 <div className="grid flex-1 text-left text-sm leading-tight">
-                  <span className="truncate font-semibold">DataDr</span>
+                  <span className="truncate font-semibold">Dataing</span>
                   <span className="truncate text-xs text-muted-foreground">
                     {tenant?.name ?? 'Data Quality'}
                   </span>
@@ -2084,7 +2084,7 @@ export function DataSourceForm({ open, onOpenChange }: DataSourceFormProps) {
                   onChange={(e) =>
                     setFormData({ ...formData, username: e.target.value })
                   }
-                  placeholder="datadr"
+                  placeholder="dataing"
                   required
                 />
               </div>

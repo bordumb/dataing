@@ -1,4 +1,4 @@
-# DataDr Demo Integration: Technical Specification
+# Dataing Demo Integration: Technical Specification
 
 ## Acceptance Criteria
 
@@ -150,10 +150,10 @@ DuckDBConfig:
 ### 2.4 Implementation Skeleton
 
 ```python
-# Location: backend/src/datadr/adapters/connectors/duckdb_connector.py
+# Location: backend/src/dataing/adapters/connectors/duckdb_connector.py
 
 """
-DuckDB Connector for DataDr.
+DuckDB Connector for Dataing.
 
 Supports two modes:
 1. Parquet directory: Auto-registers all .parquet files as views
@@ -211,7 +211,7 @@ Always read-only for safety.
 Add DuckDB to the connector registry:
 
 ```python
-# Location: backend/src/datadr/adapters/connectors/__init__.py
+# Location: backend/src/dataing/adapters/connectors/__init__.py
 
 CONNECTOR_REGISTRY = {
     "postgresql": PostgresConnector,
@@ -238,12 +238,12 @@ On demo startup, we need to:
 ### 3.2 Seed Data Structure
 
 ```python
-# Location: backend/src/datadr/demo/seed.py
+# Location: backend/src/dataing/demo/seed.py
 
 """
 Demo seed data.
 
-Run with: python -m datadr.demo.seed
+Run with: python -m dataing.demo.seed
 Or automatically on startup when DATADR_DEMO_MODE=true
 """
 
@@ -380,8 +380,8 @@ demo-fixtures:
 # Start backend in demo mode
 demo-backend:
 	DATADR_DEMO_MODE=true \
-	DATADR_DB_URL=postgresql://localhost:5432/datadr_demo \
-	cd backend && uv run python -m datadr.main &
+	DATADR_DB_URL=postgresql://localhost:5432/dataing_demo \
+	cd backend && uv run python -m dataing.main &
 
 # Start frontend
 demo-frontend:
@@ -390,7 +390,7 @@ demo-frontend:
 # Clean demo data
 demo-clean:
 	rm -rf demo/fixtures/*/
-	dropdb datadr_demo --if-exists
+	dropdb dataing_demo --if-exists
 ```
 
 ### 4.2 Docker Compose (Alternative)
@@ -404,15 +404,15 @@ services:
   postgres:
     image: postgres:16-alpine
     environment:
-      POSTGRES_DB: datadr_demo
-      POSTGRES_USER: datadr
-      POSTGRES_PASSWORD: datadr
+      POSTGRES_DB: dataing_demo
+      POSTGRES_USER: dataing
+      POSTGRES_PASSWORD: dataing
     volumes:
       - demo-pgdata:/var/lib/postgresql/data
     ports:
       - "5432:5432"
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U datadr -d datadr_demo"]
+      test: ["CMD-SHELL", "pg_isready -U dataing -d dataing_demo"]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -423,7 +423,7 @@ services:
       dockerfile: Dockerfile
     environment:
       DATADR_DEMO_MODE: "true"
-      DATADR_DB_URL: postgresql://datadr:datadr@postgres:5432/datadr_demo
+      DATADR_DB_URL: postgresql://dataing:dataing@postgres:5432/dataing_demo
       DATADR_FIXTURE_PATH: /app/fixtures
     volumes:
       - ./demo/fixtures:/app/fixtures:ro
@@ -461,10 +461,10 @@ volumes:
 ### 4.3 Backend Demo Mode
 
 ```python
-# Location: backend/src/datadr/main.py
+# Location: backend/src/dataing/main.py
 
 import os
-from datadr.demo.seed import seed_demo_data
+from dataing.demo.seed import seed_demo_data
 
 async def lifespan(app: FastAPI):
     """Application lifespan handler."""
@@ -568,7 +568,7 @@ make demo
 
 **[0:00] Introduction**
 
-> "Let me show you how DataDr works. I've got a sample e-commerce dataset here - 7 days of orders, events, user data."
+> "Let me show you how Dataing works. I've got a sample e-commerce dataset here - 7 days of orders, events, user data."
 
 **[0:30] Show Data Source**
 
@@ -584,13 +584,13 @@ make demo
 
 **[1:30] While Running**
 
-> "DataDr is now analyzing the orders table. It's looking at schema, data distributions, temporal patterns, checking for anomalies."
+> "Dataing is now analyzing the orders table. It's looking at schema, data distributions, temporal patterns, checking for anomalies."
 
 *Show the investigation progress indicator*
 
 **[2:00] Results**
 
-> "Here we go. DataDr found a NULL spike in the user_id column. 41% of orders from January 10th to 12th have no user ID."
+> "Here we go. Dataing found a NULL spike in the user_id column. 41% of orders from January 10th to 12th have no user ID."
 
 *Show results page with:*
 - *Pattern type: NULL_SPIKE*
@@ -605,7 +605,7 @@ make demo
 
 **[3:00] Impact**
 
-> "Without DataDr, you'd find this when your marketing attribution dashboard shows weird numbers in 3 days. With DataDr, you'd catch it in minutes."
+> "Without Dataing, you'd find this when your marketing attribution dashboard shows weird numbers in 3 days. With Dataing, you'd catch it in minutes."
 
 **[3:30] Close**
 
@@ -616,10 +616,10 @@ make demo
 ## 7. Directory Structure
 
 ```
-datadr/
+dataing/
 ├── backend/
 │   └── src/
-│       └── datadr/
+│       └── dataing/
 │           ├── adapters/
 │           │   └── connectors/
 │           │       ├── __init__.py        # Registry
@@ -714,10 +714,10 @@ datadr/
 
 ```bash
 # Check if seed ran
-psql -d datadr_demo -c "SELECT * FROM datasources WHERE id LIKE 'demo%';"
+psql -d dataing_demo -c "SELECT * FROM datasources WHERE id LIKE 'demo%';"
 
 # If empty, re-run seed
-DATADR_DEMO_MODE=true python -m datadr.demo.seed
+DATADR_DEMO_MODE=true python -m dataing.demo.seed
 ```
 
 ### "Can't connect to DuckDB"
@@ -787,7 +787,7 @@ Run this after implementation to verify demo works:
 #!/bin/bash
 set -e
 
-echo "=== DataDr Demo Acceptance Test ==="
+echo "=== Dataing Demo Acceptance Test ==="
 
 # 1. Clean slate
 echo "[1/7] Cleaning previous state..."

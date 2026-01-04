@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-DataDr Demo Fixtures Generator.
+Dataing Demo Fixtures Generator.
 
 Generates realistic e-commerce data with pre-baked anomalies for demos.
 Run with: uv run python demo/generate.py
@@ -1118,7 +1118,7 @@ def create_manifest(
 def generate_all_fixtures():
     """Generate all fixture sets."""
     print("=" * 60)
-    print("DataDr Demo Fixtures Generator")
+    print("Dataing Demo Fixtures Generator")
     print("=" * 60)
 
     # Generate baseline data

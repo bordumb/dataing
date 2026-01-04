@@ -1,10 +1,10 @@
-# DataDr Demo Fixtures: Technical Specification
+# Dataing Demo Fixtures: Technical Specification
 
 ## Implementation Directive
 
 **TIMELINE:** 2-3 days maximum. This is a demo, not a product. Resist the urge to overengineer.
 
-**GOAL:** Generate realistic e-commerce data with pre-baked anomalies that DataDr can detect, producing compelling "aha moments" in demos.
+**GOAL:** Generate realistic e-commerce data with pre-baked anomalies that Dataing can detect, producing compelling "aha moments" in demos.
 
 **OUTPUT:** Parquet files loadable into DuckDB/PostgreSQL/Trino that look like real production data.
 
@@ -221,7 +221,7 @@ Hourly Distribution (UTC):
 
 ## 3. Anomaly Scenarios
 
-Each scenario is a separate fixture set. DataDr should detect each anomaly type.
+Each scenario is a separate fixture set. Dataing should detect each anomaly type.
 
 ### 3.1 Scenario: NULL Spike
 
@@ -752,21 +752,21 @@ ORDER BY 1;
 
 ```bash
 # Create schema
-psql -d datadr_demo -f schema.sql
+psql -d dataing_demo -f schema.sql
 
 # Load data (requires parquet_fdw or convert to CSV first)
 # Option 1: Use DuckDB to convert
 duckdb -c "COPY (SELECT * FROM 'fixtures/null_spike/orders.parquet') TO 'orders.csv' (HEADER, DELIMITER ',');"
 
 # Option 2: Use pgloader
-pgloader parquet://fixtures/null_spike/orders.parquet postgresql:///datadr_demo
+pgloader parquet://fixtures/null_spike/orders.parquet postgresql:///dataing_demo
 ```
 
 ### 6.3 Trino (For Production-Like Demo)
 
 ```sql
 -- Create external tables pointing to parquet files
-CREATE SCHEMA IF NOT EXISTS demo WITH (location = 's3://datadr-demo-fixtures/');
+CREATE SCHEMA IF NOT EXISTS demo WITH (location = 's3://dataing-demo-fixtures/');
 
 CREATE TABLE demo.orders (
     order_id VARCHAR,
@@ -776,7 +776,7 @@ CREATE TABLE demo.orders (
     -- ...
 )
 WITH (
-    external_location = 's3://datadr-demo-fixtures/null_spike/orders/',
+    external_location = 's3://dataing-demo-fixtures/null_spike/orders/',
     format = 'PARQUET'
 );
 ```
@@ -884,8 +884,8 @@ ORDER BY 1, 2;
 - [ ] Create manifest.json generator
 - [ ] Write DuckDB loading script
 - [ ] Write PostgreSQL loading script (if needed)
-- [ ] Run DataDr against each fixture, verify detection
-- [ ] Document demo script ("At this point, DataDr will detect...")
+- [ ] Run Dataing against each fixture, verify detection
+- [ ] Document demo script ("At this point, Dataing will detect...")
 - [ ] Create demo video script/storyboard
 
 ---
@@ -898,21 +898,21 @@ ORDER BY 1, 2;
 
 ### Slide 2: "Live Demo"
 
-> "Let me show you DataDr detecting a real issue in this e-commerce dataset."
+> "Let me show you Dataing detecting a real issue in this e-commerce dataset."
 
-**Action:** Load `null_spike` fixture, run DataDr investigation.
+**Action:** Load `null_spike` fixture, run Dataing investigation.
 
 ### Slide 3: "Detection"
 
-> "DataDr identified a NULL spike in `orders.user_id` that started on January 10th. 41% of orders are affected."
+> "Dataing identified a NULL spike in `orders.user_id` that started on January 10th. 41% of orders are affected."
 
-**Show:** DataDr UI with detection result.
+**Show:** Dataing UI with detection result.
 
 ### Slide 4: "Root Cause"
 
 > "It correlated this with mobile traffic and identified the likely cause: the mobile app checkout flow isn't passing user context."
 
-**Show:** DataDr root cause analysis.
+**Show:** Dataing root cause analysis.
 
 ### Slide 5: "Impact"
 
@@ -922,7 +922,7 @@ ORDER BY 1, 2;
 
 ### Slide 6: "Call to Action"
 
-> "DataDr would have caught this in minutes, not days. Want to see it on your data?"
+> "Dataing would have caught this in minutes, not days. Want to see it on your data?"
 
 ---
 
@@ -931,7 +931,7 @@ ORDER BY 1, 2;
 ```toml
 # pyproject.toml
 [project]
-name = "datadr-fixtures"
+name = "dataing-fixtures"
 version = "0.1.0"
 dependencies = [
     "polars>=0.20.0",      # Fast DataFrame operations
@@ -950,7 +950,7 @@ dev = [
 
 ## Final Notes
 
-**Remember:** This is a demo, not a product. The goal is to show DataDr detecting problems in realistic-looking data. Don't spend time on:
+**Remember:** This is a demo, not a product. The goal is to show Dataing detecting problems in realistic-looking data. Don't spend time on:
 
 - Perfect statistical distributions
 - Edge cases that won't appear in demos
@@ -966,7 +966,7 @@ dev = [
 Yes, `./demo` at the root is perfect. Clean and obvious.
 
 ```
-datadr/
+dataing/
 ├── backend/
 ├── frontend/
 ├── demo/
@@ -1007,7 +1007,7 @@ cd demo && python generate.py && cd ../backend && make run
 # Makefile (root)
 demo:
 	cd demo && uv run generate.py
-	cd backend && uv run python -m datadr.cli investigate --source duckdb://demo/fixtures/null_spike
+	cd backend && uv run python -m dataing.cli investigate --source duckdb://demo/fixtures/null_spike
 ```
 
 This keeps the demo self-contained without polluting your core codebase. When you're ready to ship, you can even exclude `demo/` from the production Docker image.

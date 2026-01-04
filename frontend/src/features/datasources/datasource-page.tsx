@@ -1,5 +1,6 @@
 import * as React from 'react'
-import { Plus, Database } from 'lucide-react'
+import { Plus, Database, AlertCircle, RefreshCw } from 'lucide-react'
+import { Link } from 'react-router-dom'
 
 import { Button } from '@/components/ui/Button'
 import { PageHeader } from '@/components/shared/page-header'
@@ -12,7 +13,7 @@ import { EmptyState } from '@/components/shared/empty-state'
 
 export function DataSourcePage() {
   const [formOpen, setFormOpen] = React.useState(false)
-  const { data: datasources, isLoading, error } = useDataSources()
+  const { data: datasources, isLoading, error, refetch } = useDataSources()
 
   if (isLoading) {
     return (
@@ -24,8 +25,25 @@ export function DataSourcePage() {
 
   if (error) {
     return (
-      <div className="text-center py-12 text-destructive">
-        Failed to load data sources
+      <div className="flex flex-col items-center justify-center py-12 space-y-4">
+        <div className="flex items-center gap-3 rounded-lg border border-destructive/50 bg-destructive/10 p-4 max-w-lg">
+          <AlertCircle className="h-5 w-5 text-destructive flex-shrink-0" />
+          <div>
+            <p className="font-medium text-destructive">Failed to load data sources</p>
+            <p className="text-sm text-muted-foreground mt-1">
+              {error.message || 'Please check your API key and try again.'}
+            </p>
+          </div>
+        </div>
+        <div className="flex gap-3">
+          <Button variant="outline" onClick={() => refetch()}>
+            <RefreshCw className="mr-2 h-4 w-4" />
+            Retry
+          </Button>
+          <Link to="/settings">
+            <Button variant="secondary">Check Settings</Button>
+          </Link>
+        </div>
       </div>
     )
   }

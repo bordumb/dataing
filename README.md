@@ -1,4 +1,4 @@
-# DataDr
+# Dataing
 
 Autonomous Data Quality Investigation - an AI-powered system that automatically detects and diagnoses data anomalies.
 

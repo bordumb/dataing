@@ -27,7 +27,7 @@ function AppLayout({ children }: { children: React.ReactNode }) {
           <div className="flex items-center gap-2">
             <SidebarTrigger className="-ml-1" />
             <Separator orientation="vertical" className="mr-2 h-4" />
-            <span className="text-sm text-muted-foreground">DataDr</span>
+            <span className="text-sm text-muted-foreground">Dataing</span>
           </div>
           <ModeToggle />
         </header>

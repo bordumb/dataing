@@ -86,7 +86,7 @@ export function AppSidebar() {
                   <Search className="size-4" />
                 </div>
                 <div className="grid flex-1 text-left text-sm leading-tight">
-                  <span className="truncate font-semibold">DataDr</span>
+                  <span className="truncate font-semibold">Dataing</span>
                   <span className="truncate text-xs text-muted-foreground">
                     {tenant?.name ?? 'Data Quality'}
                   </span>

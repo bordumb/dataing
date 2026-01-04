@@ -11,7 +11,7 @@ from typing import TYPE_CHECKING, Any
 
 import structlog
 
-from dataing.core.domain_types import QueryResult
+from dataing.adapters.datasource.types import QueryResult
 
 if TYPE_CHECKING:
     from dataing.core.interfaces import DatabaseAdapter

@@ -1,10 +1,10 @@
 #!/bin/bash
-# DataDr Demo Acceptance Test
+# Dataing Demo Acceptance Test
 # Run this script to verify the demo is working correctly
 
 set -e
 
-echo "=== DataDr Demo Acceptance Test ==="
+echo "=== Dataing Demo Acceptance Test ==="
 echo ""
 
 # Colors for output

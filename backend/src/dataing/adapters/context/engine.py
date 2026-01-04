@@ -3,6 +3,8 @@
 This module orchestrates the various context modules to gather
 all information needed for an investigation. It's a thin coordinator
 that delegates to specialized modules.
+
+Uses the unified SchemaResponse from the datasource layer.
 """
 
 from __future__ import annotations
@@ -12,7 +14,7 @@ from typing import TYPE_CHECKING
 
 import structlog
 
-from dataing.core.domain_types import InvestigationContext
+from dataing.adapters.datasource.types import SchemaResponse
 from dataing.core.exceptions import SchemaDiscoveryError
 
 from .anomaly_context import AnomalyConfirmation, AnomalyContext
@@ -20,12 +22,25 @@ from .correlation_context import Correlation, CorrelationContext
 from .schema_context import SchemaContextBuilder
 
 if TYPE_CHECKING:
-    from dataing.core.domain_types import AnomalyAlert
-    from dataing.core.interfaces import DatabaseAdapter
+    from dataing.adapters.datasource.base import BaseAdapter
+    from dataing.core.domain_types import AnomalyAlert, LineageContext
 
     from .lineage import OpenLineageClient
 
 logger = structlog.get_logger()
+
+
+@dataclass
+class InvestigationContext:
+    """Context gathered for an investigation.
+
+    Attributes:
+        schema: Unified schema from the data source.
+        lineage: Optional lineage context.
+    """
+
+    schema: SchemaResponse
+    lineage: LineageContext | None = None
 
 
 @dataclass
@@ -54,9 +69,6 @@ class ContextEngine:
     - SchemaContextBuilder: Schema discovery and formatting
     - AnomalyContext: Anomaly confirmation
     - CorrelationContext: Cross-table pattern detection
-
-    It maintains backward compatibility with the existing
-    DefaultContextEngine interface while adding new capabilities.
     """
 
     def __init__(
@@ -79,19 +91,22 @@ class ContextEngine:
         self.correlation_ctx = correlation_ctx or CorrelationContext()
         self.lineage_client = lineage_client
 
+    def _count_tables(self, schema: SchemaResponse) -> int:
+        """Count total tables in a schema response."""
+        return sum(
+            len(db_schema.tables) for catalog in schema.catalogs for db_schema in catalog.schemas
+        )
+
     async def gather(
         self,
         alert: AnomalyAlert,
-        adapter: DatabaseAdapter,
+        adapter: BaseAdapter,
     ) -> InvestigationContext:
         """Gather schema and lineage context.
 
-        This method maintains backward compatibility with the
-        existing DefaultContextEngine.gather() interface.
-
         Args:
             alert: The anomaly alert being investigated.
-            adapter: Connected database adapter.
+            adapter: Connected data source adapter.
 
         Returns:
             InvestigationContext with schema and optional lineage.
@@ -109,7 +124,8 @@ class ContextEngine:
             log.error("schema_discovery_failed", error=str(e))
             raise SchemaDiscoveryError(f"Failed to discover schema: {e}") from e
 
-        if not schema.tables:
+        table_count = self._count_tables(schema)
+        if table_count == 0:
             log.error("no_tables_discovered")
             raise SchemaDiscoveryError(
                 "No tables discovered. "
@@ -117,7 +133,7 @@ class ContextEngine:
                 "Investigation cannot proceed without schema."
             )
 
-        log.info("schema_discovered", tables_count=len(schema.tables))
+        log.info("schema_discovered", tables_count=table_count)
 
         # 2. Lineage Discovery (OPTIONAL)
         lineage = None
@@ -138,7 +154,7 @@ class ContextEngine:
     async def gather_enriched(
         self,
         alert: AnomalyAlert,
-        adapter: DatabaseAdapter,
+        adapter: BaseAdapter,
     ) -> EnrichedContext:
         """Gather enriched context with anomaly confirmation.
 
@@ -147,7 +163,7 @@ class ContextEngine:
 
         Args:
             alert: The anomaly alert being investigated.
-            adapter: Connected database adapter.
+            adapter: Connected data source adapter.
 
         Returns:
             EnrichedContext with all available context.

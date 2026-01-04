@@ -134,12 +134,12 @@ demo: demo-fixtures
     echo ""
 
     # Start PostgreSQL if not running
-    if ! docker ps | grep -q datadr-demo-postgres; then
+    if ! docker ps | grep -q dataing-demo-postgres; then
         echo "Starting PostgreSQL..."
-        docker run -d --name datadr-demo-postgres \
-            -e POSTGRES_DB=datadr_demo \
-            -e POSTGRES_USER=datadr \
-            -e POSTGRES_PASSWORD=datadr \
+        docker run -d --name dataing-demo-postgres \
+            -e POSTGRES_DB=dataing_demo \
+            -e POSTGRES_USER=dataing \
+            -e POSTGRES_PASSWORD=dataing \
             -p 5432:5432 \
             postgres:16-alpine
         echo "Waiting for PostgreSQL to be ready..."
@@ -148,7 +148,7 @@ demo: demo-fixtures
 
     # Run migrations
     echo "Running database migrations..."
-    PGPASSWORD=datadr psql -h localhost -U datadr -d datadr_demo -f backend/migrations/001_initial.sql 2>/dev/null || true
+    PGPASSWORD=dataing psql -h localhost -U dataing -d dataing_demo -f backend/migrations/001_initial.sql 2>/dev/null || true
 
     trap 'kill 0' EXIT
 
@@ -160,8 +160,8 @@ demo: demo-fixtures
 
     export DATADR_DEMO_MODE=true
     export DATADR_FIXTURE_PATH="$(pwd)/demo/fixtures/null_spike"
-    export DATABASE_URL=postgresql://datadr:datadr@localhost:5432/datadr_demo
-    export APP_DATABASE_URL=postgresql://datadr:datadr@localhost:5432/datadr_demo
+    export DATABASE_URL=postgresql://dataing:dataing@localhost:5432/dataing_demo
+    export APP_DATABASE_URL=postgresql://dataing:dataing@localhost:5432/dataing_demo
     # Stable demo encryption key (valid Fernet key)
     export ENCRYPTION_KEY=ZnxhCyx4-ZjziPWtUguwGOFMMiLNioSwso5-qNPAGZI=
 
@@ -176,8 +176,8 @@ demo: demo-fixtures
 
 # Stop demo PostgreSQL container
 demo-stop:
-    docker stop datadr-demo-postgres 2>/dev/null || true
-    docker rm datadr-demo-postgres 2>/dev/null || true
+    docker stop dataing-demo-postgres 2>/dev/null || true
+    docker rm dataing-demo-postgres 2>/dev/null || true
 
 # Run demo with Docker Compose
 demo-docker: demo-fixtures

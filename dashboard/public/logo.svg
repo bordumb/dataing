@@ -1,0 +1,6 @@
+<svg width="140" height="32" viewBox="0 0 140 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="32" height="32" rx="8" fill="#0F172A"/>
+  <path d="M8 22L14 10L20 22H16.6L14 16.8L11.4 22H8Z" fill="#F8FAFC"/>
+  <circle cx="24" cy="9" r="4" fill="#38BDF8"/>
+  <text x="42" y="22" font-family="Verdana, Geneva, sans-serif" font-size="16" font-weight="700" fill="#0F172A">DataDr</text>
+</svg>

@@ -1,6 +1,6 @@
-# DataDr Frontend
+# Dataing Frontend
 
-Web application for DataDr - an AI-powered data quality investigation platform.
+Web application for Dataing - an AI-powered data quality investigation platform.
 
 ## Setup
 

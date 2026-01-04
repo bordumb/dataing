@@ -155,6 +155,6 @@ class TestSlackConfig:
         config = SlackConfig(webhook_url="https://hooks.slack.com/test")
 
         assert config.channel is None
-        assert config.username == "DataDr"
+        assert config.username == "Dataing"
         assert config.icon_emoji == ":microscope:"
         assert config.timeout_seconds == 30

@@ -1,4 +1,4 @@
--- DataDr Demo Fixtures: Validation Queries
+-- Dataing Demo Fixtures: Validation Queries
 -- Run these queries to verify fixtures are correct before demos.
 
 -- ==============================================================================

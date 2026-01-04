@@ -1,4 +1,4 @@
-Based on the shadcn/ui documentation, here's how to add dark mode to DataDr's Vite + React frontend:
+Based on the shadcn/ui documentation, here's how to add dark mode to Dataing's Vite + React frontend:
 Dark Mode Implementation for Vite
 Step 1: Create Theme Provider
 File: frontend/src/components/theme-provider.tsx
@@ -27,7 +27,7 @@ const ThemeProviderContext = createContext<ThemeProviderState>(initialState)
 export function ThemeProvider({
   children,
   defaultTheme = "system",
-  storageKey = "datadr-ui-theme",
+  storageKey = "dataing-ui-theme",
   ...props
 }: ThemeProviderProps) {
   const [theme, setTheme] = useState<Theme>(
@@ -133,7 +133,7 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <BrowserRouter>
       <QueryClientProvider client={queryClient}>
-        <ThemeProvider defaultTheme="system" storageKey="datadr-ui-theme">
+        <ThemeProvider defaultTheme="system" storageKey="dataing-ui-theme">
           <AuthProvider>
             <App />
             <Toaster />
@@ -144,7 +144,7 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
   </React.StrictMode>,
 )
 Step 4: Add Toggle to Header/Sidebar
-Option A: In the header (recommended for DataDr)
+Option A: In the header (recommended for Dataing)
 File: frontend/src/App.tsx (update the header section)
 typescriptimport { ModeToggle } from '@/components/mode-toggle'
 import { Separator } from '@/components/ui/separator'

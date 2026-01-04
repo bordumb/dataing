@@ -1,6 +1,6 @@
-# DataDr Demo Fixtures
+# Dataing Demo Fixtures
 
-Realistic e-commerce data with pre-baked anomalies for demonstrating DataDr's detection capabilities.
+Realistic e-commerce data with pre-baked anomalies for demonstrating Dataing's detection capabilities.
 
 ## Quick Start
 

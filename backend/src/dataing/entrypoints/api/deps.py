@@ -2,17 +2,20 @@
 
 from __future__ import annotations
 
+import json
 import logging
 import os
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from typing import TYPE_CHECKING, Any
+from uuid import UUID
 
+from cryptography.fernet import Fernet
 from fastapi import Request
 
-from dataing.adapters.context import ContextEngine, DatabaseContext
+from dataing.adapters.context import ContextEngine
+from dataing.adapters.datasource import BaseAdapter, get_registry
 from dataing.adapters.db.app_db import AppDatabase
-from dataing.adapters.db.postgres import PostgresAdapter
 from dataing.adapters.llm.client import AnthropicClient
 from dataing.core.orchestrator import InvestigationOrchestrator, OrchestratorConfig
 from dataing.safety.circuit_breaker import CircuitBreaker, CircuitBreakerConfig
@@ -51,10 +54,6 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     - LLM client initialization
     - Orchestrator configuration
     """
-    # Setup data warehouse adapter
-    db = PostgresAdapter(settings.database_url)
-    await db.connect()
-
     # Setup application database
     app_db = AppDatabase(settings.app_database_url)
     await app_db.connect()
@@ -64,10 +63,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         model=settings.llm_model,
     )
 
-    # Create database context for resolving tenant data sources
-    database_context = DatabaseContext(app_db)
-
-    # Create context engine (no longer needs db passed directly)
+    # Create context engine
     context_engine = ContextEngine()
 
     circuit_breaker = CircuitBreaker(
@@ -78,8 +74,10 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         )
     )
 
+    # Note: Orchestrator now receives adapters per-request instead of at startup
+    # The db parameter is now optional and will be resolved per-tenant
     orchestrator = InvestigationOrchestrator(
-        db=db,  # Fallback adapter
+        db=None,  # Will be set per-request based on tenant's data source
         llm=llm,
         context_engine=context_engine,
         circuit_breaker=circuit_breaker,
@@ -87,26 +85,47 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     )
 
     # Store in app state
-    app.state.db = db
     app.state.app_db = app_db
     app.state.llm = llm
-    app.state.database_context = database_context
     app.state.context_engine = context_engine
     app.state.circuit_breaker = circuit_breaker
     app.state.orchestrator = orchestrator
+    # Check DATADR_ENCRYPTION_KEY first (used by demo), then ENCRYPTION_KEY
+    app.state.encryption_key = os.getenv("DATADR_ENCRYPTION_KEY") or os.getenv("ENCRYPTION_KEY")
+
+    # Cache for active adapters (tenant_id:datasource_id -> adapter)
+    adapter_cache: dict[str, BaseAdapter] = {}
+    app.state.adapter_cache = adapter_cache
+
     investigations_store: dict[str, dict[str, Any]] = {}
     app.state.investigations = investigations_store
 
     # Demo mode: seed demo data
-    if os.getenv("DATADR_DEMO_MODE", "").lower() == "true":
-        logger.info("Running in DEMO MODE - seeding demo data")
+    demo_mode = os.getenv("DATADR_DEMO_MODE", "").lower()
+    print(f"[DEBUG] DATADR_DEMO_MODE={demo_mode}", flush=True)
+    enc_key = app.state.encryption_key
+    enc_preview = enc_key[:15] if enc_key else "None"
+    print(f"[DEBUG] Initial encryption_key: {enc_preview}...", flush=True)
+    if demo_mode == "true":
+        print("[DEBUG] Running in DEMO MODE - seeding demo data", flush=True)
         await _seed_demo_data(app_db)
+        # Re-read encryption key in case _seed_demo_data generated one
+        app.state.encryption_key = os.getenv("DATADR_ENCRYPTION_KEY") or os.getenv("ENCRYPTION_KEY")
+
+    enc_key = app.state.encryption_key
+    enc_preview = enc_key[:15] if enc_key else "None"
+    print(f"[DEBUG] Final encryption_key prefix: {enc_preview}...", flush=True)
 
     yield
 
-    # Teardown
-    await database_context.close_all()  # Close cached adapters
-    await db.close()
+    # Teardown - close all cached adapters
+    for cache_key, adapter in app.state.adapter_cache.items():
+        try:
+            await adapter.disconnect()
+            logger.debug(f"adapter_closed: {cache_key}")
+        except Exception as e:
+            logger.warning(f"adapter_close_failed: {cache_key}, error={e}")
+
     await app_db.close()
 
 
@@ -169,12 +188,14 @@ async def _seed_demo_data(app_db: AppDatabase) -> None:
 
     # Create demo data source (DuckDB pointing to fixtures)
     fixture_path = os.getenv("DATADR_FIXTURE_PATH", "./demo/fixtures/null_spike")
-    encryption_key = os.getenv("ENCRYPTION_KEY")
+    # Check DATADR_ENCRYPTION_KEY first (used by demo), then ENCRYPTION_KEY
+    encryption_key = os.getenv("DATADR_ENCRYPTION_KEY") or os.getenv("ENCRYPTION_KEY")
     if not encryption_key:
         encryption_key = Fernet.generate_key().decode()
-        os.environ["ENCRYPTION_KEY"] = encryption_key
+        os.environ["DATADR_ENCRYPTION_KEY"] = encryption_key
 
     connection_config = {
+        "source_type": "directory",
         "path": fixture_path,
         "read_only": True,
     }
@@ -213,18 +234,6 @@ def get_orchestrator(request: Request) -> InvestigationOrchestrator:
     return request.app.state.orchestrator
 
 
-def get_db(request: Request) -> PostgresAdapter:
-    """Get the database adapter from app state.
-
-    Args:
-        request: The current request.
-
-    Returns:
-        The configured PostgresAdapter.
-    """
-    return request.app.state.db
-
-
 def get_investigations(request: Request) -> dict[str, dict[str, Any]]:
     """Get the investigations store from app state.
 
@@ -250,16 +259,111 @@ def get_app_db(request: Request) -> AppDatabase:
     return request.app.state.app_db
 
 
-def get_database_context(request: Request) -> DatabaseContext:
-    """Get the database context from app state.
+async def get_tenant_adapter(
+    request: Request,
+    tenant_id: UUID,
+    data_source_id: UUID | None = None,
+) -> BaseAdapter:
+    """Get or create a data source adapter for a tenant.
 
-    The database context resolves tenant data source adapters
-    for running investigations against tenant data.
+    This function replaces DatabaseContext, using the AdapterRegistry
+    pattern instead. It caches adapters for reuse within the app lifecycle.
+
+    Args:
+        request: The current request (for accessing app state).
+        tenant_id: The tenant's UUID.
+        data_source_id: Optional specific data source ID. If not provided,
+                       uses the tenant's default data source.
+
+    Returns:
+        A connected BaseAdapter for the data source.
+
+    Raises:
+        ValueError: If data source not found or type not supported.
+        RuntimeError: If decryption or connection fails.
+    """
+    app_db: AppDatabase = request.app.state.app_db
+    adapter_cache: dict[str, BaseAdapter] = request.app.state.adapter_cache
+    encryption_key: str | None = request.app.state.encryption_key
+
+    # Get data source configuration
+    if data_source_id:
+        ds = await app_db.get_data_source(data_source_id, tenant_id)
+        if not ds:
+            raise ValueError(f"Data source {data_source_id} not found for tenant {tenant_id}")
+    else:
+        # Get default data source
+        data_sources = await app_db.list_data_sources(tenant_id)
+        active_sources = [d for d in data_sources if d.get("is_active", True)]
+        if not active_sources:
+            raise ValueError(f"No active data sources found for tenant {tenant_id}")
+        ds = active_sources[0]
+        data_source_id = ds["id"]
+
+    # Check cache
+    cache_key = f"{tenant_id}:{data_source_id}"
+    if cache_key in adapter_cache:
+        logger.debug(f"adapter_cache_hit: {cache_key}")
+        return adapter_cache[cache_key]
+
+    # Decrypt connection config
+    if not encryption_key:
+        raise RuntimeError(
+            "ENCRYPTION_KEY not set - check DATADR_ENCRYPTION_KEY or ENCRYPTION_KEY env vars"
+        )
+
+    encrypted_config = ds.get("connection_config_encrypted", "")
+    key_preview = encryption_key[:10] if encryption_key else "None"
+    print(f"[DECRYPT DEBUG] encryption_key type: {type(encryption_key)}", flush=True)
+    print(f"[DECRYPT DEBUG] encryption_key full: {encryption_key}", flush=True)
+    print(
+        f"[DECRYPT DEBUG] encryption_key length: {len(encryption_key) if encryption_key else 0}",
+        flush=True,
+    )
+    print(f"[DECRYPT DEBUG] encrypted_config length: {len(encrypted_config)}", flush=True)
+    print(f"[DECRYPT DEBUG] encrypted_config start: {encrypted_config[:50]}", flush=True)
+    try:
+        f = Fernet(encryption_key.encode())
+        decrypted = f.decrypt(encrypted_config.encode()).decode()
+        config: dict[str, Any] = json.loads(decrypted)
+        print(f"[DECRYPT DEBUG] SUCCESS: {decrypted}", flush=True)
+    except Exception as e:
+        print(f"[DECRYPT DEBUG] FAILED: {e}", flush=True)
+        import traceback
+
+        traceback.print_exc()
+        raise RuntimeError(
+            f"Failed to decrypt connection config (key_prefix={key_preview}): {e}"
+        ) from e
+
+    # Create adapter using registry
+    registry = get_registry()
+    ds_type = ds["type"]
+
+    try:
+        adapter = registry.create(ds_type, config)
+        await adapter.connect()
+    except Exception as e:
+        raise RuntimeError(f"Failed to create/connect adapter for {ds_type}: {e}") from e
+
+    # Cache for reuse
+    adapter_cache[cache_key] = adapter
+    logger.info(f"adapter_created: type={ds_type}, name={ds.get('name')}, key={cache_key}")
+
+    return adapter
+
+
+async def get_default_tenant_adapter(request: Request, tenant_id: UUID) -> BaseAdapter:
+    """Get the default data source adapter for a tenant.
+
+    Convenience wrapper around get_tenant_adapter that uses the default
+    data source.
 
     Args:
         request: The current request.
+        tenant_id: The tenant's UUID.
 
     Returns:
-        The configured DatabaseContext.
+        A connected BaseAdapter for the tenant's default data source.
     """
-    return request.app.state.database_context
+    return await get_tenant_adapter(request, tenant_id)

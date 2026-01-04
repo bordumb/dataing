@@ -49,7 +49,7 @@ export function LoginPage() {
               <Search className="h-6 w-6" />
             </div>
           </div>
-          <CardTitle className="text-2xl font-bold">Welcome to DataDr</CardTitle>
+          <CardTitle className="text-2xl font-bold">Welcome to Dataing</CardTitle>
           <CardDescription>
             Enter your API key to access the platform
           </CardDescription>

@@ -96,8 +96,9 @@ async def seed_demo_data(session: AsyncSession) -> None:
     fixture_path = get_fixture_path()
     encryption_key = get_encryption_key()
 
-    # For DuckDB, the config just needs the path
+    # For DuckDB directory mode, specify source_type and path
     connection_config = {
+        "source_type": "directory",
         "path": fixture_path,
         "read_only": True,
     }
@@ -157,7 +158,7 @@ if __name__ == "__main__":
         """Run demo seeding with a temporary database session."""
         # Get database URL from env
         db_url = os.getenv(
-            "DATADR_DB_URL", "postgresql+asyncpg://datadr:datadr@localhost:5432/datadr_demo"
+            "DATADR_DB_URL", "postgresql+asyncpg://dataing:dataing@localhost:5432/dataing_demo"
         )
 
         engine = create_async_engine(db_url)

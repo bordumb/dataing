@@ -18,8 +18,8 @@ interface AuthContextType {
 
 const AuthContext = React.createContext<AuthContextType | null>(null)
 
-const API_KEY_STORAGE_KEY = 'datadr_api_key' // pragma: allowlist secret
-const TENANT_STORAGE_KEY = 'datadr_tenant'
+const API_KEY_STORAGE_KEY = 'dataing_api_key' // pragma: allowlist secret
+const TENANT_STORAGE_KEY = 'dataing_tenant'
 
 export function useAuth() {
   const context = React.useContext(AuthContext)

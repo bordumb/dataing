@@ -1,5 +1,7 @@
 """Application database adapter using asyncpg."""
 
+from __future__ import annotations
+
 import json
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
@@ -173,6 +175,7 @@ class AppDatabase:
         """List all data sources for a tenant."""
         return await self.fetch_all(
             """SELECT id, name, type, is_default, is_active,
+                      connection_config_encrypted,
                       last_health_check_at, last_health_check_status, created_at
                FROM data_sources
                WHERE tenant_id = $1 AND is_active = true

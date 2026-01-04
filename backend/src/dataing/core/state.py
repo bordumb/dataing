@@ -17,7 +17,9 @@ from datetime import datetime
 from typing import TYPE_CHECKING, Literal
 
 if TYPE_CHECKING:
-    from .domain_types import AnomalyAlert, LineageContext, SchemaContext
+    from dataing.adapters.datasource.types import SchemaResponse
+
+    from .domain_types import AnomalyAlert, LineageContext
 
 
 EventType = Literal[
@@ -75,7 +77,7 @@ class InvestigationState:
     id: str
     alert: AnomalyAlert
     events: list[Event] = field(default_factory=list)
-    schema_context: SchemaContext | None = None
+    schema_context: SchemaResponse | None = None
     lineage_context: LineageContext | None = None
 
     @property
@@ -198,7 +200,7 @@ class InvestigationState:
 
     def with_context(
         self,
-        schema_context: SchemaContext | None = None,
+        schema_context: SchemaResponse | None = None,
         lineage_context: LineageContext | None = None,
     ) -> InvestigationState:
         """Return new state with updated context.

@@ -30,8 +30,8 @@ random.seed(42)
 # ==============================================================================
 
 # Simulation period: 7 days
-SIMULATION_START = date(2024, 1, 8)
-SIMULATION_END = date(2024, 1, 14)
+SIMULATION_START = date(2026, 1, 8)
+SIMULATION_END = date(2026, 1, 14)
 
 # Volume targets
 USER_COUNT = 10_000

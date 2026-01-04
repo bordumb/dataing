@@ -71,6 +71,8 @@ format:
 
 # Generate OpenAPI client for frontend
 generate-client:
+    @echo "Exporting OpenAPI schema from backend..."
+    cd backend && uv run python scripts/export_openapi.py
     @echo "Generating OpenAPI client..."
     cd frontend && pnpm orval
 

@@ -1,10 +1,10 @@
 {
   "name": "schema_drift",
   "description": "New product import job inserts price as string with currency",
-  "created_at": "2026-01-03T15:36:16.303476Z",
+  "created_at": "2026-01-04T21:23:59.406680Z",
   "simulation_period": {
-    "start": "2024-01-08",
-    "end": "2024-01-14"
+    "start": "2026-01-08",
+    "end": "2026-01-14"
   },
   "tables": {
     "categories": {
@@ -47,7 +47,7 @@
     }
   ],
   "ground_truth": {
-    "string_price_count": 146,
+    "string_price_count": 131,
     "total_products": 500
   }
 }

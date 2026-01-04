@@ -17,9 +17,11 @@ from dataing.core.domain_types import AnomalyAlert
 from dataing.core.orchestrator import InvestigationOrchestrator
 from dataing.core.state import InvestigationState
 from dataing.entrypoints.api.deps import (
+    get_context_engine_for_tenant,
     get_default_tenant_adapter,
     get_investigations,
     get_orchestrator,
+    get_tenant_lineage_adapter,
 )
 from dataing.entrypoints.api.middleware.auth import ApiKeyContext, verify_api_key
 
@@ -110,6 +112,15 @@ async def create_investigation(
         try:
             # Resolve tenant's data source adapter using AdapterRegistry
             data_adapter = await get_default_tenant_adapter(http_request, auth.tenant_id)
+
+            # Get tenant's lineage adapter if configured
+            lineage_adapter = await get_tenant_lineage_adapter(http_request, auth.tenant_id)
+
+            # Create context engine with tenant's lineage adapter
+            context_engine = get_context_engine_for_tenant(http_request, lineage_adapter)
+
+            # Update orchestrator with tenant-specific context engine
+            orchestrator.context_engine = context_engine
 
             # Run investigation against tenant's actual data
             finding = await orchestrator.run_investigation(state, data_adapter)

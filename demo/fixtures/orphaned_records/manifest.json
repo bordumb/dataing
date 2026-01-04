@@ -1,10 +1,10 @@
 {
   "name": "orphaned_records",
   "description": "User deletion job ran before order archival",
-  "created_at": "2026-01-03T15:36:19.336668Z",
+  "created_at": "2026-01-04T21:24:02.399183Z",
   "simulation_period": {
-    "start": "2024-01-08",
-    "end": "2024-01-14"
+    "start": "2026-01-08",
+    "end": "2026-01-14"
   },
   "tables": {
     "categories": {
@@ -16,7 +16,7 @@
       "file": "products.parquet"
     },
     "users": {
-      "row_count": 9967,
+      "row_count": 9966,
       "file": "users.parquet"
     },
     "orders": {
@@ -48,41 +48,42 @@
   ],
   "ground_truth": {
     "affected_order_ids": [
-      "26302daa-38ae-462a-ac47-2fd0fb9026e5",
-      "ea03b98c-0dc3-4e57-a92a-cb422fa2a701",
-      "b60a82a0-8537-43d2-99e8-4523156bebcc",
-      "39a4f5c6-c4dc-4684-b325-f035197010fd",
-      "b80e0e31-bcfc-42d9-9c8c-400b18d3998d",
-      "d6cd9ae1-5b26-40ac-a541-9882773a0203",
-      "26586393-aead-4fa5-93e0-bedc7a1afdf1",
-      "13d11dc7-167c-49b7-924e-c9a8c6247ba8",
-      "e08e486b-2608-4bbd-aff2-ce9672335f7c",
-      "3368858e-a1b3-4918-9d31-f55d6bf30bac",
-      "299717ed-7edd-4602-a0e2-6010a088be17",
-      "77df40ff-eb2d-43c6-b5cc-607eeb2937a2",
-      "c4ffc285-6c25-4288-bc62-29396848a441",
-      "bee2a803-761e-4224-8a3d-ede54b6b9ba2",
-      "4aaaf9fb-eada-474d-9582-2071aa6a07e7",
-      "512a14d5-b3a7-4bac-ae90-ea7a7dfd0701",
-      "94aaa559-40da-471d-8701-6df41fbc5c9f",
-      "be823af8-af0f-408c-a9cc-027ae1dbae23",
-      "5084ad43-a963-4788-9734-6f5a14065a9d",
-      "e85cf60b-26a5-414f-b157-59ba907c2e8e",
-      "6a6a77fb-0138-4e5a-b973-472d2930c1b7",
-      "e240d7da-7ce9-4bc4-af3c-ba38bda62085",
-      "c3caf5da-5ccf-46a3-a7a3-89be3e9d5b2d",
-      "408bdd07-ed50-441c-8d0d-190ca1cd7dc5",
-      "ce72c1bd-d01d-4025-bb0b-a9b5f487f0e0",
-      "3bf032d9-468c-4c0a-8cdf-98a5e3ab0430",
-      "fc8ad93d-c383-414d-941a-80e63c56fbfd",
-      "39f5b40e-b632-4a58-8e8d-a708efcb3057",
-      "fcf03302-fdc8-44d2-82b6-1070164776a8",
-      "de80ee86-f911-4cf0-9f30-288f3dd0abd0",
-      "24b794f1-e83a-4ea3-a8b8-c488f367a693",
-      "a8d7b696-2b2f-493b-bc77-c06f10fd358d",
-      "004a6eea-f6b5-487f-835d-17fbfda5ab04"
+      "06725fbd-c05a-4ac7-a73b-71c158a0a5cf",
+      "025701f0-3a56-4fb6-b34e-181a6f1554fb",
+      "0900d883-8036-4f3d-8f08-195a9cb59992",
+      "6f9cc960-3a82-417f-b452-8769f76b7853",
+      "7139e57b-f886-4bc4-98f6-2a5faef2b950",
+      "f11f0417-d011-48db-9dc2-965d13a3baf1",
+      "d8e89dd2-76f1-4886-883b-7148c25e090a",
+      "1cfa96cb-55c6-44f8-a5c4-39737a4bbe4c",
+      "e3ac445c-d889-4d73-9d93-d4839528a994",
+      "20529fc1-dce7-49b5-9332-7a8f1c3a6f7f",
+      "ac6d9380-664b-49fa-8d66-8c1e27612f4b",
+      "151a3880-7f31-4bf8-8afe-391ba166e417",
+      "58896667-39cf-47bd-bd55-10a72af84033",
+      "eea70d60-d98b-4206-af5e-638771393f27",
+      "48c61244-d099-4f96-aa1e-87886054435e",
+      "c75de6c1-1e18-4ff5-aa77-ef0faeeef56f",
+      "8a02a4b7-2373-4fea-949a-8efe67339cdd",
+      "0f3ef4d6-7ef9-4d69-9ae1-916bd799c5ad",
+      "742573aa-5a39-4e82-a6f8-f126dc77c962",
+      "362b97ce-2b00-4895-b481-c8d0d2ada289",
+      "a4904f72-b2d5-47d9-8337-f5e687047806",
+      "499ee387-5dc9-45fe-9a1b-480fcbed59e3",
+      "81827cc1-e442-403d-80bd-e74fff6801fa",
+      "80d579f0-7ae4-494c-abbf-cc1aa26a5e9a",
+      "f659c12f-9b4c-4193-9647-a4505aac5052",
+      "d0fb2bc7-3102-43b1-88ed-622583f9b681",
+      "9065ea95-2eaa-46db-8220-b96af1e2c49a",
+      "a5bd75d4-66de-4138-85a0-4c25e449b58a",
+      "3c9d7805-51db-4aac-adea-68764bf720bd",
+      "b7e5f505-3b0b-4212-9bd3-3f6850dd5607",
+      "4ade1ce9-97e3-4654-9b75-0a9e6fd4505c",
+      "3768258c-34c4-4a79-9ec4-b4264a06a3ef",
+      "e59d6a59-4cc9-4884-93ea-8318528b518f",
+      "60f09ed4-fdab-4ceb-b521-61b40a28f545"
     ],
-    "orphaned_order_count": 33,
-    "deleted_user_count": 33
+    "orphaned_order_count": 34,
+    "deleted_user_count": 34
   }
 }

@@ -133,18 +133,25 @@ demo: demo-fixtures
     echo "Starting demo stack..."
     echo ""
 
-    # Start PostgreSQL if not running
-    if ! docker ps | grep -q dataing-demo-postgres; then
-        echo "Starting PostgreSQL..."
+    # Start PostgreSQL (remove old container if exists)
+    if docker ps -a | grep -q dataing-demo-postgres; then
+        if ! docker ps | grep -q dataing-demo-postgres; then
+            echo "Starting existing PostgreSQL container..."
+            docker start dataing-demo-postgres
+        else
+            echo "PostgreSQL already running"
+        fi
+    else
+        echo "Creating PostgreSQL container..."
         docker run -d --name dataing-demo-postgres \
             -e POSTGRES_DB=dataing_demo \
             -e POSTGRES_USER=dataing \
             -e POSTGRES_PASSWORD=dataing \
             -p 5432:5432 \
             postgres:16-alpine
-        echo "Waiting for PostgreSQL to be ready..."
-        sleep 3
     fi
+    echo "Waiting for PostgreSQL to be ready..."
+    sleep 3
 
     # Run migrations
     echo "Running database migrations..."
@@ -174,10 +181,16 @@ demo: demo-fixtures
     (cd frontend && pnpm dev --port 3000) &
     wait
 
-# Stop demo PostgreSQL container
+# Stop demo (kills all processes and removes containers)
 demo-stop:
+    #!/usr/bin/env bash
+    echo "Stopping demo services..."
+    pkill -f "fastapi dev" 2>/dev/null || true
+    pkill -f "vite.*3000" 2>/dev/null || true
+    pkill -f "pnpm dev" 2>/dev/null || true
     docker stop dataing-demo-postgres 2>/dev/null || true
     docker rm dataing-demo-postgres 2>/dev/null || true
+    echo "Demo stopped."
 
 # Run demo with Docker Compose
 demo-docker: demo-fixtures

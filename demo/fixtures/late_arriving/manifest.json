@@ -1,10 +1,10 @@
 {
   "name": "late_arriving",
   "description": "Mobile app queues events offline, batch uploaded later",
-  "created_at": "2026-01-03T15:36:18.477614Z",
+  "created_at": "2026-01-04T21:24:01.539828Z",
   "simulation_period": {
-    "start": "2024-01-08",
-    "end": "2024-01-14"
+    "start": "2026-01-08",
+    "end": "2026-01-14"
   },
   "tables": {
     "categories": {
@@ -48,6 +48,6 @@
     }
   ],
   "ground_truth": {
-    "late_event_count": 1006
+    "late_event_count": 1372
   }
 }

@@ -16,7 +16,7 @@ from typing import Iterable
 ROOT_DIR = Path(".")
 
 SEARCH_PREFIXES = [
-    "backend",
+    "frontend",
     # "frontend",
     # "ee",
     # "docs",

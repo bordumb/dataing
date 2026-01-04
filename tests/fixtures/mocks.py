@@ -7,16 +7,21 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
+from dataing.adapters.context import InvestigationContext
+from dataing.adapters.datasource.types import (
+    Catalog,
+    Column,
+    QueryResult,
+    Schema,
+    SchemaResponse,
+    Table,
+)
 from dataing.core.domain_types import (
     Evidence,
     Finding,
     Hypothesis,
     HypothesisCategory,
-    InvestigationContext,
     LineageContext,
-    QueryResult,
-    SchemaContext,
-    TableSchema,
 )
 
 
@@ -25,35 +30,49 @@ def mock_database_adapter() -> AsyncMock:
     """Return a configured mock database adapter."""
     mock = AsyncMock()
 
-    schema = SchemaContext(
-        tables=(
-            TableSchema(
-                table_name="public.orders",
-                columns=("id", "user_id", "total", "status", "created_at"),
-                column_types={
-                    "id": "integer",
-                    "user_id": "integer",
-                    "total": "numeric",
-                    "status": "varchar",
-                    "created_at": "timestamp",
-                },
-            ),
-            TableSchema(
-                table_name="public.users",
-                columns=("id", "email", "created_at"),
-                column_types={
-                    "id": "integer",
-                    "email": "varchar",
-                    "created_at": "timestamp",
-                },
-            ),
-        )
+    schema = SchemaResponse(
+        catalogs=[
+            Catalog(
+                name="default",
+                schemas=[
+                    Schema(
+                        name="public",
+                        tables=[
+                            Table(
+                                name="orders",
+                                table_type="TABLE",
+                                columns=[
+                                    Column(name="id", data_type="integer", is_nullable=False),
+                                    Column(name="user_id", data_type="integer", is_nullable=True),
+                                    Column(name="total", data_type="numeric", is_nullable=True),
+                                    Column(name="status", data_type="varchar", is_nullable=True),
+                                    Column(
+                                        name="created_at", data_type="timestamp", is_nullable=True
+                                    ),
+                                ],
+                            ),
+                            Table(
+                                name="users",
+                                table_type="TABLE",
+                                columns=[
+                                    Column(name="id", data_type="integer", is_nullable=False),
+                                    Column(name="email", data_type="varchar", is_nullable=False),
+                                    Column(
+                                        name="created_at", data_type="timestamp", is_nullable=True
+                                    ),
+                                ],
+                            ),
+                        ],
+                    )
+                ],
+            )
+        ]
     )
 
     mock.get_schema.return_value = schema
     mock.execute.return_value = QueryResult(
-        columns=("count",),
-        rows=({"count": 500},),
+        columns=["count"],
+        rows=[{"count": 500}],
         row_count=1,
     )
 
@@ -115,13 +134,13 @@ def mock_llm_client() -> AsyncMock:
 
 @pytest.fixture
 def mock_context_engine(
-    sample_schema_context: SchemaContext,
+    sample_schema_response: SchemaResponse,
     sample_lineage_context: LineageContext,
 ) -> AsyncMock:
     """Return a mock context engine."""
     mock = AsyncMock()
     mock.gather.return_value = InvestigationContext(
-        schema=sample_schema_context,
+        schema=sample_schema_response,
         lineage=sample_lineage_context,
     )
     return mock

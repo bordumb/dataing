@@ -15,6 +15,8 @@ from typing import TYPE_CHECKING
 import structlog
 
 from dataing.adapters.datasource.types import SchemaResponse
+from dataing.adapters.lineage import DatasetId, LineageAdapter
+from dataing.core.domain_types import LineageContext
 from dataing.core.exceptions import SchemaDiscoveryError
 
 from .anomaly_context import AnomalyConfirmation, AnomalyContext
@@ -23,9 +25,7 @@ from .schema_context import SchemaContextBuilder
 
 if TYPE_CHECKING:
     from dataing.adapters.datasource.base import BaseAdapter
-    from dataing.core.domain_types import AnomalyAlert, LineageContext
-
-    from .lineage import OpenLineageClient
+    from dataing.core.domain_types import AnomalyAlert
 
 logger = structlog.get_logger()
 
@@ -76,7 +76,7 @@ class ContextEngine:
         schema_builder: SchemaContextBuilder | None = None,
         anomaly_ctx: AnomalyContext | None = None,
         correlation_ctx: CorrelationContext | None = None,
-        lineage_client: OpenLineageClient | None = None,
+        lineage_adapter: LineageAdapter | None = None,
     ) -> None:
         """Initialize the context engine.
 
@@ -84,12 +84,12 @@ class ContextEngine:
             schema_builder: Schema context builder (created if None).
             anomaly_ctx: Anomaly context (created if None).
             correlation_ctx: Correlation context (created if None).
-            lineage_client: Optional lineage client.
+            lineage_adapter: Optional lineage adapter for fetching lineage.
         """
         self.schema_builder = schema_builder or SchemaContextBuilder()
         self.anomaly_ctx = anomaly_ctx or AnomalyContext()
         self.correlation_ctx = correlation_ctx or CorrelationContext()
-        self.lineage_client = lineage_client
+        self.lineage_adapter = lineage_adapter
 
     def _count_tables(self, schema: SchemaResponse) -> int:
         """Count total tables in a schema response."""
@@ -137,10 +137,10 @@ class ContextEngine:
 
         # 2. Lineage Discovery (OPTIONAL)
         lineage = None
-        if self.lineage_client:
+        if self.lineage_adapter:
             try:
                 log.info("discovering_lineage")
-                lineage = await self.lineage_client.get_lineage(alert.dataset_id)
+                lineage = await self._fetch_lineage(alert.dataset_id)
                 log.info(
                     "lineage_discovered",
                     upstream_count=len(lineage.upstream),
@@ -150,6 +150,51 @@ class ContextEngine:
                 log.warning("lineage_discovery_failed", error=str(e))
 
         return InvestigationContext(schema=schema, lineage=lineage)
+
+    async def _fetch_lineage(self, dataset_id_str: str) -> LineageContext:
+        """Fetch lineage using the lineage adapter and convert to LineageContext.
+
+        Args:
+            dataset_id_str: Dataset identifier as a string.
+
+        Returns:
+            LineageContext with upstream and downstream dependencies.
+        """
+        if not self.lineage_adapter:
+            return LineageContext(target=dataset_id_str, upstream=(), downstream=())
+
+        # Parse the dataset_id string into a DatasetId
+        dataset_id = self._parse_dataset_id(dataset_id_str)
+
+        # Fetch upstream and downstream with depth=1 for direct dependencies
+        upstream_datasets = await self.lineage_adapter.get_upstream(dataset_id, depth=1)
+        downstream_datasets = await self.lineage_adapter.get_downstream(dataset_id, depth=1)
+
+        # Convert to simple string tuples for LineageContext
+        upstream_names = tuple(ds.qualified_name for ds in upstream_datasets)
+        downstream_names = tuple(ds.qualified_name for ds in downstream_datasets)
+
+        return LineageContext(
+            target=dataset_id_str,
+            upstream=upstream_names,
+            downstream=downstream_names,
+        )
+
+    def _parse_dataset_id(self, dataset_id_str: str) -> DatasetId:
+        """Parse a dataset ID string into a DatasetId object.
+
+        Handles various formats:
+        - "schema.table" -> platform="unknown", name="schema.table"
+        - "snowflake://db.schema.table" -> platform="snowflake", name="db.schema.table"
+        - DataHub URN format
+
+        Args:
+            dataset_id_str: Dataset identifier string.
+
+        Returns:
+            DatasetId object.
+        """
+        return DatasetId.from_urn(dataset_id_str)
 
     async def gather_enriched(
         self,

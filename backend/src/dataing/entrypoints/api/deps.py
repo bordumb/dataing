@@ -16,6 +16,7 @@ from fastapi import Request
 from dataing.adapters.context import ContextEngine
 from dataing.adapters.datasource import BaseAdapter, get_registry
 from dataing.adapters.db.app_db import AppDatabase
+from dataing.adapters.lineage import BaseLineageAdapter, LineageAdapter, get_lineage_registry
 from dataing.adapters.llm.client import AnthropicClient
 from dataing.core.orchestrator import InvestigationOrchestrator, OrchestratorConfig
 from dataing.safety.circuit_breaker import CircuitBreaker, CircuitBreakerConfig
@@ -367,3 +368,96 @@ async def get_default_tenant_adapter(request: Request, tenant_id: UUID) -> BaseA
         A connected BaseAdapter for the tenant's default data source.
     """
     return await get_tenant_adapter(request, tenant_id)
+
+
+async def get_tenant_lineage_adapter(
+    request: Request,
+    tenant_id: UUID,
+) -> LineageAdapter | None:
+    """Get a lineage adapter for a tenant based on their configuration.
+
+    Creates a lineage adapter (or composite adapter for multiple providers)
+    based on the tenant's lineage_providers settings.
+
+    Args:
+        request: The current request (for accessing app state).
+        tenant_id: The tenant's UUID.
+
+    Returns:
+        A LineageAdapter if configured, None if no lineage providers.
+    """
+    app_db: AppDatabase = request.app.state.app_db
+
+    # Get tenant settings
+    tenant = await app_db.get_tenant(tenant_id)
+    if not tenant:
+        logger.warning(f"Tenant {tenant_id} not found for lineage adapter")
+        return None
+
+    settings = tenant.get("settings", {})
+    if isinstance(settings, str):
+        settings = json.loads(settings)
+
+    lineage_providers = settings.get("lineage_providers", [])
+    if not lineage_providers:
+        logger.debug(f"No lineage providers configured for tenant {tenant_id}")
+        return None
+
+    registry = get_lineage_registry()
+
+    # Single provider: create directly
+    if len(lineage_providers) == 1:
+        provider_config = lineage_providers[0]
+        try:
+            adapter: BaseLineageAdapter = registry.create(
+                provider_config["provider"],
+                provider_config.get("config", {}),
+            )
+            logger.info(
+                f"Created lineage adapter for tenant {tenant_id}: " f"{provider_config['provider']}"
+            )
+            return adapter
+        except Exception as e:
+            logger.error(f"Failed to create lineage adapter for tenant {tenant_id}: {e}")
+            return None
+
+    # Multiple providers: create composite adapter
+    try:
+        adapter = registry.create_composite(lineage_providers)
+        logger.info(
+            f"Created composite lineage adapter for tenant {tenant_id} with "
+            f"{len(lineage_providers)} providers"
+        )
+        return adapter
+    except Exception as e:
+        logger.error(f"Failed to create composite lineage adapter for tenant {tenant_id}: {e}")
+        return None
+
+
+def get_context_engine_for_tenant(
+    request: Request,
+    lineage_adapter: LineageAdapter | None = None,
+) -> ContextEngine:
+    """Get a context engine with optional lineage adapter.
+
+    Args:
+        request: The current request.
+        lineage_adapter: Optional lineage adapter for the tenant.
+
+    Returns:
+        A ContextEngine configured with the lineage adapter.
+    """
+    # Get base context engine components from app state
+    base_engine: ContextEngine = request.app.state.context_engine
+
+    # If no lineage adapter, return the base engine
+    if lineage_adapter is None:
+        return base_engine
+
+    # Create a new context engine with the lineage adapter
+    return ContextEngine(
+        schema_builder=base_engine.schema_builder,
+        anomaly_ctx=base_engine.anomaly_ctx,
+        correlation_ctx=base_engine.correlation_ctx,
+        lineage_adapter=lineage_adapter,
+    )

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 import secrets
-from typing import Annotated
+from typing import Annotated, Any
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Response
@@ -23,6 +23,33 @@ WriteScopeDep = Annotated[ApiKeyContext, Depends(require_scope("write"))]
 AdminScopeDep = Annotated[ApiKeyContext, Depends(require_scope("admin"))]
 
 
+# --- Lineage Provider Configuration ---
+
+
+class LineageProviderConfig(BaseModel):
+    """Configuration for a lineage provider."""
+
+    provider: str = Field(
+        ...,
+        description="Provider type (dbt, openlineage, airflow, dagster, datahub, static_sql)",
+    )
+    priority: int = Field(
+        default=10,
+        ge=1,
+        le=100,
+        description="Priority for composite adapters (higher = preferred)",
+    )
+    config: dict[str, Any] = Field(
+        default_factory=dict,
+        description="Provider-specific configuration",
+    )
+
+    class Config:
+        """Pydantic config."""
+
+        extra = "forbid"
+
+
 # --- Tenant Settings ---
 
 
@@ -35,6 +62,10 @@ class TenantSettings(BaseModel):
     max_queries_per_investigation: int = 50
     notification_email: str | None = None
     slack_channel: str | None = None
+    lineage_providers: list[LineageProviderConfig] = Field(
+        default_factory=list,
+        description="Configured lineage providers for this tenant",
+    )
 
 
 class UpdateTenantSettingsRequest(BaseModel):
@@ -45,6 +76,10 @@ class UpdateTenantSettingsRequest(BaseModel):
     max_queries_per_investigation: int | None = Field(None, ge=1, le=200)
     notification_email: str | None = None
     slack_channel: str | None = None
+    lineage_providers: list[LineageProviderConfig] | None = Field(
+        None,
+        description="Lineage providers configuration",
+    )
 
 
 @router.get("/tenant", response_model=TenantSettings)
@@ -62,6 +97,12 @@ async def get_tenant_settings(
     if isinstance(settings, str):
         settings = json.loads(settings)
 
+    # Parse lineage providers
+    lineage_providers_raw = settings.get("lineage_providers", [])
+    lineage_providers = [
+        LineageProviderConfig(**lp) if isinstance(lp, dict) else lp for lp in lineage_providers_raw
+    ]
+
     return TenantSettings(
         name=tenant["name"],
         slug=tenant["slug"],
@@ -69,6 +110,7 @@ async def get_tenant_settings(
         max_queries_per_investigation=settings.get("max_queries_per_investigation", 50),
         notification_email=settings.get("notification_email"),
         slack_channel=settings.get("slack_channel"),
+        lineage_providers=lineage_providers,
     )
 
 
@@ -105,6 +147,11 @@ async def update_tenant_settings(
         current_settings["notification_email"] = request.notification_email
     if request.slack_channel is not None:
         current_settings["slack_channel"] = request.slack_channel
+    if request.lineage_providers is not None:
+        # Serialize lineage providers to dicts for JSON storage
+        current_settings["lineage_providers"] = [
+            lp.model_dump() for lp in request.lineage_providers
+        ]
 
     # Save updated settings
     await app_db.execute(

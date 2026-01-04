@@ -6,6 +6,13 @@ from datetime import datetime, timezone
 
 import pytest
 
+from dataing.adapters.datasource.types import (
+    Catalog,
+    Column,
+    Schema,
+    SchemaResponse,
+    Table,
+)
 from dataing.core.domain_types import (
     AnomalyAlert,
     ApprovalDecision,
@@ -16,11 +23,7 @@ from dataing.core.domain_types import (
     Finding,
     Hypothesis,
     HypothesisCategory,
-    InvestigationContext,
     LineageContext,
-    QueryResult,
-    SchemaContext,
-    TableSchema,
 )
 from dataing.core.state import Event, InvestigationState
 
@@ -41,34 +44,46 @@ def sample_anomaly_alert() -> AnomalyAlert:
 
 
 @pytest.fixture
-def sample_table_schema() -> TableSchema:
-    """Return a sample table schema."""
-    return TableSchema(
-        table_name="public.orders",
-        columns=("id", "user_id", "total", "status", "created_at"),
-        column_types={
-            "id": "integer",
-            "user_id": "integer",
-            "total": "numeric",
-            "status": "varchar",
-            "created_at": "timestamp",
-        },
+def sample_table() -> Table:
+    """Return a sample table."""
+    return Table(
+        name="orders",
+        table_type="TABLE",
+        columns=[
+            Column(name="id", data_type="integer", is_nullable=False),
+            Column(name="user_id", data_type="integer", is_nullable=True),
+            Column(name="total", data_type="numeric", is_nullable=True),
+            Column(name="status", data_type="varchar", is_nullable=True),
+            Column(name="created_at", data_type="timestamp", is_nullable=True),
+        ],
     )
 
 
 @pytest.fixture
-def sample_schema_context(sample_table_schema: TableSchema) -> SchemaContext:
-    """Return a sample schema context."""
-    users_table = TableSchema(
-        table_name="public.users",
-        columns=("id", "email", "created_at"),
-        column_types={
-            "id": "integer",
-            "email": "varchar",
-            "created_at": "timestamp",
-        },
+def sample_schema_response(sample_table: Table) -> SchemaResponse:
+    """Return a sample schema response."""
+    users_table = Table(
+        name="users",
+        table_type="TABLE",
+        columns=[
+            Column(name="id", data_type="integer", is_nullable=False),
+            Column(name="email", data_type="varchar", is_nullable=False),
+            Column(name="created_at", data_type="timestamp", is_nullable=True),
+        ],
     )
-    return SchemaContext(tables=(sample_table_schema, users_table))
+    return SchemaResponse(
+        catalogs=[
+            Catalog(
+                name="default",
+                schemas=[
+                    Schema(
+                        name="public",
+                        tables=[sample_table, users_table],
+                    )
+                ],
+            )
+        ]
+    )
 
 
 @pytest.fixture
@@ -83,14 +98,14 @@ def sample_lineage_context() -> LineageContext:
 
 @pytest.fixture
 def sample_investigation_context(
-    sample_schema_context: SchemaContext,
+    sample_schema_response: SchemaResponse,
     sample_lineage_context: LineageContext,
-) -> InvestigationContext:
+) -> dict[str, SchemaResponse | LineageContext]:
     """Return a sample investigation context."""
-    return InvestigationContext(
-        schema=sample_schema_context,
-        lineage=sample_lineage_context,
-    )
+    return {
+        "schema": sample_schema_response,
+        "lineage": sample_lineage_context,
+    }
 
 
 @pytest.fixture
@@ -106,13 +121,13 @@ def sample_hypothesis() -> Hypothesis:
 
 
 @pytest.fixture
-def sample_query_result() -> QueryResult:
+def sample_query_result() -> dict[str, list[str] | list[dict[str, int]] | int]:
     """Return a sample query result."""
-    return QueryResult(
-        columns=("count",),
-        rows=({"count": 500},),
-        row_count=1,
-    )
+    return {
+        "columns": ["count"],
+        "rows": [{"count": 500}],
+        "row_count": 1,
+    }
 
 
 @pytest.fixture

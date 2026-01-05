@@ -29,7 +29,7 @@ interface JwtAuthContextType extends AuthState {
   login: (request: LoginRequest) => Promise<void>
   register: (request: RegisterRequest) => Promise<void>
   logout: () => void
-  switchOrg: (orgId: string) => Promise<void>
+  switchOrg: (orgId: string, orgName?: string, orgSlug?: string) => Promise<void>
   // Demo role override for testing
   demoRole: OrgRole | null
   setDemoRole: (role: OrgRole | null) => void
@@ -229,7 +229,7 @@ export function JwtAuthProvider({ children }: { children: React.ReactNode }) {
   }, [clearStorage])
 
   const switchOrg = React.useCallback(
-    async (orgId: string) => {
+    async (orgId: string, orgName?: string, orgSlug?: string) => {
       const refreshToken = localStorage.getItem(REFRESH_TOKEN_KEY)
       if (!refreshToken) {
         throw new Error('No refresh token available')
@@ -240,17 +240,32 @@ export function JwtAuthProvider({ children }: { children: React.ReactNode }) {
         org_id: orgId,
       })
 
-      localStorage.setItem(ACCESS_TOKEN_KEY, response.access_token)
-
-      // Decode the new token to get updated org info
+      // Decode the new token to get updated role
       const payload = decodeJwt(response.access_token)
-      if (payload) {
-        setState((s) => ({
-          ...s,
-          accessToken: response.access_token,
-          role: payload.role,
-        }))
+      const newRole = payload?.role as OrgRole | null
+
+      // Build new org object
+      const newOrg: Organization = {
+        id: orgId,
+        name: orgName ?? 'Organization',
+        slug: orgSlug ?? orgId,
+        plan: 'pro',
       }
+
+      // Update localStorage
+      localStorage.setItem(ACCESS_TOKEN_KEY, response.access_token)
+      localStorage.setItem(ORG_KEY, JSON.stringify(newOrg))
+      if (newRole) {
+        localStorage.setItem(ROLE_KEY, newRole)
+      }
+
+      // Update state
+      setState((s) => ({
+        ...s,
+        accessToken: response.access_token,
+        org: newOrg,
+        role: newRole,
+      }))
     },
     []
   )

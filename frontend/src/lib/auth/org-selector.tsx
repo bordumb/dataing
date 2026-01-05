@@ -45,15 +45,15 @@ export function OrgSelector() {
       .finally(() => setLoading(false))
   }, [accessToken])
 
-  const handleSelect = async (orgId: string) => {
-    if (orgId === org?.id) {
+  const handleSelect = async (membership: OrgMembership) => {
+    if (membership.org.id === org?.id) {
       setOpen(false)
       return
     }
 
     setSwitching(true)
     try {
-      await switchOrg(orgId)
+      await switchOrg(membership.org.id, membership.org.name, membership.org.slug)
       // Reload to apply new org context
       window.location.reload()
     } catch (error) {
@@ -95,7 +95,7 @@ export function OrgSelector() {
                 <CommandItem
                   key={membership.org.id}
                   value={membership.org.id}
-                  onSelect={() => handleSelect(membership.org.id)}
+                  onSelect={() => handleSelect(membership)}
                 >
                   <Check
                     className={cn(

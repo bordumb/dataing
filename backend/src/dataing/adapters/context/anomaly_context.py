@@ -12,8 +12,8 @@ from typing import TYPE_CHECKING, Any
 import structlog
 
 if TYPE_CHECKING:
+    from dataing.adapters.datasource.sql.base import SQLAdapter
     from dataing.core.domain_types import AnomalyAlert
-    from dataing.core.interfaces import DatabaseAdapter
 
 logger = structlog.get_logger()
 
@@ -81,7 +81,7 @@ class AnomalyContext:
 
     async def confirm(
         self,
-        adapter: DatabaseAdapter,
+        adapter: SQLAdapter,
         anomaly: AnomalyAlert,
     ) -> AnomalyConfirmation:
         """Confirm that an anomaly exists in the data.
@@ -126,7 +126,7 @@ class AnomalyContext:
 
     async def _confirm_null_rate_anomaly(
         self,
-        adapter: DatabaseAdapter,
+        adapter: SQLAdapter,
         anomaly: AnomalyAlert,
         column_name: str,
     ) -> AnomalyConfirmation:
@@ -210,7 +210,7 @@ class AnomalyContext:
 
     async def _confirm_row_count_anomaly(
         self,
-        adapter: DatabaseAdapter,
+        adapter: SQLAdapter,
         anomaly: AnomalyAlert,
     ) -> AnomalyConfirmation:
         """Confirm a row count anomaly.
@@ -268,7 +268,7 @@ class AnomalyContext:
 
     async def _confirm_generic_anomaly(
         self,
-        adapter: DatabaseAdapter,
+        adapter: SQLAdapter,
         anomaly: AnomalyAlert,
         column_name: str,
     ) -> AnomalyConfirmation:
@@ -302,7 +302,7 @@ class AnomalyContext:
 
     async def profile_column(
         self,
-        adapter: DatabaseAdapter,
+        adapter: SQLAdapter,
         table_name: str,
         column_name: str,
         date: str | None = None,

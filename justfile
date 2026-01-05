@@ -120,7 +120,8 @@ docs-serve:
 # Generate demo fixtures if not present
 demo-fixtures:
     #!/usr/bin/env bash
-    if [ ! -d "demo/fixtures/null_spike" ]; then
+    # Check for actual parquet files, not just directory
+    if [ ! -f "demo/fixtures/null_spike/orders.parquet" ]; then
         echo "Generating demo fixtures..."
         cd demo && uv run python generate.py
     else
@@ -180,7 +181,27 @@ demo: demo-fixtures
         export $(grep -v '^#' backend/.env | xargs)
     fi
 
+    # Start backend
     (cd backend && uv run fastapi dev src/dataing/entrypoints/api/app.py --host 0.0.0.0 --port 8000) &
+    BACKEND_PID=$!
+
+    # Wait for backend to be ready, then sync datasets
+    (
+        echo "Waiting for backend to be ready..."
+        for i in {1..30}; do
+            if curl -s http://localhost:8000/health > /dev/null 2>&1; then
+                echo "Backend ready, syncing datasets..."
+                curl -s -X POST "http://localhost:8000/api/v1/datasources/00000000-0000-0000-0000-000000000003/sync" \
+                    -H "X-API-Key: dd_demo_12345" > /dev/null 2>&1 && \
+                    echo "Datasets synced successfully" || \
+                    echo "Dataset sync failed (non-critical)"
+                break
+            fi
+            sleep 1
+        done
+    ) &
+
+    # Start frontend
     (cd frontend && pnpm dev --port 3000) &
     wait
 

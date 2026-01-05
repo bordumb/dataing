@@ -15,7 +15,7 @@ import structlog
 from dataing.adapters.datasource.types import SchemaResponse, Table
 
 if TYPE_CHECKING:
-    from dataing.adapters.datasource.base import BaseAdapter
+    from dataing.adapters.datasource.sql.base import SQLAdapter
     from dataing.core.domain_types import AnomalyAlert
 
 logger = structlog.get_logger()
@@ -86,7 +86,7 @@ class CorrelationContext:
 
     async def find_correlations(
         self,
-        adapter: BaseAdapter,
+        adapter: SQLAdapter,
         anomaly: AnomalyAlert,
         schema: SchemaResponse,
     ) -> list[Correlation]:
@@ -140,7 +140,7 @@ class CorrelationContext:
 
     async def analyze_time_series(
         self,
-        adapter: BaseAdapter,
+        adapter: SQLAdapter,
         table_name: str,
         column_name: str,
         center_date: str,
@@ -207,7 +207,7 @@ class CorrelationContext:
 
     async def find_upstream_anomalies(
         self,
-        adapter: BaseAdapter,
+        adapter: SQLAdapter,
         anomaly: AnomalyAlert,
         schema: SchemaResponse,
     ) -> list[dict[str, Any]]:
@@ -316,7 +316,7 @@ class CorrelationContext:
 
     async def _analyze_table_correlation(
         self,
-        adapter: BaseAdapter,
+        adapter: SQLAdapter,
         anomaly: AnomalyAlert,
         source_table: str,
         related_table: str,

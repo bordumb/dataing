@@ -14,9 +14,11 @@ Note: Lineage fetching now uses the pluggable lineage adapter layer.
 See dataing.adapters.lineage for the full lineage adapter API.
 """
 
+from dataing.core.domain_types import InvestigationContext
+
 from .anomaly_context import AnomalyConfirmation, AnomalyContext, ColumnProfile
 from .correlation_context import Correlation, CorrelationContext, TimeSeriesPattern
-from .engine import ContextEngine, DefaultContextEngine, EnrichedContext, InvestigationContext
+from .engine import ContextEngine, DefaultContextEngine, EnrichedContext
 from .query_context import QueryContext, QueryExecutionError
 from .schema_context import SchemaContextBuilder
 

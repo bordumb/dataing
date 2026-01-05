@@ -12,14 +12,15 @@ Tools provided:
 from __future__ import annotations
 
 import uuid
-from typing import Any
+from typing import Any, cast
 
 from mcp.server import Server
 from mcp.server.stdio import stdio_server
 from mcp.types import TextContent, Tool
 
 from dataing.adapters.context.engine import DefaultContextEngine
-from dataing.adapters.datasource import BaseAdapter, get_registry
+from dataing.adapters.datasource import get_registry
+from dataing.adapters.datasource.sql.base import SQLAdapter
 from dataing.adapters.llm.client import AnthropicClient
 from dataing.core.domain_types import AnomalyAlert
 from dataing.core.orchestrator import InvestigationOrchestrator, OrchestratorConfig
@@ -29,13 +30,13 @@ from dataing.safety.validator import validate_query
 
 
 def create_server(
-    db: BaseAdapter,
+    db: SQLAdapter,
     llm: AnthropicClient,
 ) -> Server:
     """Create and configure the MCP server.
 
     Args:
-        db: Database adapter for queries.
+        db: SQL database adapter for queries.
         llm: LLM client for investigations.
 
     Returns:
@@ -196,7 +197,7 @@ async def _investigate_anomaly(
 
 
 async def _query_dataset(
-    db: BaseAdapter,
+    db: SQLAdapter,
     args: dict[str, Any],
 ) -> list[TextContent]:
     """Execute a read-only query.
@@ -214,13 +215,14 @@ async def _query_dataset(
         # Validate query for safety
         validate_query(sql)
 
-        result = await db.execute(sql)
+        result = await db.execute_query(sql)
 
         # Format results
         if not result.rows:
             return [TextContent(type="text", text="Query returned no results.")]
 
-        lines = [f"Columns: {', '.join(result.columns)}"]
+        column_names = [c["name"] for c in result.columns]
+        lines = [f"Columns: {', '.join(column_names)}"]
         lines.append(f"Row count: {result.row_count}")
         lines.append("")
 
@@ -238,7 +240,7 @@ async def _query_dataset(
 
 
 async def _get_table_schema(
-    db: BaseAdapter,
+    db: SQLAdapter,
     args: dict[str, Any],
 ) -> list[TextContent]:
     """Get schema for a table.
@@ -294,8 +296,10 @@ async def run_server(database_url: str, anthropic_api_key: str) -> None:
         anthropic_api_key: Anthropic API key.
     """
     registry = get_registry()
-    db = registry.create("postgres", {"dsn": database_url})
-    await db.connect()
+    adapter = registry.create("postgres", {"dsn": database_url})
+    await adapter.connect()
+    # Postgres adapter is always SQLAdapter
+    db = cast(SQLAdapter, adapter)
 
     llm = AnthropicClient(api_key=anthropic_api_key)
 
@@ -304,4 +308,4 @@ async def run_server(database_url: str, anthropic_api_key: str) -> None:
     async with stdio_server() as (read_stream, write_stream):
         await server.run(read_stream, write_stream, server.create_initialization_options())
 
-    await db.disconnect()
+    await adapter.disconnect()

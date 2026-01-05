@@ -16,7 +16,7 @@ import structlog
 
 from dataing.adapters.datasource.types import SchemaResponse
 from dataing.adapters.lineage import DatasetId, LineageAdapter
-from dataing.core.domain_types import LineageContext
+from dataing.core.domain_types import InvestigationContext, LineageContext
 from dataing.core.exceptions import SchemaDiscoveryError
 
 from .anomaly_context import AnomalyConfirmation, AnomalyContext
@@ -25,22 +25,10 @@ from .schema_context import SchemaContextBuilder
 
 if TYPE_CHECKING:
     from dataing.adapters.datasource.base import BaseAdapter
+    from dataing.adapters.datasource.sql.base import SQLAdapter
     from dataing.core.domain_types import AnomalyAlert
 
 logger = structlog.get_logger()
-
-
-@dataclass
-class InvestigationContext:
-    """Context gathered for an investigation.
-
-    Attributes:
-        schema: Unified schema from the data source.
-        lineage: Optional lineage context.
-    """
-
-    schema: SchemaResponse
-    lineage: LineageContext | None = None
 
 
 @dataclass
@@ -199,7 +187,7 @@ class ContextEngine:
     async def gather_enriched(
         self,
         alert: AnomalyAlert,
-        adapter: BaseAdapter,
+        adapter: SQLAdapter,
     ) -> EnrichedContext:
         """Gather enriched context with anomaly confirmation.
 

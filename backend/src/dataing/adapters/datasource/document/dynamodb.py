@@ -235,9 +235,10 @@ class DynamoDBAdapter(DocumentAdapter):
 
     async def scan_collection(
         self,
-        name: str,
+        collection: str,
         filter: dict[str, Any] | None = None,
         limit: int = 100,
+        skip: int = 0,
     ) -> QueryResult:
         """Scan a DynamoDB table."""
         if not self._connected or not self._client:
@@ -245,7 +246,7 @@ class DynamoDBAdapter(DocumentAdapter):
 
         start_time = time.time()
         try:
-            scan_params = {"TableName": name, "Limit": limit}
+            scan_params = {"TableName": collection, "Limit": limit}
 
             if filter:
                 filter_expression_parts = []

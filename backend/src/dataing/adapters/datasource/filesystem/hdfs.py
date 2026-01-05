@@ -17,11 +17,12 @@ from dataing.adapters.datasource.errors import (
     QueryTimeoutError,
     SchemaFetchFailedError,
 )
-from dataing.adapters.datasource.filesystem.base import FileSystemAdapter
+from dataing.adapters.datasource.filesystem.base import FileInfo, FileSystemAdapter
 from dataing.adapters.datasource.registry import register_adapter
 from dataing.adapters.datasource.type_mapping import normalize_type
 from dataing.adapters.datasource.types import (
     AdapterCapabilities,
+    Column,
     ConfigField,
     ConfigSchema,
     ConnectionTestResult,
@@ -32,6 +33,7 @@ from dataing.adapters.datasource.types import (
     SchemaResponse,
     SourceCategory,
     SourceType,
+    Table,
 )
 
 HDFS_CONFIG_SCHEMA = ConfigSchema(
@@ -262,7 +264,11 @@ class HDFSAdapter(FileSystemAdapter):
                 error_code="CONNECTION_FAILED",
             )
 
-    async def list_files(self, pattern: str = "*") -> list[dict[str, Any]]:
+    async def list_files(
+        self,
+        pattern: str = "*",
+        recursive: bool = True,
+    ) -> list[FileInfo]:
         """List files in the HDFS directory."""
         if not self._connected or not self._conn:
             raise ConnectionFailedError(message="Not connected to HDFS")
@@ -274,16 +280,16 @@ class HDFSAdapter(FileSystemAdapter):
             try:
                 result = self._conn.execute(f"SELECT * FROM glob('{full_pattern}')").fetchall()
 
-                files = []
+                files: list[FileInfo] = []
                 for row in result:
                     filepath = row[0]
                     filename = filepath.split("/")[-1]
                     files.append(
-                        {
-                            "path": filepath,
-                            "name": filename,
-                            "size": None,
-                        }
+                        FileInfo(
+                            path=filepath,
+                            name=filename,
+                            size_bytes=0,
+                        )
                     )
                 return files
             except Exception:
@@ -374,29 +380,33 @@ class HDFSAdapter(FileSystemAdapter):
         result: str = normalize_type(type_str, SourceType.DUCKDB).value
         return result
 
-    async def infer_schema(self, path: str) -> dict[str, Any]:
+    async def infer_schema(
+        self,
+        path: str,
+        file_format: str | None = None,
+    ) -> Table:
         """Infer schema from an HDFS file."""
         if not self._connected or not self._conn:
             raise ConnectionFailedError(message="Not connected to HDFS")
 
         try:
-            file_format = self._config.get("file_format", "auto")
+            fmt = file_format or self._config.get("file_format", "auto")
 
-            if file_format == "auto":
+            if fmt == "auto":
                 if path.endswith(".parquet"):
-                    file_format = "parquet"
+                    fmt = "parquet"
                 elif path.endswith(".csv"):
-                    file_format = "csv"
+                    fmt = "csv"
                 elif path.endswith(".orc"):
-                    file_format = "orc"
+                    fmt = "orc"
                 else:
-                    file_format = "json"
+                    fmt = "json"
 
-            if file_format == "parquet":
+            if fmt == "parquet":
                 sql = f"DESCRIBE SELECT * FROM read_parquet('{path}')"
-            elif file_format == "csv":
+            elif fmt == "csv":
                 sql = f"DESCRIBE SELECT * FROM read_csv_auto('{path}')"
-            elif file_format == "orc":
+            elif fmt == "orc":
                 sql = f"DESCRIBE SELECT * FROM read_orc('{path}')"
             else:
                 sql = f"DESCRIBE SELECT * FROM read_json_auto('{path}')"
@@ -409,26 +419,26 @@ class HDFSAdapter(FileSystemAdapter):
                 col_name = row[0]
                 col_type = row[1]
                 columns.append(
-                    {
-                        "name": col_name,
-                        "data_type": normalize_type(col_type, SourceType.DUCKDB),
-                        "native_type": col_type,
-                        "nullable": True,
-                        "is_primary_key": False,
-                        "is_partition_key": False,
-                    }
+                    Column(
+                        name=col_name,
+                        data_type=normalize_type(col_type, SourceType.DUCKDB),
+                        native_type=col_type,
+                        nullable=True,
+                        is_primary_key=False,
+                        is_partition_key=False,
+                    )
                 )
 
             filename = path.split("/")[-1]
             table_name = filename.rsplit(".", 1)[0].replace("-", "_").replace(" ", "_")
 
-            return {
-                "name": table_name,
-                "table_type": "file",
-                "native_type": f"HDFS_{file_format.upper()}_FILE",
-                "native_path": path,
-                "columns": columns,
-            }
+            return Table(
+                name=table_name,
+                table_type="file",
+                native_type=f"HDFS_{fmt.upper()}_FILE",
+                native_path=path,
+                columns=columns,
+            )
 
         except Exception as e:
             raise SchemaFetchFailedError(
@@ -510,25 +520,25 @@ class HDFSAdapter(FileSystemAdapter):
                     pass
 
             if filter and filter.table_pattern:
-                all_files = [f for f in all_files if filter.table_pattern in f["name"]]
+                all_files = [f for f in all_files if filter.table_pattern in f.name]
 
             if filter and filter.max_tables:
                 all_files = all_files[: filter.max_tables]
 
-            tables = []
+            tables: list[Table] = []
             for file_info in all_files:
                 try:
-                    table_def = await self.infer_schema(file_info["path"])
+                    table_def = await self.infer_schema(file_info.path)
                     tables.append(table_def)
                 except Exception:
                     tables.append(
-                        {
-                            "name": file_info["name"].rsplit(".", 1)[0],
-                            "table_type": "file",
-                            "native_type": "HDFS_FILE",
-                            "native_path": file_info["path"],
-                            "columns": [],
-                        }
+                        Table(
+                            name=file_info.name.rsplit(".", 1)[0],
+                            table_type="file",
+                            native_type="HDFS_FILE",
+                            native_path=file_info.path,
+                            columns=[],
+                        )
                     )
 
             path = self._config.get("path", "/")

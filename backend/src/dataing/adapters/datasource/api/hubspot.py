@@ -20,6 +20,7 @@ from dataing.adapters.datasource.errors import (
 from dataing.adapters.datasource.registry import register_adapter
 from dataing.adapters.datasource.types import (
     AdapterCapabilities,
+    Column,
     ConfigField,
     ConfigSchema,
     ConnectionTestResult,
@@ -31,6 +32,7 @@ from dataing.adapters.datasource.types import (
     SchemaResponse,
     SourceCategory,
     SourceType,
+    Table,
 )
 
 HUBSPOT_TYPE_MAP = {
@@ -224,7 +226,7 @@ class HubSpotAdapter(APIAdapter):
             return [o.strip() for o in objects_config.split(",")]
         return HUBSPOT_OBJECTS
 
-    async def describe_object(self, object_name: str) -> dict[str, Any]:
+    async def describe_object(self, object_name: str) -> Table:
         """Get schema for a HubSpot object."""
         if not self._connected or not self._session:
             raise ConnectionFailedError(message="Not connected to HubSpot")
@@ -249,24 +251,24 @@ class HubSpotAdapter(APIAdapter):
             for prop in data.get("results", []):
                 prop_type = prop.get("type", "string")
                 columns.append(
-                    {
-                        "name": prop.get("name"),
-                        "data_type": HUBSPOT_TYPE_MAP.get(prop_type, NormalizedType.STRING),
-                        "native_type": prop_type,
-                        "nullable": True,
-                        "is_primary_key": prop.get("name") == "hs_object_id",
-                        "is_partition_key": False,
-                        "description": prop.get("label"),
-                    }
+                    Column(
+                        name=prop.get("name", ""),
+                        data_type=HUBSPOT_TYPE_MAP.get(prop_type, NormalizedType.STRING),
+                        native_type=prop_type,
+                        nullable=True,
+                        is_primary_key=prop.get("name") == "hs_object_id",
+                        is_partition_key=False,
+                        description=prop.get("label"),
+                    )
                 )
 
-            return {
-                "name": object_name,
-                "table_type": "object",
-                "native_type": "HUBSPOT_OBJECT",
-                "native_path": object_name,
-                "columns": columns,
-            }
+            return Table(
+                name=object_name,
+                table_type="object",
+                native_type="HUBSPOT_OBJECT",
+                native_path=object_name,
+                columns=columns,
+            )
 
         except (AuthenticationFailedError, AccessDeniedError, RateLimitedError):
             raise
@@ -279,8 +281,8 @@ class HubSpotAdapter(APIAdapter):
     async def query_object(
         self,
         object_name: str,
+        query: str | None = None,
         limit: int = 100,
-        properties: list[str] | None = None,
     ) -> QueryResult:
         """Query records from a HubSpot object."""
         if not self._connected or not self._session:
@@ -289,8 +291,6 @@ class HubSpotAdapter(APIAdapter):
         start_time = time.time()
         try:
             params: dict[str, Any] = {"limit": min(limit, 100)}
-            if properties:
-                params["properties"] = ",".join(properties)
 
             response = await self._session.get(
                 f"/crm/v3/objects/{object_name}",
@@ -364,20 +364,20 @@ class HubSpotAdapter(APIAdapter):
             if filter and filter.max_tables:
                 objects = objects[: filter.max_tables]
 
-            tables = []
+            tables: list[Table] = []
             for obj_name in objects:
                 try:
                     table_def = await self.describe_object(obj_name)
                     tables.append(table_def)
                 except Exception:
                     tables.append(
-                        {
-                            "name": obj_name,
-                            "table_type": "object",
-                            "native_type": "HUBSPOT_OBJECT",
-                            "native_path": obj_name,
-                            "columns": [],
-                        }
+                        Table(
+                            name=obj_name,
+                            table_type="object",
+                            native_type="HUBSPOT_OBJECT",
+                            native_path=obj_name,
+                            columns=[],
+                        )
                     )
 
             catalogs = [

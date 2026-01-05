@@ -131,8 +131,9 @@ class QueryContext:
         if result.row_count == 0:
             return "No rows returned"
 
+        column_names = [c["name"] for c in result.columns]
         lines = [
-            f"Columns: {', '.join(result.columns)}",
+            f"Columns: {', '.join(column_names)}",
             f"Total rows: {result.row_count}",
             "",
             "Sample rows:",
@@ -167,14 +168,15 @@ class QueryContext:
             return "No rows returned"
 
         lines = []
+        column_names = [c["name"] for c in result.columns]
 
         # Header
-        lines.append("| " + " | ".join(result.columns) + " |")
-        lines.append("| " + " | ".join(["---"] * len(result.columns)) + " |")
+        lines.append("| " + " | ".join(column_names) + " |")
+        lines.append("| " + " | ".join(["---"] * len(column_names)) + " |")
 
         # Rows
         for row in result.rows[:max_rows]:
-            values = [str(row.get(col, "")) for col in result.columns]
+            values = [str(row.get(col, "")) for col in column_names]
             lines.append("| " + " | ".join(values) + " |")
 
         if result.row_count > max_rows:
@@ -215,7 +217,7 @@ class QueryContext:
         Returns:
             List of QueryResult or QueryExecutionError for each query.
         """
-        results = []
+        results: list[QueryResult | QueryExecutionError] = []
 
         for sql in queries:
             try:

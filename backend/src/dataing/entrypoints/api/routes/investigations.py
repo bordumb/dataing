@@ -6,7 +6,10 @@ import asyncio
 import uuid
 from collections.abc import AsyncIterator
 from datetime import UTC, datetime
-from typing import Annotated, Any
+from typing import TYPE_CHECKING, Annotated, Any, cast
+
+if TYPE_CHECKING:
+    from dataing.adapters.datasource.sql.base import SQLAdapter
 
 import structlog
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request
@@ -123,7 +126,9 @@ async def create_investigation(
             orchestrator.context_engine = context_engine
 
             # Run investigation against tenant's actual data
-            finding = await orchestrator.run_investigation(state, data_adapter)
+            # Cast to SQLAdapter since investigations require SQL capabilities
+            sql_adapter = cast("SQLAdapter", data_adapter)
+            finding = await orchestrator.run_investigation(state, sql_adapter)
             investigations[investigation_id]["finding"] = finding.model_dump()
             investigations[investigation_id]["status"] = "completed"
         except Exception as e:

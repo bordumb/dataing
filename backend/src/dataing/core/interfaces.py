@@ -12,7 +12,8 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Protocol, runtime_checkable
 
 if TYPE_CHECKING:
-    from dataing.adapters.datasource.types import QueryResult, SchemaResponse
+    from dataing.adapters.datasource.base import BaseAdapter
+    from dataing.adapters.datasource.types import QueryResult, SchemaFilter, SchemaResponse
 
     from .domain_types import (
         AnomalyAlert,
@@ -25,21 +26,30 @@ if TYPE_CHECKING:
 
 @runtime_checkable
 class DatabaseAdapter(Protocol):
-    """Interface for database connections.
+    """Interface for SQL database connections.
 
     Implementations must provide:
     - Query execution with timeout support
     - Schema discovery for available tables
 
     All queries should be read-only (SELECT only).
+    This protocol is implemented by SQLAdapter subclasses.
     """
 
-    async def execute_query(self, sql: str, timeout_seconds: int = 30) -> QueryResult:
+    async def execute_query(
+        self,
+        sql: str,
+        params: dict[str, object] | None = None,
+        timeout_seconds: int = 30,
+        limit: int | None = None,
+    ) -> QueryResult:
         """Execute a read-only SQL query.
 
         Args:
             sql: The SQL query to execute (must be SELECT).
+            params: Optional query parameters.
             timeout_seconds: Maximum time to wait for query completion.
+            limit: Optional row limit.
 
         Returns:
             QueryResult with columns, rows, and row count.
@@ -50,11 +60,11 @@ class DatabaseAdapter(Protocol):
         """
         ...
 
-    async def get_schema(self, table_pattern: str | None = None) -> SchemaResponse:
+    async def get_schema(self, filter: SchemaFilter | None = None) -> SchemaResponse:
         """Discover available tables and columns.
 
         Args:
-            table_pattern: Optional pattern to filter tables.
+            filter: Optional filter to narrow down schema discovery.
 
         Returns:
             SchemaResponse with all discovered tables.
@@ -167,12 +177,12 @@ class ContextEngine(Protocol):
     - Data lineage (OPTIONAL - graceful degradation)
     """
 
-    async def gather(self, alert: AnomalyAlert, adapter: DatabaseAdapter) -> InvestigationContext:
+    async def gather(self, alert: AnomalyAlert, adapter: BaseAdapter) -> InvestigationContext:
         """Gather all context needed for investigation.
 
         Args:
             alert: The anomaly alert being investigated.
-            adapter: Connected database adapter.
+            adapter: Connected data source adapter.
 
         Returns:
             InvestigationContext with schema and optional lineage.

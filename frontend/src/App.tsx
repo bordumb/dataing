@@ -20,6 +20,13 @@ import { LoginPage } from '@/features/auth/login-page'
 // Auth
 import { AuthProvider, RequireAuth } from '@/lib/auth/context'
 
+// Entitlements
+import {
+  EntitlementsProvider,
+  useDemoEntitlements,
+  DemoToggle,
+} from '@/lib/entitlements'
+
 function AppLayout({ children }: { children: React.ReactNode }) {
   return (
     <SidebarProvider>
@@ -39,100 +46,111 @@ function AppLayout({ children }: { children: React.ReactNode }) {
   )
 }
 
+function AppWithEntitlements() {
+  const { entitlements, plan, setPlan } = useDemoEntitlements()
+
+  return (
+    <EntitlementsProvider entitlements={entitlements}>
+      <Routes>
+        {/* Public routes */}
+        <Route path="/login" element={<LoginPage />} />
+
+        {/* Protected routes */}
+        <Route
+          path="/*"
+          element={
+            <RequireAuth>
+              <AppLayout>
+                <Routes>
+                  <Route
+                    index
+                    element={
+                      <FeatureErrorBoundary feature="dashboard">
+                        <DashboardPage />
+                      </FeatureErrorBoundary>
+                    }
+                  />
+                  <Route
+                    path="investigations"
+                    element={
+                      <FeatureErrorBoundary feature="investigations">
+                        <InvestigationList />
+                      </FeatureErrorBoundary>
+                    }
+                  />
+                  <Route
+                    path="investigations/new"
+                    element={
+                      <FeatureErrorBoundary feature="new investigation">
+                        <NewInvestigation />
+                      </FeatureErrorBoundary>
+                    }
+                  />
+                  <Route
+                    path="investigations/:id"
+                    element={
+                      <FeatureErrorBoundary feature="investigation details">
+                        <InvestigationDetail />
+                      </FeatureErrorBoundary>
+                    }
+                  />
+                  <Route
+                    path="datasources"
+                    element={
+                      <FeatureErrorBoundary feature="data sources">
+                        <DataSourcePage />
+                      </FeatureErrorBoundary>
+                    }
+                  />
+                  <Route
+                    path="datasources/:datasourceId/datasets"
+                    element={
+                      <FeatureErrorBoundary feature="datasets">
+                        <DatasetListPage />
+                      </FeatureErrorBoundary>
+                    }
+                  />
+                  <Route
+                    path="datasets/:datasetId"
+                    element={
+                      <FeatureErrorBoundary feature="dataset details">
+                        <DatasetDetailPage />
+                      </FeatureErrorBoundary>
+                    }
+                  />
+                  <Route
+                    path="settings/*"
+                    element={
+                      <FeatureErrorBoundary feature="settings">
+                        <SettingsPage />
+                      </FeatureErrorBoundary>
+                    }
+                  />
+                  <Route
+                    path="usage"
+                    element={
+                      <FeatureErrorBoundary feature="usage">
+                        <UsagePage />
+                      </FeatureErrorBoundary>
+                    }
+                  />
+                </Routes>
+              </AppLayout>
+            </RequireAuth>
+          }
+        />
+      </Routes>
+      <DemoToggle plan={plan} onPlanChange={setPlan} />
+      <Toaster />
+    </EntitlementsProvider>
+  )
+}
+
 function App() {
   return (
     <ErrorBoundary>
       <AuthProvider>
-        <Routes>
-          {/* Public routes */}
-          <Route path="/login" element={<LoginPage />} />
-
-          {/* Protected routes */}
-          <Route
-            path="/*"
-            element={
-              <RequireAuth>
-                <AppLayout>
-                  <Routes>
-                    <Route
-                      index
-                      element={
-                        <FeatureErrorBoundary feature="dashboard">
-                          <DashboardPage />
-                        </FeatureErrorBoundary>
-                      }
-                    />
-                    <Route
-                      path="investigations"
-                      element={
-                        <FeatureErrorBoundary feature="investigations">
-                          <InvestigationList />
-                        </FeatureErrorBoundary>
-                      }
-                    />
-                    <Route
-                      path="investigations/new"
-                      element={
-                        <FeatureErrorBoundary feature="new investigation">
-                          <NewInvestigation />
-                        </FeatureErrorBoundary>
-                      }
-                    />
-                    <Route
-                      path="investigations/:id"
-                      element={
-                        <FeatureErrorBoundary feature="investigation details">
-                          <InvestigationDetail />
-                        </FeatureErrorBoundary>
-                      }
-                    />
-                    <Route
-                      path="datasources"
-                      element={
-                        <FeatureErrorBoundary feature="data sources">
-                          <DataSourcePage />
-                        </FeatureErrorBoundary>
-                      }
-                    />
-                    <Route
-                      path="datasources/:datasourceId/datasets"
-                      element={
-                        <FeatureErrorBoundary feature="datasets">
-                          <DatasetListPage />
-                        </FeatureErrorBoundary>
-                      }
-                    />
-                    <Route
-                      path="datasets/:datasetId"
-                      element={
-                        <FeatureErrorBoundary feature="dataset details">
-                          <DatasetDetailPage />
-                        </FeatureErrorBoundary>
-                      }
-                    />
-                    <Route
-                      path="settings/*"
-                      element={
-                        <FeatureErrorBoundary feature="settings">
-                          <SettingsPage />
-                        </FeatureErrorBoundary>
-                      }
-                    />
-                    <Route
-                      path="usage"
-                      element={
-                        <FeatureErrorBoundary feature="usage">
-                          <UsagePage />
-                        </FeatureErrorBoundary>
-                      }
-                    />
-                  </Routes>
-                </AppLayout>
-              </RequireAuth>
-            }
-          />
-        </Routes>
-        <Toaster />
+        <AppWithEntitlements />
       </AuthProvider>
     </ErrorBoundary>
   )

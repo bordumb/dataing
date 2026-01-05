@@ -440,22 +440,41 @@ class AppDatabase:
 
         return await self.fetch_all(base_query, *args)
 
-    async def get_dataset_count(self, tenant_id: UUID, datasource_id: UUID) -> int:
-        """Get count of active datasets for a datasource.
+    async def get_dataset_count(
+        self,
+        tenant_id: UUID,
+        datasource_id: UUID,
+        table_type: str | None = None,
+        search: str | None = None,
+    ) -> int:
+        """Get count of active datasets for a datasource with optional filtering.
 
         Args:
             tenant_id: The tenant ID.
             datasource_id: The datasource ID.
+            table_type: Optional filter by table type.
+            search: Optional search term for name or native_path.
 
         Returns:
-            Number of active datasets.
+            Number of active datasets matching the filters.
         """
-        result = await self.fetch_one(
-            """SELECT COUNT(*)::int as count FROM datasets
-               WHERE tenant_id = $1 AND datasource_id = $2 AND is_active = true""",
-            tenant_id,
-            datasource_id,
-        )
+        base_query = """
+            SELECT COUNT(*)::int as count FROM datasets
+            WHERE tenant_id = $1 AND datasource_id = $2 AND is_active = true
+        """
+        args: list[Any] = [tenant_id, datasource_id]
+        idx = 3
+
+        if table_type:
+            base_query += f" AND table_type = ${idx}"
+            args.append(table_type)
+            idx += 1
+
+        if search:
+            base_query += f" AND (name ILIKE ${idx} OR native_path ILIKE ${idx})"
+            args.append(f"%{search}%")
+
+        result = await self.fetch_one(base_query, *args)
         return result["count"] if result else 0
 
     # Investigation operations

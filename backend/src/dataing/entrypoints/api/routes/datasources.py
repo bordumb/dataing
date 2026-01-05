@@ -186,6 +186,29 @@ class SyncResponse(BaseModel):
     message: str
 
 
+class DatasetSummary(BaseModel):
+    """Summary of a dataset for list responses."""
+
+    id: str
+    datasource_id: str
+    native_path: str
+    name: str
+    table_type: str
+    schema_name: str | None = None
+    catalog_name: str | None = None
+    row_count: int | None = None
+    column_count: int | None = None
+    last_synced_at: str | None = None
+    created_at: str
+
+
+class DatasourceDatasetsResponse(BaseModel):
+    """Response for listing datasets of a datasource."""
+
+    datasets: list[DatasetSummary]
+    total: int
+
+
 def _encrypt_config(config: dict[str, Any], key: bytes) -> str:
     """Encrypt configuration."""
     f = Fernet(key)
@@ -823,7 +846,7 @@ async def sync_datasource_schema(
         ) from e
 
 
-@router.get("/{datasource_id}/datasets")
+@router.get("/{datasource_id}/datasets", response_model=DatasourceDatasetsResponse)
 async def list_datasource_datasets(
     datasource_id: UUID,
     auth: AuthDep,
@@ -832,7 +855,7 @@ async def list_datasource_datasets(
     search: str | None = None,
     limit: int = Query(default=1000, ge=1, le=10000),
     offset: int = Query(default=0, ge=0),
-) -> dict[str, Any]:
+) -> DatasourceDatasetsResponse:
     """List datasets for a datasource."""
     ds = await app_db.get_data_source(datasource_id, auth.tenant_id)
 
@@ -848,26 +871,31 @@ async def list_datasource_datasets(
         offset=offset,
     )
 
-    total = await app_db.get_dataset_count(auth.tenant_id, datasource_id)
+    total = await app_db.get_dataset_count(
+        auth.tenant_id,
+        datasource_id,
+        table_type=table_type,
+        search=search,
+    )
 
-    return {
-        "datasets": [
-            {
-                "id": str(d["id"]),
-                "datasource_id": str(d["datasource_id"]),
-                "native_path": d["native_path"],
-                "name": d["name"],
-                "table_type": d["table_type"],
-                "schema_name": d.get("schema_name"),
-                "catalog_name": d.get("catalog_name"),
-                "row_count": d.get("row_count"),
-                "column_count": d.get("column_count"),
-                "last_synced_at": (
+    return DatasourceDatasetsResponse(
+        datasets=[
+            DatasetSummary(
+                id=str(d["id"]),
+                datasource_id=str(d["datasource_id"]),
+                native_path=d["native_path"],
+                name=d["name"],
+                table_type=d["table_type"],
+                schema_name=d.get("schema_name"),
+                catalog_name=d.get("catalog_name"),
+                row_count=d.get("row_count"),
+                column_count=d.get("column_count"),
+                last_synced_at=(
                     d["last_synced_at"].isoformat() if d.get("last_synced_at") else None
                 ),
-                "created_at": d["created_at"].isoformat(),
-            }
+                created_at=d["created_at"].isoformat(),
+            )
             for d in datasets
         ],
-        "total": total,
-    }
+        total=total,
+    )

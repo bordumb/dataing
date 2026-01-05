@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from datetime import datetime
 from typing import Annotated, Literal
 from uuid import UUID
@@ -117,15 +118,22 @@ async def get_investigation_feedback(
         and (user_id is None or e.get("actor_id") == user_id)
     ]
 
-    return [
-        FeedbackItem(
-            id=e["id"],
-            target_type=e["event_type"].replace("feedback.", ""),
-            target_id=UUID(str(e["event_data"]["target_id"])),
-            rating=e["event_data"]["rating"],
-            reason=e["event_data"].get("reason"),
-            comment=e["event_data"].get("comment"),
-            created_at=e["created_at"],
+    result = []
+    for e in feedback_events:
+        # Parse event_data if it's a JSON string
+        event_data = e["event_data"]
+        if isinstance(event_data, str):
+            event_data = json.loads(event_data)
+
+        result.append(
+            FeedbackItem(
+                id=e["id"],
+                target_type=e["event_type"].replace("feedback.", ""),
+                target_id=UUID(str(event_data["target_id"])),
+                rating=event_data["rating"],
+                reason=event_data.get("reason"),
+                comment=event_data.get("comment"),
+                created_at=e["created_at"],
+            )
         )
-        for e in feedback_events
-    ]
+    return result

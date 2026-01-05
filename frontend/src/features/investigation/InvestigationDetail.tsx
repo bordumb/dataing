@@ -4,7 +4,7 @@ import { useInvestigation, Evidence } from '@/lib/api/investigations'
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card'
 import { Badge } from '@/components/ui/Badge'
 import { Button } from '@/components/ui/Button'
-import { formatPercentage, cn } from '@/lib/utils'
+import { formatPercentage, cn, generateFeedbackTargetId } from '@/lib/utils'
 import { ArrowLeft, RefreshCw, ChevronDown, ChevronRight } from 'lucide-react'
 import { InvestigationLiveView } from './InvestigationLiveView'
 import { SqlExplainer } from './SqlExplainer'
@@ -50,9 +50,21 @@ interface HypothesisAccordionProps {
   group: HypothesisGroup
   isExpanded: boolean
   onToggle: () => void
+  investigationId: string
 }
 
-function HypothesisAccordion({ group, isExpanded, onToggle }: HypothesisAccordionProps) {
+function HypothesisAccordion({
+  group,
+  isExpanded,
+  onToggle,
+  investigationId,
+}: HypothesisAccordionProps) {
+  // Generate deterministic UUIDs for feedback targets
+  const hypothesisTargetId = generateFeedbackTargetId(
+    investigationId,
+    'hypothesis',
+    group.hypothesis_id
+  )
   return (
     <div className="border rounded-lg">
       <button
@@ -77,32 +89,45 @@ function HypothesisAccordion({ group, isExpanded, onToggle }: HypothesisAccordio
           <span className="text-sm font-medium">
             Confidence: {formatPercentage(group.maxConfidence)}
           </span>
-          <FeedbackButtons targetType="hypothesis" targetId={group.hypothesis_id} />
+          <FeedbackButtons targetType="hypothesis" targetId={hypothesisTargetId} />
         </div>
       </button>
 
       {isExpanded && (
         <div className="p-4 space-y-4">
-          {group.evidence.map((ev, i) => (
-            <div
-              key={i}
-              className="border rounded-lg p-4 bg-muted/20 space-y-3"
-            >
-              {/* Query Section */}
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <h5 className="text-sm font-medium">Query</h5>
-                  <FeedbackButtons targetType="query" targetId={`${ev.hypothesis_id}-${i}`} />
-                </div>
-                <SqlExplainer sql={ev.query} />
-              </div>
+          {group.evidence.map((ev, i) => {
+            // Generate deterministic UUIDs for query and evidence
+            const queryTargetId = generateFeedbackTargetId(
+              investigationId,
+              'query',
+              `${ev.hypothesis_id}-${i}`
+            )
+            const evidenceTargetId = generateFeedbackTargetId(
+              investigationId,
+              'evidence',
+              `${ev.hypothesis_id}-${i}`
+            )
 
-              {/* Evidence Section */}
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <h5 className="text-sm font-medium">Evidence</h5>
-                  <FeedbackButtons targetType="evidence" targetId={`${ev.hypothesis_id}-${i}`} />
+            return (
+              <div
+                key={i}
+                className="border rounded-lg p-4 bg-muted/20 space-y-3"
+              >
+                {/* Query Section */}
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <h5 className="text-sm font-medium">Query</h5>
+                    <FeedbackButtons targetType="query" targetId={queryTargetId} />
+                  </div>
+                  <SqlExplainer sql={ev.query} />
                 </div>
+
+                {/* Evidence Section */}
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <h5 className="text-sm font-medium">Evidence</h5>
+                    <FeedbackButtons targetType="evidence" targetId={evidenceTargetId} />
+                  </div>
                 <p className="text-sm text-muted-foreground">{ev.interpretation}</p>
                 <div className="flex items-center gap-4 text-xs text-muted-foreground">
                   <span>{ev.row_count} rows returned</span>
@@ -115,7 +140,8 @@ function HypothesisAccordion({ group, isExpanded, onToggle }: HypothesisAccordio
                 </div>
               </div>
             </div>
-          ))}
+            )
+          })}
         </div>
       )}
     </div>
@@ -259,6 +285,7 @@ function InvestigationDetailContent() {
                 group={group}
                 isExpanded={expandedHypotheses.has(group.hypothesis_id)}
                 onToggle={() => toggleHypothesis(group.hypothesis_id)}
+                investigationId={id!}
               />
             ))}
           </CardContent>

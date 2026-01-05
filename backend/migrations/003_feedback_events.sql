@@ -4,7 +4,7 @@
 CREATE TABLE feedback_events (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
-    investigation_id UUID REFERENCES investigations(id) ON DELETE SET NULL,
+    investigation_id UUID,  -- No FK - investigations are in-memory
     dataset_id UUID REFERENCES datasets(id) ON DELETE SET NULL,
     event_type VARCHAR(100) NOT NULL,
     event_data JSONB NOT NULL DEFAULT '{}',

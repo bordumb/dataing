@@ -65,6 +65,11 @@ function HypothesisAccordion({
     'hypothesis',
     group.hypothesis_id
   )
+
+  // Determine if any evidence supports the hypothesis
+  const hasAnySupport = group.evidence.some((ev) => ev.supports_hypothesis === true)
+  const hasAnyEvidence = group.evidence.some((ev) => ev.supports_hypothesis !== null)
+
   return (
     <div className="border rounded-lg">
       <button
@@ -84,6 +89,11 @@ function HypothesisAccordion({
           <span className="text-sm text-muted-foreground">
             {group.evidence.length} evidence item{group.evidence.length !== 1 ? 's' : ''}
           </span>
+          {hasAnyEvidence && (
+            <Badge variant={hasAnySupport ? 'success' : 'secondary'}>
+              {hasAnySupport ? 'Supporting evidence' : 'Does not support'}
+            </Badge>
+          )}
         </div>
         <div className="flex items-center gap-2">
           <span className="text-sm font-medium">

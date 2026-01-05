@@ -1,3 +1,5 @@
 export type { Entitlements, Plan, UsageLimit } from './types'
 export { EntitlementsProvider } from './context'
 export { useEntitlements } from './hooks'
+export { useDemoEntitlements, DEMO_ENTITLEMENTS } from './demo-toggle'
+export { DemoToggle } from './demo-toggle-ui'

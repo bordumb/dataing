@@ -6,7 +6,7 @@ import {
   useKnowledgeComments,
   useCreateKnowledgeComment,
 } from '@/lib/api/knowledge-comments'
-import { useVoteOnComment } from '@/lib/api/comment-votes'
+import { useVoteOnComment, useRemoveVote } from '@/lib/api/comment-votes'
 import type { KnowledgeCommentResponse } from '@/lib/api/model'
 
 interface KnowledgeTabProps {
@@ -17,6 +17,7 @@ export function KnowledgeTab({ datasetId }: KnowledgeTabProps) {
   const { data: comments = [], isLoading, isError } = useKnowledgeComments(datasetId)
   const createComment = useCreateKnowledgeComment(datasetId)
   const voteOnComment = useVoteOnComment(datasetId, 'knowledge')
+  const removeVote = useRemoveVote(datasetId, 'knowledge')
 
   // Sort comments: (upvotes - downvotes) descending, then created_at descending
   const sortedComments = useMemo(() => {
@@ -46,6 +47,10 @@ export function KnowledgeTab({ datasetId }: KnowledgeTabProps) {
 
   const handleVote = (commentId: string, vote: 1 | -1) => {
     voteOnComment.mutate({ commentId, vote: { vote } })
+  }
+
+  const handleRemoveVote = (commentId: string) => {
+    removeVote.mutate(commentId)
   }
 
   const rootCount = rootComments.length
@@ -105,6 +110,7 @@ export function KnowledgeTab({ datasetId }: KnowledgeTabProps) {
             comments={sortedComments}
             onReply={(parentId, content) => handleCreateComment(content, parentId)}
             onVote={handleVote}
+            onRemoveVote={handleRemoveVote}
             isSubmitting={createComment.isPending}
           />
         )}

@@ -12,21 +12,35 @@ interface CommentItemProps {
   comment: Comment
   onReply?: () => void
   onVote?: (vote: 1 | -1) => void
+  onRemoveVote?: () => void
   onDelete?: () => void
   isNested?: boolean
+  currentUserVote?: 1 | -1 | null
 }
 
 export function CommentItem({
   comment,
   onReply,
   onVote,
+  onRemoveVote,
   onDelete,
   isNested = false,
+  currentUserVote = null,
 }: CommentItemProps) {
   // Suppress unused variable warning - onDelete will be used in future iterations
   void onDelete
 
   const netVotes = comment.upvotes - comment.downvotes
+
+  const handleVoteClick = (vote: 1 | -1) => {
+    if (currentUserVote === vote) {
+      // Clicking the same vote removes it
+      onRemoveVote?.()
+    } else {
+      // Clicking different vote or no vote - set the vote
+      onVote?.(vote)
+    }
+  }
 
   return (
     <div className={cn('flex flex-col gap-2', isNested && 'ml-6 pl-4 border-l-2 border-muted')}>
@@ -47,8 +61,11 @@ export function CommentItem({
           <Button
             variant="ghost"
             size="sm"
-            className="h-7 px-2"
-            onClick={() => onVote?.(1)}
+            className={cn(
+              'h-7 px-2',
+              currentUserVote === 1 && 'text-green-600 bg-green-50'
+            )}
+            onClick={() => handleVoteClick(1)}
           >
             <ThumbsUp className="h-3 w-3" />
           </Button>
@@ -62,8 +79,11 @@ export function CommentItem({
           <Button
             variant="ghost"
             size="sm"
-            className="h-7 px-2"
-            onClick={() => onVote?.(-1)}
+            className={cn(
+              'h-7 px-2',
+              currentUserVote === -1 && 'text-red-600 bg-red-50'
+            )}
+            onClick={() => handleVoteClick(-1)}
           >
             <ThumbsDown className="h-3 w-3" />
           </Button>

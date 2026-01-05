@@ -16,3 +16,7 @@ CREATE TABLE schema_comments (
 
 CREATE INDEX idx_schema_comments_dataset ON schema_comments(tenant_id, dataset_id, field_name);
 CREATE INDEX idx_schema_comments_parent ON schema_comments(parent_id);
+
+-- Trigger to auto-update updated_at timestamp
+CREATE TRIGGER update_schema_comments_updated_at BEFORE UPDATE ON schema_comments
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();

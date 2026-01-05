@@ -179,3 +179,4 @@ export * from "./webhookCreatedResponse";
 export * from "./webhookResponse";
 export * from "./webhookResponseLastStatus";
 export * from "./webhookResponseLastTriggeredAt";
+export * from "./feedbackItemComment";

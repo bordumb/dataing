@@ -9,6 +9,7 @@
 export type FeedbackCreateRating =
   (typeof FeedbackCreateRating)[keyof typeof FeedbackCreateRating];
 
+// eslint-disable-next-line @typescript-eslint/no-redeclare
 export const FeedbackCreateRating = {
   NUMBER_1: 1,
   NUMBER_MINUS_1: -1,

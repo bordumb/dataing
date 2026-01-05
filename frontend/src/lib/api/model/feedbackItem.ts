@@ -5,12 +5,14 @@
  * Autonomous Data Quality Investigation
  * OpenAPI spec version: 2.0.0
  */
+import type { FeedbackItemComment } from "./feedbackItemComment";
 import type { FeedbackItemReason } from "./feedbackItemReason";
 
 /**
  * A single feedback item returned from the API.
  */
 export interface FeedbackItem {
+  comment: FeedbackItemComment;
   created_at: string;
   id: string;
   rating: number;

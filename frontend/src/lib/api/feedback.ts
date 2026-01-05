@@ -24,6 +24,7 @@ export interface FeedbackItem {
   target_id: string
   rating: number
   reason: string | null
+  comment: string | null
   created_at: string
 }
 

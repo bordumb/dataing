@@ -43,6 +43,13 @@ export function FeedbackButtons({ targetType, targetId }: FeedbackButtonsProps) 
   const currentRating = getRating(targetType, targetId)
   const reasons = REASON_OPTIONS[targetType]
 
+  // Get display text (prefer reason over comment, truncate if needed)
+  const displayText = currentRating?.reason || currentRating?.comment
+  const maxLength = 20
+  const truncatedText = displayText && displayText.length > maxLength
+    ? displayText.slice(0, maxLength) + '...'
+    : displayText
+
   const handleRatingClick = (rating: 1 | -1) => {
     setOpenPopover(rating === 1 ? 'up' : 'down')
   }
@@ -82,6 +89,19 @@ export function FeedbackButtons({ targetType, targetId }: FeedbackButtonsProps) 
 
   return (
     <div className="flex items-center gap-1">
+      {/* Display persisted feedback text */}
+      {displayText && (
+        <span
+          className={cn(
+            'text-xs max-w-[120px] truncate',
+            currentRating?.rating === 1 ? 'text-green-600' : 'text-red-600'
+          )}
+          title={displayText}
+        >
+          {truncatedText}
+        </span>
+      )}
+
       <Popover open={openPopover === 'up'} onOpenChange={(open) => !open && setOpenPopover(null)}>
         <PopoverTrigger asChild>
           <Button

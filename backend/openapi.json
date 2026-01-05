@@ -4905,6 +4905,17 @@
             ],
             "title": "Reason"
           },
+          "comment": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Comment"
+          },
           "created_at": {
             "type": "string",
             "format": "date-time",
@@ -4918,6 +4929,7 @@
           "target_id",
           "rating",
           "reason",
+          "comment",
           "created_at"
         ],
         "title": "FeedbackItem",

@@ -83,6 +83,7 @@ class FeedbackItem(BaseModel):
     target_id: UUID
     rating: int
     reason: str | None
+    comment: str | None
     created_at: datetime
 
 
@@ -123,6 +124,7 @@ async def get_investigation_feedback(
             target_id=UUID(str(e["event_data"]["target_id"])),
             rating=e["event_data"]["rating"],
             reason=e["event_data"].get("reason"),
+            comment=e["event_data"].get("comment"),
             created_at=e["created_at"],
         )
         for e in feedback_events

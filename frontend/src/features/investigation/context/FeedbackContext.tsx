@@ -6,11 +6,17 @@ import {
   TargetType,
 } from '@/lib/api/feedback'
 
+interface FeedbackData {
+  rating: 1 | -1
+  reason?: string
+  comment?: string
+}
+
 interface FeedbackState {
-  ratings: Record<string, { rating: 1 | -1; reason?: string }>
+  ratings: Record<string, FeedbackData>
   isLoading: boolean
   submitFeedback: (params: Omit<FeedbackCreate, 'investigation_id'>) => Promise<void>
-  getRating: (targetType: TargetType, targetId: string) => { rating: 1 | -1; reason?: string } | null
+  getRating: (targetType: TargetType, targetId: string) => FeedbackData | null
 }
 
 const FeedbackContext = createContext<FeedbackState | null>(null)
@@ -29,10 +35,14 @@ export function FeedbackProvider({ investigationId, children }: FeedbackProvider
     return feedbackItems.reduce(
       (acc, item) => {
         const key = `${item.target_type}:${item.target_id}`
-        acc[key] = { rating: item.rating as 1 | -1, reason: item.reason ?? undefined }
+        acc[key] = {
+          rating: item.rating as 1 | -1,
+          reason: item.reason ?? undefined,
+          comment: item.comment ?? undefined,
+        }
         return acc
       },
-      {} as Record<string, { rating: 1 | -1; reason?: string }>
+      {} as Record<string, FeedbackData>
     )
   }, [feedbackItems])
 

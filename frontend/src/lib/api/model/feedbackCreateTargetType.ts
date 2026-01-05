@@ -9,6 +9,7 @@
 export type FeedbackCreateTargetType =
   (typeof FeedbackCreateTargetType)[keyof typeof FeedbackCreateTargetType];
 
+// eslint-disable-next-line @typescript-eslint/no-redeclare
 export const FeedbackCreateTargetType = {
   hypothesis: "hypothesis",
   query: "query",

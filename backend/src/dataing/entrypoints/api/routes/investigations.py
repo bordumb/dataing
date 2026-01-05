@@ -241,7 +241,7 @@ async def stream_events(
     )
 
 
-@router.get("/")
+@router.get("")
 async def list_investigations(
     auth: AuthDep,
     investigations: InvestigationsDep,

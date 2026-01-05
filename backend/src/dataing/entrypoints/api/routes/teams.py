@@ -45,7 +45,7 @@ def get_repo(request: Request) -> PostgresAuthRepository:
     return PostgresAuthRepository(app_db)
 
 
-@router.get("/")
+@router.get("")
 async def list_teams(
     request: Request,
     auth: Annotated[JwtContext, Depends(verify_jwt)],
@@ -65,7 +65,7 @@ async def list_teams(
     ]
 
 
-@router.post("/", status_code=201)
+@router.post("", status_code=201)
 async def create_team(
     body: CreateTeamRequest,
     auth: RequireAdmin,

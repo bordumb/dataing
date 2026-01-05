@@ -222,3 +222,5 @@ export * from "./webhookCreatedResponse";
 export * from "./webhookResponse";
 export * from "./webhookResponseLastStatus";
 export * from "./webhookResponseLastTriggeredAt";
+export * from "./inviteUserApiV1UsersInvitePost201";
+export * from "./inviteUserRequest";

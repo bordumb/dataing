@@ -18,6 +18,8 @@ import type {
 import type {
   CreateUserRequest,
   HTTPValidationError,
+  InviteUserApiV1UsersInvitePost201,
+  InviteUserRequest,
   OrgMemberResponse,
   RemoveOrgMemberApiV1UsersUserIdRemovePost200,
   UpdateMemberRoleApiV1UsersUserIdRolePatch200,
@@ -331,6 +333,83 @@ export const useListOrgMembersApiV1UsersOrgMembersGet = <
   return query;
 };
 
+/**
+ * Invite a user to the organization (admin only).
+
+If user exists, adds them to the org. If not, creates a new user.
+ * @summary Invite User
+ */
+export const inviteUserApiV1UsersInvitePost = (
+  inviteUserRequest: InviteUserRequest,
+) => {
+  return customInstance<InviteUserApiV1UsersInvitePost201>({
+    url: `/api/v1/users/invite`,
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    data: inviteUserRequest,
+  });
+};
+
+export const getInviteUserApiV1UsersInvitePostMutationOptions = <
+  TError = HTTPValidationError,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof inviteUserApiV1UsersInvitePost>>,
+    TError,
+    { data: InviteUserRequest },
+    TContext
+  >;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof inviteUserApiV1UsersInvitePost>>,
+  TError,
+  { data: InviteUserRequest },
+  TContext
+> => {
+  const { mutation: mutationOptions } = options ?? {};
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof inviteUserApiV1UsersInvitePost>>,
+    { data: InviteUserRequest }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return inviteUserApiV1UsersInvitePost(data);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type InviteUserApiV1UsersInvitePostMutationResult = NonNullable<
+  Awaited<ReturnType<typeof inviteUserApiV1UsersInvitePost>>
+>;
+export type InviteUserApiV1UsersInvitePostMutationBody = InviteUserRequest;
+export type InviteUserApiV1UsersInvitePostMutationError = HTTPValidationError;
+
+/**
+ * @summary Invite User
+ */
+export const useInviteUserApiV1UsersInvitePost = <
+  TError = HTTPValidationError,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof inviteUserApiV1UsersInvitePost>>,
+    TError,
+    { data: InviteUserRequest },
+    TContext
+  >;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof inviteUserApiV1UsersInvitePost>>,
+  TError,
+  { data: InviteUserRequest },
+  TContext
+> => {
+  const mutationOptions =
+    getInviteUserApiV1UsersInvitePostMutationOptions(options);
+
+  return useMutation(mutationOptions);
+};
 /**
  * Get a specific user.
  * @summary Get User

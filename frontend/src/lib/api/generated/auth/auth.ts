@@ -16,12 +16,17 @@ import type {
   UseQueryResult,
 } from "@tanstack/react-query";
 import type {
+  ConfirmPasswordResetApiV1AuthPasswordResetConfirmPost200,
   GetCurrentUserApiV1AuthMeGet200,
   GetUserOrgsApiV1AuthMeOrgsGet200Item,
   HTTPValidationError,
   LoginRequest,
+  PasswordResetConfirm,
+  PasswordResetRequest,
+  RecoveryMethodResponse,
   RefreshRequest,
   RegisterRequest,
+  RequestPasswordResetApiV1AuthPasswordResetRequestPost200,
   TokenResponse,
 } from "../../model";
 import { customInstance } from "../../client";
@@ -419,4 +424,321 @@ export const useGetUserOrgsApiV1AuthMeOrgsGet = <
   query.queryKey = queryOptions.queryKey;
 
   return query;
+};
+
+/**
+ * Get the recovery method for a user's email.
+
+This tells the frontend what UI to show (email form, admin contact, etc.).
+
+Args:
+    body: Request containing the user's email.
+    service: Auth service.
+    recovery_adapter: Password recovery adapter.
+
+Returns:
+    Recovery method describing how the user can reset their password.
+ * @summary Get Recovery Method
+ */
+export const getRecoveryMethodApiV1AuthPasswordResetRecoveryMethodPost = (
+  passwordResetRequest: PasswordResetRequest,
+) => {
+  return customInstance<RecoveryMethodResponse>({
+    url: `/api/v1/auth/password-reset/recovery-method`,
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    data: passwordResetRequest,
+  });
+};
+
+export const getGetRecoveryMethodApiV1AuthPasswordResetRecoveryMethodPostMutationOptions =
+  <TError = HTTPValidationError, TContext = unknown>(options?: {
+    mutation?: UseMutationOptions<
+      Awaited<
+        ReturnType<
+          typeof getRecoveryMethodApiV1AuthPasswordResetRecoveryMethodPost
+        >
+      >,
+      TError,
+      { data: PasswordResetRequest },
+      TContext
+    >;
+  }): UseMutationOptions<
+    Awaited<
+      ReturnType<
+        typeof getRecoveryMethodApiV1AuthPasswordResetRecoveryMethodPost
+      >
+    >,
+    TError,
+    { data: PasswordResetRequest },
+    TContext
+  > => {
+    const { mutation: mutationOptions } = options ?? {};
+
+    const mutationFn: MutationFunction<
+      Awaited<
+        ReturnType<
+          typeof getRecoveryMethodApiV1AuthPasswordResetRecoveryMethodPost
+        >
+      >,
+      { data: PasswordResetRequest }
+    > = (props) => {
+      const { data } = props ?? {};
+
+      return getRecoveryMethodApiV1AuthPasswordResetRecoveryMethodPost(data);
+    };
+
+    return { mutationFn, ...mutationOptions };
+  };
+
+export type GetRecoveryMethodApiV1AuthPasswordResetRecoveryMethodPostMutationResult =
+  NonNullable<
+    Awaited<
+      ReturnType<
+        typeof getRecoveryMethodApiV1AuthPasswordResetRecoveryMethodPost
+      >
+    >
+  >;
+export type GetRecoveryMethodApiV1AuthPasswordResetRecoveryMethodPostMutationBody =
+  PasswordResetRequest;
+export type GetRecoveryMethodApiV1AuthPasswordResetRecoveryMethodPostMutationError =
+  HTTPValidationError;
+
+/**
+ * @summary Get Recovery Method
+ */
+export const useGetRecoveryMethodApiV1AuthPasswordResetRecoveryMethodPost = <
+  TError = HTTPValidationError,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<
+      ReturnType<
+        typeof getRecoveryMethodApiV1AuthPasswordResetRecoveryMethodPost
+      >
+    >,
+    TError,
+    { data: PasswordResetRequest },
+    TContext
+  >;
+}): UseMutationResult<
+  Awaited<
+    ReturnType<typeof getRecoveryMethodApiV1AuthPasswordResetRecoveryMethodPost>
+  >,
+  TError,
+  { data: PasswordResetRequest },
+  TContext
+> => {
+  const mutationOptions =
+    getGetRecoveryMethodApiV1AuthPasswordResetRecoveryMethodPostMutationOptions(
+      options,
+    );
+
+  return useMutation(mutationOptions);
+};
+/**
+ * Request a password reset email.
+
+For security, this always returns success regardless of whether
+the email exists. This prevents email enumeration attacks.
+
+Args:
+    body: Request containing the user's email.
+    service: Auth service.
+    recovery_adapter: Password recovery adapter.
+    frontend_url: Frontend URL for building reset links.
+
+Returns:
+    Success message.
+ * @summary Request Password Reset
+ */
+export const requestPasswordResetApiV1AuthPasswordResetRequestPost = (
+  passwordResetRequest: PasswordResetRequest,
+) => {
+  return customInstance<RequestPasswordResetApiV1AuthPasswordResetRequestPost200>(
+    {
+      url: `/api/v1/auth/password-reset/request`,
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      data: passwordResetRequest,
+    },
+  );
+};
+
+export const getRequestPasswordResetApiV1AuthPasswordResetRequestPostMutationOptions =
+  <TError = HTTPValidationError, TContext = unknown>(options?: {
+    mutation?: UseMutationOptions<
+      Awaited<
+        ReturnType<typeof requestPasswordResetApiV1AuthPasswordResetRequestPost>
+      >,
+      TError,
+      { data: PasswordResetRequest },
+      TContext
+    >;
+  }): UseMutationOptions<
+    Awaited<
+      ReturnType<typeof requestPasswordResetApiV1AuthPasswordResetRequestPost>
+    >,
+    TError,
+    { data: PasswordResetRequest },
+    TContext
+  > => {
+    const { mutation: mutationOptions } = options ?? {};
+
+    const mutationFn: MutationFunction<
+      Awaited<
+        ReturnType<typeof requestPasswordResetApiV1AuthPasswordResetRequestPost>
+      >,
+      { data: PasswordResetRequest }
+    > = (props) => {
+      const { data } = props ?? {};
+
+      return requestPasswordResetApiV1AuthPasswordResetRequestPost(data);
+    };
+
+    return { mutationFn, ...mutationOptions };
+  };
+
+export type RequestPasswordResetApiV1AuthPasswordResetRequestPostMutationResult =
+  NonNullable<
+    Awaited<
+      ReturnType<typeof requestPasswordResetApiV1AuthPasswordResetRequestPost>
+    >
+  >;
+export type RequestPasswordResetApiV1AuthPasswordResetRequestPostMutationBody =
+  PasswordResetRequest;
+export type RequestPasswordResetApiV1AuthPasswordResetRequestPostMutationError =
+  HTTPValidationError;
+
+/**
+ * @summary Request Password Reset
+ */
+export const useRequestPasswordResetApiV1AuthPasswordResetRequestPost = <
+  TError = HTTPValidationError,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<
+      ReturnType<typeof requestPasswordResetApiV1AuthPasswordResetRequestPost>
+    >,
+    TError,
+    { data: PasswordResetRequest },
+    TContext
+  >;
+}): UseMutationResult<
+  Awaited<
+    ReturnType<typeof requestPasswordResetApiV1AuthPasswordResetRequestPost>
+  >,
+  TError,
+  { data: PasswordResetRequest },
+  TContext
+> => {
+  const mutationOptions =
+    getRequestPasswordResetApiV1AuthPasswordResetRequestPostMutationOptions(
+      options,
+    );
+
+  return useMutation(mutationOptions);
+};
+/**
+ * Reset password using a valid token.
+
+Args:
+    body: Request containing the reset token and new password.
+    service: Auth service.
+
+Returns:
+    Success message.
+
+Raises:
+    HTTPException: If token is invalid, expired, or already used.
+ * @summary Confirm Password Reset
+ */
+export const confirmPasswordResetApiV1AuthPasswordResetConfirmPost = (
+  passwordResetConfirm: PasswordResetConfirm,
+) => {
+  return customInstance<ConfirmPasswordResetApiV1AuthPasswordResetConfirmPost200>(
+    {
+      url: `/api/v1/auth/password-reset/confirm`,
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      data: passwordResetConfirm,
+    },
+  );
+};
+
+export const getConfirmPasswordResetApiV1AuthPasswordResetConfirmPostMutationOptions =
+  <TError = HTTPValidationError, TContext = unknown>(options?: {
+    mutation?: UseMutationOptions<
+      Awaited<
+        ReturnType<typeof confirmPasswordResetApiV1AuthPasswordResetConfirmPost>
+      >,
+      TError,
+      { data: PasswordResetConfirm },
+      TContext
+    >;
+  }): UseMutationOptions<
+    Awaited<
+      ReturnType<typeof confirmPasswordResetApiV1AuthPasswordResetConfirmPost>
+    >,
+    TError,
+    { data: PasswordResetConfirm },
+    TContext
+  > => {
+    const { mutation: mutationOptions } = options ?? {};
+
+    const mutationFn: MutationFunction<
+      Awaited<
+        ReturnType<typeof confirmPasswordResetApiV1AuthPasswordResetConfirmPost>
+      >,
+      { data: PasswordResetConfirm }
+    > = (props) => {
+      const { data } = props ?? {};
+
+      return confirmPasswordResetApiV1AuthPasswordResetConfirmPost(data);
+    };
+
+    return { mutationFn, ...mutationOptions };
+  };
+
+export type ConfirmPasswordResetApiV1AuthPasswordResetConfirmPostMutationResult =
+  NonNullable<
+    Awaited<
+      ReturnType<typeof confirmPasswordResetApiV1AuthPasswordResetConfirmPost>
+    >
+  >;
+export type ConfirmPasswordResetApiV1AuthPasswordResetConfirmPostMutationBody =
+  PasswordResetConfirm;
+export type ConfirmPasswordResetApiV1AuthPasswordResetConfirmPostMutationError =
+  HTTPValidationError;
+
+/**
+ * @summary Confirm Password Reset
+ */
+export const useConfirmPasswordResetApiV1AuthPasswordResetConfirmPost = <
+  TError = HTTPValidationError,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<
+      ReturnType<typeof confirmPasswordResetApiV1AuthPasswordResetConfirmPost>
+    >,
+    TError,
+    { data: PasswordResetConfirm },
+    TContext
+  >;
+}): UseMutationResult<
+  Awaited<
+    ReturnType<typeof confirmPasswordResetApiV1AuthPasswordResetConfirmPost>
+  >,
+  TError,
+  { data: PasswordResetConfirm },
+  TContext
+> => {
+  const mutationOptions =
+    getConfirmPasswordResetApiV1AuthPasswordResetConfirmPostMutationOptions(
+      options,
+    );
+
+  return useMutation(mutationOptions);
 };

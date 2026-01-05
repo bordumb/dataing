@@ -1,6 +1,7 @@
 """Auth repository protocol for database operations."""
 
-from typing import Protocol, runtime_checkable
+from datetime import datetime
+from typing import Any, Protocol, runtime_checkable
 from uuid import UUID
 
 from dataing.core.auth.types import (
@@ -107,4 +108,66 @@ class AuthRepository(Protocol):
 
     async def add_user_to_team(self, user_id: UUID, team_id: UUID) -> TeamMembership:
         """Add user to a team."""
+        ...
+
+    # Password reset token operations
+    async def create_password_reset_token(
+        self,
+        user_id: UUID,
+        token_hash: str,
+        expires_at: datetime,
+    ) -> UUID:
+        """Create a password reset token.
+
+        Args:
+            user_id: The user requesting password reset.
+            token_hash: SHA-256 hash of the reset token.
+            expires_at: When the token expires.
+
+        Returns:
+            The ID of the created token record.
+        """
+        ...
+
+    async def get_password_reset_token(self, token_hash: str) -> dict[str, Any] | None:
+        """Look up a password reset token by its hash.
+
+        Args:
+            token_hash: SHA-256 hash of the reset token.
+
+        Returns:
+            Token record with id, user_id, expires_at, used_at, or None if not found.
+        """
+        ...
+
+    async def mark_token_used(self, token_id: UUID) -> None:
+        """Mark a password reset token as used.
+
+        Args:
+            token_id: The token record ID.
+        """
+        ...
+
+    async def delete_user_reset_tokens(self, user_id: UUID) -> int:
+        """Delete all password reset tokens for a user.
+
+        Used to invalidate old tokens when a new one is created
+        or when password is successfully reset.
+
+        Args:
+            user_id: The user whose tokens to delete.
+
+        Returns:
+            Number of tokens deleted.
+        """
+        ...
+
+    async def delete_expired_tokens(self) -> int:
+        """Delete all expired password reset tokens.
+
+        Cleanup utility for periodic maintenance.
+
+        Returns:
+            Number of tokens deleted.
+        """
         ...

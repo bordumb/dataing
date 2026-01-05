@@ -304,3 +304,84 @@ class PostgresAuthRepository:
             team_id=row["team_id"],
             created_at=row["created_at"],
         )
+
+    # Password reset token operations
+    async def create_password_reset_token(
+        self,
+        user_id: UUID,
+        token_hash: str,
+        expires_at: datetime,
+    ) -> UUID:
+        """Create a password reset token."""
+        row = await self._db.fetch_one(
+            """
+            INSERT INTO password_reset_tokens (user_id, token_hash, expires_at)
+            VALUES ($1, $2, $3)
+            RETURNING id
+            """,
+            user_id,
+            token_hash,
+            expires_at,
+        )
+        assert row is not None, "INSERT RETURNING should always return a row"
+        token_id: UUID = row["id"]
+        return token_id
+
+    async def get_password_reset_token(self, token_hash: str) -> dict[str, Any] | None:
+        """Look up a password reset token by its hash."""
+        row = await self._db.fetch_one(
+            """
+            SELECT id, user_id, expires_at, used_at, created_at
+            FROM password_reset_tokens
+            WHERE token_hash = $1
+            """,
+            token_hash,
+        )
+        if not row:
+            return None
+        return {
+            "id": row["id"],
+            "user_id": row["user_id"],
+            "expires_at": row["expires_at"],
+            "used_at": row["used_at"],
+            "created_at": row["created_at"],
+        }
+
+    async def mark_token_used(self, token_id: UUID) -> None:
+        """Mark a password reset token as used."""
+        await self._db.execute(
+            """
+            UPDATE password_reset_tokens
+            SET used_at = $2
+            WHERE id = $1
+            """,
+            token_id,
+            datetime.now(UTC),
+        )
+
+    async def delete_user_reset_tokens(self, user_id: UUID) -> int:
+        """Delete all password reset tokens for a user."""
+        result = await self._db.execute(
+            "DELETE FROM password_reset_tokens WHERE user_id = $1",
+            user_id,
+        )
+        # Extract count from result like "DELETE 3"
+        if result and "DELETE" in result:
+            try:
+                return int(result.split()[-1])
+            except (ValueError, IndexError):
+                return 0
+        return 0
+
+    async def delete_expired_tokens(self) -> int:
+        """Delete all expired password reset tokens."""
+        result = await self._db.execute(
+            "DELETE FROM password_reset_tokens WHERE expires_at < $1",
+            datetime.now(UTC),
+        )
+        if result and "DELETE" in result:
+            try:
+                return int(result.split()[-1])
+            except (ValueError, IndexError):
+                return 0
+        return 0

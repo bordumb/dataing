@@ -16,6 +16,8 @@ import { DatasetListPage, DatasetDetailPage } from '@/features/datasets'
 import { SettingsPage } from '@/features/settings/settings-page'
 import { UsagePage } from '@/features/usage/usage-page'
 import { JwtLoginPage } from '@/features/auth/jwt-login-page'
+import { PasswordResetRequest } from '@/features/auth/password-reset-request'
+import { PasswordResetConfirm } from '@/features/auth/password-reset-confirm'
 import { AdminPage } from '@/features/admin/admin-page'
 
 // Auth - Using JWT auth
@@ -63,6 +65,9 @@ function AppWithEntitlements() {
       <Routes>
         {/* Public routes */}
         <Route path="/login" element={<JwtLoginPage />} />
+        <Route path="/jwt-login" element={<JwtLoginPage />} />
+        <Route path="/password-reset" element={<PasswordResetRequest />} />
+        <Route path="/password-reset/confirm" element={<PasswordResetConfirm />} />
 
         {/* Protected routes */}
         <Route

@@ -199,3 +199,78 @@ This email was sent by Dataing. Please do not reply to this email.
         """
 
         return self.send(to_emails, subject, body_html, body_text)
+
+    async def send_password_reset(
+        self,
+        to_email: str,
+        reset_url: str,
+        expires_minutes: int = 60,
+    ) -> bool:
+        """Send password reset email.
+
+        Args:
+            to_email: The email address to send the reset link to.
+            reset_url: The full URL for password reset (includes token).
+            expires_minutes: How many minutes until the link expires.
+
+        Returns:
+            True if email was sent successfully.
+        """
+        subject = "Reset Your Password - Dataing"
+
+        body_html = f"""
+        <html>
+        <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
+            <h2 style="color: #333;">Reset Your Password</h2>
+
+            <p>We received a request to reset your password. Click the button below
+            to create a new password:</p>
+
+            <p style="text-align: center; margin: 30px 0;">
+                <a href="{reset_url}" style="background: #007bff; color: white;
+                padding: 12px 24px; text-decoration: none; border-radius: 5px;
+                font-weight: bold; display: inline-block;">
+                    Reset Password
+                </a>
+            </p>
+
+            <p style="color: #666; font-size: 14px;">
+                This link will expire in {expires_minutes} minutes.
+            </p>
+
+            <div style="background: #f8f9fa; padding: 15px; border-radius: 5px;
+                        margin: 20px 0; border-left: 4px solid #ffc107;">
+                <p style="margin: 0; color: #856404;">
+                    <strong>Didn't request this?</strong><br>
+                    If you didn't request a password reset, you can safely ignore
+                    this email. Your password will not be changed.
+                </p>
+            </div>
+
+            <hr style="border: none; border-top: 1px solid #ddd; margin: 30px 0;">
+            <p style="color: #666; font-size: 12px;">
+                This email was sent by Dataing. Please do not reply to this email.
+            </p>
+        </body>
+        </html>
+        """
+
+        body_text = f"""
+Reset Your Password
+
+We received a request to reset your password.
+
+Click this link to create a new password:
+{reset_url}
+
+This link will expire in {expires_minutes} minutes.
+
+Didn't request this?
+If you didn't request a password reset, you can safely ignore this email.
+Your password will not be changed.
+
+---
+This email was sent by Dataing. Please do not reply to this email.
+        """
+
+        return self.send([to_email], subject, body_html, body_text)

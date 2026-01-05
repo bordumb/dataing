@@ -29,6 +29,7 @@ dependencies = [
     "faker>=40.1.0",
     "bcrypt>=5.0.0",
     "pyjwt>=2.10.1",
+    "pytest-asyncio>=1.3.0",
 ]
 
 [project.optional-dependencies]
@@ -126,4 +127,5 @@ addopts = "-v --cov=backend/src/dataing --cov-report=term-missing"
 [dependency-groups]
 dev = [
     "pytest>=9.0.2",
+    "pytest-cov>=7.0.0",
 ]

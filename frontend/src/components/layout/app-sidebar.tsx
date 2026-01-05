@@ -9,6 +9,7 @@ import {
   Bell,
   ChevronUp,
   LogOut,
+  Shield,
 } from 'lucide-react'
 
 import {
@@ -62,6 +63,11 @@ const settingsNavItems = [
     title: 'Settings',
     url: '/settings',
     icon: Settings,
+  },
+  {
+    title: 'Single Sign-On',
+    url: '/settings/sso',
+    icon: Shield,
   },
   {
     title: 'Notifications',
@@ -145,8 +151,10 @@ export function AppSidebar() {
                 <SidebarMenuItem key={item.url}>
                   <SidebarMenuButton
                     asChild
-                    isActive={location.pathname === item.url ||
-                      (item.url === '/settings' && location.pathname.startsWith('/settings'))}
+                    isActive={
+                      location.pathname === item.url ||
+                      (item.url !== '/settings' && location.pathname.startsWith(item.url))
+                    }
                     tooltip={item.title}
                   >
                     <Link to={item.url}>

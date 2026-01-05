@@ -14,8 +14,11 @@ import { NewInvestigation } from '@/features/investigation/NewInvestigation'
 import { DataSourcePage } from '@/features/datasources/datasource-page'
 import { DatasetListPage, DatasetDetailPage } from '@/features/datasets'
 import { SettingsPage } from '@/features/settings/settings-page'
+import { SSOSettingsPage } from '@/features/settings/sso'
 import { UsagePage } from '@/features/usage/usage-page'
 import { LoginPage } from '@/features/auth/login-page'
+import { SSOLoginPage } from '@/features/auth/sso-login-page'
+import { SSOCallbackPage } from '@/features/auth/sso-callback-page'
 
 // Auth
 import { AuthProvider, RequireAuth } from '@/lib/auth/context'
@@ -46,6 +49,8 @@ function App() {
         <Routes>
           {/* Public routes */}
           <Route path="/login" element={<LoginPage />} />
+          <Route path="/sso-login" element={<SSOLoginPage />} />
+          <Route path="/auth/sso/callback" element={<SSOCallbackPage />} />
 
           {/* Protected routes */}
           <Route
@@ -111,10 +116,18 @@ function App() {
                       }
                     />
                     <Route
-                      path="settings/*"
+                      path="settings"
                       element={
                         <FeatureErrorBoundary feature="settings">
                           <SettingsPage />
+                        </FeatureErrorBoundary>
+                      }
+                    />
+                    <Route
+                      path="settings/sso"
+                      element={
+                        <FeatureErrorBoundary feature="sso settings">
+                          <SSOSettingsPage />
                         </FeatureErrorBoundary>
                       }
                     />

@@ -64,6 +64,13 @@ export const queryKeys = {
     pending: ['/api/v1/approvals/', { status: 'pending' }] as const,
     detail: (id: string) => [`/api/v1/approvals/${id}`] as const,
   },
+
+  // Datasets
+  datasets: {
+    all: (datasourceId: string) => [`/api/v1/datasources/${datasourceId}/datasets`] as const,
+    detail: (id: string) => [`/api/v1/datasets/${id}`] as const,
+    investigations: (id: string) => [`/api/v1/datasets/${id}/investigations`] as const,
+  },
 } as const
 
 // Type helper for getting query key types

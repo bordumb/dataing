@@ -9,7 +9,6 @@
 export type UserResponseRole =
   (typeof UserResponseRole)[keyof typeof UserResponseRole];
 
-
 export const UserResponseRole = {
   admin: "admin",
   member: "member",

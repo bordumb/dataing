@@ -47,9 +47,9 @@ export function FeedbackButtons({ targetType, targetId }: FeedbackButtonsProps) 
     setOpenPopover(rating === 1 ? 'up' : 'down')
   }
 
-  const handleReasonClick = async (reason: string) => {
+  const handleReasonClick = (reason: string) => {
     const rating = openPopover === 'up' ? 1 : -1
-    await submitFeedback({
+    submitFeedback({
       target_type: targetType,
       target_id: targetId,
       rating,
@@ -58,6 +58,26 @@ export function FeedbackButtons({ targetType, targetId }: FeedbackButtonsProps) 
     })
     setOpenPopover(null)
     setComment('')
+  }
+
+  const handleCommentSubmit = () => {
+    if (!comment.trim()) return
+    const rating = openPopover === 'up' ? 1 : -1
+    submitFeedback({
+      target_type: targetType,
+      target_id: targetId,
+      rating,
+      comment: comment.trim(),
+    })
+    setOpenPopover(null)
+    setComment('')
+  }
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' && comment.trim()) {
+      e.preventDefault()
+      handleCommentSubmit()
+    }
   }
 
   return (
@@ -82,10 +102,15 @@ export function FeedbackButtons({ targetType, targetId }: FeedbackButtonsProps) 
             {reasons.positive.map((reason) => (
               <Button
                 key={reason}
+                type="button"
                 variant="outline"
                 size="sm"
                 className="text-xs"
-                onClick={() => handleReasonClick(reason)}
+                onClick={(e) => {
+                  e.preventDefault()
+                  e.stopPropagation()
+                  handleReasonClick(reason)
+                }}
               >
                 {reason}
               </Button>
@@ -95,6 +120,7 @@ export function FeedbackButtons({ targetType, targetId }: FeedbackButtonsProps) 
             placeholder="Add comment..."
             value={comment}
             onChange={(e) => setComment(e.target.value)}
+            onKeyDown={handleKeyDown}
             className="text-xs h-7"
           />
         </PopoverContent>
@@ -123,10 +149,15 @@ export function FeedbackButtons({ targetType, targetId }: FeedbackButtonsProps) 
             {reasons.negative.map((reason) => (
               <Button
                 key={reason}
+                type="button"
                 variant="outline"
                 size="sm"
                 className="text-xs"
-                onClick={() => handleReasonClick(reason)}
+                onClick={(e) => {
+                  e.preventDefault()
+                  e.stopPropagation()
+                  handleReasonClick(reason)
+                }}
               >
                 {reason}
               </Button>
@@ -136,6 +167,7 @@ export function FeedbackButtons({ targetType, targetId }: FeedbackButtonsProps) 
             placeholder="Add comment..."
             value={comment}
             onChange={(e) => setComment(e.target.value)}
+            onKeyDown={handleKeyDown}
             className="text-xs h-7"
           />
         </PopoverContent>

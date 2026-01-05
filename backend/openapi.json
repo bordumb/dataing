@@ -3558,6 +3558,106 @@
         }
       }
     },
+    "/api/v1/feedback/": {
+      "post": {
+        "tags": [
+          "feedback"
+        ],
+        "summary": "Submit Feedback",
+        "description": "Submit feedback on a hypothesis, query, evidence, synthesis, or investigation.",
+        "operationId": "submit_feedback_api_v1_feedback__post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FeedbackCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FeedbackResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "APIKeyHeader": []
+          }
+        ]
+      }
+    },
+    "/api/v1/feedback/investigations/{investigation_id}": {
+      "get": {
+        "tags": [
+          "feedback"
+        ],
+        "summary": "Get Investigation Feedback",
+        "description": "Get current user's feedback for an investigation.\n\nArgs:\n    investigation_id: The investigation to get feedback for.\n    auth: Authentication context.\n    db: Application database.\n\nReturns:\n    List of feedback items for the investigation.",
+        "operationId": "get_investigation_feedback_api_v1_feedback_investigations__investigation_id__get",
+        "security": [
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "investigation_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Investigation Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/FeedbackItem"
+                  },
+                  "title": "Response Get Investigation Feedback Api V1 Feedback Investigations  Investigation Id  Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/health": {
       "get": {
         "summary": "Health Check",
@@ -4709,6 +4809,140 @@
         ],
         "title": "DownstreamResponse",
         "description": "Response for downstream datasets."
+      },
+      "FeedbackCreate": {
+        "properties": {
+          "target_type": {
+            "type": "string",
+            "enum": [
+              "hypothesis",
+              "query",
+              "evidence",
+              "synthesis",
+              "investigation"
+            ],
+            "title": "Target Type"
+          },
+          "target_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Target Id"
+          },
+          "investigation_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Investigation Id"
+          },
+          "rating": {
+            "type": "integer",
+            "enum": [
+              1,
+              -1
+            ],
+            "title": "Rating"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "comment": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Comment"
+          }
+        },
+        "type": "object",
+        "required": [
+          "target_type",
+          "target_id",
+          "investigation_id",
+          "rating"
+        ],
+        "title": "FeedbackCreate",
+        "description": "Request body for submitting feedback."
+      },
+      "FeedbackItem": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "target_type": {
+            "type": "string",
+            "title": "Target Type"
+          },
+          "target_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Target Id"
+          },
+          "rating": {
+            "type": "integer",
+            "title": "Rating"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "target_type",
+          "target_id",
+          "rating",
+          "reason",
+          "created_at"
+        ],
+        "title": "FeedbackItem",
+        "description": "A single feedback item returned from the API."
+      },
+      "FeedbackResponse": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "created_at"
+        ],
+        "title": "FeedbackResponse",
+        "description": "Response after submitting feedback."
       },
       "HTTPValidationError": {
         "properties": {

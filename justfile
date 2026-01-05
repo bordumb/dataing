@@ -159,6 +159,7 @@ demo: demo-fixtures
     echo "Running database migrations..."
     PGPASSWORD=dataing psql -h localhost -U dataing -d dataing_demo -f backend/migrations/001_initial.sql 2>/dev/null || true
     PGPASSWORD=dataing psql -h localhost -U dataing -d dataing_demo -f backend/migrations/002_datasets.sql 2>/dev/null || true
+    PGPASSWORD=dataing psql -h localhost -U dataing -d dataing_demo -f backend/migrations/003_feedback_events.sql 2>/dev/null || true
 
     trap 'kill 0' EXIT
 

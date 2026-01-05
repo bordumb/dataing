@@ -69,6 +69,9 @@ async def create_knowledge_comment(
     db: DbDep,
 ) -> KnowledgeCommentResponse:
     """Create a knowledge comment."""
+    dataset = await db.get_dataset_by_id(auth.tenant_id, dataset_id)
+    if not dataset:
+        raise HTTPException(status_code=404, detail="Dataset not found")
     comment = await db.create_knowledge_comment(
         tenant_id=auth.tenant_id,
         dataset_id=dataset_id,

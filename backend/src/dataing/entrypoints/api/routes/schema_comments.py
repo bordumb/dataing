@@ -73,6 +73,9 @@ async def create_schema_comment(
     db: DbDep,
 ) -> SchemaCommentResponse:
     """Create a schema comment."""
+    dataset = await db.get_dataset_by_id(auth.tenant_id, dataset_id)
+    if not dataset:
+        raise HTTPException(status_code=404, detail="Dataset not found")
     comment = await db.create_schema_comment(
         tenant_id=auth.tenant_id,
         dataset_id=dataset_id,

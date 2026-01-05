@@ -15,10 +15,10 @@ import { DataSourcePage } from '@/features/datasources/datasource-page'
 import { DatasetListPage, DatasetDetailPage } from '@/features/datasets'
 import { SettingsPage } from '@/features/settings/settings-page'
 import { UsagePage } from '@/features/usage/usage-page'
-import { LoginPage } from '@/features/auth/login-page'
+import { JwtLoginPage } from '@/features/auth/jwt-login-page'
 
-// Auth
-import { AuthProvider, RequireAuth } from '@/lib/auth/context'
+// Auth - Using JWT auth
+import { JwtAuthProvider, RequireJwtAuth } from '@/lib/auth/jwt-context'
 
 // Entitlements
 import {
@@ -53,13 +53,13 @@ function AppWithEntitlements() {
     <EntitlementsProvider entitlements={entitlements}>
       <Routes>
         {/* Public routes */}
-        <Route path="/login" element={<LoginPage />} />
+        <Route path="/login" element={<JwtLoginPage />} />
 
         {/* Protected routes */}
         <Route
           path="/*"
           element={
-            <RequireAuth>
+            <RequireJwtAuth>
               <AppLayout>
                 <Routes>
                   <Route
@@ -136,7 +136,7 @@ function AppWithEntitlements() {
                   />
                 </Routes>
               </AppLayout>
-            </RequireAuth>
+            </RequireJwtAuth>
           }
         />
       </Routes>
@@ -149,9 +149,9 @@ function AppWithEntitlements() {
 function App() {
   return (
     <ErrorBoundary>
-      <AuthProvider>
+      <JwtAuthProvider>
         <AppWithEntitlements />
-      </AuthProvider>
+      </JwtAuthProvider>
     </ErrorBoundary>
   )
 }

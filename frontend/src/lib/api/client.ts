@@ -1,4 +1,6 @@
-const API_KEY_STORAGE_KEY = 'dataing_api_key' // pragma: allowlist secret
+// Storage keys for authentication
+const ACCESS_TOKEN_KEY = 'dataing_access_token' // pragma: allowlist secret
+const API_KEY_STORAGE_KEY = 'dataing_api_key' // pragma: allowlist secret (legacy)
 
 export interface RequestConfig {
   url: string
@@ -22,15 +24,24 @@ export const customInstance = async <T>(config: RequestConfig): Promise<T> => {
       ).toString()
     : ''
 
-  // Get API key from storage
+  // Get JWT access token (preferred) or fall back to API key (legacy)
+  const accessToken = localStorage.getItem(ACCESS_TOKEN_KEY)
   const apiKey = localStorage.getItem(API_KEY_STORAGE_KEY)
+
+  // Build auth header - prefer JWT, fall back to API key
+  const authHeaders: Record<string, string> = {}
+  if (accessToken) {
+    authHeaders['Authorization'] = `Bearer ${accessToken}`
+  } else if (apiKey) {
+    authHeaders['X-API-Key'] = apiKey
+  }
 
   // URL already includes /api/v1 prefix from generated code
   const response = await fetch(`${url}${queryString}`, {
     method,
     headers: {
       'Content-Type': 'application/json',
-      ...(apiKey ? { 'X-API-Key': apiKey } : {}),
+      ...authHeaders,
       ...headers,
     },
     body: data ? JSON.stringify(data) : undefined,

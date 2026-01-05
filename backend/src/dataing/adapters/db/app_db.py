@@ -940,3 +940,145 @@ class AppDatabase:
 
         result = await self.fetch_one(base_query, *args)
         return result["count"] if result else 0
+
+    # Schema comment operations
+    async def create_schema_comment(
+        self,
+        tenant_id: UUID,
+        dataset_id: UUID,
+        field_name: str,
+        content: str,
+        parent_id: UUID | None = None,
+        author_id: UUID | None = None,
+        author_name: str | None = None,
+    ) -> dict[str, Any]:
+        """Create a schema comment.
+
+        Args:
+            tenant_id: The tenant ID.
+            dataset_id: The dataset ID.
+            field_name: The schema field name.
+            content: The comment content (markdown).
+            parent_id: Parent comment ID for replies.
+            author_id: The author's user ID.
+            author_name: The author's display name.
+
+        Returns:
+            The created comment as a dict.
+        """
+        query = """
+            INSERT INTO schema_comments
+                (tenant_id, dataset_id, field_name, parent_id, content, author_id, author_name)
+            VALUES ($1, $2, $3, $4, $5, $6, $7)
+            RETURNING id, tenant_id, dataset_id, field_name, parent_id, content,
+                      author_id, author_name, upvotes, downvotes, created_at, updated_at
+        """
+        result = await self.execute_returning(
+            query, tenant_id, dataset_id, field_name, parent_id, content, author_id, author_name
+        )
+        if result is None:
+            raise RuntimeError("Failed to create schema comment")
+        return result
+
+    async def list_schema_comments(
+        self,
+        tenant_id: UUID,
+        dataset_id: UUID,
+        field_name: str | None = None,
+    ) -> list[dict[str, Any]]:
+        """List schema comments for a dataset.
+
+        Args:
+            tenant_id: The tenant ID.
+            dataset_id: The dataset ID.
+            field_name: Optional filter by field name.
+
+        Returns:
+            List of comments ordered by votes then recency.
+        """
+        if field_name:
+            query = """
+                SELECT id, tenant_id, dataset_id, field_name, parent_id, content,
+                       author_id, author_name, upvotes, downvotes, created_at, updated_at
+                FROM schema_comments
+                WHERE tenant_id = $1 AND dataset_id = $2 AND field_name = $3
+                ORDER BY (upvotes - downvotes) DESC, created_at DESC
+            """
+            return await self.fetch_all(query, tenant_id, dataset_id, field_name)
+        else:
+            query = """
+                SELECT id, tenant_id, dataset_id, field_name, parent_id, content,
+                       author_id, author_name, upvotes, downvotes, created_at, updated_at
+                FROM schema_comments
+                WHERE tenant_id = $1 AND dataset_id = $2
+                ORDER BY field_name, (upvotes - downvotes) DESC, created_at DESC
+            """
+            return await self.fetch_all(query, tenant_id, dataset_id)
+
+    async def get_schema_comment(
+        self,
+        tenant_id: UUID,
+        comment_id: UUID,
+    ) -> dict[str, Any] | None:
+        """Get a single schema comment.
+
+        Args:
+            tenant_id: The tenant ID.
+            comment_id: The comment ID.
+
+        Returns:
+            The comment or None if not found.
+        """
+        query = """
+            SELECT id, tenant_id, dataset_id, field_name, parent_id, content,
+                   author_id, author_name, upvotes, downvotes, created_at, updated_at
+            FROM schema_comments
+            WHERE tenant_id = $1 AND id = $2
+        """
+        return await self.fetch_one(query, tenant_id, comment_id)
+
+    async def update_schema_comment(
+        self,
+        tenant_id: UUID,
+        comment_id: UUID,
+        content: str,
+    ) -> dict[str, Any] | None:
+        """Update a schema comment's content.
+
+        Args:
+            tenant_id: The tenant ID.
+            comment_id: The comment ID.
+            content: The new content.
+
+        Returns:
+            The updated comment or None if not found.
+        """
+        query = """
+            UPDATE schema_comments
+            SET content = $3, updated_at = now()
+            WHERE tenant_id = $1 AND id = $2
+            RETURNING id, tenant_id, dataset_id, field_name, parent_id, content,
+                      author_id, author_name, upvotes, downvotes, created_at, updated_at
+        """
+        return await self.execute_returning(query, tenant_id, comment_id, content)
+
+    async def delete_schema_comment(
+        self,
+        tenant_id: UUID,
+        comment_id: UUID,
+    ) -> bool:
+        """Delete a schema comment.
+
+        Args:
+            tenant_id: The tenant ID.
+            comment_id: The comment ID.
+
+        Returns:
+            True if deleted, False if not found.
+        """
+        query = """
+            DELETE FROM schema_comments
+            WHERE tenant_id = $1 AND id = $2
+        """
+        result = await self.execute(query, tenant_id, comment_id)
+        return result == "DELETE 1"

@@ -46,12 +46,21 @@ just demo
 
 # This will:
 # 1. Generate fixtures if not present
-# 2. Start backend at http://localhost:8000
-# 3. Start frontend at http://localhost:3000
-# 4. Seed demo data source "E-Commerce Demo"
-
-# Demo API key for testing: dd_demo_12345
+# 2. Start PostgreSQL and run all migrations
+# 3. Start backend at http://localhost:8000
+# 4. Start frontend at http://localhost:3000
+# 5. Seed demo data source "E-Commerce Demo"
 ```
+
+### Login Credentials
+
+| Field | Value |
+|-------|-------|
+| **Email** | `demo@dataing.io` |
+| **Password** | `demo123456` |
+| **Org ID** | `00000000-0000-0000-0000-000000000001` |
+
+Legacy API key for testing: `dd_demo_12345`
 
 ## Running with Docker
 

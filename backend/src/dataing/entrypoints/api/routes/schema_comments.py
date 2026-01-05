@@ -7,7 +7,7 @@ from typing import Annotated
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from dataing.adapters.db.app_db import AppDatabase
 from dataing.entrypoints.api.deps import get_app_db
@@ -22,15 +22,15 @@ DbDep = Annotated[AppDatabase, Depends(get_app_db)]
 class SchemaCommentCreate(BaseModel):
     """Request body for creating a schema comment."""
 
-    field_name: str
-    content: str
+    field_name: str = Field(..., min_length=1)
+    content: str = Field(..., min_length=1)
     parent_id: UUID | None = None
 
 
 class SchemaCommentUpdate(BaseModel):
     """Request body for updating a schema comment."""
 
-    content: str
+    content: str = Field(..., min_length=1)
 
 
 class SchemaCommentResponse(BaseModel):
@@ -79,7 +79,7 @@ async def create_schema_comment(
         field_name=body.field_name,
         content=body.content,
         parent_id=body.parent_id,
-        author_id=None,  # We don't have user_id in ApiKeyContext
+        author_id=auth.user_id,
         author_name=None,
     )
     return SchemaCommentResponse(**comment)
@@ -101,6 +101,8 @@ async def update_schema_comment(
     )
     if not comment:
         raise HTTPException(status_code=404, detail="Comment not found")
+    if comment["dataset_id"] != dataset_id:
+        raise HTTPException(status_code=404, detail="Comment not found")
     return SchemaCommentResponse(**comment)
 
 
@@ -112,6 +114,12 @@ async def delete_schema_comment(
     db: DbDep,
 ) -> None:
     """Delete a schema comment."""
+    existing = await db.get_schema_comment(
+        tenant_id=auth.tenant_id,
+        comment_id=comment_id,
+    )
+    if not existing or existing["dataset_id"] != dataset_id:
+        raise HTTPException(status_code=404, detail="Comment not found")
     deleted = await db.delete_schema_comment(
         tenant_id=auth.tenant_id,
         comment_id=comment_id,

@@ -381,9 +381,19 @@ async def create_datasource(
             UUID(str(db_result["id"])),
             dataset_records,
         )
+        logger.info(
+            "Auto-sync completed for datasource",
+            datasource_id=str(db_result["id"]),
+            datasets_synced=len(dataset_records),
+        )
     except Exception as e:
         # Log but don't fail - datasource was created successfully
-        logger.warning(f"Auto-sync failed for datasource {db_result['id']}: {e!s}")
+        logger.warning(
+            "Auto-sync failed for datasource",
+            datasource_id=str(db_result["id"]),
+            error=str(e),
+            exc_info=True,
+        )
 
     return DataSourceResponse(
         id=str(db_result["id"]),

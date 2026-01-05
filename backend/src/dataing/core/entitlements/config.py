@@ -2,13 +2,14 @@
 
 import os
 from functools import lru_cache
+from typing import TYPE_CHECKING
 
-from dataing.adapters.entitlements.opencore import OpenCoreAdapter
-from dataing.core.entitlements.interfaces import EntitlementsAdapter
+if TYPE_CHECKING:
+    from dataing.core.entitlements.interfaces import EntitlementsAdapter
 
 
 @lru_cache
-def get_entitlements_adapter() -> EntitlementsAdapter:
+def get_entitlements_adapter() -> "EntitlementsAdapter":
     """Get the configured entitlements adapter.
 
     Selection priority:
@@ -19,6 +20,9 @@ def get_entitlements_adapter() -> EntitlementsAdapter:
     Returns:
         Configured entitlements adapter instance
     """
+    # Lazy import to avoid circular dependency
+    from dataing.adapters.entitlements.opencore import OpenCoreAdapter
+
     stripe_key = os.environ.get("STRIPE_SECRET_KEY", "").strip()
     license_key = os.environ.get("LICENSE_KEY", "").strip()
 

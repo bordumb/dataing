@@ -3,6 +3,7 @@
 from fastapi import APIRouter
 
 from dataing.entrypoints.api.routes.approvals import router as approvals_router
+from dataing.entrypoints.api.routes.auth import router as auth_router
 from dataing.entrypoints.api.routes.comment_votes import router as comment_votes_router
 from dataing.entrypoints.api.routes.dashboard import router as dashboard_router
 from dataing.entrypoints.api.routes.datasets import router as datasets_router
@@ -24,6 +25,7 @@ from dataing.entrypoints.api.routes.users import router as users_router
 api_router = APIRouter()
 
 # Include all route modules
+api_router.include_router(auth_router, prefix="/auth")  # Auth routes (no API key required)
 api_router.include_router(investigations_router)
 api_router.include_router(datasources_router)
 api_router.include_router(datasources_v2_router, prefix="/v2")  # New unified adapter API

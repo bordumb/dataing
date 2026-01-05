@@ -15,6 +15,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from datetime import datetime
 from typing import TYPE_CHECKING, Literal
+from uuid import UUID
 
 if TYPE_CHECKING:
     from dataing.adapters.datasource.types import SchemaResponse
@@ -68,6 +69,7 @@ class InvestigationState:
 
     Attributes:
         id: Unique investigation identifier.
+        tenant_id: Tenant this investigation belongs to.
         alert: The anomaly alert that triggered this investigation.
         events: Ordered list of all events in this investigation.
         schema_context: Cached schema context (set once after gathering).
@@ -75,6 +77,7 @@ class InvestigationState:
     """
 
     id: str
+    tenant_id: UUID
     alert: AnomalyAlert
     events: list[Event] = field(default_factory=list)
     schema_context: SchemaResponse | None = None
@@ -192,6 +195,7 @@ class InvestigationState:
         """
         return InvestigationState(
             id=self.id,
+            tenant_id=self.tenant_id,
             alert=self.alert,
             events=[*self.events, event],
             schema_context=self.schema_context,
@@ -214,6 +218,7 @@ class InvestigationState:
         """
         return InvestigationState(
             id=self.id,
+            tenant_id=self.tenant_id,
             alert=self.alert,
             events=self.events.copy(),
             schema_context=schema_context or self.schema_context,

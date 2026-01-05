@@ -168,7 +168,11 @@ async def _investigate_anomaly(
         severity="medium",
     )
 
-    state = InvestigationState(id=str(uuid.uuid4()), alert=alert)
+    state = InvestigationState(
+        id=str(uuid.uuid4()),
+        tenant_id=uuid.uuid4(),  # MCP server uses ephemeral tenant
+        alert=alert,
+    )
 
     try:
         finding = await orchestrator.run_investigation(state)

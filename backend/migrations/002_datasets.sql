@@ -25,3 +25,7 @@ CREATE INDEX idx_datasets_tenant ON datasets(tenant_id);
 CREATE INDEX idx_datasets_datasource ON datasets(datasource_id);
 CREATE INDEX idx_datasets_native_path ON datasets(native_path);
 CREATE INDEX idx_datasets_name ON datasets(name);
+
+-- Trigger to auto-update updated_at timestamp
+CREATE TRIGGER update_datasets_updated_at BEFORE UPDATE ON datasets
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();

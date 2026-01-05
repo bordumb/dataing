@@ -13,7 +13,7 @@ from typing import Annotated, Any
 from uuid import UUID
 
 from cryptography.fernet import Fernet
-from fastapi import APIRouter, Depends, HTTPException, Response
+from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from pydantic import BaseModel, Field
 
 from dataing.adapters.datasource import (
@@ -176,6 +176,14 @@ class StatsResponse(BaseModel):
     table: str
     row_count: int | None = None
     columns: dict[str, dict[str, Any]]
+
+
+class SyncResponse(BaseModel):
+    """Response for schema sync."""
+
+    datasets_synced: int
+    datasets_removed: int
+    message: str
 
 
 def _encrypt_config(config: dict[str, Any], key: bytes) -> str:
@@ -724,3 +732,142 @@ async def get_column_stats(
             status_code=500,
             detail=f"Failed to get column statistics: {str(e)}",
         ) from e
+
+
+@router.post("/{datasource_id}/sync", response_model=SyncResponse)
+async def sync_datasource_schema(
+    datasource_id: UUID,
+    auth: AuthDep,
+    app_db: AppDbDep,
+) -> SyncResponse:
+    """Sync schema and register/update datasets.
+
+    Discovers all tables from the data source and upserts them
+    into the datasets table. Soft-deletes datasets that no longer exist.
+    """
+    ds = await app_db.get_data_source(datasource_id, auth.tenant_id)
+
+    if not ds:
+        raise HTTPException(status_code=404, detail="Data source not found")
+
+    registry = get_registry()
+
+    try:
+        source_type = SourceType(ds["type"])
+    except ValueError:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Unsupported source type: {ds['type']}",
+        ) from None
+
+    # Decrypt config
+    encryption_key = get_encryption_key()
+    try:
+        config = _decrypt_config(ds["connection_config_encrypted"], encryption_key)
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to decrypt configuration: {e!s}",
+        ) from e
+
+    # Get schema
+    try:
+        adapter = registry.create(source_type, config)
+        async with adapter:
+            schema = await adapter.get_schema(SchemaFilter(max_tables=10000))
+
+        # Build dataset records from schema
+        dataset_records: list[dict[str, Any]] = []
+        for catalog in schema.catalogs:
+            for schema_obj in catalog.schemas:
+                for table in schema_obj.tables:
+                    dataset_records.append(
+                        {
+                            "native_path": table.native_path,
+                            "name": table.name,
+                            "table_type": table.table_type,
+                            "schema_name": schema_obj.name,
+                            "catalog_name": catalog.name,
+                            "row_count": table.row_count,
+                            "column_count": len(table.columns),
+                        }
+                    )
+
+        # Upsert datasets
+        synced_count = await app_db.upsert_datasets(
+            auth.tenant_id,
+            datasource_id,
+            dataset_records,
+        )
+
+        # Soft-delete removed datasets
+        active_paths = {d["native_path"] for d in dataset_records}
+        removed_count = await app_db.deactivate_stale_datasets(
+            auth.tenant_id,
+            datasource_id,
+            active_paths,
+        )
+
+        return SyncResponse(
+            datasets_synced=synced_count,
+            datasets_removed=removed_count,
+            message=f"Synced {synced_count} datasets, removed {removed_count}",
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Schema sync failed: {e!s}",
+        ) from e
+
+
+@router.get("/{datasource_id}/datasets")
+async def list_datasource_datasets(
+    datasource_id: UUID,
+    auth: AuthDep,
+    app_db: AppDbDep,
+    table_type: str | None = None,
+    search: str | None = None,
+    limit: int = Query(default=1000, ge=1, le=10000),
+    offset: int = Query(default=0, ge=0),
+) -> dict[str, Any]:
+    """List datasets for a datasource."""
+    ds = await app_db.get_data_source(datasource_id, auth.tenant_id)
+
+    if not ds:
+        raise HTTPException(status_code=404, detail="Data source not found")
+
+    datasets = await app_db.list_datasets(
+        auth.tenant_id,
+        datasource_id,
+        table_type=table_type,
+        search=search,
+        limit=limit,
+        offset=offset,
+    )
+
+    total = await app_db.get_dataset_count(auth.tenant_id, datasource_id)
+
+    return {
+        "datasets": [
+            {
+                "id": str(d["id"]),
+                "datasource_id": str(d["datasource_id"]),
+                "native_path": d["native_path"],
+                "name": d["name"],
+                "table_type": d["table_type"],
+                "schema_name": d.get("schema_name"),
+                "catalog_name": d.get("catalog_name"),
+                "row_count": d.get("row_count"),
+                "column_count": d.get("column_count"),
+                "last_synced_at": (
+                    d["last_synced_at"].isoformat() if d.get("last_synced_at") else None
+                ),
+                "created_at": d["created_at"].isoformat(),
+            }
+            for d in datasets
+        ],
+        "total": total,
+    }

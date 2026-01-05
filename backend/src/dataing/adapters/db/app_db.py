@@ -393,6 +393,71 @@ class AppDatabase:
         result = await self.fetch_one(query, tenant_id, datasource_id, list(active_paths))
         return result["count"] if result else 0
 
+    async def list_datasets(
+        self,
+        tenant_id: UUID,
+        datasource_id: UUID,
+        table_type: str | None = None,
+        search: str | None = None,
+        limit: int = 1000,
+        offset: int = 0,
+    ) -> list[dict[str, Any]]:
+        """List datasets for a datasource with optional filtering.
+
+        Args:
+            tenant_id: The tenant ID.
+            datasource_id: The datasource ID.
+            table_type: Optional filter by table type.
+            search: Optional search term for name or native_path.
+            limit: Maximum number of datasets to return.
+            offset: Number of datasets to skip.
+
+        Returns:
+            List of dataset dictionaries.
+        """
+        base_query = """
+            SELECT id, datasource_id, native_path, name, table_type,
+                   schema_name, catalog_name, row_count, column_count,
+                   last_synced_at, created_at
+            FROM datasets
+            WHERE tenant_id = $1 AND datasource_id = $2 AND is_active = true
+        """
+        args: list[Any] = [tenant_id, datasource_id]
+        idx = 3
+
+        if table_type:
+            base_query += f" AND table_type = ${idx}"
+            args.append(table_type)
+            idx += 1
+
+        if search:
+            base_query += f" AND (name ILIKE ${idx} OR native_path ILIKE ${idx})"
+            args.append(f"%{search}%")
+            idx += 1
+
+        base_query += f" ORDER BY native_path LIMIT ${idx} OFFSET ${idx + 1}"
+        args.extend([limit, offset])
+
+        return await self.fetch_all(base_query, *args)
+
+    async def get_dataset_count(self, tenant_id: UUID, datasource_id: UUID) -> int:
+        """Get count of active datasets for a datasource.
+
+        Args:
+            tenant_id: The tenant ID.
+            datasource_id: The datasource ID.
+
+        Returns:
+            Number of active datasets.
+        """
+        result = await self.fetch_one(
+            """SELECT COUNT(*)::int as count FROM datasets
+               WHERE tenant_id = $1 AND datasource_id = $2 AND is_active = true""",
+            tenant_id,
+            datasource_id,
+        )
+        return result["count"] if result else 0
+
     # Investigation operations
     async def create_investigation(
         self,

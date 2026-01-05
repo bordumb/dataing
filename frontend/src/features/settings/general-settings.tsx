@@ -5,7 +5,7 @@ import { Label } from '@/components/ui/label'
 import { useJwtAuth } from '@/lib/auth'
 
 export function GeneralSettings() {
-  const { organization } = useJwtAuth()
+  const { org } = useJwtAuth()
 
   return (
     <Card>
@@ -20,7 +20,7 @@ export function GeneralSettings() {
           <Label htmlFor="org-name">Organization Name</Label>
           <Input
             id="org-name"
-            defaultValue={organization?.name ?? ''}
+            defaultValue={org?.name ?? ''}
             placeholder="Your organization"
           />
         </div>
@@ -28,7 +28,7 @@ export function GeneralSettings() {
           <Label htmlFor="org-slug">Organization Slug</Label>
           <Input
             id="org-slug"
-            defaultValue={organization?.slug ?? ''}
+            defaultValue={org?.slug ?? ''}
             placeholder="your-org"
             disabled
           />

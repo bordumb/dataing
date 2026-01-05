@@ -1,10 +1,12 @@
 /**
  * Admin page - only accessible to admin+ roles.
  * Contains team and user management.
+ *
+ * Users without admin+ role are redirected to home page.
  */
 
 import { Routes, Route, NavLink, Navigate } from 'react-router-dom'
-import { Users, UsersRound, Shield } from 'lucide-react'
+import { Users, UsersRound } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { RoleGuard } from '@/lib/auth'
 
@@ -15,22 +17,9 @@ const adminNavItems = [
   { to: '/admin/users', label: 'Users', icon: Users },
 ]
 
-function AdminAccessDenied() {
-  return (
-    <div className="flex flex-col items-center justify-center py-16 text-center">
-      <Shield className="h-16 w-16 text-muted-foreground mb-4" />
-      <h2 className="text-2xl font-semibold mb-2">Admin Access Required</h2>
-      <p className="text-muted-foreground max-w-md">
-        You need admin or owner privileges to access this section.
-        Contact your organization owner if you need elevated permissions.
-      </p>
-    </div>
-  )
-}
-
 export function AdminPage() {
   return (
-    <RoleGuard minRole="admin" fallback={<AdminAccessDenied />}>
+    <RoleGuard minRole="admin" redirectTo="/">
     <div className="space-y-6">
       <div>
         <h1 className="text-3xl font-bold tracking-tight">Admin</h1>

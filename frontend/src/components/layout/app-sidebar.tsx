@@ -74,7 +74,7 @@ const settingsNavItems = [
 export function AppSidebar() {
   const location = useLocation()
   const { state } = useSidebar()
-  const { user, organization, logout } = useJwtAuth()
+  const { user, org, logout } = useJwtAuth()
   const { isAdmin } = useRole()
 
   return (
@@ -90,7 +90,7 @@ export function AppSidebar() {
                 <div className="grid flex-1 text-left text-sm leading-tight">
                   <span className="truncate font-semibold">Dataing</span>
                   <span className="truncate text-xs text-muted-foreground">
-                    {organization?.name ?? 'Data Quality'}
+                    {org?.name ?? 'Data Quality'}
                   </span>
                 </div>
               </Link>
@@ -208,7 +208,7 @@ export function AppSidebar() {
                       {user?.name ?? 'User'}
                     </span>
                     <span className="truncate text-xs">
-                      {organization?.name ?? 'Organization'}
+                      {org?.name ?? 'Organization'}
                     </span>
                   </div>
                   <ChevronUp className="ml-auto size-4" />

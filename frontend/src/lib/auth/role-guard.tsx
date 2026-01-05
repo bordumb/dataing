@@ -4,7 +4,8 @@
  * Show/hide UI elements based on user role.
  */
 
-import type { ReactNode } from 'react'
+import { type ReactNode, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useRole } from './use-role'
 import type { OrgRole } from './types'
 
@@ -13,27 +14,46 @@ interface RoleGuardProps {
   minRole: OrgRole
   /** Content to show if user has required role */
   children: ReactNode
-  /** Optional content to show if user lacks required role */
+  /** Optional content to show if user lacks required role (for component-level use) */
   fallback?: ReactNode
+  /** Redirect path if user lacks required role (for page-level use) */
+  redirectTo?: string
 }
 
 /**
  * Only renders children if user has required role or higher.
  *
+ * For page-level protection, use redirectTo to send users to another page.
+ * For component-level hiding, use fallback to show alternative content.
+ *
  * @example
- * <RoleGuard minRole="admin">
- *   <AdminOnlyButton />
+ * // Page-level: redirect if not admin
+ * <RoleGuard minRole="admin" redirectTo="/">
+ *   <AdminPage />
  * </RoleGuard>
  *
  * @example
- * <RoleGuard minRole="admin" fallback={<UpgradePrompt />}>
- *   <AdminSettings />
+ * // Component-level: hide button if not admin
+ * <RoleGuard minRole="admin">
+ *   <AdminOnlyButton />
  * </RoleGuard>
  */
-export function RoleGuard({ minRole, children, fallback = null }: RoleGuardProps) {
+export function RoleGuard({ minRole, children, fallback = null, redirectTo }: RoleGuardProps) {
   const { hasRole } = useRole()
+  const navigate = useNavigate()
+  const hasAccess = hasRole(minRole)
 
-  if (!hasRole(minRole)) {
+  useEffect(() => {
+    if (!hasAccess && redirectTo) {
+      navigate(redirectTo, { replace: true })
+    }
+  }, [hasAccess, redirectTo, navigate])
+
+  if (!hasAccess) {
+    // If redirecting, render nothing while redirect happens
+    if (redirectTo) {
+      return null
+    }
     return <>{fallback}</>
   }
 

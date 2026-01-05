@@ -2,36 +2,22 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import customInstance from './client'
 import { queryKeys } from './query-keys'
 
-export interface SchemaComment {
-  id: string
-  dataset_id: string
-  field_name: string
-  parent_id: string | null
-  content: string
-  author_id: string | null
-  author_name: string | null
-  upvotes: number
-  downvotes: number
-  created_at: string
-  updated_at: string
-}
+// Re-export generated types for convenience
+export type { SchemaCommentResponse, SchemaCommentCreate, SchemaCommentUpdate } from './model'
 
-export interface SchemaCommentCreate {
-  field_name: string
-  content: string
-  parent_id?: string
-}
-
-export interface SchemaCommentUpdate {
-  content: string
-}
+// Import types for internal use
+import type {
+  SchemaCommentResponse,
+  SchemaCommentCreate,
+  SchemaCommentUpdate,
+} from './model'
 
 async function listSchemaComments(
   datasetId: string,
   fieldName?: string
-): Promise<SchemaComment[]> {
+): Promise<SchemaCommentResponse[]> {
   const params = fieldName ? `?field_name=${encodeURIComponent(fieldName)}` : ''
-  return customInstance<SchemaComment[]>({
+  return customInstance<SchemaCommentResponse[]>({
     url: `/api/v1/datasets/${datasetId}/schema-comments${params}`,
     method: 'GET',
   })
@@ -40,8 +26,8 @@ async function listSchemaComments(
 async function createSchemaComment(
   datasetId: string,
   data: SchemaCommentCreate
-): Promise<SchemaComment> {
-  return customInstance<SchemaComment>({
+): Promise<SchemaCommentResponse> {
+  return customInstance<SchemaCommentResponse>({
     url: `/api/v1/datasets/${datasetId}/schema-comments`,
     method: 'POST',
     data,
@@ -52,8 +38,8 @@ async function updateSchemaComment(
   datasetId: string,
   commentId: string,
   data: SchemaCommentUpdate
-): Promise<SchemaComment> {
-  return customInstance<SchemaComment>({
+): Promise<SchemaCommentResponse> {
+  return customInstance<SchemaCommentResponse>({
     url: `/api/v1/datasets/${datasetId}/schema-comments/${commentId}`,
     method: 'PATCH',
     data,

@@ -2,11 +2,13 @@ import { useMutation, useQueryClient } from '@tanstack/react-query'
 import customInstance from './client'
 import { queryKeys } from './query-keys'
 
-export type CommentType = 'schema' | 'knowledge'
+// Re-export generated types for convenience
+export type { VoteCreate } from './model'
 
-export interface VoteCreate {
-  vote: 1 | -1
-}
+// Import types for internal use
+import type { VoteCreate } from './model'
+
+export type CommentType = 'schema' | 'knowledge'
 
 async function voteOnComment(
   commentType: CommentType,

@@ -2,30 +2,22 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import customInstance from './client'
 import { queryKeys } from './query-keys'
 
-export interface KnowledgeComment {
-  id: string
-  dataset_id: string
-  parent_id: string | null
-  content: string
-  author_id: string | null
-  author_name: string | null
-  upvotes: number
-  downvotes: number
-  created_at: string
-  updated_at: string
-}
+// Re-export generated types for convenience
+export type {
+  KnowledgeCommentResponse,
+  KnowledgeCommentCreate,
+  KnowledgeCommentUpdate,
+} from './model'
 
-export interface KnowledgeCommentCreate {
-  content: string
-  parent_id?: string
-}
+// Import types for internal use
+import type {
+  KnowledgeCommentResponse,
+  KnowledgeCommentCreate,
+  KnowledgeCommentUpdate,
+} from './model'
 
-export interface KnowledgeCommentUpdate {
-  content: string
-}
-
-async function listKnowledgeComments(datasetId: string): Promise<KnowledgeComment[]> {
-  return customInstance<KnowledgeComment[]>({
+async function listKnowledgeComments(datasetId: string): Promise<KnowledgeCommentResponse[]> {
+  return customInstance<KnowledgeCommentResponse[]>({
     url: `/api/v1/datasets/${datasetId}/knowledge-comments`,
     method: 'GET',
   })
@@ -34,8 +26,8 @@ async function listKnowledgeComments(datasetId: string): Promise<KnowledgeCommen
 async function createKnowledgeComment(
   datasetId: string,
   data: KnowledgeCommentCreate
-): Promise<KnowledgeComment> {
-  return customInstance<KnowledgeComment>({
+): Promise<KnowledgeCommentResponse> {
+  return customInstance<KnowledgeCommentResponse>({
     url: `/api/v1/datasets/${datasetId}/knowledge-comments`,
     method: 'POST',
     data,
@@ -46,8 +38,8 @@ async function updateKnowledgeComment(
   datasetId: string,
   commentId: string,
   data: KnowledgeCommentUpdate
-): Promise<KnowledgeComment> {
-  return customInstance<KnowledgeComment>({
+): Promise<KnowledgeCommentResponse> {
+  return customInstance<KnowledgeCommentResponse>({
     url: `/api/v1/datasets/${datasetId}/knowledge-comments/${commentId}`,
     method: 'PATCH',
     data,

@@ -80,15 +80,15 @@ export const queryKeys = {
 
   // Schema Comments
   schemaComments: {
-    all: (datasetId: string) => ['schema-comments', datasetId] as const,
+    all: (datasetId: string) => [`/api/v1/datasets/${datasetId}/schema-comments`] as const,
     list: (datasetId: string, fieldName?: string) =>
-      ['schema-comments', datasetId, fieldName] as const,
+      [`/api/v1/datasets/${datasetId}/schema-comments`, { field_name: fieldName }] as const,
   },
 
   // Knowledge Comments
   knowledgeComments: {
-    all: (datasetId: string) => ['knowledge-comments', datasetId] as const,
-    list: (datasetId: string) => ['knowledge-comments', datasetId, 'list'] as const,
+    all: (datasetId: string) => [`/api/v1/datasets/${datasetId}/knowledge-comments`] as const,
+    list: (datasetId: string) => [`/api/v1/datasets/${datasetId}/knowledge-comments`] as const,
   },
 } as const
 

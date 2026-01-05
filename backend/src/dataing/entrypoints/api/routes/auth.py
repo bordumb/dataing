@@ -10,6 +10,7 @@ from dataing.adapters.auth.postgres import PostgresAuthRepository
 from dataing.core.auth.recovery import PasswordRecoveryAdapter
 from dataing.core.auth.service import AuthError, AuthService
 from dataing.entrypoints.api.deps import get_frontend_url, get_recovery_adapter
+from dataing.entrypoints.api.middleware.jwt_auth import JwtContext, verify_jwt
 
 router = APIRouter(tags=["auth"])
 
@@ -176,18 +177,14 @@ async def get_current_user(request: Request) -> dict[str, Any]:
 
 @router.get("/me/orgs")
 async def get_user_orgs(
-    request: Request,
+    auth: Annotated[JwtContext, Depends(verify_jwt)],
     service: Annotated[AuthService, Depends(get_auth_service)],
 ) -> list[dict[str, Any]]:
     """Get all organizations the current user belongs to.
 
     Returns list of orgs with role for each.
     """
-    if not hasattr(request.state, "user"):
-        raise HTTPException(status_code=401, detail="Not authenticated")
-
-    user_id = UUID(request.state.user.sub)
-    return await service.get_user_orgs(user_id)
+    return await service.get_user_orgs(auth.user_uuid)
 
 
 # Password reset endpoints

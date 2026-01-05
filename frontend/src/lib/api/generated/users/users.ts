@@ -18,6 +18,12 @@ import type {
 import type {
   CreateUserRequest,
   HTTPValidationError,
+  InviteUserApiV1UsersInvitePost201,
+  InviteUserRequest,
+  OrgMemberResponse,
+  RemoveOrgMemberApiV1UsersUserIdRemovePost200,
+  UpdateMemberRoleApiV1UsersUserIdRolePatch200,
+  UpdateRoleRequest,
   UpdateUserRequest,
   UserListResponse,
   UserResponse,
@@ -250,6 +256,160 @@ export const useGetCurrentUserApiV1UsersMeGet = <
   return query;
 };
 
+/**
+ * List all members of the current organization (JWT auth).
+ * @summary List Org Members
+ */
+export const listOrgMembersApiV1UsersOrgMembersGet = (signal?: AbortSignal) => {
+  return customInstance<OrgMemberResponse[]>({
+    url: `/api/v1/users/org-members`,
+    method: "GET",
+    signal,
+  });
+};
+
+export const getListOrgMembersApiV1UsersOrgMembersGetQueryKey = () => {
+  return [`/api/v1/users/org-members`] as const;
+};
+
+export const getListOrgMembersApiV1UsersOrgMembersGetQueryOptions = <
+  TData = Awaited<ReturnType<typeof listOrgMembersApiV1UsersOrgMembersGet>>,
+  TError = unknown,
+>(options?: {
+  query?: Partial<
+    UseQueryOptions<
+      Awaited<ReturnType<typeof listOrgMembersApiV1UsersOrgMembersGet>>,
+      TError,
+      TData
+    >
+  >;
+}) => {
+  const { query: queryOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ??
+    getListOrgMembersApiV1UsersOrgMembersGetQueryKey();
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof listOrgMembersApiV1UsersOrgMembersGet>>
+  > = ({ signal }) => listOrgMembersApiV1UsersOrgMembersGet(signal);
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof listOrgMembersApiV1UsersOrgMembersGet>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type ListOrgMembersApiV1UsersOrgMembersGetQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listOrgMembersApiV1UsersOrgMembersGet>>
+>;
+export type ListOrgMembersApiV1UsersOrgMembersGetQueryError = unknown;
+
+/**
+ * @summary List Org Members
+ */
+export const useListOrgMembersApiV1UsersOrgMembersGet = <
+  TData = Awaited<ReturnType<typeof listOrgMembersApiV1UsersOrgMembersGet>>,
+  TError = unknown,
+>(options?: {
+  query?: Partial<
+    UseQueryOptions<
+      Awaited<ReturnType<typeof listOrgMembersApiV1UsersOrgMembersGet>>,
+      TError,
+      TData
+    >
+  >;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } => {
+  const queryOptions =
+    getListOrgMembersApiV1UsersOrgMembersGetQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  query.queryKey = queryOptions.queryKey;
+
+  return query;
+};
+
+/**
+ * Invite a user to the organization (admin only).
+
+If user exists, adds them to the org. If not, creates a new user.
+ * @summary Invite User
+ */
+export const inviteUserApiV1UsersInvitePost = (
+  inviteUserRequest: InviteUserRequest,
+) => {
+  return customInstance<InviteUserApiV1UsersInvitePost201>({
+    url: `/api/v1/users/invite`,
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    data: inviteUserRequest,
+  });
+};
+
+export const getInviteUserApiV1UsersInvitePostMutationOptions = <
+  TError = HTTPValidationError,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof inviteUserApiV1UsersInvitePost>>,
+    TError,
+    { data: InviteUserRequest },
+    TContext
+  >;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof inviteUserApiV1UsersInvitePost>>,
+  TError,
+  { data: InviteUserRequest },
+  TContext
+> => {
+  const { mutation: mutationOptions } = options ?? {};
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof inviteUserApiV1UsersInvitePost>>,
+    { data: InviteUserRequest }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return inviteUserApiV1UsersInvitePost(data);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type InviteUserApiV1UsersInvitePostMutationResult = NonNullable<
+  Awaited<ReturnType<typeof inviteUserApiV1UsersInvitePost>>
+>;
+export type InviteUserApiV1UsersInvitePostMutationBody = InviteUserRequest;
+export type InviteUserApiV1UsersInvitePostMutationError = HTTPValidationError;
+
+/**
+ * @summary Invite User
+ */
+export const useInviteUserApiV1UsersInvitePost = <
+  TError = HTTPValidationError,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof inviteUserApiV1UsersInvitePost>>,
+    TError,
+    { data: InviteUserRequest },
+    TContext
+  >;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof inviteUserApiV1UsersInvitePost>>,
+  TError,
+  { data: InviteUserRequest },
+  TContext
+> => {
+  const mutationOptions =
+    getInviteUserApiV1UsersInvitePostMutationOptions(options);
+
+  return useMutation(mutationOptions);
+};
 /**
  * Get a specific user.
  * @summary Get User
@@ -491,6 +651,158 @@ export const useDeactivateUserApiV1UsersUserIdDelete = <
 > => {
   const mutationOptions =
     getDeactivateUserApiV1UsersUserIdDeleteMutationOptions(options);
+
+  return useMutation(mutationOptions);
+};
+/**
+ * Update a member's role in the organization (admin only).
+ * @summary Update Member Role
+ */
+export const updateMemberRoleApiV1UsersUserIdRolePatch = (
+  userId: string,
+  updateRoleRequest: UpdateRoleRequest,
+) => {
+  return customInstance<UpdateMemberRoleApiV1UsersUserIdRolePatch200>({
+    url: `/api/v1/users/${userId}/role`,
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    data: updateRoleRequest,
+  });
+};
+
+export const getUpdateMemberRoleApiV1UsersUserIdRolePatchMutationOptions = <
+  TError = HTTPValidationError,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof updateMemberRoleApiV1UsersUserIdRolePatch>>,
+    TError,
+    { userId: string; data: UpdateRoleRequest },
+    TContext
+  >;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof updateMemberRoleApiV1UsersUserIdRolePatch>>,
+  TError,
+  { userId: string; data: UpdateRoleRequest },
+  TContext
+> => {
+  const { mutation: mutationOptions } = options ?? {};
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof updateMemberRoleApiV1UsersUserIdRolePatch>>,
+    { userId: string; data: UpdateRoleRequest }
+  > = (props) => {
+    const { userId, data } = props ?? {};
+
+    return updateMemberRoleApiV1UsersUserIdRolePatch(userId, data);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type UpdateMemberRoleApiV1UsersUserIdRolePatchMutationResult =
+  NonNullable<
+    Awaited<ReturnType<typeof updateMemberRoleApiV1UsersUserIdRolePatch>>
+  >;
+export type UpdateMemberRoleApiV1UsersUserIdRolePatchMutationBody =
+  UpdateRoleRequest;
+export type UpdateMemberRoleApiV1UsersUserIdRolePatchMutationError =
+  HTTPValidationError;
+
+/**
+ * @summary Update Member Role
+ */
+export const useUpdateMemberRoleApiV1UsersUserIdRolePatch = <
+  TError = HTTPValidationError,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof updateMemberRoleApiV1UsersUserIdRolePatch>>,
+    TError,
+    { userId: string; data: UpdateRoleRequest },
+    TContext
+  >;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof updateMemberRoleApiV1UsersUserIdRolePatch>>,
+  TError,
+  { userId: string; data: UpdateRoleRequest },
+  TContext
+> => {
+  const mutationOptions =
+    getUpdateMemberRoleApiV1UsersUserIdRolePatchMutationOptions(options);
+
+  return useMutation(mutationOptions);
+};
+/**
+ * Remove a member from the organization (admin only).
+ * @summary Remove Org Member
+ */
+export const removeOrgMemberApiV1UsersUserIdRemovePost = (userId: string) => {
+  return customInstance<RemoveOrgMemberApiV1UsersUserIdRemovePost200>({
+    url: `/api/v1/users/${userId}/remove`,
+    method: "POST",
+  });
+};
+
+export const getRemoveOrgMemberApiV1UsersUserIdRemovePostMutationOptions = <
+  TError = HTTPValidationError,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof removeOrgMemberApiV1UsersUserIdRemovePost>>,
+    TError,
+    { userId: string },
+    TContext
+  >;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof removeOrgMemberApiV1UsersUserIdRemovePost>>,
+  TError,
+  { userId: string },
+  TContext
+> => {
+  const { mutation: mutationOptions } = options ?? {};
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof removeOrgMemberApiV1UsersUserIdRemovePost>>,
+    { userId: string }
+  > = (props) => {
+    const { userId } = props ?? {};
+
+    return removeOrgMemberApiV1UsersUserIdRemovePost(userId);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type RemoveOrgMemberApiV1UsersUserIdRemovePostMutationResult =
+  NonNullable<
+    Awaited<ReturnType<typeof removeOrgMemberApiV1UsersUserIdRemovePost>>
+  >;
+
+export type RemoveOrgMemberApiV1UsersUserIdRemovePostMutationError =
+  HTTPValidationError;
+
+/**
+ * @summary Remove Org Member
+ */
+export const useRemoveOrgMemberApiV1UsersUserIdRemovePost = <
+  TError = HTTPValidationError,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof removeOrgMemberApiV1UsersUserIdRemovePost>>,
+    TError,
+    { userId: string },
+    TContext
+  >;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof removeOrgMemberApiV1UsersUserIdRemovePost>>,
+  TError,
+  { userId: string },
+  TContext
+> => {
+  const mutationOptions =
+    getRemoveOrgMemberApiV1UsersUserIdRemovePostMutationOptions(options);
 
   return useMutation(mutationOptions);
 };

@@ -155,21 +155,31 @@ demo: demo-fixtures
     echo "Waiting for PostgreSQL to be ready..."
     sleep 3
 
-    # Run migrations
+    # Run migrations in order
     echo "Running database migrations..."
-    PGPASSWORD=dataing psql -h localhost -U dataing -d dataing_demo -f backend/migrations/001_initial.sql 2>/dev/null || true
-    PGPASSWORD=dataing psql -h localhost -U dataing -d dataing_demo -f backend/migrations/002_datasets.sql 2>/dev/null || true
-    PGPASSWORD=dataing psql -h localhost -U dataing -d dataing_demo -f backend/migrations/003_investigation_feedback_events.sql 2>/dev/null || true
-    PGPASSWORD=dataing psql -h localhost -U dataing -d dataing_demo -f backend/migrations/004_schema_comments.sql 2>/dev/null || true
-    PGPASSWORD=dataing psql -h localhost -U dataing -d dataing_demo -f backend/migrations/005_knowledge_comments.sql 2>/dev/null || true
-    PGPASSWORD=dataing psql -h localhost -U dataing -d dataing_demo -f backend/migrations/006_comment_votes.sql 2>/dev/null || true
+    for migration in backend/migrations/0*.sql; do
+        echo "  $(basename $migration)"
+        PGPASSWORD=dataing psql -h localhost -U dataing -d dataing_demo -f "$migration" 2>&1 | grep -E "^(ERROR|NOTICE)" || true
+    done
+    echo "  Done."
 
     trap 'kill 0' EXIT
 
     echo ""
-    echo "  API Key for testing: dd_demo_12345"
+    echo "========================================="
+    echo "  Dataing Demo Ready!"
+    echo "========================================="
+    echo ""
     echo "  Frontend: http://localhost:3000"
     echo "  Backend:  http://localhost:8000"
+    echo ""
+    echo "  Login credentials:"
+    echo "    Email:    demo@dataing.io"
+    echo "    Password: demo123456"
+    echo "    Org ID:   00000000-0000-0000-0000-000000000001"
+    echo ""
+    echo "  Legacy API Key: dd_demo_12345"
+    echo "========================================="
     echo ""
 
     export DATADR_DEMO_MODE=true

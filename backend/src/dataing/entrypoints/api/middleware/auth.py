@@ -1,4 +1,4 @@
-"""API Key authentication middleware."""
+"""API Key and JWT authentication middleware."""
 
 import hashlib
 import json
@@ -10,11 +10,14 @@ from uuid import UUID
 
 import structlog
 from fastapi import Depends, HTTPException, Request, Security
-from fastapi.security import APIKeyHeader
+from fastapi.security import APIKeyHeader, HTTPAuthorizationCredentials, HTTPBearer
+
+from dataing.core.auth.jwt import TokenError, decode_token
 
 logger = structlog.get_logger()
 
 API_KEY_HEADER = APIKeyHeader(name="X-API-Key", auto_error=False)
+BEARER_SCHEME = HTTPBearer(auto_error=False)
 
 
 @dataclass
@@ -32,11 +35,33 @@ class ApiKeyContext:
 async def verify_api_key(
     request: Request,
     api_key: str | None = Security(API_KEY_HEADER),
+    bearer: HTTPAuthorizationCredentials | None = Security(BEARER_SCHEME),  # noqa: B008
 ) -> ApiKeyContext:
-    """Verify API key and return context.
+    """Verify API key or JWT and return context.
 
-    This dependency validates the API key and returns tenant/user context.
+    This dependency validates authentication and returns tenant/user context.
+    Accepts either X-API-Key header or Bearer token (JWT).
     """
+    # Try JWT first if Bearer token is provided
+    if bearer:
+        try:
+            payload = decode_token(bearer.credentials)
+            context = ApiKeyContext(
+                key_id=UUID("00000000-0000-0000-0000-000000000000"),  # Placeholder for JWT auth
+                tenant_id=UUID(payload.org_id),
+                tenant_slug="",  # Not available in JWT
+                tenant_name="",  # Not available in JWT
+                user_id=UUID(payload.sub),
+                scopes=["read", "write"],  # JWT users get full access
+            )
+            request.state.auth_context = context
+            logger.debug(f"jwt_verified: user_id={payload.sub}, org_id={payload.org_id}")
+            return context
+        except TokenError as e:
+            logger.warning(f"jwt_validation_failed: {e}")
+            # Fall through to try API key
+
+    # Try API key
     if not api_key:
         raise HTTPException(status_code=401, detail="Missing API key")
 
@@ -115,16 +140,17 @@ def require_scope(required_scope: str) -> Callable[..., Any]:
     return scope_checker
 
 
-# Optional authentication - returns None if no API key provided
+# Optional authentication - returns None if no API key or JWT provided
 async def optional_api_key(
     request: Request,
     api_key: str | None = Security(API_KEY_HEADER),
+    bearer: HTTPAuthorizationCredentials | None = Security(BEARER_SCHEME),  # noqa: B008
 ) -> ApiKeyContext | None:
-    """Optionally verify API key, returning None if not provided."""
-    if not api_key:
+    """Optionally verify API key or JWT, returning None if not provided."""
+    if not api_key and not bearer:
         return None
 
     try:
-        return await verify_api_key(request, api_key)
+        return await verify_api_key(request, api_key, bearer)
     except HTTPException:
         return None

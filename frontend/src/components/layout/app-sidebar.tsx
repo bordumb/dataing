@@ -9,6 +9,7 @@ import {
   Bell,
   ChevronUp,
   LogOut,
+  Shield,
 } from 'lucide-react'
 
 import {
@@ -32,7 +33,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
-import { useAuth } from '@/lib/auth/context'
+import { useJwtAuth, useRole, OrgSelector } from '@/lib/auth'
 
 const mainNavItems = [
   {
@@ -73,7 +74,8 @@ const settingsNavItems = [
 export function AppSidebar() {
   const location = useLocation()
   const { state } = useSidebar()
-  const { tenant, logout } = useAuth()
+  const { user, organization, logout } = useJwtAuth()
+  const { isAdmin } = useRole()
 
   return (
     <Sidebar collapsible="icon">
@@ -88,11 +90,14 @@ export function AppSidebar() {
                 <div className="grid flex-1 text-left text-sm leading-tight">
                   <span className="truncate font-semibold">Dataing</span>
                   <span className="truncate text-xs text-muted-foreground">
-                    {tenant?.name ?? 'Data Quality'}
+                    {organization?.name ?? 'Data Quality'}
                   </span>
                 </div>
               </Link>
             </SidebarMenuButton>
+          </SidebarMenuItem>
+          <SidebarMenuItem>
+            <OrgSelector />
           </SidebarMenuItem>
         </SidebarMenu>
       </SidebarHeader>
@@ -159,6 +164,29 @@ export function AppSidebar() {
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
+
+        {/* Admin - only visible for admin+ roles */}
+        {isAdmin && (
+          <SidebarGroup>
+            <SidebarGroupLabel>Admin</SidebarGroupLabel>
+            <SidebarGroupContent>
+              <SidebarMenu>
+                <SidebarMenuItem>
+                  <SidebarMenuButton
+                    asChild
+                    isActive={location.pathname.startsWith('/admin')}
+                    tooltip="Admin"
+                  >
+                    <Link to="/admin">
+                      <Shield className="size-4" />
+                      <span>Admin</span>
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        )}
       </SidebarContent>
 
       <SidebarFooter>
@@ -172,15 +200,15 @@ export function AppSidebar() {
                 >
                   <Avatar className="h-8 w-8 rounded-lg">
                     <AvatarFallback className="rounded-lg">
-                      {tenant?.name?.charAt(0) ?? 'U'}
+                      {user?.name?.charAt(0) ?? 'U'}
                     </AvatarFallback>
                   </Avatar>
                   <div className="grid flex-1 text-left text-sm leading-tight">
                     <span className="truncate font-semibold">
-                      {tenant?.name ?? 'User'}
+                      {user?.name ?? 'User'}
                     </span>
                     <span className="truncate text-xs">
-                      {tenant?.slug ?? 'team'}
+                      {organization?.name ?? 'Organization'}
                     </span>
                   </div>
                   <ChevronUp className="ml-auto size-4" />

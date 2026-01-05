@@ -7,6 +7,8 @@ from dataing.core.auth.jwt import (
     decode_token,
 )
 from dataing.core.auth.password import hash_password, verify_password
+from dataing.core.auth.repository import AuthRepository
+from dataing.core.auth.service import AuthError, AuthService
 from dataing.core.auth.types import (
     Organization,
     OrgMembership,
@@ -31,4 +33,7 @@ __all__ = [
     "create_refresh_token",
     "decode_token",
     "TokenError",
+    "AuthRepository",
+    "AuthService",
+    "AuthError",
 ]

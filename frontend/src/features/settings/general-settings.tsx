@@ -2,10 +2,10 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { Label } from '@/components/ui/label'
-import { useAuth } from '@/lib/auth/context'
+import { useJwtAuth } from '@/lib/auth'
 
 export function GeneralSettings() {
-  const { tenant } = useAuth()
+  const { organization } = useJwtAuth()
 
   return (
     <Card>
@@ -20,7 +20,7 @@ export function GeneralSettings() {
           <Label htmlFor="org-name">Organization Name</Label>
           <Input
             id="org-name"
-            defaultValue={tenant?.name ?? ''}
+            defaultValue={organization?.name ?? ''}
             placeholder="Your organization"
           />
         </div>
@@ -28,7 +28,7 @@ export function GeneralSettings() {
           <Label htmlFor="org-slug">Organization Slug</Label>
           <Input
             id="org-slug"
-            defaultValue={tenant?.slug ?? ''}
+            defaultValue={organization?.slug ?? ''}
             placeholder="your-org"
             disabled
           />

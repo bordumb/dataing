@@ -238,6 +238,149 @@ class AppDatabase:
         )
         return "UPDATE 1" in result
 
+    # Dataset operations
+    async def upsert_datasets(
+        self,
+        tenant_id: UUID,
+        datasource_id: UUID,
+        datasets: list[dict[str, Any]],
+    ) -> int:
+        """Upsert datasets during schema sync.
+
+        Args:
+            tenant_id: The tenant ID.
+            datasource_id: The datasource ID.
+            datasets: List of dataset dictionaries containing native_path, name, etc.
+
+        Returns:
+            Number of datasets upserted.
+        """
+        if not datasets:
+            return 0
+
+        query = """
+            INSERT INTO datasets (
+                tenant_id, datasource_id, native_path, name, table_type,
+                schema_name, catalog_name, row_count, size_bytes, column_count,
+                description, is_active, last_synced_at
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, true, NOW())
+            ON CONFLICT (datasource_id, native_path)
+            DO UPDATE SET
+                name = EXCLUDED.name,
+                table_type = EXCLUDED.table_type,
+                schema_name = EXCLUDED.schema_name,
+                catalog_name = EXCLUDED.catalog_name,
+                row_count = EXCLUDED.row_count,
+                size_bytes = EXCLUDED.size_bytes,
+                column_count = EXCLUDED.column_count,
+                description = EXCLUDED.description,
+                is_active = true,
+                last_synced_at = NOW(),
+                updated_at = NOW()
+        """
+
+        async with self.acquire() as conn:
+            for dataset in datasets:
+                await conn.execute(
+                    query,
+                    tenant_id,
+                    datasource_id,
+                    dataset["native_path"],
+                    dataset["name"],
+                    dataset.get("table_type", "table"),
+                    dataset.get("schema_name"),
+                    dataset.get("catalog_name"),
+                    dataset.get("row_count"),
+                    dataset.get("size_bytes"),
+                    dataset.get("column_count"),
+                    dataset.get("description"),
+                )
+
+        return len(datasets)
+
+    async def get_datasets_by_datasource(
+        self,
+        tenant_id: UUID,
+        datasource_id: UUID,
+    ) -> list[dict[str, Any]]:
+        """Get all active datasets for a datasource.
+
+        Args:
+            tenant_id: The tenant ID.
+            datasource_id: The datasource ID.
+
+        Returns:
+            List of dataset dictionaries.
+        """
+        query = """
+            SELECT id, native_path, name, table_type, schema_name, catalog_name,
+                   row_count, size_bytes, column_count, description,
+                   last_synced_at, created_at, updated_at
+            FROM datasets
+            WHERE tenant_id = $1 AND datasource_id = $2 AND is_active = true
+            ORDER BY name
+        """
+        return await self.fetch_all(query, tenant_id, datasource_id)
+
+    async def get_dataset_by_id(
+        self,
+        tenant_id: UUID,
+        dataset_id: UUID,
+    ) -> dict[str, Any] | None:
+        """Get a single dataset by ID.
+
+        Args:
+            tenant_id: The tenant ID.
+            dataset_id: The dataset ID.
+
+        Returns:
+            Dataset dictionary or None if not found.
+        """
+        query = """
+            SELECT d.id, d.native_path, d.name, d.table_type, d.schema_name,
+                   d.catalog_name, d.row_count, d.size_bytes, d.column_count,
+                   d.description, d.last_synced_at, d.created_at, d.updated_at,
+                   d.datasource_id, ds.name as datasource_name
+            FROM datasets d
+            JOIN data_sources ds ON d.datasource_id = ds.id
+            WHERE d.tenant_id = $1 AND d.id = $2 AND d.is_active = true
+        """
+        return await self.fetch_one(query, tenant_id, dataset_id)
+
+    async def deactivate_stale_datasets(
+        self,
+        tenant_id: UUID,
+        datasource_id: UUID,
+        active_paths: set[str],
+    ) -> int:
+        """Mark datasets as inactive if they no longer exist in the datasource.
+
+        Args:
+            tenant_id: The tenant ID.
+            datasource_id: The datasource ID.
+            active_paths: Set of native paths that are still active.
+
+        Returns:
+            Number of datasets deactivated.
+        """
+        if not active_paths:
+            # Deactivate all datasets for this datasource
+            query = """
+                UPDATE datasets SET is_active = false, updated_at = NOW()
+                WHERE tenant_id = $1 AND datasource_id = $2 AND is_active = true
+            """
+            result = await self.execute(query, tenant_id, datasource_id)
+            return int(result.split()[-1])
+
+        # Deactivate datasets not in active_paths
+        query = """
+            UPDATE datasets SET is_active = false, updated_at = NOW()
+            WHERE tenant_id = $1 AND datasource_id = $2
+            AND is_active = true AND native_path != ALL($3::text[])
+        """
+        result = await self.execute(query, tenant_id, datasource_id, list(active_paths))
+        return int(result.split()[-1])
+
     # Investigation operations
     async def create_investigation(
         self,

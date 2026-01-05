@@ -280,21 +280,25 @@ class AppDatabase:
         """
 
         async with self.acquire() as conn:
-            for dataset in datasets:
-                await conn.execute(
-                    query,
-                    tenant_id,
-                    datasource_id,
-                    dataset["native_path"],
-                    dataset["name"],
-                    dataset.get("table_type", "table"),
-                    dataset.get("schema_name"),
-                    dataset.get("catalog_name"),
-                    dataset.get("row_count"),
-                    dataset.get("size_bytes"),
-                    dataset.get("column_count"),
-                    dataset.get("description"),
-                )
+            await conn.executemany(
+                query,
+                [
+                    (
+                        tenant_id,
+                        datasource_id,
+                        dataset["native_path"],
+                        dataset["name"],
+                        dataset.get("table_type", "table"),
+                        dataset.get("schema_name"),
+                        dataset.get("catalog_name"),
+                        dataset.get("row_count"),
+                        dataset.get("size_bytes"),
+                        dataset.get("column_count"),
+                        dataset.get("description"),
+                    )
+                    for dataset in datasets
+                ],
+            )
 
         return len(datasets)
 
@@ -313,8 +317,8 @@ class AppDatabase:
             List of dataset dictionaries.
         """
         query = """
-            SELECT id, native_path, name, table_type, schema_name, catalog_name,
-                   row_count, size_bytes, column_count, description,
+            SELECT id, datasource_id, native_path, name, table_type, schema_name,
+                   catalog_name, row_count, size_bytes, column_count, description,
                    last_synced_at, created_at, updated_at
             FROM datasets
             WHERE tenant_id = $1 AND datasource_id = $2 AND is_active = true
@@ -366,20 +370,28 @@ class AppDatabase:
         if not active_paths:
             # Deactivate all datasets for this datasource
             query = """
-                UPDATE datasets SET is_active = false, updated_at = NOW()
-                WHERE tenant_id = $1 AND datasource_id = $2 AND is_active = true
+                WITH updated AS (
+                    UPDATE datasets SET is_active = false, updated_at = NOW()
+                    WHERE tenant_id = $1 AND datasource_id = $2 AND is_active = true
+                    RETURNING 1
+                )
+                SELECT COUNT(*)::int as count FROM updated
             """
-            result = await self.execute(query, tenant_id, datasource_id)
-            return int(result.split()[-1])
+            result = await self.fetch_one(query, tenant_id, datasource_id)
+            return result["count"] if result else 0
 
         # Deactivate datasets not in active_paths
         query = """
-            UPDATE datasets SET is_active = false, updated_at = NOW()
-            WHERE tenant_id = $1 AND datasource_id = $2
-            AND is_active = true AND native_path != ALL($3::text[])
+            WITH updated AS (
+                UPDATE datasets SET is_active = false, updated_at = NOW()
+                WHERE tenant_id = $1 AND datasource_id = $2
+                AND is_active = true AND native_path != ALL($3::text[])
+                RETURNING 1
+            )
+            SELECT COUNT(*)::int as count FROM updated
         """
-        result = await self.execute(query, tenant_id, datasource_id, list(active_paths))
-        return int(result.split()[-1])
+        result = await self.fetch_one(query, tenant_id, datasource_id, list(active_paths))
+        return result["count"] if result else 0
 
     # Investigation operations
     async def create_investigation(

@@ -9,14 +9,16 @@ from uuid import UUID
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 
+from dataing.adapters.db.app_db import AppDatabase
 from dataing.adapters.feedback import EventType, FeedbackAdapter
-from dataing.entrypoints.api.deps import get_feedback_adapter
+from dataing.entrypoints.api.deps import get_app_db, get_feedback_adapter
 from dataing.entrypoints.api.middleware.auth import ApiKeyContext, verify_api_key
 
 router = APIRouter(prefix="/feedback", tags=["feedback"])
 
 AuthDep = Annotated[ApiKeyContext, Depends(verify_api_key)]
 FeedbackAdapterDep = Annotated[FeedbackAdapter, Depends(get_feedback_adapter)]
+DbDep = Annotated[AppDatabase, Depends(get_app_db)]
 
 
 class FeedbackCreate(BaseModel):
@@ -71,3 +73,57 @@ async def submit_feedback(
     )
 
     return FeedbackResponse(id=event.id, created_at=event.created_at)
+
+
+class FeedbackItem(BaseModel):
+    """A single feedback item returned from the API."""
+
+    id: UUID
+    target_type: str
+    target_id: UUID
+    rating: int
+    reason: str | None
+    created_at: datetime
+
+
+@router.get("/investigations/{investigation_id}", response_model=list[FeedbackItem])
+async def get_investigation_feedback(
+    investigation_id: UUID,
+    auth: AuthDep,
+    db: DbDep,
+) -> list[FeedbackItem]:
+    """Get current user's feedback for an investigation.
+
+    Args:
+        investigation_id: The investigation to get feedback for.
+        auth: Authentication context.
+        db: Application database.
+
+    Returns:
+        List of feedback items for the investigation.
+    """
+    events = await db.list_feedback_events(
+        tenant_id=auth.tenant_id,
+        investigation_id=investigation_id,
+    )
+
+    # Filter to only feedback events and current user
+    user_id = auth.user_id if hasattr(auth, "user_id") else None
+    feedback_events = [
+        e
+        for e in events
+        if e["event_type"].startswith("feedback.")
+        and (user_id is None or e.get("actor_id") == user_id)
+    ]
+
+    return [
+        FeedbackItem(
+            id=e["id"],
+            target_type=e["event_type"].replace("feedback.", ""),
+            target_id=UUID(str(e["event_data"]["target_id"])),
+            rating=e["event_data"]["rating"],
+            reason=e["event_data"].get("reason"),
+            created_at=e["created_at"],
+        )
+        for e in feedback_events
+    ]

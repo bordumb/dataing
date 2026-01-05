@@ -25,7 +25,7 @@ import { useJwtAuth } from './jwt-context'
 import type { OrgMembership } from './types'
 
 export function OrgSelector() {
-  const { organization, accessToken, switchOrg } = useJwtAuth()
+  const { org, accessToken, switchOrg } = useJwtAuth()
   const [open, setOpen] = React.useState(false)
   const [orgs, setOrgs] = React.useState<OrgMembership[]>([])
   const [loading, setLoading] = React.useState(true)
@@ -46,7 +46,7 @@ export function OrgSelector() {
   }, [accessToken])
 
   const handleSelect = async (orgId: string) => {
-    if (orgId === organization?.id) {
+    if (orgId === org?.id) {
       setOpen(false)
       return
     }
@@ -81,7 +81,7 @@ export function OrgSelector() {
         >
           <Building2 className="mr-2 h-4 w-4 shrink-0" />
           <span className="truncate flex-1 text-left">
-            {organization?.name ?? 'Select org...'}
+            {org?.name ?? 'Select org...'}
           </span>
           <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
         </Button>
@@ -100,7 +100,7 @@ export function OrgSelector() {
                   <Check
                     className={cn(
                       'mr-2 h-4 w-4',
-                      organization?.id === membership.org.id
+                      org?.id === membership.org.id
                         ? 'opacity-100'
                         : 'opacity-0'
                     )}

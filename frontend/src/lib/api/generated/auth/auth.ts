@@ -274,8 +274,6 @@ export const useRefreshApiV1AuthRefreshPost = <
 };
 /**
  * Get current authenticated user info.
-
-Requires JWT authentication via the jwt_auth middleware.
  * @summary Get Current User
  */
 export const getCurrentUserApiV1AuthMeGet = (signal?: AbortSignal) => {

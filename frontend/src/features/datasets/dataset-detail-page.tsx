@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import {
   Table as TableIcon,
@@ -27,6 +27,7 @@ import {
 import { LoadingSpinner } from '@/components/shared/loading-spinner'
 import { EmptyState } from '@/components/shared/empty-state'
 import { useDataset, useDatasetInvestigations } from '@/lib/api/datasets'
+import { useSchemaComments } from '@/lib/api/schema-comments'
 import { formatNumber, formatRelativeTime } from '@/lib/utils'
 import { LineagePanel } from '@/features/investigation/components/lineage-panel'
 import { SchemaCommentIndicator } from './components/schema-comment-indicator'
@@ -68,6 +69,21 @@ export function DatasetDetailPage() {
   const { data: investigationsResponse, isLoading: investigationsLoading } =
     useDatasetInvestigations(datasetId ?? null)
   const [selectedField, setSelectedField] = useState<string | null>(null)
+
+  // Fetch all comments for the dataset once (no fieldName filter) to avoid N+1 queries
+  const { data: allSchemaComments = [] } = useSchemaComments(datasetId ?? '')
+
+  // Create a map of field -> comment count for efficient lookup
+  const commentCountsByField = useMemo(() => {
+    return allSchemaComments.reduce(
+      (acc, comment) => {
+        const field = comment.field_name
+        acc[field] = (acc[field] || 0) + 1
+        return acc
+      },
+      {} as Record<string, number>
+    )
+  }, [allSchemaComments])
 
   const investigations = investigationsResponse?.investigations ?? []
 
@@ -239,9 +255,9 @@ export function DatasetDetailPage() {
                             )}
                           </TableCell>
                           <TableCell className="text-right">
-                            {datasetId && column.name && (
+                            {column.name && (
                               <SchemaCommentIndicator
-                                datasetId={datasetId}
+                                commentCount={commentCountsByField[column.name] || 0}
                                 fieldName={column.name}
                                 onClick={() => setSelectedField(column.name ?? null)}
                               />

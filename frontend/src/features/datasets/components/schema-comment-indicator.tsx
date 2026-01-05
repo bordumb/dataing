@@ -1,23 +1,19 @@
-'use client'
-
 import { MessageSquare } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { cn } from '@/lib/utils'
-import { useSchemaComments } from '@/lib/api/schema-comments'
 
 interface SchemaCommentIndicatorProps {
-  datasetId: string
+  commentCount: number
   fieldName: string
   onClick: () => void
 }
 
 export function SchemaCommentIndicator({
-  datasetId,
+  commentCount,
   fieldName,
   onClick,
 }: SchemaCommentIndicatorProps) {
-  const { data: comments = [] } = useSchemaComments(datasetId, fieldName)
-  const hasComments = comments.length > 0
+  const hasComments = commentCount > 0
 
   return (
     <Button
@@ -31,12 +27,13 @@ export function SchemaCommentIndicator({
         e.stopPropagation()
         onClick()
       }}
-      title={hasComments ? `${comments.length} comment(s)` : 'Add comment'}
+      title={hasComments ? `${commentCount} comment(s)` : 'Add comment'}
+      aria-label={`Comments for ${fieldName}: ${hasComments ? `${commentCount} comment(s)` : 'No comments'}`}
     >
       <MessageSquare
         className={cn('h-4 w-4', hasComments ? 'fill-primary text-primary' : '')}
       />
-      {hasComments && <span className="ml-1 text-xs">{comments.length}</span>}
+      {hasComments && <span className="ml-1 text-xs">{commentCount}</span>}
     </Button>
   )
 }

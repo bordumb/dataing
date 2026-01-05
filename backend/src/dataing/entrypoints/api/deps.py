@@ -13,6 +13,8 @@ from uuid import UUID
 from cryptography.fernet import Fernet
 from fastapi import Request
 
+from dataing.adapters.auth.recovery_admin import AdminContactRecoveryAdapter
+from dataing.adapters.auth.recovery_console import ConsoleRecoveryAdapter
 from dataing.adapters.auth.recovery_email import EmailPasswordRecoveryAdapter
 from dataing.adapters.context import ContextEngine
 from dataing.adapters.datasource import BaseAdapter, get_registry
@@ -21,6 +23,7 @@ from dataing.adapters.investigation_feedback import InvestigationFeedbackAdapter
 from dataing.adapters.lineage import BaseLineageAdapter, LineageAdapter, get_lineage_registry
 from dataing.adapters.llm.client import AnthropicClient
 from dataing.adapters.notifications.email import EmailConfig, EmailNotifier
+from dataing.core.auth.recovery import PasswordRecoveryAdapter
 from dataing.core.orchestrator import InvestigationOrchestrator, OrchestratorConfig
 from dataing.safety.circuit_breaker import CircuitBreaker, CircuitBreakerConfig
 
@@ -56,6 +59,14 @@ class Settings:
 
         # Frontend URL for building links in emails
         self.frontend_url = os.getenv("FRONTEND_URL", "http://localhost:3000")
+
+        # Password recovery settings
+        # "auto" = email if SMTP configured, else console
+        # "email" = force email (fails if no SMTP)
+        # "console" = force console (prints reset link to stdout)
+        # "admin_contact" = show admin contact info (for SSO orgs)
+        self.password_recovery_type = os.getenv("PASSWORD_RECOVERY_TYPE", "auto")
+        self.admin_email = os.getenv("ADMIN_EMAIL", "")
 
 
 settings = Settings()
@@ -103,10 +114,8 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     # Initialize investigation feedback adapter
     feedback_adapter = InvestigationFeedbackAdapter(db=app_db)
 
-    # Initialize email notifier and password recovery adapter (if SMTP configured)
+    # Initialize email notifier (optional, needed for email recovery)
     email_notifier: EmailNotifier | None = None
-    recovery_adapter: EmailPasswordRecoveryAdapter | None = None
-
     if settings.smtp_host:
         email_config = EmailConfig(
             smtp_host=settings.smtp_host,
@@ -118,13 +127,55 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
             use_tls=settings.smtp_use_tls,
         )
         email_notifier = EmailNotifier(email_config)
+        logger.info("Email notifier initialized")
+
+    # Initialize password recovery adapter based on configuration
+    recovery_adapter: PasswordRecoveryAdapter
+    recovery_type = settings.password_recovery_type.lower()
+
+    if recovery_type == "auto":
+        # Auto-select: email if SMTP configured, else console
+        if settings.smtp_host and email_notifier:
+            recovery_adapter = EmailPasswordRecoveryAdapter(
+                email_notifier=email_notifier,
+                frontend_url=settings.frontend_url,
+            )
+            logger.info("Using email recovery adapter (SMTP configured)")
+        else:
+            recovery_adapter = ConsoleRecoveryAdapter(
+                frontend_url=settings.frontend_url,
+            )
+            logger.info("Using console recovery adapter (no SMTP, demo mode)")
+
+    elif recovery_type == "email":
+        # Force email - fail if no SMTP
+        if not settings.smtp_host or not email_notifier:
+            raise RuntimeError("PASSWORD_RECOVERY_TYPE=email but SMTP_HOST not configured")
         recovery_adapter = EmailPasswordRecoveryAdapter(
             email_notifier=email_notifier,
             frontend_url=settings.frontend_url,
         )
-        logger.info("Email notifier and recovery adapter initialized")
+        logger.info("Using email recovery adapter (forced)")
+
+    elif recovery_type == "console":
+        # Force console
+        recovery_adapter = ConsoleRecoveryAdapter(
+            frontend_url=settings.frontend_url,
+        )
+        logger.info("Using console recovery adapter (forced)")
+
+    elif recovery_type == "admin_contact":
+        # Admin contact for SSO orgs
+        recovery_adapter = AdminContactRecoveryAdapter(
+            admin_email=settings.admin_email or None,
+        )
+        logger.info("Using admin contact recovery adapter")
+
     else:
-        logger.warning("SMTP_HOST not configured - password reset emails will not work")
+        raise RuntimeError(
+            f"Invalid PASSWORD_RECOVERY_TYPE: {recovery_type}. "
+            "Must be one of: auto, email, console, admin_contact"
+        )
 
     # Store in app state
     app.state.app_db = app_db
@@ -523,16 +574,19 @@ def get_feedback_adapter(request: Request) -> InvestigationFeedbackAdapter:
     return feedback_adapter
 
 
-def get_recovery_adapter(request: Request) -> EmailPasswordRecoveryAdapter | None:
-    """Get EmailPasswordRecoveryAdapter from app state.
+def get_recovery_adapter(request: Request) -> PasswordRecoveryAdapter:
+    """Get password recovery adapter from app state.
+
+    The adapter is always available - in demo mode it uses ConsoleRecoveryAdapter,
+    in production it uses EmailPasswordRecoveryAdapter, etc.
 
     Args:
         request: The current request.
 
     Returns:
-        The configured EmailPasswordRecoveryAdapter, or None if SMTP not configured.
+        The configured password recovery adapter.
     """
-    adapter: EmailPasswordRecoveryAdapter | None = request.app.state.recovery_adapter
+    adapter: PasswordRecoveryAdapter = request.app.state.recovery_adapter
     return adapter
 
 

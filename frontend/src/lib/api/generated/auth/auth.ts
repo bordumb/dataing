@@ -537,10 +537,15 @@ export const useGetRecoveryMethodApiV1AuthPasswordResetRecoveryMethodPost = <
   return useMutation(mutationOptions);
 };
 /**
- * Request a password reset email.
+ * Request a password reset.
 
 For security, this always returns success regardless of whether
 the email exists. This prevents email enumeration attacks.
+
+The actual recovery method depends on the configured adapter:
+- email: Sends reset link via email
+- console: Prints reset link to server console (demo/dev mode)
+- admin_contact: Logs the request for admin visibility
 
 Args:
     body: Request containing the user's email.

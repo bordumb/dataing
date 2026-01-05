@@ -7,7 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, EmailStr, Field
 
 from dataing.adapters.auth.postgres import PostgresAuthRepository
-from dataing.adapters.auth.recovery_email import EmailPasswordRecoveryAdapter
+from dataing.core.auth.recovery import PasswordRecoveryAdapter
 from dataing.core.auth.service import AuthError, AuthService
 from dataing.entrypoints.api.deps import get_frontend_url, get_recovery_adapter
 
@@ -197,7 +197,7 @@ async def get_user_orgs(
 async def get_recovery_method(
     body: PasswordResetRequest,
     service: Annotated[AuthService, Depends(get_auth_service)],
-    recovery_adapter: Annotated[EmailPasswordRecoveryAdapter | None, Depends(get_recovery_adapter)],
+    recovery_adapter: Annotated[PasswordRecoveryAdapter, Depends(get_recovery_adapter)],
 ) -> RecoveryMethodResponse:
     """Get the recovery method for a user's email.
 
@@ -211,12 +211,6 @@ async def get_recovery_method(
     Returns:
         Recovery method describing how the user can reset their password.
     """
-    if not recovery_adapter:
-        raise HTTPException(
-            status_code=503,
-            detail="Password reset is not configured. Please contact your administrator.",
-        )
-
     method = await service.get_recovery_method(body.email, recovery_adapter)
     return RecoveryMethodResponse(
         type=method.type,
@@ -230,13 +224,18 @@ async def get_recovery_method(
 async def request_password_reset(
     body: PasswordResetRequest,
     service: Annotated[AuthService, Depends(get_auth_service)],
-    recovery_adapter: Annotated[EmailPasswordRecoveryAdapter | None, Depends(get_recovery_adapter)],
+    recovery_adapter: Annotated[PasswordRecoveryAdapter, Depends(get_recovery_adapter)],
     frontend_url: Annotated[str, Depends(get_frontend_url)],
 ) -> dict[str, str]:
-    """Request a password reset email.
+    """Request a password reset.
 
     For security, this always returns success regardless of whether
     the email exists. This prevents email enumeration attacks.
+
+    The actual recovery method depends on the configured adapter:
+    - email: Sends reset link via email
+    - console: Prints reset link to server console (demo/dev mode)
+    - admin_contact: Logs the request for admin visibility
 
     Args:
         body: Request containing the user's email.
@@ -247,12 +246,6 @@ async def request_password_reset(
     Returns:
         Success message.
     """
-    if not recovery_adapter:
-        raise HTTPException(
-            status_code=503,
-            detail="Password reset is not configured. Please contact your administrator.",
-        )
-
     # Always succeeds (for security - doesn't reveal if email exists)
     await service.request_password_reset(
         email=body.email,
@@ -260,7 +253,7 @@ async def request_password_reset(
         frontend_url=frontend_url,
     )
 
-    return {"message": "If an account with that email exists, " "we've sent a password reset link."}
+    return {"message": "If an account with that email exists, we've sent a password reset link."}
 
 
 @router.post("/password-reset/confirm")

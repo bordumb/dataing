@@ -231,7 +231,7 @@
           "auth"
         ],
         "summary": "Request Password Reset",
-        "description": "Request a password reset email.\n\nFor security, this always returns success regardless of whether\nthe email exists. This prevents email enumeration attacks.\n\nArgs:\n    body: Request containing the user's email.\n    service: Auth service.\n    recovery_adapter: Password recovery adapter.\n    frontend_url: Frontend URL for building reset links.\n\nReturns:\n    Success message.",
+        "description": "Request a password reset.\n\nFor security, this always returns success regardless of whether\nthe email exists. This prevents email enumeration attacks.\n\nThe actual recovery method depends on the configured adapter:\n- email: Sends reset link via email\n- console: Prints reset link to server console (demo/dev mode)\n- admin_contact: Logs the request for admin visibility\n\nArgs:\n    body: Request containing the user's email.\n    service: Auth service.\n    recovery_adapter: Password recovery adapter.\n    frontend_url: Frontend URL for building reset links.\n\nReturns:\n    Success message.",
         "operationId": "request_password_reset_api_v1_auth_password_reset_request_post",
         "requestBody": {
           "content": {

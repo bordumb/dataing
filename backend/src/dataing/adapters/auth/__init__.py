@@ -1,6 +1,13 @@
 """Auth adapters."""
 
 from dataing.adapters.auth.postgres import PostgresAuthRepository
+from dataing.adapters.auth.recovery_admin import AdminContactRecoveryAdapter
+from dataing.adapters.auth.recovery_console import ConsoleRecoveryAdapter
 from dataing.adapters.auth.recovery_email import EmailPasswordRecoveryAdapter
 
-__all__ = ["PostgresAuthRepository", "EmailPasswordRecoveryAdapter"]
+__all__ = [
+    "PostgresAuthRepository",
+    "AdminContactRecoveryAdapter",
+    "ConsoleRecoveryAdapter",
+    "EmailPasswordRecoveryAdapter",
+]

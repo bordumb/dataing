@@ -1,12 +1,15 @@
 /**
  * Password reset request page.
  *
- * Allows users to request a password reset email.
+ * Allows users to request a password reset. Supports different recovery methods:
+ * - email: Sends reset link via email
+ * - console: Prints reset link to server console (demo/dev mode)
+ * - admin_contact: Shows admin contact info (SSO orgs)
  */
 
 import * as React from 'react'
 import { Link } from 'react-router-dom'
-import { Search, Mail, ArrowLeft, CheckCircle } from 'lucide-react'
+import { Search, Mail, ArrowLeft, CheckCircle, Terminal, UserCog } from 'lucide-react'
 
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
@@ -22,11 +25,20 @@ import { Alert, AlertDescription } from '@/components/ui/alert'
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000'
 
+interface RecoveryMethod {
+  type: string
+  message: string
+  action_url?: string | null
+  admin_email?: string | null
+}
+
 export function PasswordResetRequest() {
   const [email, setEmail] = React.useState('')
   const [isLoading, setIsLoading] = React.useState(false)
   const [error, setError] = React.useState<string | null>(null)
   const [isSuccess, setIsSuccess] = React.useState(false)
+  const [recoveryType, setRecoveryType] = React.useState<string>('email')
+  const [adminEmail, setAdminEmail] = React.useState<string | null>(null)
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -34,11 +46,23 @@ export function PasswordResetRequest() {
     setIsLoading(true)
 
     try {
+      // First, get the recovery method to know what type of message to show
+      const methodResponse = await fetch(`${API_URL}/api/v1/auth/password-reset/recovery-method`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email }),
+      })
+
+      if (methodResponse.ok) {
+        const method: RecoveryMethod = await methodResponse.json()
+        setRecoveryType(method.type)
+        setAdminEmail(method.admin_email ?? null)
+      }
+
+      // Then request the password reset
       const response = await fetch(`${API_URL}/api/v1/auth/password-reset/request`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email }),
       })
 
@@ -55,6 +79,98 @@ export function PasswordResetRequest() {
     }
   }
 
+  // Render different success messages based on recovery type
+  const renderSuccessMessage = () => {
+    switch (recoveryType) {
+      case 'console':
+        return (
+          <div className="space-y-4">
+            <Alert className="bg-blue-50 border-blue-200">
+              <Terminal className="h-4 w-4 text-blue-600" />
+              <AlertDescription className="text-blue-800">
+                <strong>Demo Mode:</strong> Check the server console for your
+                password reset link. The link will be printed in the terminal
+                where the backend is running.
+              </AlertDescription>
+            </Alert>
+            <Link
+              to="/jwt-login"
+              className="flex items-center justify-center gap-2 text-sm text-primary hover:underline"
+            >
+              <ArrowLeft className="h-4 w-4" />
+              Back to login
+            </Link>
+          </div>
+        )
+
+      case 'admin_contact':
+        return (
+          <div className="space-y-4">
+            <Alert className="bg-amber-50 border-amber-200">
+              <UserCog className="h-4 w-4 text-amber-600" />
+              <AlertDescription className="text-amber-800">
+                Your organization uses single sign-on (SSO). Please contact your
+                administrator to reset your password.
+                {adminEmail && (
+                  <p className="mt-2">
+                    <strong>Admin contact:</strong>{' '}
+                    <a
+                      href={`mailto:${adminEmail}`}
+                      className="text-primary hover:underline"
+                    >
+                      {adminEmail}
+                    </a>
+                  </p>
+                )}
+              </AlertDescription>
+            </Alert>
+            <Link
+              to="/jwt-login"
+              className="flex items-center justify-center gap-2 text-sm text-primary hover:underline"
+            >
+              <ArrowLeft className="h-4 w-4" />
+              Back to login
+            </Link>
+          </div>
+        )
+
+      case 'email':
+      default:
+        return (
+          <div className="space-y-4">
+            <Alert className="bg-green-50 border-green-200">
+              <CheckCircle className="h-4 w-4 text-green-600" />
+              <AlertDescription className="text-green-800">
+                If an account with that email exists, we've sent a password
+                reset link. Please check your inbox.
+              </AlertDescription>
+            </Alert>
+            <p className="text-sm text-muted-foreground text-center">
+              Didn't receive the email? Check your spam folder or{' '}
+              <button
+                type="button"
+                onClick={() => {
+                  setIsSuccess(false)
+                  setEmail('')
+                }}
+                className="text-primary hover:underline"
+              >
+                try again
+              </button>
+              .
+            </p>
+            <Link
+              to="/jwt-login"
+              className="flex items-center justify-center gap-2 text-sm text-primary hover:underline"
+            >
+              <ArrowLeft className="h-4 w-4" />
+              Back to login
+            </Link>
+          </div>
+        )
+    }
+  }
+
   return (
     <div className="flex min-h-screen items-center justify-center bg-background p-4">
       <Card className="w-full max-w-md">
@@ -67,42 +183,17 @@ export function PasswordResetRequest() {
           <CardTitle className="text-2xl font-bold">Reset Password</CardTitle>
           <CardDescription>
             {isSuccess
-              ? 'Check your email for reset instructions'
-              : "Enter your email and we'll send you a reset link"}
+              ? recoveryType === 'console'
+                ? 'Check the server console'
+                : recoveryType === 'admin_contact'
+                  ? 'Contact your administrator'
+                  : 'Check your email for reset instructions'
+              : "Enter your email and we'll help you reset your password"}
           </CardDescription>
         </CardHeader>
         <CardContent>
           {isSuccess ? (
-            <div className="space-y-4">
-              <Alert className="bg-green-50 border-green-200">
-                <CheckCircle className="h-4 w-4 text-green-600" />
-                <AlertDescription className="text-green-800">
-                  If an account with that email exists, we've sent a password
-                  reset link. Please check your inbox.
-                </AlertDescription>
-              </Alert>
-              <p className="text-sm text-muted-foreground text-center">
-                Didn't receive the email? Check your spam folder or{' '}
-                <button
-                  type="button"
-                  onClick={() => {
-                    setIsSuccess(false)
-                    setEmail('')
-                  }}
-                  className="text-primary hover:underline"
-                >
-                  try again
-                </button>
-                .
-              </p>
-              <Link
-                to="/jwt-login"
-                className="flex items-center justify-center gap-2 text-sm text-primary hover:underline"
-              >
-                <ArrowLeft className="h-4 w-4" />
-                Back to login
-              </Link>
-            </div>
+            renderSuccessMessage()
           ) : (
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="space-y-2">
@@ -129,7 +220,7 @@ export function PasswordResetRequest() {
                 className="w-full"
                 disabled={isLoading || !email}
               >
-                {isLoading ? 'Sending...' : 'Send Reset Link'}
+                {isLoading ? 'Sending...' : 'Reset Password'}
               </Button>
 
               <Link

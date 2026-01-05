@@ -12,6 +12,7 @@ from datetime import datetime
 from typing import Annotated, Any
 from uuid import UUID
 
+import structlog
 from cryptography.fernet import Fernet
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from pydantic import BaseModel, Field
@@ -28,6 +29,8 @@ from dataing.entrypoints.api.middleware.auth import (
     require_scope,
     verify_api_key,
 )
+
+logger = structlog.get_logger(__name__)
 
 router = APIRouter(prefix="/datasources", tags=["datasources"])
 
@@ -350,6 +353,37 @@ async def create_datasource(
 
     # Update health check status
     await app_db.update_data_source_health(db_result["id"], "healthy")
+
+    # Auto-sync schema to register datasets
+    try:
+        adapter = registry.create(source_type, request.config)
+        async with adapter:
+            schema = await adapter.get_schema(SchemaFilter(max_tables=10000))
+
+        dataset_records: list[dict[str, Any]] = []
+        for catalog in schema.catalogs:
+            for schema_obj in catalog.schemas:
+                for table in schema_obj.tables:
+                    dataset_records.append(
+                        {
+                            "native_path": table.native_path,
+                            "name": table.name,
+                            "table_type": table.table_type,
+                            "schema_name": schema_obj.name,
+                            "catalog_name": catalog.name,
+                            "row_count": table.row_count,
+                            "column_count": len(table.columns),
+                        }
+                    )
+
+        await app_db.upsert_datasets(
+            auth.tenant_id,
+            UUID(str(db_result["id"])),
+            dataset_records,
+        )
+    except Exception as e:
+        # Log but don't fail - datasource was created successfully
+        logger.warning(f"Auto-sync failed for datasource {db_result['id']}: {e!s}")
 
     return DataSourceResponse(
         id=str(db_result["id"]),

@@ -30,14 +30,14 @@ import { customInstance } from "../../client";
  */
 export const listTeamsApiV1TeamsGet = (signal?: AbortSignal) => {
   return customInstance<TeamResponse[]>({
-    url: `/api/v1/teams/`,
+    url: `/api/v1/teams`,
     method: "GET",
     signal,
   });
 };
 
 export const getListTeamsApiV1TeamsGetQueryKey = () => {
-  return [`/api/v1/teams/`] as const;
+  return [`/api/v1/teams`] as const;
 };
 
 export const getListTeamsApiV1TeamsGetQueryOptions = <
@@ -107,7 +107,7 @@ export const createTeamApiV1TeamsPost = (
   createTeamRequest: CreateTeamRequest,
 ) => {
   return customInstance<TeamResponse>({
-    url: `/api/v1/teams/`,
+    url: `/api/v1/teams`,
     method: "POST",
     headers: { "Content-Type": "application/json" },
     data: createTeamRequest,

@@ -184,39 +184,6 @@
       }
     },
     "/api/v1/investigations/": {
-      "get": {
-        "tags": [
-          "investigations"
-        ],
-        "summary": "List Investigations",
-        "description": "List all investigations for the current tenant.",
-        "operationId": "list_investigations_api_v1_investigations__get",
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "items": {
-                    "additionalProperties": true,
-                    "type": "object"
-                  },
-                  "type": "array",
-                  "title": "Response List Investigations Api V1 Investigations  Get"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "APIKeyHeader": []
-          },
-          {
-            "HTTPBearer": []
-          }
-        ]
-      },
       "post": {
         "tags": [
           "investigations"
@@ -364,6 +331,41 @@
             }
           }
         }
+      }
+    },
+    "/api/v1/investigations": {
+      "get": {
+        "tags": [
+          "investigations"
+        ],
+        "summary": "List Investigations",
+        "description": "List all investigations for the current tenant.",
+        "operationId": "list_investigations_api_v1_investigations_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "additionalProperties": true,
+                    "type": "object"
+                  },
+                  "type": "array",
+                  "title": "Response List Investigations Api V1 Investigations Get"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "APIKeyHeader": []
+          },
+          {
+            "HTTPBearer": []
+          }
+        ]
       }
     },
     "/api/v1/datasources/types": {
@@ -4835,14 +4837,14 @@
         }
       }
     },
-    "/api/v1/teams/": {
+    "/api/v1/teams": {
       "get": {
         "tags": [
           "teams"
         ],
         "summary": "List Teams",
         "description": "List all teams in current organization.",
-        "operationId": "list_teams_api_v1_teams__get",
+        "operationId": "list_teams_api_v1_teams_get",
         "responses": {
           "200": {
             "description": "Successful Response",
@@ -4853,7 +4855,7 @@
                     "$ref": "#/components/schemas/TeamResponse"
                   },
                   "type": "array",
-                  "title": "Response List Teams Api V1 Teams  Get"
+                  "title": "Response List Teams Api V1 Teams Get"
                 }
               }
             }
@@ -4871,7 +4873,7 @@
         ],
         "summary": "Create Team",
         "description": "Create a new team (admin only).",
-        "operationId": "create_team_api_v1_teams__post",
+        "operationId": "create_team_api_v1_teams_post",
         "requestBody": {
           "content": {
             "application/json": {

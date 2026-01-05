@@ -1,3 +1,4 @@
+import { useState, useMemo } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import {
   Table as TableIcon,
@@ -10,6 +11,7 @@ import {
   Key,
   CheckCircle,
   XCircle,
+  Brain,
 } from 'lucide-react'
 
 import { Button } from '@/components/ui/Button'
@@ -26,8 +28,12 @@ import {
 import { LoadingSpinner } from '@/components/shared/loading-spinner'
 import { EmptyState } from '@/components/shared/empty-state'
 import { useDataset, useDatasetInvestigations } from '@/lib/api/datasets'
+import { useSchemaComments } from '@/lib/api/schema-comments'
 import { formatNumber, formatRelativeTime } from '@/lib/utils'
 import { LineagePanel } from '@/features/investigation/components/lineage-panel'
+import { SchemaCommentIndicator } from './components/schema-comment-indicator'
+import { CommentSlidePanel } from './components/comment-slide-panel'
+import { KnowledgeTab } from './components/knowledge-tab'
 
 function getStatusBadgeVariant(status: string) {
   switch (status.toLowerCase()) {
@@ -64,6 +70,22 @@ export function DatasetDetailPage() {
   const { data: dataset, isLoading, error, refetch } = useDataset(datasetId ?? null)
   const { data: investigationsResponse, isLoading: investigationsLoading } =
     useDatasetInvestigations(datasetId ?? null)
+  const [selectedField, setSelectedField] = useState<string | null>(null)
+
+  // Fetch all comments for the dataset once (no fieldName filter) to avoid N+1 queries
+  const { data: allSchemaComments = [] } = useSchemaComments(datasetId ?? '')
+
+  // Create a map of field -> comment count for efficient lookup
+  const commentCountsByField = useMemo(() => {
+    return allSchemaComments.reduce(
+      (acc, comment) => {
+        const field = comment.field_name
+        acc[field] = (acc[field] || 0) + 1
+        return acc
+      },
+      {} as Record<string, number>
+    )
+  }, [allSchemaComments])
 
   const investigations = investigationsResponse?.investigations ?? []
 
@@ -183,6 +205,10 @@ export function DatasetDetailPage() {
             <Search className="h-4 w-4" />
             Investigations
           </TabsTrigger>
+          <TabsTrigger value="knowledge" className="flex items-center gap-2">
+            <Brain className="h-4 w-4" />
+            Knowledge
+          </TabsTrigger>
         </TabsList>
 
         {/* Schema Tab */}
@@ -194,50 +220,70 @@ export function DatasetDetailPage() {
               description="Schema information is not available for this dataset."
             />
           ) : (
-            <div className="rounded-md border">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Column Name</TableHead>
-                    <TableHead>Data Type</TableHead>
-                    <TableHead>Nullable</TableHead>
-                    <TableHead>Key</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {columns.map((col, index) => {
-                    const column = col as {
-                      name?: string
-                      data_type?: string
-                      nullable?: boolean
-                      is_primary_key?: boolean
-                    }
-                    return (
-                      <TableRow key={column.name ?? index}>
-                        <TableCell className="font-medium font-mono">
-                          {column.name ?? '-'}
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant="outline">{column.data_type ?? 'unknown'}</Badge>
-                        </TableCell>
-                        <TableCell>
-                          {column.nullable ? (
-                            <CheckCircle className="h-4 w-4 text-muted-foreground" />
-                          ) : (
-                            <XCircle className="h-4 w-4 text-muted-foreground" />
-                          )}
-                        </TableCell>
-                        <TableCell>
-                          {column.is_primary_key && (
-                            <Key className="h-4 w-4 text-yellow-500" />
-                          )}
-                        </TableCell>
-                      </TableRow>
-                    )
-                  })}
-                </TableBody>
-              </Table>
-            </div>
+            <>
+              <div className="rounded-md border">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Column Name</TableHead>
+                      <TableHead>Data Type</TableHead>
+                      <TableHead>Nullable</TableHead>
+                      <TableHead>Key</TableHead>
+                      <TableHead className="w-[100px] text-right">Comments</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {columns.map((col, index) => {
+                      const column = col as {
+                        name?: string
+                        data_type?: string
+                        nullable?: boolean
+                        is_primary_key?: boolean
+                      }
+                      return (
+                        <TableRow key={column.name ?? index} className="group">
+                          <TableCell className="font-medium font-mono">
+                            {column.name ?? '-'}
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant="outline">{column.data_type ?? 'unknown'}</Badge>
+                          </TableCell>
+                          <TableCell>
+                            {column.nullable ? (
+                              <CheckCircle className="h-4 w-4 text-muted-foreground" />
+                            ) : (
+                              <XCircle className="h-4 w-4 text-muted-foreground" />
+                            )}
+                          </TableCell>
+                          <TableCell>
+                            {column.is_primary_key && (
+                              <Key className="h-4 w-4 text-yellow-500" />
+                            )}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            {column.name && (
+                              <SchemaCommentIndicator
+                                commentCount={commentCountsByField[column.name] || 0}
+                                fieldName={column.name}
+                                onClick={() => setSelectedField(column.name ?? null)}
+                              />
+                            )}
+                          </TableCell>
+                        </TableRow>
+                      )
+                    })}
+                  </TableBody>
+                </Table>
+              </div>
+              {datasetId && (
+                <CommentSlidePanel
+                  datasetId={datasetId}
+                  fieldName={selectedField ?? ''}
+                  isOpen={!!selectedField}
+                  onClose={() => setSelectedField(null)}
+                />
+              )}
+            </>
           )}
         </TabsContent>
 
@@ -326,6 +372,11 @@ export function DatasetDetailPage() {
               </Table>
             </div>
           )}
+        </TabsContent>
+
+        {/* Knowledge Tab */}
+        <TabsContent value="knowledge">
+          {datasetId && <KnowledgeTab datasetId={datasetId} />}
         </TabsContent>
       </Tabs>
     </div>

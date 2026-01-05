@@ -16,8 +16,8 @@ if TYPE_CHECKING:
 logger = structlog.get_logger()
 
 
-class FeedbackAdapter:
-    """Adapter for emitting feedback events to the event log.
+class InvestigationFeedbackAdapter:
+    """Adapter for emitting investigation feedback events to the event log.
 
     This adapter provides a clean interface for recording investigation
     traces, user feedback, and other events for later analysis.
@@ -82,7 +82,7 @@ class FeedbackAdapter:
             event: The event to store.
         """
         query = """
-            INSERT INTO feedback_events (
+            INSERT INTO investigation_feedback_events (
                 id, tenant_id, investigation_id, dataset_id,
                 event_type, event_data, actor_id, actor_type, created_at
             ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)

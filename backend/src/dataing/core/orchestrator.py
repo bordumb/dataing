@@ -21,7 +21,7 @@ from uuid import UUID
 
 import structlog
 
-from dataing.adapters.feedback import EventType
+from dataing.adapters.investigation_feedback import EventType
 
 from .domain_types import Evidence, Finding, Hypothesis, InvestigationContext
 from .exceptions import CircuitBreakerTripped, SchemaDiscoveryError
@@ -31,7 +31,7 @@ if TYPE_CHECKING:
     from dataing.adapters.datasource.sql.base import SQLAdapter
 
     from ..safety.circuit_breaker import CircuitBreaker
-    from .interfaces import ContextEngine, FeedbackEmitter, LLMClient
+    from .interfaces import ContextEngine, InvestigationFeedbackEmitter, LLMClient
 
 logger = structlog.get_logger()
 
@@ -71,7 +71,7 @@ class InvestigationOrchestrator:
         context_engine: ContextEngine,
         circuit_breaker: CircuitBreaker,
         config: OrchestratorConfig | None = None,
-        feedback: FeedbackEmitter | None = None,
+        feedback: InvestigationFeedbackEmitter | None = None,
     ) -> None:
         """Initialize the orchestrator.
 

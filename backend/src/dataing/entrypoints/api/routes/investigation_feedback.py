@@ -11,14 +11,16 @@ from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 
 from dataing.adapters.db.app_db import AppDatabase
-from dataing.adapters.feedback import EventType, FeedbackAdapter
+from dataing.adapters.investigation_feedback import EventType, InvestigationFeedbackAdapter
 from dataing.entrypoints.api.deps import get_app_db, get_feedback_adapter
 from dataing.entrypoints.api.middleware.auth import ApiKeyContext, verify_api_key
 
-router = APIRouter(prefix="/feedback", tags=["feedback"])
+router = APIRouter(prefix="/investigation-feedback", tags=["investigation-feedback"])
 
 AuthDep = Annotated[ApiKeyContext, Depends(verify_api_key)]
-FeedbackAdapterDep = Annotated[FeedbackAdapter, Depends(get_feedback_adapter)]
+InvestigationFeedbackAdapterDep = Annotated[
+    InvestigationFeedbackAdapter, Depends(get_feedback_adapter)
+]
 DbDep = Annotated[AppDatabase, Depends(get_app_db)]
 
 
@@ -54,7 +56,7 @@ TARGET_TYPE_TO_EVENT = {
 async def submit_feedback(
     body: FeedbackCreate,
     auth: AuthDep,
-    feedback_adapter: FeedbackAdapterDep,
+    feedback_adapter: InvestigationFeedbackAdapterDep,
 ) -> FeedbackResponse:
     """Submit feedback on a hypothesis, query, evidence, synthesis, or investigation."""
     event_type = TARGET_TYPE_TO_EVENT[body.target_type]

@@ -1,34 +1,37 @@
 import { createContext, useContext, useMemo, ReactNode } from 'react'
 import {
   useInvestigationFeedback,
-  useSubmitFeedback,
+  useSubmitInvestigationFeedback,
   FeedbackCreate,
   TargetType,
-} from '@/lib/api/feedback'
+} from '@/lib/api/investigation-feedback'
 
-interface FeedbackData {
+interface InvestigationFeedbackData {
   rating: 1 | -1
   reason?: string
   comment?: string
 }
 
-interface FeedbackState {
-  ratings: Record<string, FeedbackData>
+interface InvestigationFeedbackState {
+  ratings: Record<string, InvestigationFeedbackData>
   isLoading: boolean
   submitFeedback: (params: Omit<FeedbackCreate, 'investigation_id'>) => Promise<void>
-  getRating: (targetType: TargetType, targetId: string) => FeedbackData | null
+  getRating: (targetType: TargetType, targetId: string) => InvestigationFeedbackData | null
 }
 
-const FeedbackContext = createContext<FeedbackState | null>(null)
+const InvestigationFeedbackContext = createContext<InvestigationFeedbackState | null>(null)
 
-interface FeedbackProviderProps {
+interface InvestigationFeedbackProviderProps {
   investigationId: string
   children: ReactNode
 }
 
-export function FeedbackProvider({ investigationId, children }: FeedbackProviderProps) {
+export function InvestigationFeedbackProvider({
+  investigationId,
+  children,
+}: InvestigationFeedbackProviderProps) {
   const { data: feedbackItems, isLoading } = useInvestigationFeedback(investigationId)
-  const submitMutation = useSubmitFeedback(investigationId)
+  const submitMutation = useSubmitInvestigationFeedback(investigationId)
 
   const ratings = useMemo(() => {
     if (!feedbackItems) return {}
@@ -42,7 +45,7 @@ export function FeedbackProvider({ investigationId, children }: FeedbackProvider
         }
         return acc
       },
-      {} as Record<string, FeedbackData>
+      {} as Record<string, InvestigationFeedbackData>
     )
   }, [feedbackItems])
 
@@ -59,16 +62,20 @@ export function FeedbackProvider({ investigationId, children }: FeedbackProvider
   }
 
   return (
-    <FeedbackContext.Provider value={{ ratings, isLoading, submitFeedback, getRating }}>
+    <InvestigationFeedbackContext.Provider
+      value={{ ratings, isLoading, submitFeedback, getRating }}
+    >
       {children}
-    </FeedbackContext.Provider>
+    </InvestigationFeedbackContext.Provider>
   )
 }
 
-export function useFeedback() {
-  const context = useContext(FeedbackContext)
+export function useInvestigationFeedbackContext() {
+  const context = useContext(InvestigationFeedbackContext)
   if (!context) {
-    throw new Error('useFeedback must be used within FeedbackProvider')
+    throw new Error(
+      'useInvestigationFeedbackContext must be used within InvestigationFeedbackProvider'
+    )
   }
   return context
 }

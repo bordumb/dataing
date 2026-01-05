@@ -4,7 +4,7 @@ from unittest.mock import AsyncMock, MagicMock
 from uuid import uuid4
 
 import pytest
-from dataing.adapters.feedback import EventType
+from dataing.adapters.investigation_feedback import EventType
 from dataing.core.domain_types import AnomalyAlert
 from dataing.core.orchestrator import InvestigationOrchestrator, OrchestratorConfig
 from dataing.core.state import InvestigationState

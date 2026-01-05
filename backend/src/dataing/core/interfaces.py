@@ -217,8 +217,8 @@ class LineageClient(Protocol):
 
 
 @runtime_checkable
-class FeedbackEmitter(Protocol):
-    """Interface for emitting feedback events.
+class InvestigationFeedbackEmitter(Protocol):
+    """Interface for emitting investigation feedback events.
 
     Implementations store events in an append-only log for:
     - Investigation trace recording

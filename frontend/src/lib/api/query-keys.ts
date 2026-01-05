@@ -72,10 +72,23 @@ export const queryKeys = {
     investigations: (id: string) => [`/api/v1/datasets/${id}/investigations`] as const,
   },
 
-  // Feedback
-  feedback: {
+  // Investigation Feedback
+  investigationFeedback: {
     investigation: (investigationId: string) =>
-      [`/api/v1/feedback/investigations/${investigationId}`] as const,
+      [`/api/v1/investigation-feedback/investigations/${investigationId}`] as const,
+  },
+
+  // Schema Comments
+  schemaComments: {
+    all: (datasetId: string) => [`/api/v1/datasets/${datasetId}/schema-comments`] as const,
+    list: (datasetId: string, fieldName?: string) =>
+      [`/api/v1/datasets/${datasetId}/schema-comments`, { field_name: fieldName }] as const,
+  },
+
+  // Knowledge Comments
+  knowledgeComments: {
+    all: (datasetId: string) => [`/api/v1/datasets/${datasetId}/knowledge-comments`] as const,
+    list: (datasetId: string) => [`/api/v1/datasets/${datasetId}/knowledge-comments`] as const,
   },
 } as const
 

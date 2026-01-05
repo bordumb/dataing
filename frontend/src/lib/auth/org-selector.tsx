@@ -54,13 +54,11 @@ export function OrgSelector() {
     setSwitching(true)
     try {
       await switchOrg(membership.org.id, membership.org.name, membership.org.slug)
-      // Reload to apply new org context
-      window.location.reload()
+      setOpen(false)
     } catch (error) {
       console.error('Failed to switch org:', error)
     } finally {
       setSwitching(false)
-      setOpen(false)
     }
   }
 

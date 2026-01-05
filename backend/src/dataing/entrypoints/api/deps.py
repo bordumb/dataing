@@ -16,6 +16,7 @@ from fastapi import Request
 from dataing.adapters.context import ContextEngine
 from dataing.adapters.datasource import BaseAdapter, get_registry
 from dataing.adapters.db.app_db import AppDatabase
+from dataing.adapters.feedback import FeedbackAdapter
 from dataing.adapters.lineage import BaseLineageAdapter, LineageAdapter, get_lineage_registry
 from dataing.adapters.llm.client import AnthropicClient
 from dataing.core.orchestrator import InvestigationOrchestrator, OrchestratorConfig
@@ -85,12 +86,16 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         config=OrchestratorConfig(),
     )
 
+    # Initialize feedback adapter
+    feedback_adapter = FeedbackAdapter(db=app_db)
+
     # Store in app state
     app.state.app_db = app_db
     app.state.llm = llm
     app.state.context_engine = context_engine
     app.state.circuit_breaker = circuit_breaker
     app.state.orchestrator = orchestrator
+    app.state.feedback_adapter = feedback_adapter
     # Check DATADR_ENCRYPTION_KEY first (used by demo), then ENCRYPTION_KEY
     app.state.encryption_key = os.getenv("DATADR_ENCRYPTION_KEY") or os.getenv("ENCRYPTION_KEY")
 
@@ -416,7 +421,7 @@ async def get_tenant_lineage_adapter(
                 provider_config.get("config", {}),
             )
             logger.info(
-                f"Created lineage adapter for tenant {tenant_id}: " f"{provider_config['provider']}"
+                f"Created lineage adapter for tenant {tenant_id}: {provider_config['provider']}"
             )
             return adapter
         except Exception as e:
@@ -463,3 +468,16 @@ def get_context_engine_for_tenant(
         correlation_ctx=base_engine.correlation_ctx,
         lineage_adapter=lineage_adapter,
     )
+
+
+def get_feedback_adapter(request: Request) -> FeedbackAdapter:
+    """Get FeedbackAdapter from app state.
+
+    Args:
+        request: The current request.
+
+    Returns:
+        The configured FeedbackAdapter.
+    """
+    feedback_adapter: FeedbackAdapter = request.app.state.feedback_adapter
+    return feedback_adapter

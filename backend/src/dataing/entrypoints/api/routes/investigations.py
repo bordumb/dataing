@@ -99,7 +99,11 @@ async def create_investigation(
         metadata=request.metadata,
     )
 
-    state = InvestigationState(id=investigation_id, alert=alert)
+    state = InvestigationState(
+        id=investigation_id,
+        tenant_id=auth.tenant_id,
+        alert=alert,
+    )
 
     # Store initial state
     investigations[investigation_id] = {

@@ -7,6 +7,7 @@ from dataing.entrypoints.api.routes.dashboard import router as dashboard_router
 from dataing.entrypoints.api.routes.datasets import router as datasets_router
 from dataing.entrypoints.api.routes.datasources import router as datasources_router
 from dataing.entrypoints.api.routes.datasources import router as datasources_v2_router
+from dataing.entrypoints.api.routes.feedback import router as feedback_router
 from dataing.entrypoints.api.routes.investigations import router as investigations_router
 from dataing.entrypoints.api.routes.lineage import router as lineage_router
 from dataing.entrypoints.api.routes.settings import router as settings_router
@@ -25,5 +26,6 @@ api_router.include_router(settings_router)
 api_router.include_router(users_router)
 api_router.include_router(dashboard_router)
 api_router.include_router(lineage_router)
+api_router.include_router(feedback_router)
 
 __all__ = ["api_router"]

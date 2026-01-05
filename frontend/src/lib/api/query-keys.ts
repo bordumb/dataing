@@ -71,6 +71,12 @@ export const queryKeys = {
     detail: (id: string) => [`/api/v1/datasets/${id}`] as const,
     investigations: (id: string) => [`/api/v1/datasets/${id}/investigations`] as const,
   },
+
+  // Feedback
+  feedback: {
+    investigation: (investigationId: string) =>
+      [`/api/v1/feedback/investigations/${investigationId}`] as const,
+  },
 } as const
 
 // Type helper for getting query key types

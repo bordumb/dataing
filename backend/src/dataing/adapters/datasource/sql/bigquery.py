@@ -172,7 +172,9 @@ class BigQueryAdapter(SQLAdapter):
             else:
                 credentials_info = credentials_json
 
-            credentials = service_account.Credentials.from_service_account_info(credentials_info)
+            credentials = service_account.Credentials.from_service_account_info(  # type: ignore[no-untyped-call]
+                credentials_info
+            )
 
             self._client = bigquery.Client(
                 project=project_id,

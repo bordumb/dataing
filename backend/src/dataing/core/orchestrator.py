@@ -17,8 +17,11 @@ import time
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING
+from uuid import UUID
 
 import structlog
+
+from dataing.adapters.feedback import EventType
 
 from .domain_types import Evidence, Finding, Hypothesis, InvestigationContext
 from .exceptions import CircuitBreakerTripped, SchemaDiscoveryError
@@ -28,7 +31,7 @@ if TYPE_CHECKING:
     from dataing.adapters.datasource.sql.base import SQLAdapter
 
     from ..safety.circuit_breaker import CircuitBreaker
-    from .interfaces import ContextEngine, LLMClient
+    from .interfaces import ContextEngine, FeedbackEmitter, LLMClient
 
 logger = structlog.get_logger()
 
@@ -68,6 +71,7 @@ class InvestigationOrchestrator:
         context_engine: ContextEngine,
         circuit_breaker: CircuitBreaker,
         config: OrchestratorConfig | None = None,
+        feedback: FeedbackEmitter | None = None,
     ) -> None:
         """Initialize the orchestrator.
 
@@ -78,12 +82,14 @@ class InvestigationOrchestrator:
             context_engine: Engine for gathering investigation context.
             circuit_breaker: Safety circuit breaker.
             config: Optional orchestrator configuration.
+            feedback: Optional feedback emitter for event logging.
         """
         self.db = db
         self.llm = llm
         self.context_engine = context_engine
         self.circuit_breaker = circuit_breaker
         self.config = config or OrchestratorConfig()
+        self.feedback = feedback
         # Will be set per-investigation when using tenant data source
         self._current_adapter: SQLAdapter | None = None
 
@@ -129,12 +135,32 @@ class InvestigationOrchestrator:
             )
         )
 
+        # Emit feedback event
+        if self.feedback:
+            await self.feedback.emit(
+                tenant_id=state.tenant_id,
+                event_type=EventType.INVESTIGATION_STARTED,
+                event_data={"dataset_id": state.alert.dataset_id},
+                investigation_id=UUID(state.id),
+            )
+
         try:
             # 1. Gather Context (FAIL FAST if schema empty)
             state = await self._gather_context(state)
             if state.schema_context is None:
                 raise SchemaDiscoveryError("Schema context is None after gathering")
             log.info("Context gathered", tables_found=state.schema_context.table_count())
+
+            if self.feedback:
+                await self.feedback.emit(
+                    tenant_id=state.tenant_id,
+                    event_type=EventType.INVESTIGATION_STARTED,  # Reuse for context
+                    event_data={
+                        "tables_found": state.schema_context.table_count(),
+                        "has_lineage": state.lineage_context is not None,
+                    },
+                    investigation_id=UUID(state.id),
+                )
 
             # 2. Generate Hypotheses
             state, hypotheses = await self._generate_hypotheses(state)
@@ -151,6 +177,18 @@ class InvestigationOrchestrator:
                 root_cause=finding.root_cause,
                 confidence=finding.confidence,
             )
+
+            if self.feedback:
+                await self.feedback.emit(
+                    tenant_id=state.tenant_id,
+                    event_type=EventType.INVESTIGATION_COMPLETED,
+                    event_data={
+                        "root_cause": finding.root_cause,
+                        "confidence": finding.confidence,
+                        "duration_seconds": finding.duration_seconds,
+                    },
+                    investigation_id=UUID(state.id),
+                )
 
             return finding
 

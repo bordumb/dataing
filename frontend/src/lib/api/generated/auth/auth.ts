@@ -17,6 +17,7 @@ import type {
 } from "@tanstack/react-query";
 import type {
   GetCurrentUserApiV1AuthMeGet200,
+  GetUserOrgsApiV1AuthMeOrgsGet200Item,
   HTTPValidationError,
   LoginRequest,
   RefreshRequest,
@@ -333,6 +334,83 @@ export const useGetCurrentUserApiV1AuthMeGet = <
   >;
 }): UseQueryResult<TData, TError> & { queryKey: QueryKey } => {
   const queryOptions = getGetCurrentUserApiV1AuthMeGetQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  query.queryKey = queryOptions.queryKey;
+
+  return query;
+};
+
+/**
+ * Get all organizations the current user belongs to.
+
+Returns list of orgs with role for each.
+ * @summary Get User Orgs
+ */
+export const getUserOrgsApiV1AuthMeOrgsGet = (signal?: AbortSignal) => {
+  return customInstance<GetUserOrgsApiV1AuthMeOrgsGet200Item[]>({
+    url: `/api/v1/auth/me/orgs`,
+    method: "GET",
+    signal,
+  });
+};
+
+export const getGetUserOrgsApiV1AuthMeOrgsGetQueryKey = () => {
+  return [`/api/v1/auth/me/orgs`] as const;
+};
+
+export const getGetUserOrgsApiV1AuthMeOrgsGetQueryOptions = <
+  TData = Awaited<ReturnType<typeof getUserOrgsApiV1AuthMeOrgsGet>>,
+  TError = unknown,
+>(options?: {
+  query?: Partial<
+    UseQueryOptions<
+      Awaited<ReturnType<typeof getUserOrgsApiV1AuthMeOrgsGet>>,
+      TError,
+      TData
+    >
+  >;
+}) => {
+  const { query: queryOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getGetUserOrgsApiV1AuthMeOrgsGetQueryKey();
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getUserOrgsApiV1AuthMeOrgsGet>>
+  > = ({ signal }) => getUserOrgsApiV1AuthMeOrgsGet(signal);
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof getUserOrgsApiV1AuthMeOrgsGet>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetUserOrgsApiV1AuthMeOrgsGetQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getUserOrgsApiV1AuthMeOrgsGet>>
+>;
+export type GetUserOrgsApiV1AuthMeOrgsGetQueryError = unknown;
+
+/**
+ * @summary Get User Orgs
+ */
+export const useGetUserOrgsApiV1AuthMeOrgsGet = <
+  TData = Awaited<ReturnType<typeof getUserOrgsApiV1AuthMeOrgsGet>>,
+  TError = unknown,
+>(options?: {
+  query?: Partial<
+    UseQueryOptions<
+      Awaited<ReturnType<typeof getUserOrgsApiV1AuthMeOrgsGet>>,
+      TError,
+      TData
+    >
+  >;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } => {
+  const queryOptions = getGetUserOrgsApiV1AuthMeOrgsGetQueryOptions(options);
 
   const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
     queryKey: QueryKey;

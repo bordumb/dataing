@@ -156,6 +156,33 @@
         }
       }
     },
+    "/api/v1/auth/me/orgs": {
+      "get": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Get User Orgs",
+        "description": "Get all organizations the current user belongs to.\n\nReturns list of orgs with role for each.",
+        "operationId": "get_user_orgs_api_v1_auth_me_orgs_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "additionalProperties": true,
+                    "type": "object"
+                  },
+                  "type": "array",
+                  "title": "Response Get User Orgs Api V1 Auth Me Orgs Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/investigations/": {
       "get": {
         "tags": [
@@ -2744,6 +2771,174 @@
         }
       }
     },
+    "/api/v1/users/org-members": {
+      "get": {
+        "tags": [
+          "users"
+        ],
+        "summary": "List Org Members",
+        "description": "List all members of the current organization (JWT auth).",
+        "operationId": "list_org_members_api_v1_users_org_members_get",
+        "parameters": [
+          {
+            "name": "request",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "title": "Request"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/OrgMemberResponse"
+                  },
+                  "title": "Response List Org Members Api V1 Users Org Members Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/users/{user_id}/role": {
+      "patch": {
+        "tags": [
+          "users"
+        ],
+        "summary": "Update Member Role",
+        "description": "Update a member's role in the organization (admin only).",
+        "operationId": "update_member_role_api_v1_users__user_id__role_patch",
+        "parameters": [
+          {
+            "name": "user_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "User Id"
+            }
+          },
+          {
+            "name": "request",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "title": "Request"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateRoleRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "title": "Response Update Member Role Api V1 Users  User Id  Role Patch"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/users/{user_id}/remove": {
+      "post": {
+        "tags": [
+          "users"
+        ],
+        "summary": "Remove Org Member",
+        "description": "Remove a member from the organization (admin only).",
+        "operationId": "remove_org_member_api_v1_users__user_id__remove_post",
+        "parameters": [
+          {
+            "name": "user_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "User Id"
+            }
+          },
+          {
+            "name": "request",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "title": "Request"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "title": "Response Remove Org Member Api V1 Users  User Id  Remove Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/dashboard/": {
       "get": {
         "tags": [
@@ -4610,6 +4805,214 @@
         }
       }
     },
+    "/api/v1/teams/": {
+      "get": {
+        "tags": [
+          "teams"
+        ],
+        "summary": "List Teams",
+        "description": "List all teams in current organization.",
+        "operationId": "list_teams_api_v1_teams__get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/TeamResponse"
+                  },
+                  "type": "array",
+                  "title": "Response List Teams Api V1 Teams  Get"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "teams"
+        ],
+        "summary": "Create Team",
+        "description": "Create a new team (admin only).",
+        "operationId": "create_team_api_v1_teams__post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateTeamRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TeamResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/teams/{team_id}": {
+      "get": {
+        "tags": [
+          "teams"
+        ],
+        "summary": "Get Team",
+        "description": "Get a specific team.",
+        "operationId": "get_team_api_v1_teams__team_id__get",
+        "parameters": [
+          {
+            "name": "team_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Team Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TeamResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "teams"
+        ],
+        "summary": "Delete Team",
+        "description": "Delete a team (admin only).",
+        "operationId": "delete_team_api_v1_teams__team_id__delete",
+        "parameters": [
+          {
+            "name": "team_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Team Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/teams/{team_id}/members": {
+      "post": {
+        "tags": [
+          "teams"
+        ],
+        "summary": "Add Team Member",
+        "description": "Add a user to a team (admin only).",
+        "operationId": "add_team_member_api_v1_teams__team_id__members_post",
+        "parameters": [
+          {
+            "name": "team_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Team Id"
+            }
+          },
+          {
+            "name": "user_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "User Id"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Add Team Member Api V1 Teams  Team Id  Members Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/health": {
       "get": {
         "summary": "Health Check",
@@ -5177,6 +5580,20 @@
         ],
         "title": "CreateInvestigationRequest",
         "description": "Request body for creating an investigation."
+      },
+      "CreateTeamRequest": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name"
+        ],
+        "title": "CreateTeamRequest",
+        "description": "Request to create a team."
       },
       "CreateUserRequest": {
         "properties": {
@@ -6545,6 +6962,48 @@
         "title": "ModifyRequest",
         "description": "Request to approve with modifications."
       },
+      "OrgMemberResponse": {
+        "properties": {
+          "user_id": {
+            "type": "string",
+            "title": "User Id"
+          },
+          "email": {
+            "type": "string",
+            "title": "Email"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "role": {
+            "type": "string",
+            "title": "Role"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "user_id",
+          "email",
+          "name",
+          "role",
+          "created_at"
+        ],
+        "title": "OrgMemberResponse",
+        "description": "Response for an org member."
+      },
       "PendingApprovalsResponse": {
         "properties": {
           "approvals": {
@@ -7100,6 +7559,35 @@
         "title": "SyncResponse",
         "description": "Response for schema sync."
       },
+      "TeamResponse": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "org_id": {
+            "type": "string",
+            "title": "Org Id"
+          },
+          "created_at": {
+            "type": "string",
+            "title": "Created At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "org_id",
+          "created_at"
+        ],
+        "title": "TeamResponse",
+        "description": "Team response model."
+      },
       "TenantSettings": {
         "properties": {
           "name": {
@@ -7284,6 +7772,20 @@
         ],
         "title": "TokenResponse",
         "description": "Token response."
+      },
+      "UpdateRoleRequest": {
+        "properties": {
+          "role": {
+            "type": "string",
+            "title": "Role"
+          }
+        },
+        "type": "object",
+        "required": [
+          "role"
+        ],
+        "title": "UpdateRoleRequest",
+        "description": "Request to update a member's role."
       },
       "UpdateTenantSettingsRequest": {
         "properties": {

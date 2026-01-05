@@ -158,20 +158,15 @@ async def refresh(
 
 
 @router.get("/me")
-async def get_current_user(request: Request) -> dict[str, Any]:
-    """Get current authenticated user info.
-
-    Requires JWT authentication via the jwt_auth middleware.
-    """
-    # This will be populated by JWT middleware
-    if not hasattr(request.state, "user"):
-        raise HTTPException(status_code=401, detail="Not authenticated")
-
+async def get_current_user(
+    auth: Annotated[JwtContext, Depends(verify_jwt)],
+) -> dict[str, Any]:
+    """Get current authenticated user info."""
     return {
-        "user_id": request.state.user.sub,
-        "org_id": request.state.user.org_id,
-        "role": request.state.user.role,
-        "teams": request.state.user.teams,
+        "user_id": auth.user_id,
+        "org_id": auth.org_id,
+        "role": auth.role.value,
+        "teams": auth.teams,
     }
 
 

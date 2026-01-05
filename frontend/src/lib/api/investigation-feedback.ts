@@ -28,9 +28,11 @@ export interface FeedbackItem {
   created_at: string
 }
 
-async function submitFeedback(data: FeedbackCreate): Promise<FeedbackResponse> {
+async function submitInvestigationFeedback(
+  data: FeedbackCreate
+): Promise<FeedbackResponse> {
   return customInstance<FeedbackResponse>({
-    url: '/api/v1/feedback/',
+    url: '/api/v1/investigation-feedback/',
     method: 'POST',
     data,
   })
@@ -38,26 +40,28 @@ async function submitFeedback(data: FeedbackCreate): Promise<FeedbackResponse> {
 
 async function getInvestigationFeedback(investigationId: string): Promise<FeedbackItem[]> {
   return customInstance<FeedbackItem[]>({
-    url: `/api/v1/feedback/investigations/${investigationId}`,
+    url: `/api/v1/investigation-feedback/investigations/${investigationId}`,
     method: 'GET',
   })
 }
 
 export function useInvestigationFeedback(investigationId: string) {
   return useQuery({
-    queryKey: queryKeys.feedback.investigation(investigationId),
+    queryKey: queryKeys.investigationFeedback.investigation(investigationId),
     queryFn: () => getInvestigationFeedback(investigationId),
     enabled: !!investigationId,
   })
 }
 
-export function useSubmitFeedback(investigationId: string) {
+export function useSubmitInvestigationFeedback(investigationId: string) {
   const queryClient = useQueryClient()
 
   return useMutation({
-    mutationFn: submitFeedback,
+    mutationFn: submitInvestigationFeedback,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.feedback.investigation(investigationId) })
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.investigationFeedback.investigation(investigationId),
+      })
     },
   })
 }

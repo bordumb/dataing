@@ -3,8 +3,8 @@ import { ThumbsUp, ThumbsDown } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { Input } from '@/components/ui/Input'
-import { useFeedback } from '../context/FeedbackContext'
-import { TargetType } from '@/lib/api/feedback'
+import { useInvestigationFeedbackContext } from '../context/InvestigationFeedbackContext'
+import { TargetType } from '@/lib/api/investigation-feedback'
 import { cn } from '@/lib/utils'
 
 const REASON_OPTIONS: Record<TargetType, { positive: string[]; negative: string[] }> = {
@@ -30,13 +30,16 @@ const REASON_OPTIONS: Record<TargetType, { positive: string[]; negative: string[
   },
 }
 
-interface FeedbackButtonsProps {
+interface InvestigationFeedbackButtonsProps {
   targetType: TargetType
   targetId: string
 }
 
-export function FeedbackButtons({ targetType, targetId }: FeedbackButtonsProps) {
-  const { getRating, submitFeedback } = useFeedback()
+export function InvestigationFeedbackButtons({
+  targetType,
+  targetId,
+}: InvestigationFeedbackButtonsProps) {
+  const { getRating, submitFeedback } = useInvestigationFeedbackContext()
   const [openPopover, setOpenPopover] = useState<'up' | 'down' | null>(null)
   const [comment, setComment] = useState('')
 

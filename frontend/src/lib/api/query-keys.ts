@@ -72,10 +72,10 @@ export const queryKeys = {
     investigations: (id: string) => [`/api/v1/datasets/${id}/investigations`] as const,
   },
 
-  // Feedback
-  feedback: {
+  // Investigation Feedback
+  investigationFeedback: {
     investigation: (investigationId: string) =>
-      [`/api/v1/feedback/investigations/${investigationId}`] as const,
+      [`/api/v1/investigation-feedback/investigations/${investigationId}`] as const,
   },
 } as const
 

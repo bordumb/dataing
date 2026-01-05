@@ -3558,14 +3558,14 @@
         }
       }
     },
-    "/api/v1/feedback/": {
+    "/api/v1/investigation-feedback/": {
       "post": {
         "tags": [
-          "feedback"
+          "investigation-feedback"
         ],
         "summary": "Submit Feedback",
         "description": "Submit feedback on a hypothesis, query, evidence, synthesis, or investigation.",
-        "operationId": "submit_feedback_api_v1_feedback__post",
+        "operationId": "submit_feedback_api_v1_investigation_feedback__post",
         "requestBody": {
           "content": {
             "application/json": {
@@ -3605,14 +3605,14 @@
         ]
       }
     },
-    "/api/v1/feedback/investigations/{investigation_id}": {
+    "/api/v1/investigation-feedback/investigations/{investigation_id}": {
       "get": {
         "tags": [
-          "feedback"
+          "investigation-feedback"
         ],
         "summary": "Get Investigation Feedback",
         "description": "Get current user's feedback for an investigation.\n\nArgs:\n    investigation_id: The investigation to get feedback for.\n    auth: Authentication context.\n    db: Application database.\n\nReturns:\n    List of feedback items for the investigation.",
-        "operationId": "get_investigation_feedback_api_v1_feedback_investigations__investigation_id__get",
+        "operationId": "get_investigation_feedback_api_v1_investigation_feedback_investigations__investigation_id__get",
         "security": [
           {
             "APIKeyHeader": []
@@ -3640,7 +3640,7 @@
                   "items": {
                     "$ref": "#/components/schemas/FeedbackItem"
                   },
-                  "title": "Response Get Investigation Feedback Api V1 Feedback Investigations  Investigation Id  Get"
+                  "title": "Response Get Investigation Feedback Api V1 Investigation Feedback Investigations  Investigation Id  Get"
                 }
               }
             }

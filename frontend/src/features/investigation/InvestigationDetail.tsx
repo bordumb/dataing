@@ -8,8 +8,8 @@ import { formatPercentage, cn, generateFeedbackTargetId } from '@/lib/utils'
 import { ArrowLeft, RefreshCw, ChevronDown, ChevronRight } from 'lucide-react'
 import { InvestigationLiveView } from './InvestigationLiveView'
 import { SqlExplainer } from './SqlExplainer'
-import { FeedbackProvider } from './context/FeedbackContext'
-import { FeedbackButtons } from './components/FeedbackButtons'
+import { InvestigationFeedbackProvider } from './context/InvestigationFeedbackContext'
+import { InvestigationFeedbackButtons } from './components/InvestigationFeedbackButtons'
 
 function getStatusVariant(status: string) {
   switch (status) {
@@ -89,7 +89,7 @@ function HypothesisAccordion({
           <span className="text-sm font-medium">
             Confidence: {formatPercentage(group.maxConfidence)}
           </span>
-          <FeedbackButtons targetType="hypothesis" targetId={hypothesisTargetId} />
+          <InvestigationFeedbackButtons targetType="hypothesis" targetId={hypothesisTargetId} />
         </div>
       </button>
 
@@ -117,7 +117,7 @@ function HypothesisAccordion({
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
                     <h5 className="text-sm font-medium">Query</h5>
-                    <FeedbackButtons targetType="query" targetId={queryTargetId} />
+                    <InvestigationFeedbackButtons targetType="query" targetId={queryTargetId} />
                   </div>
                   <SqlExplainer sql={ev.query} />
                 </div>
@@ -126,7 +126,7 @@ function HypothesisAccordion({
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
                     <h5 className="text-sm font-medium">Evidence</h5>
-                    <FeedbackButtons targetType="evidence" targetId={evidenceTargetId} />
+                    <InvestigationFeedbackButtons targetType="evidence" targetId={evidenceTargetId} />
                   </div>
                 <p className="text-sm text-muted-foreground">{ev.interpretation}</p>
                 <div className="flex items-center gap-4 text-xs text-muted-foreground">
@@ -212,7 +212,7 @@ function InvestigationDetailContent() {
         {isCompleted && (
           <div className="flex items-center gap-2">
             <span className="text-sm text-muted-foreground">Rate Investigation:</span>
-            <FeedbackButtons targetType="investigation" targetId={id!} />
+            <InvestigationFeedbackButtons targetType="investigation" targetId={id!} />
           </div>
         )}
       </div>
@@ -223,7 +223,7 @@ function InvestigationDetailContent() {
           <CardHeader>
             <div className="flex items-center justify-between">
               <CardTitle>Synthesis</CardTitle>
-              <FeedbackButtons targetType="synthesis" targetId={id!} />
+              <InvestigationFeedbackButtons targetType="synthesis" targetId={id!} />
             </div>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -312,8 +312,8 @@ export function InvestigationDetail() {
   }
 
   return (
-    <FeedbackProvider investigationId={id}>
+    <InvestigationFeedbackProvider investigationId={id}>
       <InvestigationDetailContent />
-    </FeedbackProvider>
+    </InvestigationFeedbackProvider>
   )
 }

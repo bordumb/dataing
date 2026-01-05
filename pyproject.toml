@@ -27,6 +27,8 @@ dependencies = [
     "cryptography>=41.0.0",
     "polars>=1.36.1",
     "faker>=40.1.0",
+    "bcrypt>=5.0.0",
+    "pyjwt>=2.10.1",
 ]
 
 [project.optional-dependencies]

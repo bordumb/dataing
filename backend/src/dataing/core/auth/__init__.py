@@ -1,5 +1,11 @@
 """Auth domain types and utilities."""
 
+from dataing.core.auth.jwt import (
+    TokenError,
+    create_access_token,
+    create_refresh_token,
+    decode_token,
+)
 from dataing.core.auth.password import hash_password, verify_password
 from dataing.core.auth.types import (
     Organization,
@@ -21,4 +27,8 @@ __all__ = [
     "TokenPayload",
     "hash_password",
     "verify_password",
+    "create_access_token",
+    "create_refresh_token",
+    "decode_token",
+    "TokenError",
 ]

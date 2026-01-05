@@ -136,23 +136,22 @@ demo: demo-fixtures
     echo "Starting demo stack..."
     echo ""
 
-    # Start PostgreSQL (remove old container if exists)
-    if docker ps -a | grep -q dataing-demo-postgres; then
-        if ! docker ps | grep -q dataing-demo-postgres; then
-            echo "Starting existing PostgreSQL container..."
-            docker start dataing-demo-postgres
-        else
-            echo "PostgreSQL already running"
-        fi
-    else
-        echo "Creating PostgreSQL container..."
-        docker run -d --name dataing-demo-postgres \
-            -e POSTGRES_DB=dataing_demo \
-            -e POSTGRES_USER=dataing \
-            -e POSTGRES_PASSWORD=dataing \
-            -p 5432:5432 \
-            postgres:16-alpine
-    fi
+    # Generate OpenAPI client for frontend
+    echo "Generating OpenAPI client..."
+    cd backend && uv run python scripts/export_openapi.py
+    cd ../frontend && pnpm orval
+    cd ..
+    echo ""
+
+    # Start PostgreSQL - clean start every time for reliability
+    echo "Setting up PostgreSQL..."
+    docker rm -f dataing-demo-postgres 2>/dev/null || true
+    docker run -d --name dataing-demo-postgres \
+        -e POSTGRES_DB=dataing_demo \
+        -e POSTGRES_USER=dataing \
+        -e POSTGRES_PASSWORD=dataing \
+        -p 5432:5432 \
+        postgres:16-alpine
     echo "Waiting for PostgreSQL to be ready..."
     sleep 3
 
@@ -209,11 +208,20 @@ demo: demo-fixtures
 demo-stop:
     #!/usr/bin/env bash
     echo "Stopping demo services..."
+
+    # Kill by process pattern
     pkill -f "fastapi dev" 2>/dev/null || true
     pkill -f "vite.*3000" 2>/dev/null || true
     pkill -f "pnpm dev" 2>/dev/null || true
+
+    # Kill by port (more reliable fallback)
+    lsof -ti:8000 | xargs kill -9 2>/dev/null || true
+    lsof -ti:3000 | xargs kill -9 2>/dev/null || true
+
+    # Stop and remove postgres container
     docker stop dataing-demo-postgres 2>/dev/null || true
-    docker rm dataing-demo-postgres 2>/dev/null || true
+    docker rm -f dataing-demo-postgres 2>/dev/null || true
+
     echo "Demo stopped."
 
 # Run demo with Docker Compose

@@ -2616,6 +2616,37 @@
         ]
       }
     },
+    "/api/v1/users/org-members": {
+      "get": {
+        "tags": [
+          "users"
+        ],
+        "summary": "List Org Members",
+        "description": "List all members of the current organization (JWT auth).",
+        "operationId": "list_org_members_api_v1_users_org_members_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/OrgMemberResponse"
+                  },
+                  "type": "array",
+                  "title": "Response List Org Members Api V1 Users Org Members Get"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
     "/api/v1/users/{user_id}": {
       "get": {
         "tags": [
@@ -2771,52 +2802,6 @@
         }
       }
     },
-    "/api/v1/users/org-members": {
-      "get": {
-        "tags": [
-          "users"
-        ],
-        "summary": "List Org Members",
-        "description": "List all members of the current organization (JWT auth).",
-        "operationId": "list_org_members_api_v1_users_org_members_get",
-        "parameters": [
-          {
-            "name": "request",
-            "in": "query",
-            "required": true,
-            "schema": {
-              "title": "Request"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/OrgMemberResponse"
-                  },
-                  "title": "Response List Org Members Api V1 Users Org Members Get"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
     "/api/v1/users/{user_id}/role": {
       "patch": {
         "tags": [
@@ -2825,6 +2810,11 @@
         "summary": "Update Member Role",
         "description": "Update a member's role in the organization (admin only).",
         "operationId": "update_member_role_api_v1_users__user_id__role_patch",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "parameters": [
           {
             "name": "user_id",
@@ -2834,14 +2824,6 @@
               "type": "string",
               "format": "uuid",
               "title": "User Id"
-            }
-          },
-          {
-            "name": "request",
-            "in": "query",
-            "required": true,
-            "schema": {
-              "title": "Request"
             }
           }
         ],
@@ -2891,6 +2873,11 @@
         "summary": "Remove Org Member",
         "description": "Remove a member from the organization (admin only).",
         "operationId": "remove_org_member_api_v1_users__user_id__remove_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "parameters": [
           {
             "name": "user_id",
@@ -2900,14 +2887,6 @@
               "type": "string",
               "format": "uuid",
               "title": "User Id"
-            }
-          },
-          {
-            "name": "request",
-            "in": "query",
-            "required": true,
-            "schema": {
-              "title": "Request"
             }
           }
         ],
@@ -4828,7 +4807,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
       },
       "post": {
         "tags": [
@@ -4868,7 +4852,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
       }
     },
     "/api/v1/teams/{team_id}": {
@@ -4879,6 +4868,11 @@
         "summary": "Get Team",
         "description": "Get a specific team.",
         "operationId": "get_team_api_v1_teams__team_id__get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "parameters": [
           {
             "name": "team_id",
@@ -4921,6 +4915,11 @@
         "summary": "Delete Team",
         "description": "Delete a team (admin only).",
         "operationId": "delete_team_api_v1_teams__team_id__delete",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "parameters": [
           {
             "name": "team_id",
@@ -4958,6 +4957,11 @@
         "summary": "Add Team Member",
         "description": "Add a user to a team (admin only).",
         "operationId": "add_team_member_api_v1_teams__team_id__members_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "parameters": [
           {
             "name": "team_id",
@@ -4994,7 +4998,9 @@
               "application/json": {
                 "schema": {
                   "type": "object",
-                  "additionalProperties": true,
+                  "additionalProperties": {
+                    "type": "string"
+                  },
                   "title": "Response Add Team Member Api V1 Teams  Team Id  Members Post"
                 }
               }

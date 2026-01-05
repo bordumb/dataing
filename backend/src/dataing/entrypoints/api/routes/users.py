@@ -125,6 +125,135 @@ async def get_current_user(
     )
 
 
+# ============================================================================
+# JWT-based Organization Member Management (must be before /{user_id} routes)
+# ============================================================================
+
+
+class OrgMemberResponse(BaseModel):
+    """Response for an org member."""
+
+    user_id: str
+    email: str
+    name: str | None
+    role: str
+    created_at: datetime
+
+
+class UpdateRoleRequest(BaseModel):
+    """Request to update a member's role."""
+
+    role: str
+
+
+@router.get("/org-members", response_model=list[OrgMemberResponse])
+async def list_org_members(
+    auth: Annotated[JwtContext, Depends(verify_jwt)],
+    app_db: AppDbDep,
+) -> list[OrgMemberResponse]:
+    """List all members of the current organization (JWT auth)."""
+    org_id = auth.org_uuid
+
+    # Get all org members with user info
+    members = await app_db.fetch_all(
+        """
+        SELECT u.id as user_id, u.email, u.name, m.role, m.created_at
+        FROM users u
+        JOIN org_memberships m ON u.id = m.user_id
+        WHERE m.org_id = $1
+        ORDER BY m.created_at DESC
+        """,
+        org_id,
+    )
+
+    return [
+        OrgMemberResponse(
+            user_id=str(m["user_id"]),
+            email=m["email"],
+            name=m.get("name"),
+            role=m["role"],
+            created_at=m["created_at"],
+        )
+        for m in members
+    ]
+
+
+class InviteUserRequest(BaseModel):
+    """Request to invite a user to the organization."""
+
+    email: EmailStr
+    role: str = "member"
+
+
+@router.post("/invite", status_code=201)
+async def invite_user(
+    body: InviteUserRequest,
+    auth: RequireAdmin,
+    app_db: AppDbDep,
+) -> dict[str, str]:
+    """Invite a user to the organization (admin only).
+
+    If user exists, adds them to the org. If not, creates a new user.
+    """
+    org_id = auth.org_uuid
+
+    # Validate role
+    try:
+        role = AuthOrgRole(body.role)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=f"Invalid role: {body.role}") from exc
+
+    if role == AuthOrgRole.OWNER:
+        raise HTTPException(status_code=400, detail="Cannot assign owner role via invite")
+
+    # Check if user already exists
+    existing_user = await app_db.fetch_one(
+        "SELECT id FROM users WHERE email = $1",
+        body.email,
+    )
+
+    if existing_user:
+        user_id = existing_user["id"]
+        # Check if already a member
+        existing_membership = await app_db.fetch_one(
+            "SELECT user_id FROM org_memberships WHERE user_id = $1 AND org_id = $2",
+            user_id,
+            org_id,
+        )
+        if existing_membership:
+            raise HTTPException(
+                status_code=409,
+                detail="User is already a member of this organization",
+            )
+    else:
+        # Create new user
+        result = await app_db.execute_returning(
+            "INSERT INTO users (email) VALUES ($1) RETURNING id",
+            body.email,
+        )
+        if not result:
+            raise HTTPException(status_code=500, detail="Failed to create user")
+        user_id = result["id"]
+
+    # Add to organization
+    await app_db.execute(
+        """
+        INSERT INTO org_memberships (user_id, org_id, role)
+        VALUES ($1, $2, $3)
+        """,
+        user_id,
+        org_id,
+        role.value,
+    )
+
+    return {"status": "invited", "user_id": str(user_id), "email": body.email}
+
+
+# ============================================================================
+# Legacy API Key-based User Management
+# ============================================================================
+
+
 @router.get("/{user_id}", response_model=UserResponse)
 async def get_user(
     user_id: UUID,
@@ -277,59 +406,6 @@ async def deactivate_user(
         raise HTTPException(status_code=404, detail="User not found")
 
     return Response(status_code=204)
-
-
-# ============================================================================
-# JWT-based Organization Member Management
-# ============================================================================
-
-
-class OrgMemberResponse(BaseModel):
-    """Response for an org member."""
-
-    user_id: str
-    email: str
-    name: str | None
-    role: str
-    created_at: datetime
-
-
-class UpdateRoleRequest(BaseModel):
-    """Request to update a member's role."""
-
-    role: str
-
-
-@router.get("/org-members", response_model=list[OrgMemberResponse])
-async def list_org_members(
-    auth: Annotated[JwtContext, Depends(verify_jwt)],
-    app_db: AppDbDep,
-) -> list[OrgMemberResponse]:
-    """List all members of the current organization (JWT auth)."""
-    org_id = auth.org_uuid
-
-    # Get all org members with user info
-    members = await app_db.fetch_all(
-        """
-        SELECT u.id as user_id, u.email, u.name, m.role, m.created_at
-        FROM users u
-        JOIN org_memberships m ON u.id = m.user_id
-        WHERE m.org_id = $1
-        ORDER BY m.created_at DESC
-        """,
-        org_id,
-    )
-
-    return [
-        OrgMemberResponse(
-            user_id=str(m["user_id"]),
-            email=m["email"],
-            name=m.get("name"),
-            role=m["role"],
-            created_at=m["created_at"],
-        )
-        for m in members
-    ]
 
 
 @router.patch("/{user_id}/role")

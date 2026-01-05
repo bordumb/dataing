@@ -7,5 +7,5 @@
  */
 
 export type AddTeamMemberApiV1TeamsTeamIdMembersPost201 = {
-  [key: string]: unknown;
+  [key: string]: string;
 };

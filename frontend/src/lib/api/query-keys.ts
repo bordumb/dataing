@@ -77,6 +77,19 @@ export const queryKeys = {
     investigation: (investigationId: string) =>
       [`/api/v1/investigation-feedback/investigations/${investigationId}`] as const,
   },
+
+  // Schema Comments
+  schemaComments: {
+    all: (datasetId: string) => ['schema-comments', datasetId] as const,
+    list: (datasetId: string, fieldName?: string) =>
+      ['schema-comments', datasetId, fieldName] as const,
+  },
+
+  // Knowledge Comments
+  knowledgeComments: {
+    all: (datasetId: string) => ['knowledge-comments', datasetId] as const,
+    list: (datasetId: string) => ['knowledge-comments', datasetId, 'list'] as const,
+  },
 } as const
 
 // Type helper for getting query key types

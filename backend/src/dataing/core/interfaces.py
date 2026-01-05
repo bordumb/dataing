@@ -9,7 +9,8 @@ isolated from infrastructure concerns.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Protocol, runtime_checkable
+from typing import TYPE_CHECKING, Any, Protocol, runtime_checkable
+from uuid import UUID
 
 if TYPE_CHECKING:
     from dataing.adapters.datasource.base import BaseAdapter
@@ -211,6 +212,43 @@ class LineageClient(Protocol):
 
         Returns:
             LineageContext with upstream and downstream dependencies.
+        """
+        ...
+
+
+@runtime_checkable
+class FeedbackEmitter(Protocol):
+    """Interface for emitting feedback events.
+
+    Implementations store events in an append-only log for:
+    - Investigation trace recording
+    - User feedback collection
+    - ML training data generation
+    """
+
+    async def emit(
+        self,
+        tenant_id: UUID,
+        event_type: Any,  # EventType enum
+        event_data: dict[str, Any],
+        investigation_id: UUID | None = None,
+        dataset_id: UUID | None = None,
+        actor_id: UUID | None = None,
+        actor_type: str = "system",
+    ) -> Any:
+        """Emit an event to the feedback log.
+
+        Args:
+            tenant_id: Tenant this event belongs to.
+            event_type: Type of event being emitted.
+            event_data: Event-specific data payload.
+            investigation_id: Optional investigation this relates to.
+            dataset_id: Optional dataset this relates to.
+            actor_id: Optional user or system that caused the event.
+            actor_type: Type of actor (user or system).
+
+        Returns:
+            The created event object.
         """
         ...
 

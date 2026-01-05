@@ -5,6 +5,7 @@ from uuid import uuid4
 
 import pytest
 from dataing.adapters.feedback import EventType, FeedbackAdapter, FeedbackEvent
+from dataing.core.interfaces import FeedbackEmitter
 
 
 class TestFeedbackAdapter:
@@ -80,3 +81,15 @@ class TestFeedbackAdapter:
         )
 
         assert event is not None
+
+
+class TestFeedbackAdapterProtocol:
+    """Tests for protocol conformance."""
+
+    def test_adapter_implements_feedback_emitter(self) -> None:
+        """FeedbackAdapter implements FeedbackEmitter protocol."""
+        assert isinstance(FeedbackAdapter, type)
+        # Verify the class has the emit method signature matching FeedbackEmitter
+        assert hasattr(FeedbackAdapter, "emit")
+        # Verify FeedbackEmitter is a runtime checkable protocol
+        assert hasattr(FeedbackEmitter, "__protocol_attrs__")

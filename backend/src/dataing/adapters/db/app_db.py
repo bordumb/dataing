@@ -344,7 +344,7 @@ class AppDatabase:
             SELECT d.id, d.native_path, d.name, d.table_type, d.schema_name,
                    d.catalog_name, d.row_count, d.size_bytes, d.column_count,
                    d.description, d.last_synced_at, d.created_at, d.updated_at,
-                   d.datasource_id, ds.name as datasource_name
+                   d.datasource_id, ds.name as datasource_name, ds.type as datasource_type
             FROM datasets d
             JOIN data_sources ds ON d.datasource_id = ds.id
             WHERE d.tenant_id = $1 AND d.id = $2 AND d.is_active = true

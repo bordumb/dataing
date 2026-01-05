@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import Annotated, Any
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
 
 from dataing.adapters.db.app_db import AppDatabase
@@ -114,7 +114,7 @@ async def get_dataset_investigations(
     dataset_id: UUID,
     auth: AuthDep,
     app_db: AppDbDep,
-    limit: int = 50,
+    limit: int = Query(default=50, ge=1, le=100),
 ) -> DatasetInvestigationsResponse:
     """Get investigations for a dataset."""
     ds = await app_db.get_dataset_by_id(auth.tenant_id, dataset_id)

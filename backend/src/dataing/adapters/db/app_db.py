@@ -470,6 +470,32 @@ class AppDatabase:
             offset,
         )
 
+    async def list_investigations_for_dataset(
+        self,
+        tenant_id: UUID,
+        dataset_native_path: str,
+        limit: int = 50,
+    ) -> list[dict[str, Any]]:
+        """List investigations that reference a dataset.
+
+        Args:
+            tenant_id: The tenant ID.
+            dataset_native_path: The native path of the dataset.
+            limit: Maximum number of investigations to return.
+
+        Returns:
+            List of investigation dictionaries.
+        """
+        query = """
+            SELECT id, dataset_id, metric_name, status, severity,
+                   created_at, completed_at
+            FROM investigations
+            WHERE tenant_id = $1 AND dataset_id = $2
+            ORDER BY created_at DESC
+            LIMIT $3
+        """
+        return await self.fetch_all(query, tenant_id, dataset_native_path, limit)
+
     async def update_investigation_status(
         self,
         investigation_id: UUID,

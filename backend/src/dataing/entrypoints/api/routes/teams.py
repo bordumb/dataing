@@ -1,13 +1,17 @@
 """Team management API routes."""
 
-from typing import Annotated, Any
+from typing import Annotated
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
 
 from dataing.adapters.auth.postgres import PostgresAuthRepository
-from dataing.core.auth.types import OrgRole
+from dataing.entrypoints.api.middleware.jwt_auth import (
+    JwtContext,
+    RequireAdmin,
+    verify_jwt,
+)
 
 router = APIRouter(tags=["teams"])
 
@@ -41,27 +45,14 @@ def get_repo(request: Request) -> PostgresAuthRepository:
     return PostgresAuthRepository(app_db)
 
 
-def require_admin(request: Request) -> None:
-    """Require admin role for this endpoint."""
-    if not hasattr(request.state, "user"):
-        raise HTTPException(status_code=401, detail="Not authenticated")
-
-    role = request.state.user.role
-    if role not in (OrgRole.ADMIN.value, OrgRole.OWNER.value):
-        raise HTTPException(status_code=403, detail="Admin role required")
-
-
 @router.get("/")
 async def list_teams(
     request: Request,
+    auth: Annotated[JwtContext, Depends(verify_jwt)],
     repo: Annotated[PostgresAuthRepository, Depends(get_repo)],
 ) -> list[TeamResponse]:
     """List all teams in current organization."""
-    if not hasattr(request.state, "user"):
-        raise HTTPException(status_code=401, detail="Not authenticated")
-
-    org_id = UUID(request.state.user.org_id)
-    teams = await repo.get_org_teams(org_id)
+    teams = await repo.get_org_teams(auth.org_uuid)
 
     return [
         TeamResponse(
@@ -77,12 +68,11 @@ async def list_teams(
 @router.post("/", status_code=201)
 async def create_team(
     body: CreateTeamRequest,
-    request: Request,
+    auth: RequireAdmin,
     repo: Annotated[PostgresAuthRepository, Depends(get_repo)],
-    _admin: Annotated[None, Depends(require_admin)],
 ) -> TeamResponse:
     """Create a new team (admin only)."""
-    org_id = UUID(request.state.user.org_id)
+    org_id = auth.org_uuid
 
     team = await repo.create_team(org_id, body.name)
 
@@ -97,20 +87,16 @@ async def create_team(
 @router.get("/{team_id}")
 async def get_team(
     team_id: UUID,
-    request: Request,
+    auth: Annotated[JwtContext, Depends(verify_jwt)],
     repo: Annotated[PostgresAuthRepository, Depends(get_repo)],
 ) -> TeamResponse:
     """Get a specific team."""
-    if not hasattr(request.state, "user"):
-        raise HTTPException(status_code=401, detail="Not authenticated")
-
     team = await repo.get_team_by_id(team_id)
     if not team:
         raise HTTPException(status_code=404, detail="Team not found")
 
     # Verify team belongs to user's org
-    org_id = UUID(request.state.user.org_id)
-    if team.org_id != org_id:
+    if team.org_id != auth.org_uuid:
         raise HTTPException(status_code=404, detail="Team not found")
 
     return TeamResponse(
@@ -124,9 +110,8 @@ async def get_team(
 @router.delete("/{team_id}", status_code=204)
 async def delete_team(
     team_id: UUID,
-    request: Request,
+    auth: RequireAdmin,
     repo: Annotated[PostgresAuthRepository, Depends(get_repo)],
-    _admin: Annotated[None, Depends(require_admin)],
 ) -> None:
     """Delete a team (admin only)."""
     team = await repo.get_team_by_id(team_id)
@@ -134,8 +119,7 @@ async def delete_team(
         raise HTTPException(status_code=404, detail="Team not found")
 
     # Verify team belongs to user's org
-    org_id = UUID(request.state.user.org_id)
-    if team.org_id != org_id:
+    if team.org_id != auth.org_uuid:
         raise HTTPException(status_code=404, detail="Team not found")
 
     await repo.delete_team(team_id)
@@ -144,11 +128,10 @@ async def delete_team(
 @router.post("/{team_id}/members", status_code=201)
 async def add_team_member(
     team_id: UUID,
-    request: Request,
+    auth: RequireAdmin,
     repo: Annotated[PostgresAuthRepository, Depends(get_repo)],
-    _admin: Annotated[None, Depends(require_admin)],
     user_id: UUID | None = None,
-) -> dict[str, Any]:
+) -> dict[str, str]:
     """Add a user to a team (admin only)."""
     if not user_id:
         raise HTTPException(status_code=400, detail="user_id is required")
@@ -158,8 +141,7 @@ async def add_team_member(
         raise HTTPException(status_code=404, detail="Team not found")
 
     # Verify team belongs to user's org
-    org_id = UUID(request.state.user.org_id)
-    if team.org_id != org_id:
+    if team.org_id != auth.org_uuid:
         raise HTTPException(status_code=404, detail="Team not found")
 
     membership = await repo.add_user_to_team(user_id, team_id)

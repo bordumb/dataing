@@ -9,11 +9,15 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, Response
 from pydantic import BaseModel, EmailStr, Field
 
-from dataing.adapters.auth.postgres import PostgresAuthRepository
 from dataing.adapters.db.app_db import AppDatabase
 from dataing.core.auth.types import OrgRole as AuthOrgRole
 from dataing.entrypoints.api.deps import get_app_db
 from dataing.entrypoints.api.middleware.auth import ApiKeyContext, require_scope, verify_api_key
+from dataing.entrypoints.api.middleware.jwt_auth import (
+    JwtContext,
+    RequireAdmin,
+    verify_jwt,
+)
 
 router = APIRouter(prefix="/users", tags=["users"])
 
@@ -296,34 +300,13 @@ class UpdateRoleRequest(BaseModel):
     role: str
 
 
-def get_auth_repo(app_db: AppDbDep) -> PostgresAuthRepository:
-    """Get auth repository."""
-    return PostgresAuthRepository(app_db)
-
-
-def require_org_admin(request: Any) -> None:
-    """Require admin role for org operations."""
-    if not hasattr(request.state, "user"):
-        raise HTTPException(status_code=401, detail="Not authenticated")
-
-    role = request.state.user.role
-    if role not in (AuthOrgRole.ADMIN.value, AuthOrgRole.OWNER.value):
-        raise HTTPException(status_code=403, detail="Admin role required")
-
-
 @router.get("/org-members", response_model=list[OrgMemberResponse])
 async def list_org_members(
-    request: Any,
+    auth: Annotated[JwtContext, Depends(verify_jwt)],
     app_db: AppDbDep,
 ) -> list[OrgMemberResponse]:
     """List all members of the current organization (JWT auth)."""
-    from fastapi import Request as FastAPIRequest
-
-    req: FastAPIRequest = request
-    if not hasattr(req.state, "user"):
-        raise HTTPException(status_code=401, detail="Not authenticated")
-
-    org_id = UUID(req.state.user.org_id)
+    org_id = auth.org_uuid
 
     # Get all org members with user info
     members = await app_db.fetch_all(
@@ -353,17 +336,12 @@ async def list_org_members(
 async def update_member_role(
     user_id: UUID,
     body: UpdateRoleRequest,
-    request: Any,
+    auth: RequireAdmin,
     app_db: AppDbDep,
 ) -> dict[str, str]:
     """Update a member's role in the organization (admin only)."""
-    from fastapi import Request as FastAPIRequest
-
-    req: FastAPIRequest = request
-    require_org_admin(req)
-
-    org_id = UUID(req.state.user.org_id)
-    current_user_id = UUID(req.state.user.sub)
+    org_id = auth.org_uuid
+    current_user_id = auth.user_uuid
 
     # Cannot change own role
     if user_id == current_user_id:
@@ -400,17 +378,12 @@ async def update_member_role(
 @router.post("/{user_id}/remove")
 async def remove_org_member(
     user_id: UUID,
-    request: Any,
+    auth: RequireAdmin,
     app_db: AppDbDep,
 ) -> dict[str, str]:
     """Remove a member from the organization (admin only)."""
-    from fastapi import Request as FastAPIRequest
-
-    req: FastAPIRequest = request
-    require_org_admin(req)
-
-    org_id = UUID(req.state.user.org_id)
-    current_user_id = UUID(req.state.user.sub)
+    org_id = auth.org_uuid
+    current_user_id = auth.user_uuid
 
     # Cannot remove self
     if user_id == current_user_id:

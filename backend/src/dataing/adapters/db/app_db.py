@@ -846,3 +846,97 @@ class AppDatabase:
             "dataSources": ds_result["count"] if ds_result else 0,
             "pendingApprovals": approvals_result["count"] if approvals_result else 0,
         }
+
+    # Feedback event operations
+    async def list_feedback_events(
+        self,
+        tenant_id: UUID,
+        investigation_id: UUID | None = None,
+        dataset_id: UUID | None = None,
+        event_type: str | None = None,
+        limit: int = 100,
+        offset: int = 0,
+    ) -> list[dict[str, Any]]:
+        """List feedback events with optional filtering.
+
+        Args:
+            tenant_id: The tenant ID.
+            investigation_id: Optional investigation ID filter.
+            dataset_id: Optional dataset ID filter.
+            event_type: Optional event type filter.
+            limit: Maximum events to return.
+            offset: Number of events to skip.
+
+        Returns:
+            List of feedback event dictionaries.
+        """
+        base_query = """
+            SELECT id, investigation_id, dataset_id, event_type,
+                   event_data, actor_id, actor_type, created_at
+            FROM feedback_events
+            WHERE tenant_id = $1
+        """
+        args: list[Any] = [tenant_id]
+        idx = 2
+
+        if investigation_id:
+            base_query += f" AND investigation_id = ${idx}"
+            args.append(investigation_id)
+            idx += 1
+
+        if dataset_id:
+            base_query += f" AND dataset_id = ${idx}"
+            args.append(dataset_id)
+            idx += 1
+
+        if event_type:
+            base_query += f" AND event_type = ${idx}"
+            args.append(event_type)
+            idx += 1
+
+        base_query += f" ORDER BY created_at DESC LIMIT ${idx} OFFSET ${idx + 1}"
+        args.extend([limit, offset])
+
+        return await self.fetch_all(base_query, *args)
+
+    async def count_feedback_events(
+        self,
+        tenant_id: UUID,
+        investigation_id: UUID | None = None,
+        dataset_id: UUID | None = None,
+        event_type: str | None = None,
+    ) -> int:
+        """Count feedback events with optional filtering.
+
+        Args:
+            tenant_id: The tenant ID.
+            investigation_id: Optional investigation ID filter.
+            dataset_id: Optional dataset ID filter.
+            event_type: Optional event type filter.
+
+        Returns:
+            Number of matching events.
+        """
+        base_query = """
+            SELECT COUNT(*)::int as count FROM feedback_events
+            WHERE tenant_id = $1
+        """
+        args: list[Any] = [tenant_id]
+        idx = 2
+
+        if investigation_id:
+            base_query += f" AND investigation_id = ${idx}"
+            args.append(investigation_id)
+            idx += 1
+
+        if dataset_id:
+            base_query += f" AND dataset_id = ${idx}"
+            args.append(dataset_id)
+            idx += 1
+
+        if event_type:
+            base_query += f" AND event_type = ${idx}"
+            args.append(event_type)
+
+        result = await self.fetch_one(base_query, *args)
+        return result["count"] if result else 0

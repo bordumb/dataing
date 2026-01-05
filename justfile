@@ -160,6 +160,9 @@ demo: demo-fixtures
     PGPASSWORD=dataing psql -h localhost -U dataing -d dataing_demo -f backend/migrations/001_initial.sql 2>/dev/null || true
     PGPASSWORD=dataing psql -h localhost -U dataing -d dataing_demo -f backend/migrations/002_datasets.sql 2>/dev/null || true
     PGPASSWORD=dataing psql -h localhost -U dataing -d dataing_demo -f backend/migrations/003_feedback_events.sql 2>/dev/null || true
+    PGPASSWORD=dataing psql -h localhost -U dataing -d dataing_demo -f backend/migrations/004_schema_comments.sql 2>/dev/null || true
+    PGPASSWORD=dataing psql -h localhost -U dataing -d dataing_demo -f backend/migrations/005_knowledge_comments.sql 2>/dev/null || true
+    PGPASSWORD=dataing psql -h localhost -U dataing -d dataing_demo -f backend/migrations/006_comment_votes.sql 2>/dev/null || true
 
     trap 'kill 0' EXIT
 

@@ -3,6 +3,7 @@
 from fastapi import APIRouter
 
 from dataing.entrypoints.api.routes.approvals import router as approvals_router
+from dataing.entrypoints.api.routes.comment_votes import router as comment_votes_router
 from dataing.entrypoints.api.routes.dashboard import router as dashboard_router
 from dataing.entrypoints.api.routes.datasets import router as datasets_router
 from dataing.entrypoints.api.routes.datasources import router as datasources_router
@@ -35,5 +36,6 @@ api_router.include_router(lineage_router)
 api_router.include_router(investigation_feedback_router)
 api_router.include_router(schema_comments_router)
 api_router.include_router(knowledge_comments_router)
+api_router.include_router(comment_votes_router)
 
 __all__ = ["api_router"]

@@ -1210,3 +1210,83 @@ class AppDatabase:
         """
         result = await self.execute(query, tenant_id, comment_id)
         return result == "DELETE 1"
+
+    # Comment vote operations
+    async def upsert_comment_vote(
+        self,
+        tenant_id: UUID,
+        comment_type: str,
+        comment_id: UUID,
+        user_id: UUID,
+        vote: int,
+    ) -> None:
+        """Create or update a comment vote.
+
+        Args:
+            tenant_id: The tenant ID.
+            comment_type: 'schema' or 'knowledge'.
+            comment_id: The comment ID.
+            user_id: The user ID.
+            vote: 1 for upvote, -1 for downvote.
+        """
+        # Upsert vote
+        vote_query = """
+            INSERT INTO comment_votes (tenant_id, comment_type, comment_id, user_id, vote)
+            VALUES ($1, $2, $3, $4, $5)
+            ON CONFLICT (comment_type, comment_id, user_id)
+            DO UPDATE SET vote = $5
+        """
+        await self.execute(vote_query, tenant_id, comment_type, comment_id, user_id, vote)
+
+        # Update vote counts on the comment
+        await self._update_comment_vote_counts(comment_type, comment_id)
+
+    async def delete_comment_vote(
+        self,
+        tenant_id: UUID,
+        comment_type: str,
+        comment_id: UUID,
+        user_id: UUID,
+    ) -> bool:
+        """Delete a comment vote.
+
+        Args:
+            tenant_id: The tenant ID.
+            comment_type: 'schema' or 'knowledge'.
+            comment_id: The comment ID.
+            user_id: The user ID.
+
+        Returns:
+            True if deleted, False if not found.
+        """
+        query = """
+            DELETE FROM comment_votes
+            WHERE tenant_id = $1 AND comment_type = $2 AND comment_id = $3 AND user_id = $4
+        """
+        result = await self.execute(query, tenant_id, comment_type, comment_id, user_id)
+        if result == "DELETE 1":
+            await self._update_comment_vote_counts(comment_type, comment_id)
+            return True
+        return False
+
+    async def _update_comment_vote_counts(self, comment_type: str, comment_id: UUID) -> None:
+        """Recalculate vote counts for a comment.
+
+        Args:
+            comment_type: 'schema' or 'knowledge'.
+            comment_id: The comment ID.
+        """
+        table = "schema_comments" if comment_type == "schema" else "knowledge_comments"
+        query = f"""
+            UPDATE {table}
+            SET upvotes = (
+                    SELECT COUNT(*) FROM comment_votes
+                    WHERE comment_type = $1 AND comment_id = $2 AND vote = 1
+                ),
+                downvotes = (
+                    SELECT COUNT(*) FROM comment_votes
+                    WHERE comment_type = $1 AND comment_id = $2 AND vote = -1
+                )
+            WHERE id = $2
+        """
+        await self.execute(query, comment_type, comment_id)

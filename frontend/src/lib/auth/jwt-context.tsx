@@ -30,6 +30,10 @@ interface JwtAuthContextType extends AuthState {
   register: (request: RegisterRequest) => Promise<void>
   logout: () => void
   switchOrg: (orgId: string) => Promise<void>
+  // Demo role override for testing
+  demoRole: OrgRole | null
+  setDemoRole: (role: OrgRole | null) => void
+  effectiveRole: OrgRole | null // demoRole if set, otherwise real role
 }
 
 const JwtAuthContext = React.createContext<JwtAuthContextType | null>(null)
@@ -85,6 +89,12 @@ export function JwtAuthProvider({ children }: { children: React.ReactNode }) {
     role: null,
     accessToken: null,
   })
+
+  // Demo role override for testing different permission levels
+  const [demoRole, setDemoRole] = React.useState<OrgRole | null>(null)
+
+  // Effective role: demo override takes precedence
+  const effectiveRole = demoRole ?? state.role
 
   const clearStorage = React.useCallback(() => {
     localStorage.removeItem(ACCESS_TOKEN_KEY)
@@ -252,8 +262,11 @@ export function JwtAuthProvider({ children }: { children: React.ReactNode }) {
       register,
       logout,
       switchOrg,
+      demoRole,
+      setDemoRole,
+      effectiveRole,
     }),
-    [state, login, register, logout, switchOrg]
+    [state, login, register, logout, switchOrg, demoRole, effectiveRole]
   )
 
   return (

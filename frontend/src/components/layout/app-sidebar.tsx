@@ -9,6 +9,7 @@ import {
   Bell,
   ChevronUp,
   LogOut,
+  Shield,
 } from 'lucide-react'
 
 import {
@@ -32,7 +33,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
-import { useJwtAuth } from '@/lib/auth'
+import { useJwtAuth, useRole, OrgSelector } from '@/lib/auth'
 
 const mainNavItems = [
   {
@@ -74,6 +75,7 @@ export function AppSidebar() {
   const location = useLocation()
   const { state } = useSidebar()
   const { user, organization, logout } = useJwtAuth()
+  const { isAdmin } = useRole()
 
   return (
     <Sidebar collapsible="icon">
@@ -93,6 +95,9 @@ export function AppSidebar() {
                 </div>
               </Link>
             </SidebarMenuButton>
+          </SidebarMenuItem>
+          <SidebarMenuItem>
+            <OrgSelector />
           </SidebarMenuItem>
         </SidebarMenu>
       </SidebarHeader>
@@ -159,6 +164,29 @@ export function AppSidebar() {
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
+
+        {/* Admin - only visible for admin+ roles */}
+        {isAdmin && (
+          <SidebarGroup>
+            <SidebarGroupLabel>Admin</SidebarGroupLabel>
+            <SidebarGroupContent>
+              <SidebarMenu>
+                <SidebarMenuItem>
+                  <SidebarMenuButton
+                    asChild
+                    isActive={location.pathname.startsWith('/admin')}
+                    tooltip="Admin"
+                  >
+                    <Link to="/admin">
+                      <Shield className="size-4" />
+                      <span>Admin</span>
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        )}
       </SidebarContent>
 
       <SidebarFooter>

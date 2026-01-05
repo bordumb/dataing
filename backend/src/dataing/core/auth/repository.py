@@ -79,6 +79,10 @@ class AuthRepository(Protocol):
         """Create a new team in an organization."""
         ...
 
+    async def delete_team(self, team_id: UUID) -> None:
+        """Delete a team."""
+        ...
+
     # Membership operations
     async def get_user_org_membership(self, user_id: UUID, org_id: UUID) -> OrgMembership | None:
         """Get user's membership in an organization."""

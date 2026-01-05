@@ -148,3 +148,19 @@ async def get_current_user(request: Request) -> dict[str, Any]:
         "role": request.state.user.role,
         "teams": request.state.user.teams,
     }
+
+
+@router.get("/me/orgs")
+async def get_user_orgs(
+    request: Request,
+    service: Annotated[AuthService, Depends(get_auth_service)],
+) -> list[dict[str, Any]]:
+    """Get all organizations the current user belongs to.
+
+    Returns list of orgs with role for each.
+    """
+    if not hasattr(request.state, "user"):
+        raise HTTPException(status_code=401, detail="Not authenticated")
+
+    user_id = UUID(request.state.user.sub)
+    return await service.get_user_orgs(user_id)

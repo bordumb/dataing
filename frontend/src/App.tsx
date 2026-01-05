@@ -16,9 +16,10 @@ import { DatasetListPage, DatasetDetailPage } from '@/features/datasets'
 import { SettingsPage } from '@/features/settings/settings-page'
 import { UsagePage } from '@/features/usage/usage-page'
 import { JwtLoginPage } from '@/features/auth/jwt-login-page'
+import { AdminPage } from '@/features/admin/admin-page'
 
 // Auth - Using JWT auth
-import { JwtAuthProvider, RequireJwtAuth } from '@/lib/auth/jwt-context'
+import { JwtAuthProvider, RequireJwtAuth, useJwtAuth, DemoRoleToggle } from '@/lib/auth'
 
 // Entitlements
 import {
@@ -44,6 +45,14 @@ function AppLayout({ children }: { children: React.ReactNode }) {
       </SidebarInset>
     </SidebarProvider>
   )
+}
+
+function DemoRoleToggleWrapper() {
+  const { effectiveRole, setDemoRole, isAuthenticated } = useJwtAuth()
+
+  if (!isAuthenticated || !effectiveRole) return null
+
+  return <DemoRoleToggle currentRole={effectiveRole} onRoleChange={setDemoRole} />
 }
 
 function AppWithEntitlements() {
@@ -134,6 +143,14 @@ function AppWithEntitlements() {
                       </FeatureErrorBoundary>
                     }
                   />
+                  <Route
+                    path="admin/*"
+                    element={
+                      <FeatureErrorBoundary feature="admin">
+                        <AdminPage />
+                      </FeatureErrorBoundary>
+                    }
+                  />
                 </Routes>
               </AppLayout>
             </RequireJwtAuth>
@@ -141,6 +158,7 @@ function AppWithEntitlements() {
         />
       </Routes>
       <DemoToggle plan={plan} onPlanChange={setPlan} />
+      <DemoRoleToggleWrapper />
       <Toaster />
     </EntitlementsProvider>
   )

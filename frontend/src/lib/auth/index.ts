@@ -10,6 +10,7 @@ export type {
   JwtPayload,
   LoginRequest,
   Organization,
+  OrgMembership,
   OrgRole,
   RefreshRequest,
   RegisterRequest,
@@ -17,10 +18,19 @@ export type {
 } from './types'
 
 // API
-export { login, register, refreshToken, getCurrentUser, AuthApiError } from './api'
+export { login, register, refreshToken, getCurrentUser, getUserOrgs, AuthApiError } from './api'
 
 // Legacy API key auth (for backwards compatibility during migration)
 export { AuthProvider, RequireAuth, useAuth } from './context'
 
 // JWT auth
 export { JwtAuthProvider, RequireJwtAuth, useJwtAuth } from './jwt-context'
+
+// Demo role toggle
+export { DemoRoleToggle } from './demo-role-toggle'
+
+// Role utilities
+export { useRole } from './use-role'
+
+// Org selector
+export { OrgSelector } from './org-selector'

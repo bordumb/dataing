@@ -234,6 +234,29 @@ class AuthService:
             "token_type": "bearer",
         }
 
+    async def get_user_orgs(self, user_id: UUID) -> list[dict[str, Any]]:
+        """Get all organizations a user belongs to.
+
+        Args:
+            user_id: User's ID.
+
+        Returns:
+            List of dicts with org info and role.
+        """
+        orgs = await self._repo.get_user_orgs(user_id)
+        return [
+            {
+                "org": {
+                    "id": str(org.id),
+                    "name": org.name,
+                    "slug": org.slug,
+                    "plan": org.plan,
+                },
+                "role": role.value,
+            }
+            for org, role in orgs
+        ]
+
     def _generate_slug(self, name: str) -> str:
         """Generate URL-safe slug from name."""
         slug = name.lower()

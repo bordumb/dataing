@@ -204,6 +204,18 @@ class PostgresAuthRepository:
         assert row is not None, "INSERT RETURNING should always return a row"
         return self._row_to_team(row)
 
+    async def delete_team(self, team_id: UUID) -> None:
+        """Delete a team and its memberships."""
+        # Delete memberships first (CASCADE should handle this, but be explicit)
+        await self._db.execute(
+            "DELETE FROM team_memberships WHERE team_id = $1",
+            team_id,
+        )
+        await self._db.execute(
+            "DELETE FROM teams WHERE id = $1",
+            team_id,
+        )
+
     # Membership operations
     async def get_user_org_membership(self, user_id: UUID, org_id: UUID) -> OrgMembership | None:
         """Get user's membership in an organization."""

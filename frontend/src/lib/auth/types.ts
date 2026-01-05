@@ -71,3 +71,11 @@ export interface JwtPayload {
   exp: number
   iat: number
 }
+
+/**
+ * Organization membership with role.
+ */
+export interface OrgMembership {
+  org: Organization
+  role: OrgRole
+}

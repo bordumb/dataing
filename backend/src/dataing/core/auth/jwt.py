@@ -1,7 +1,7 @@
 """JWT token creation and validation."""
 
 import os
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import jwt
 
@@ -38,7 +38,7 @@ def create_access_token(
     Returns:
         Encoded JWT string
     """
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     expire = now + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
 
     payload = {
@@ -62,7 +62,7 @@ def create_refresh_token(user_id: str) -> str:
     Returns:
         Encoded JWT string
     """
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     expire = now + timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS)
 
     payload = {

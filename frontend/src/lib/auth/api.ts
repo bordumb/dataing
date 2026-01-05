@@ -5,6 +5,7 @@
 import type {
   AuthResponse,
   LoginRequest,
+  OrgMembership,
   RefreshRequest,
   RegisterRequest,
 } from './types'
@@ -83,6 +84,18 @@ export async function getCurrentUser(
   accessToken: string
 ): Promise<{ user_id: string; org_id: string; role: string; teams: string[] }> {
   const response = await fetch(`${API_BASE}/me`, {
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+    },
+  })
+  return handleResponse(response)
+}
+
+/**
+ * Get user's organizations (requires valid access token).
+ */
+export async function getUserOrgs(accessToken: string): Promise<OrgMembership[]> {
+  const response = await fetch(`${API_BASE}/me/orgs`, {
     headers: {
       Authorization: `Bearer ${accessToken}`,
     },

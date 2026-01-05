@@ -86,12 +86,16 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         config=OrchestratorConfig(),
     )
 
+    # Initialize feedback adapter
+    feedback_adapter = FeedbackAdapter(db=app_db)
+
     # Store in app state
     app.state.app_db = app_db
     app.state.llm = llm
     app.state.context_engine = context_engine
     app.state.circuit_breaker = circuit_breaker
     app.state.orchestrator = orchestrator
+    app.state.feedback_adapter = feedback_adapter
     # Check DATADR_ENCRYPTION_KEY first (used by demo), then ENCRYPTION_KEY
     app.state.encryption_key = os.getenv("DATADR_ENCRYPTION_KEY") or os.getenv("ENCRYPTION_KEY")
 

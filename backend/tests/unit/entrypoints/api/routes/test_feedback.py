@@ -1,10 +1,13 @@
-"""Tests for feedback API routes."""
+"""Tests for investigation feedback API routes."""
 
 from datetime import UTC, datetime
 from uuid import uuid4
 
 import pytest
-from dataing.entrypoints.api.routes.feedback import FeedbackCreate, FeedbackResponse
+from dataing.entrypoints.api.routes.investigation_feedback import (
+    FeedbackCreate,
+    FeedbackResponse,
+)
 from pydantic import ValidationError
 
 
@@ -63,15 +66,15 @@ class TestFeedbackSchemas:
 
 
 class TestFeedbackEndpoint:
-    """Tests for POST /feedback endpoint."""
+    """Tests for POST /investigation-feedback endpoint."""
 
     def test_submit_feedback_success(self) -> None:
-        """POST /feedback creates feedback event."""
+        """POST /investigation-feedback creates feedback event."""
         from unittest.mock import AsyncMock, MagicMock
 
         from dataing.entrypoints.api.deps import get_feedback_adapter
         from dataing.entrypoints.api.middleware.auth import verify_api_key
-        from dataing.entrypoints.api.routes.feedback import router
+        from dataing.entrypoints.api.routes.investigation_feedback import router
         from fastapi import FastAPI
         from fastapi.testclient import TestClient
 
@@ -98,7 +101,7 @@ class TestFeedbackEndpoint:
 
         client = TestClient(app)
         response = client.post(
-            "/api/v1/feedback/",
+            "/api/v1/investigation-feedback/",
             json={
                 "target_type": "hypothesis",
                 "target_id": str(target_id),
@@ -115,15 +118,15 @@ class TestFeedbackEndpoint:
 
 
 class TestGetFeedbackEndpoint:
-    """Tests for GET /investigations/:id/feedback endpoint."""
+    """Tests for GET /investigation-feedback/investigations/:id endpoint."""
 
     def test_get_investigation_feedback(self) -> None:
-        """GET /investigations/:id/feedback returns user's feedback."""
+        """GET /investigation-feedback/investigations/:id returns user's feedback."""
         from unittest.mock import AsyncMock, MagicMock
 
         from dataing.entrypoints.api.deps import get_app_db, get_feedback_adapter
         from dataing.entrypoints.api.middleware.auth import verify_api_key
-        from dataing.entrypoints.api.routes.feedback import router
+        from dataing.entrypoints.api.routes.investigation_feedback import router
         from fastapi import FastAPI
         from fastapi.testclient import TestClient
 
@@ -163,7 +166,7 @@ class TestGetFeedbackEndpoint:
         app.dependency_overrides[get_feedback_adapter] = lambda: mock_adapter
 
         client = TestClient(app)
-        response = client.get(f"/api/v1/feedback/investigations/{investigation_id}")
+        response = client.get(f"/api/v1/investigation-feedback/investigations/{investigation_id}")
 
         assert response.status_code == 200
         data = response.json()
@@ -173,12 +176,12 @@ class TestGetFeedbackEndpoint:
         assert data[0]["id"] == str(event_id)
 
     def test_get_investigation_feedback_filters_by_user(self) -> None:
-        """GET /investigations/:id/feedback filters to current user's feedback."""
+        """GET /investigation-feedback/investigations/:id filters to current user."""
         from unittest.mock import AsyncMock, MagicMock
 
         from dataing.entrypoints.api.deps import get_app_db, get_feedback_adapter
         from dataing.entrypoints.api.middleware.auth import verify_api_key
-        from dataing.entrypoints.api.routes.feedback import router
+        from dataing.entrypoints.api.routes.investigation_feedback import router
         from fastapi import FastAPI
         from fastapi.testclient import TestClient
 
@@ -221,7 +224,7 @@ class TestGetFeedbackEndpoint:
         app.dependency_overrides[get_feedback_adapter] = lambda: MagicMock()
 
         client = TestClient(app)
-        response = client.get(f"/api/v1/feedback/investigations/{investigation_id}")
+        response = client.get(f"/api/v1/investigation-feedback/investigations/{investigation_id}")
 
         assert response.status_code == 200
         data = response.json()
@@ -230,12 +233,12 @@ class TestGetFeedbackEndpoint:
         assert data[0]["rating"] == 1
 
     def test_get_investigation_feedback_empty(self) -> None:
-        """GET /investigations/:id/feedback returns empty list when no feedback."""
+        """GET /investigation-feedback/investigations/:id returns empty list."""
         from unittest.mock import AsyncMock, MagicMock
 
         from dataing.entrypoints.api.deps import get_app_db, get_feedback_adapter
         from dataing.entrypoints.api.middleware.auth import verify_api_key
-        from dataing.entrypoints.api.routes.feedback import router
+        from dataing.entrypoints.api.routes.investigation_feedback import router
         from fastapi import FastAPI
         from fastapi.testclient import TestClient
 
@@ -259,7 +262,7 @@ class TestGetFeedbackEndpoint:
         app.dependency_overrides[get_feedback_adapter] = lambda: MagicMock()
 
         client = TestClient(app)
-        response = client.get(f"/api/v1/feedback/investigations/{investigation_id}")
+        response = client.get(f"/api/v1/investigation-feedback/investigations/{investigation_id}")
 
         assert response.status_code == 200
         data = response.json()

@@ -873,7 +873,7 @@ class AppDatabase:
         base_query = """
             SELECT id, investigation_id, dataset_id, event_type,
                    event_data, actor_id, actor_type, created_at
-            FROM feedback_events
+            FROM investigation_feedback_events
             WHERE tenant_id = $1
         """
         args: list[Any] = [tenant_id]
@@ -918,7 +918,7 @@ class AppDatabase:
             Number of matching events.
         """
         base_query = """
-            SELECT COUNT(*)::int as count FROM feedback_events
+            SELECT COUNT(*)::int as count FROM investigation_feedback_events
             WHERE tenant_id = $1
         """
         args: list[Any] = [tenant_id]

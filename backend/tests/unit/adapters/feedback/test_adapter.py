@@ -1,15 +1,19 @@
-"""Tests for FeedbackAdapter."""
+"""Tests for InvestigationFeedbackAdapter."""
 
 from unittest.mock import AsyncMock, MagicMock
 from uuid import uuid4
 
 import pytest
-from dataing.adapters.feedback import EventType, FeedbackAdapter, FeedbackEvent
-from dataing.core.interfaces import FeedbackEmitter
+from dataing.adapters.investigation_feedback import (
+    EventType,
+    FeedbackEvent,
+    InvestigationFeedbackAdapter,
+)
+from dataing.core.interfaces import InvestigationFeedbackEmitter
 
 
-class TestFeedbackAdapter:
-    """Tests for FeedbackAdapter."""
+class TestInvestigationFeedbackAdapter:
+    """Tests for InvestigationFeedbackAdapter."""
 
     @pytest.fixture
     def mock_db(self) -> MagicMock:
@@ -19,11 +23,13 @@ class TestFeedbackAdapter:
         return db
 
     @pytest.fixture
-    def adapter(self, mock_db: MagicMock) -> FeedbackAdapter:
+    def adapter(self, mock_db: MagicMock) -> InvestigationFeedbackAdapter:
         """Create adapter with mock database."""
-        return FeedbackAdapter(db=mock_db)
+        return InvestigationFeedbackAdapter(db=mock_db)
 
-    async def test_emit_stores_event(self, adapter: FeedbackAdapter, mock_db: MagicMock) -> None:
+    async def test_emit_stores_event(
+        self, adapter: InvestigationFeedbackAdapter, mock_db: MagicMock
+    ) -> None:
         """emit() stores event in database."""
         tenant_id = uuid4()
         investigation_id = uuid4()
@@ -37,9 +43,9 @@ class TestFeedbackAdapter:
 
         mock_db.execute.assert_called_once()
         call_args = mock_db.execute.call_args
-        assert "INSERT INTO feedback_events" in call_args[0][0]
+        assert "INSERT INTO investigation_feedback_events" in call_args[0][0]
 
-    async def test_emit_returns_event(self, adapter: FeedbackAdapter) -> None:
+    async def test_emit_returns_event(self, adapter: InvestigationFeedbackAdapter) -> None:
         """emit() returns the created event."""
         tenant_id = uuid4()
 
@@ -53,7 +59,9 @@ class TestFeedbackAdapter:
         assert event.tenant_id == tenant_id
         assert event.event_type == EventType.HYPOTHESIS_GENERATED
 
-    async def test_emit_with_actor(self, adapter: FeedbackAdapter, mock_db: MagicMock) -> None:
+    async def test_emit_with_actor(
+        self, adapter: InvestigationFeedbackAdapter, mock_db: MagicMock
+    ) -> None:
         """emit() includes actor information when provided."""
         tenant_id = uuid4()
         actor_id = uuid4()
@@ -69,7 +77,9 @@ class TestFeedbackAdapter:
         assert event.actor_id == actor_id
         assert event.actor_type == "user"
 
-    async def test_emit_logs_event(self, adapter: FeedbackAdapter, mock_db: MagicMock) -> None:
+    async def test_emit_logs_event(
+        self, adapter: InvestigationFeedbackAdapter, mock_db: MagicMock
+    ) -> None:
         """emit() logs the event for observability."""
         tenant_id = uuid4()
 
@@ -83,13 +93,13 @@ class TestFeedbackAdapter:
         assert event is not None
 
 
-class TestFeedbackAdapterProtocol:
+class TestInvestigationFeedbackAdapterProtocol:
     """Tests for protocol conformance."""
 
     def test_adapter_implements_feedback_emitter(self) -> None:
-        """FeedbackAdapter implements FeedbackEmitter protocol."""
-        assert isinstance(FeedbackAdapter, type)
-        # Verify the class has the emit method signature matching FeedbackEmitter
-        assert hasattr(FeedbackAdapter, "emit")
-        # Verify FeedbackEmitter is a runtime checkable protocol
-        assert hasattr(FeedbackEmitter, "__protocol_attrs__")
+        """InvestigationFeedbackAdapter implements InvestigationFeedbackEmitter protocol."""
+        assert isinstance(InvestigationFeedbackAdapter, type)
+        # Verify the class has the emit method signature matching InvestigationFeedbackEmitter
+        assert hasattr(InvestigationFeedbackAdapter, "emit")
+        # Verify InvestigationFeedbackEmitter is a runtime checkable protocol
+        assert hasattr(InvestigationFeedbackEmitter, "__protocol_attrs__")

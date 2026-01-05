@@ -16,7 +16,7 @@ from fastapi import Request
 from dataing.adapters.context import ContextEngine
 from dataing.adapters.datasource import BaseAdapter, get_registry
 from dataing.adapters.db.app_db import AppDatabase
-from dataing.adapters.feedback import FeedbackAdapter
+from dataing.adapters.investigation_feedback import InvestigationFeedbackAdapter
 from dataing.adapters.lineage import BaseLineageAdapter, LineageAdapter, get_lineage_registry
 from dataing.adapters.llm.client import AnthropicClient
 from dataing.core.orchestrator import InvestigationOrchestrator, OrchestratorConfig
@@ -86,8 +86,8 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         config=OrchestratorConfig(),
     )
 
-    # Initialize feedback adapter
-    feedback_adapter = FeedbackAdapter(db=app_db)
+    # Initialize investigation feedback adapter
+    feedback_adapter = InvestigationFeedbackAdapter(db=app_db)
 
     # Store in app state
     app.state.app_db = app_db
@@ -470,14 +470,14 @@ def get_context_engine_for_tenant(
     )
 
 
-def get_feedback_adapter(request: Request) -> FeedbackAdapter:
-    """Get FeedbackAdapter from app state.
+def get_feedback_adapter(request: Request) -> InvestigationFeedbackAdapter:
+    """Get InvestigationFeedbackAdapter from app state.
 
     Args:
         request: The current request.
 
     Returns:
-        The configured FeedbackAdapter.
+        The configured InvestigationFeedbackAdapter.
     """
-    feedback_adapter: FeedbackAdapter = request.app.state.feedback_adapter
+    feedback_adapter: InvestigationFeedbackAdapter = request.app.state.feedback_adapter
     return feedback_adapter

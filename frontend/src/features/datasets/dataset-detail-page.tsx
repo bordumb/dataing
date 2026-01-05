@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import {
   Table as TableIcon,
@@ -28,6 +29,8 @@ import { EmptyState } from '@/components/shared/empty-state'
 import { useDataset, useDatasetInvestigations } from '@/lib/api/datasets'
 import { formatNumber, formatRelativeTime } from '@/lib/utils'
 import { LineagePanel } from '@/features/investigation/components/lineage-panel'
+import { SchemaCommentIndicator } from './components/schema-comment-indicator'
+import { CommentSlidePanel } from './components/comment-slide-panel'
 
 function getStatusBadgeVariant(status: string) {
   switch (status.toLowerCase()) {
@@ -64,6 +67,7 @@ export function DatasetDetailPage() {
   const { data: dataset, isLoading, error, refetch } = useDataset(datasetId ?? null)
   const { data: investigationsResponse, isLoading: investigationsLoading } =
     useDatasetInvestigations(datasetId ?? null)
+  const [selectedField, setSelectedField] = useState<string | null>(null)
 
   const investigations = investigationsResponse?.investigations ?? []
 
@@ -194,50 +198,70 @@ export function DatasetDetailPage() {
               description="Schema information is not available for this dataset."
             />
           ) : (
-            <div className="rounded-md border">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Column Name</TableHead>
-                    <TableHead>Data Type</TableHead>
-                    <TableHead>Nullable</TableHead>
-                    <TableHead>Key</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {columns.map((col, index) => {
-                    const column = col as {
-                      name?: string
-                      data_type?: string
-                      nullable?: boolean
-                      is_primary_key?: boolean
-                    }
-                    return (
-                      <TableRow key={column.name ?? index}>
-                        <TableCell className="font-medium font-mono">
-                          {column.name ?? '-'}
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant="outline">{column.data_type ?? 'unknown'}</Badge>
-                        </TableCell>
-                        <TableCell>
-                          {column.nullable ? (
-                            <CheckCircle className="h-4 w-4 text-muted-foreground" />
-                          ) : (
-                            <XCircle className="h-4 w-4 text-muted-foreground" />
-                          )}
-                        </TableCell>
-                        <TableCell>
-                          {column.is_primary_key && (
-                            <Key className="h-4 w-4 text-yellow-500" />
-                          )}
-                        </TableCell>
-                      </TableRow>
-                    )
-                  })}
-                </TableBody>
-              </Table>
-            </div>
+            <>
+              <div className="rounded-md border">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Column Name</TableHead>
+                      <TableHead>Data Type</TableHead>
+                      <TableHead>Nullable</TableHead>
+                      <TableHead>Key</TableHead>
+                      <TableHead className="w-[100px] text-right">Comments</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {columns.map((col, index) => {
+                      const column = col as {
+                        name?: string
+                        data_type?: string
+                        nullable?: boolean
+                        is_primary_key?: boolean
+                      }
+                      return (
+                        <TableRow key={column.name ?? index} className="group">
+                          <TableCell className="font-medium font-mono">
+                            {column.name ?? '-'}
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant="outline">{column.data_type ?? 'unknown'}</Badge>
+                          </TableCell>
+                          <TableCell>
+                            {column.nullable ? (
+                              <CheckCircle className="h-4 w-4 text-muted-foreground" />
+                            ) : (
+                              <XCircle className="h-4 w-4 text-muted-foreground" />
+                            )}
+                          </TableCell>
+                          <TableCell>
+                            {column.is_primary_key && (
+                              <Key className="h-4 w-4 text-yellow-500" />
+                            )}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            {datasetId && column.name && (
+                              <SchemaCommentIndicator
+                                datasetId={datasetId}
+                                fieldName={column.name}
+                                onClick={() => setSelectedField(column.name ?? null)}
+                              />
+                            )}
+                          </TableCell>
+                        </TableRow>
+                      )
+                    })}
+                  </TableBody>
+                </Table>
+              </div>
+              {datasetId && (
+                <CommentSlidePanel
+                  datasetId={datasetId}
+                  fieldName={selectedField ?? ''}
+                  isOpen={!!selectedField}
+                  onClose={() => setSelectedField(null)}
+                />
+              )}
+            </>
           )}
         </TabsContent>
 

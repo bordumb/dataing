@@ -16,6 +16,7 @@ from fastapi import Request
 from dataing.adapters.context import ContextEngine
 from dataing.adapters.datasource import BaseAdapter, get_registry
 from dataing.adapters.db.app_db import AppDatabase
+from dataing.adapters.feedback import FeedbackAdapter
 from dataing.adapters.lineage import BaseLineageAdapter, LineageAdapter, get_lineage_registry
 from dataing.adapters.llm.client import AnthropicClient
 from dataing.core.orchestrator import InvestigationOrchestrator, OrchestratorConfig
@@ -416,7 +417,7 @@ async def get_tenant_lineage_adapter(
                 provider_config.get("config", {}),
             )
             logger.info(
-                f"Created lineage adapter for tenant {tenant_id}: " f"{provider_config['provider']}"
+                f"Created lineage adapter for tenant {tenant_id}: {provider_config['provider']}"
             )
             return adapter
         except Exception as e:
@@ -463,3 +464,16 @@ def get_context_engine_for_tenant(
         correlation_ctx=base_engine.correlation_ctx,
         lineage_adapter=lineage_adapter,
     )
+
+
+def get_feedback_adapter(request: Request) -> FeedbackAdapter:
+    """Get FeedbackAdapter from app state.
+
+    Args:
+        request: The current request.
+
+    Returns:
+        The configured FeedbackAdapter.
+    """
+    feedback_adapter: FeedbackAdapter = request.app.state.feedback_adapter
+    return feedback_adapter

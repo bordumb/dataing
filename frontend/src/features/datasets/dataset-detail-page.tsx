@@ -11,6 +11,7 @@ import {
   Key,
   CheckCircle,
   XCircle,
+  Brain,
 } from 'lucide-react'
 
 import { Button } from '@/components/ui/Button'
@@ -32,6 +33,7 @@ import { formatNumber, formatRelativeTime } from '@/lib/utils'
 import { LineagePanel } from '@/features/investigation/components/lineage-panel'
 import { SchemaCommentIndicator } from './components/schema-comment-indicator'
 import { CommentSlidePanel } from './components/comment-slide-panel'
+import { KnowledgeTab } from './components/knowledge-tab'
 
 function getStatusBadgeVariant(status: string) {
   switch (status.toLowerCase()) {
@@ -203,6 +205,10 @@ export function DatasetDetailPage() {
             <Search className="h-4 w-4" />
             Investigations
           </TabsTrigger>
+          <TabsTrigger value="knowledge" className="flex items-center gap-2">
+            <Brain className="h-4 w-4" />
+            Knowledge
+          </TabsTrigger>
         </TabsList>
 
         {/* Schema Tab */}
@@ -366,6 +372,11 @@ export function DatasetDetailPage() {
               </Table>
             </div>
           )}
+        </TabsContent>
+
+        {/* Knowledge Tab */}
+        <TabsContent value="knowledge">
+          {datasetId && <KnowledgeTab datasetId={datasetId} />}
         </TabsContent>
       </Tabs>
     </div>

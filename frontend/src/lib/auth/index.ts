@@ -31,6 +31,7 @@ export { DemoRoleToggle } from './demo-role-toggle'
 
 // Role utilities
 export { useRole } from './use-role'
+export { RoleGuard, ExactRoleGuard } from './role-guard'
 
 // Org selector
 export { OrgSelector } from './org-selector'

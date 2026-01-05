@@ -3,7 +3,6 @@
  * Only visible in demo mode.
  */
 
-import * as React from 'react'
 import { Shield, ChevronDown } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import {

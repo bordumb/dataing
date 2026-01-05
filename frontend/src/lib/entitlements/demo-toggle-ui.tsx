@@ -1,5 +1,5 @@
 import type { Plan } from './types'
-import { Badge } from '@/components/ui/badge'
+import { Badge } from '@/components/ui/Badge'
 import {
   Select,
   SelectContent,

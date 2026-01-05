@@ -1,11 +1,14 @@
 /**
  * Admin page - only accessible to admin+ roles.
  * Contains team and user management.
+ *
+ * Users without admin+ role are redirected to home page.
  */
 
 import { Routes, Route, NavLink, Navigate } from 'react-router-dom'
 import { Users, UsersRound } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { RoleGuard } from '@/lib/auth'
 
 import { TeamManagement, UserManagement } from './components'
 
@@ -16,6 +19,7 @@ const adminNavItems = [
 
 export function AdminPage() {
   return (
+    <RoleGuard minRole="admin" redirectTo="/">
     <div className="space-y-6">
       <div>
         <h1 className="text-3xl font-bold tracking-tight">Admin</h1>
@@ -50,5 +54,6 @@ export function AdminPage() {
         <Route index element={<Navigate to="teams" replace />} />
       </Routes>
     </div>
+    </RoleGuard>
   )
 }

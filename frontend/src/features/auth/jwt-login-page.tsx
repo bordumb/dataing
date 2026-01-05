@@ -5,7 +5,7 @@
  */
 
 import * as React from 'react'
-import { useNavigate, useLocation } from 'react-router-dom'
+import { useNavigate, useLocation, Link } from 'react-router-dom'
 import { Search, Mail, Lock, User, Building } from 'lucide-react'
 
 import { Button } from '@/components/ui/Button'
@@ -121,7 +121,15 @@ function LoginForm({ onSuccess }: FormProps) {
       </div>
 
       <div className="space-y-2">
-        <Label htmlFor="login-password">Password</Label>
+        <div className="flex items-center justify-between">
+          <Label htmlFor="login-password">Password</Label>
+          <Link
+            to="/password-reset"
+            className="text-xs text-primary hover:underline"
+          >
+            Forgot password?
+          </Link>
+        </div>
         <div className="relative">
           <Lock className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
           <Input

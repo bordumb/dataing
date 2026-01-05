@@ -138,7 +138,7 @@
           "auth"
         ],
         "summary": "Get Current User",
-        "description": "Get current authenticated user info.\n\nRequires JWT authentication via the jwt_auth middleware.",
+        "description": "Get current authenticated user info.",
         "operationId": "get_current_user_api_v1_auth_me_get",
         "responses": {
           "200": {
@@ -153,7 +153,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
       }
     },
     "/api/v1/auth/me/orgs": {
@@ -176,6 +181,145 @@
                   },
                   "type": "array",
                   "title": "Response Get User Orgs Api V1 Auth Me Orgs Get"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/auth/password-reset/recovery-method": {
+      "post": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Get Recovery Method",
+        "description": "Get the recovery method for a user's email.\n\nThis tells the frontend what UI to show (email form, admin contact, etc.).\n\nArgs:\n    body: Request containing the user's email.\n    service: Auth service.\n    recovery_adapter: Password recovery adapter.\n\nReturns:\n    Recovery method describing how the user can reset their password.",
+        "operationId": "get_recovery_method_api_v1_auth_password_reset_recovery_method_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PasswordResetRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RecoveryMethodResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/auth/password-reset/request": {
+      "post": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Request Password Reset",
+        "description": "Request a password reset.\n\nFor security, this always returns success regardless of whether\nthe email exists. This prevents email enumeration attacks.\n\nThe actual recovery method depends on the configured adapter:\n- email: Sends reset link via email\n- console: Prints reset link to server console (demo/dev mode)\n- admin_contact: Logs the request for admin visibility\n\nArgs:\n    body: Request containing the user's email.\n    service: Auth service.\n    recovery_adapter: Password recovery adapter.\n    frontend_url: Frontend URL for building reset links.\n\nReturns:\n    Success message.",
+        "operationId": "request_password_reset_api_v1_auth_password_reset_request_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PasswordResetRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object",
+                  "title": "Response Request Password Reset Api V1 Auth Password Reset Request Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/auth/password-reset/confirm": {
+      "post": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Confirm Password Reset",
+        "description": "Reset password using a valid token.\n\nArgs:\n    body: Request containing the reset token and new password.\n    service: Auth service.\n\nReturns:\n    Success message.\n\nRaises:\n    HTTPException: If token is invalid, expired, or already used.",
+        "operationId": "confirm_password_reset_api_v1_auth_password_reset_confirm_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PasswordResetConfirm"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object",
+                  "title": "Response Confirm Password Reset Api V1 Auth Password Reset Confirm Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
                 }
               }
             }
@@ -7083,6 +7227,41 @@
         "title": "OrgMemberResponse",
         "description": "Response for an org member."
       },
+      "PasswordResetConfirm": {
+        "properties": {
+          "token": {
+            "type": "string",
+            "title": "Token"
+          },
+          "new_password": {
+            "type": "string",
+            "minLength": 8,
+            "title": "New Password"
+          }
+        },
+        "type": "object",
+        "required": [
+          "token",
+          "new_password"
+        ],
+        "title": "PasswordResetConfirm",
+        "description": "Password reset confirmation body."
+      },
+      "PasswordResetRequest": {
+        "properties": {
+          "email": {
+            "type": "string",
+            "format": "email",
+            "title": "Email"
+          }
+        },
+        "type": "object",
+        "required": [
+          "email"
+        ],
+        "title": "PasswordResetRequest",
+        "description": "Password reset request body."
+      },
       "PendingApprovalsResponse": {
         "properties": {
           "approvals": {
@@ -7217,6 +7396,47 @@
         ],
         "title": "RecentInvestigation",
         "description": "Summary of a recent investigation."
+      },
+      "RecoveryMethodResponse": {
+        "properties": {
+          "type": {
+            "type": "string",
+            "title": "Type"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          },
+          "action_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Action Url"
+          },
+          "admin_email": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Admin Email"
+          }
+        },
+        "type": "object",
+        "required": [
+          "type",
+          "message"
+        ],
+        "title": "RecoveryMethodResponse",
+        "description": "Recovery method response."
       },
       "RefreshRequest": {
         "properties": {
@@ -8233,14 +8453,14 @@
       }
     },
     "securitySchemes": {
+      "HTTPBearer": {
+        "type": "http",
+        "scheme": "bearer"
+      },
       "APIKeyHeader": {
         "type": "apiKey",
         "in": "header",
         "name": "X-API-Key"
-      },
-      "HTTPBearer": {
-        "type": "http",
-        "scheme": "bearer"
       }
     }
   }

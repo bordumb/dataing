@@ -12,6 +12,7 @@ import { InvestigationList } from '@/features/investigation/InvestigationList'
 import { InvestigationDetail } from '@/features/investigation/InvestigationDetail'
 import { NewInvestigation } from '@/features/investigation/NewInvestigation'
 import { DataSourcePage } from '@/features/datasources/datasource-page'
+import { DatasetListPage, DatasetDetailPage } from '@/features/datasets'
 import { SettingsPage } from '@/features/settings/settings-page'
 import { UsagePage } from '@/features/usage/usage-page'
 import { LoginPage } from '@/features/auth/login-page'
@@ -90,6 +91,22 @@ function App() {
                       element={
                         <FeatureErrorBoundary feature="data sources">
                           <DataSourcePage />
+                        </FeatureErrorBoundary>
+                      }
+                    />
+                    <Route
+                      path="datasources/:datasourceId/datasets"
+                      element={
+                        <FeatureErrorBoundary feature="datasets">
+                          <DatasetListPage />
+                        </FeatureErrorBoundary>
+                      }
+                    />
+                    <Route
+                      path="datasets/:datasetId"
+                      element={
+                        <FeatureErrorBoundary feature="dataset details">
+                          <DatasetDetailPage />
                         </FeatureErrorBoundary>
                       }
                     />

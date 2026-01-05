@@ -19,15 +19,19 @@ import type {
   CreateDataSourceRequest,
   DataSourceListResponse,
   DataSourceResponse,
+  DatasourceDatasetsResponse,
   GetDatasourceSchemaApiV1DatasourcesDatasourceIdSchemaGetParams,
   GetDatasourceSchemaApiV1V2DatasourcesDatasourceIdSchemaGetParams,
   HTTPValidationError,
+  ListDatasourceDatasetsApiV1DatasourcesDatasourceIdDatasetsGetParams,
+  ListDatasourceDatasetsApiV1V2DatasourcesDatasourceIdDatasetsGetParams,
   QueryRequest,
   QueryResponse,
   SchemaResponseModel,
   SourceTypesResponse,
   StatsRequest,
   StatsResponse,
+  SyncResponse,
   TestConnectionRequest,
   TestConnectionResponse,
 } from "../../model";
@@ -981,6 +985,254 @@ export const useGetColumnStatsApiV1DatasourcesDatasourceIdStatsPost = <
   return useMutation(mutationOptions);
 };
 /**
+ * Sync schema and register/update datasets.
+
+Discovers all tables from the data source and upserts them
+into the datasets table. Soft-deletes datasets that no longer exist.
+ * @summary Sync Datasource Schema
+ */
+export const syncDatasourceSchemaApiV1DatasourcesDatasourceIdSyncPost = (
+  datasourceId: string,
+) => {
+  return customInstance<SyncResponse>({
+    url: `/api/v1/datasources/${datasourceId}/sync`,
+    method: "POST",
+  });
+};
+
+export const getSyncDatasourceSchemaApiV1DatasourcesDatasourceIdSyncPostMutationOptions =
+  <TError = HTTPValidationError, TContext = unknown>(options?: {
+    mutation?: UseMutationOptions<
+      Awaited<
+        ReturnType<
+          typeof syncDatasourceSchemaApiV1DatasourcesDatasourceIdSyncPost
+        >
+      >,
+      TError,
+      { datasourceId: string },
+      TContext
+    >;
+  }): UseMutationOptions<
+    Awaited<
+      ReturnType<
+        typeof syncDatasourceSchemaApiV1DatasourcesDatasourceIdSyncPost
+      >
+    >,
+    TError,
+    { datasourceId: string },
+    TContext
+  > => {
+    const { mutation: mutationOptions } = options ?? {};
+
+    const mutationFn: MutationFunction<
+      Awaited<
+        ReturnType<
+          typeof syncDatasourceSchemaApiV1DatasourcesDatasourceIdSyncPost
+        >
+      >,
+      { datasourceId: string }
+    > = (props) => {
+      const { datasourceId } = props ?? {};
+
+      return syncDatasourceSchemaApiV1DatasourcesDatasourceIdSyncPost(
+        datasourceId,
+      );
+    };
+
+    return { mutationFn, ...mutationOptions };
+  };
+
+export type SyncDatasourceSchemaApiV1DatasourcesDatasourceIdSyncPostMutationResult =
+  NonNullable<
+    Awaited<
+      ReturnType<
+        typeof syncDatasourceSchemaApiV1DatasourcesDatasourceIdSyncPost
+      >
+    >
+  >;
+
+export type SyncDatasourceSchemaApiV1DatasourcesDatasourceIdSyncPostMutationError =
+  HTTPValidationError;
+
+/**
+ * @summary Sync Datasource Schema
+ */
+export const useSyncDatasourceSchemaApiV1DatasourcesDatasourceIdSyncPost = <
+  TError = HTTPValidationError,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<
+      ReturnType<
+        typeof syncDatasourceSchemaApiV1DatasourcesDatasourceIdSyncPost
+      >
+    >,
+    TError,
+    { datasourceId: string },
+    TContext
+  >;
+}): UseMutationResult<
+  Awaited<
+    ReturnType<typeof syncDatasourceSchemaApiV1DatasourcesDatasourceIdSyncPost>
+  >,
+  TError,
+  { datasourceId: string },
+  TContext
+> => {
+  const mutationOptions =
+    getSyncDatasourceSchemaApiV1DatasourcesDatasourceIdSyncPostMutationOptions(
+      options,
+    );
+
+  return useMutation(mutationOptions);
+};
+/**
+ * List datasets for a datasource.
+ * @summary List Datasource Datasets
+ */
+export const listDatasourceDatasetsApiV1DatasourcesDatasourceIdDatasetsGet = (
+  datasourceId: string,
+  params?: ListDatasourceDatasetsApiV1DatasourcesDatasourceIdDatasetsGetParams,
+  signal?: AbortSignal,
+) => {
+  return customInstance<DatasourceDatasetsResponse>({
+    url: `/api/v1/datasources/${datasourceId}/datasets`,
+    method: "GET",
+    params,
+    signal,
+  });
+};
+
+export const getListDatasourceDatasetsApiV1DatasourcesDatasourceIdDatasetsGetQueryKey =
+  (
+    datasourceId: string,
+    params?: ListDatasourceDatasetsApiV1DatasourcesDatasourceIdDatasetsGetParams,
+  ) => {
+    return [
+      `/api/v1/datasources/${datasourceId}/datasets`,
+      ...(params ? [params] : []),
+    ] as const;
+  };
+
+export const getListDatasourceDatasetsApiV1DatasourcesDatasourceIdDatasetsGetQueryOptions =
+  <
+    TData = Awaited<
+      ReturnType<
+        typeof listDatasourceDatasetsApiV1DatasourcesDatasourceIdDatasetsGet
+      >
+    >,
+    TError = HTTPValidationError,
+  >(
+    datasourceId: string,
+    params?: ListDatasourceDatasetsApiV1DatasourcesDatasourceIdDatasetsGetParams,
+    options?: {
+      query?: Partial<
+        UseQueryOptions<
+          Awaited<
+            ReturnType<
+              typeof listDatasourceDatasetsApiV1DatasourcesDatasourceIdDatasetsGet
+            >
+          >,
+          TError,
+          TData
+        >
+      >;
+    },
+  ) => {
+    const { query: queryOptions } = options ?? {};
+
+    const queryKey =
+      queryOptions?.queryKey ??
+      getListDatasourceDatasetsApiV1DatasourcesDatasourceIdDatasetsGetQueryKey(
+        datasourceId,
+        params,
+      );
+
+    const queryFn: QueryFunction<
+      Awaited<
+        ReturnType<
+          typeof listDatasourceDatasetsApiV1DatasourcesDatasourceIdDatasetsGet
+        >
+      >
+    > = ({ signal }) =>
+      listDatasourceDatasetsApiV1DatasourcesDatasourceIdDatasetsGet(
+        datasourceId,
+        params,
+        signal,
+      );
+
+    return {
+      queryKey,
+      queryFn,
+      enabled: !!datasourceId,
+      ...queryOptions,
+    } as UseQueryOptions<
+      Awaited<
+        ReturnType<
+          typeof listDatasourceDatasetsApiV1DatasourcesDatasourceIdDatasetsGet
+        >
+      >,
+      TError,
+      TData
+    > & { queryKey: QueryKey };
+  };
+
+export type ListDatasourceDatasetsApiV1DatasourcesDatasourceIdDatasetsGetQueryResult =
+  NonNullable<
+    Awaited<
+      ReturnType<
+        typeof listDatasourceDatasetsApiV1DatasourcesDatasourceIdDatasetsGet
+      >
+    >
+  >;
+export type ListDatasourceDatasetsApiV1DatasourcesDatasourceIdDatasetsGetQueryError =
+  HTTPValidationError;
+
+/**
+ * @summary List Datasource Datasets
+ */
+export const useListDatasourceDatasetsApiV1DatasourcesDatasourceIdDatasetsGet =
+  <
+    TData = Awaited<
+      ReturnType<
+        typeof listDatasourceDatasetsApiV1DatasourcesDatasourceIdDatasetsGet
+      >
+    >,
+    TError = HTTPValidationError,
+  >(
+    datasourceId: string,
+    params?: ListDatasourceDatasetsApiV1DatasourcesDatasourceIdDatasetsGetParams,
+    options?: {
+      query?: Partial<
+        UseQueryOptions<
+          Awaited<
+            ReturnType<
+              typeof listDatasourceDatasetsApiV1DatasourcesDatasourceIdDatasetsGet
+            >
+          >,
+          TError,
+          TData
+        >
+      >;
+    },
+  ): UseQueryResult<TData, TError> & { queryKey: QueryKey } => {
+    const queryOptions =
+      getListDatasourceDatasetsApiV1DatasourcesDatasourceIdDatasetsGetQueryOptions(
+        datasourceId,
+        params,
+        options,
+      );
+
+    const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+      queryKey: QueryKey;
+    };
+
+    query.queryKey = queryOptions.queryKey;
+
+    return query;
+  };
+
+/**
  * List all supported data source types.
 
 Returns the configuration schema for each type, which can be used
@@ -1930,3 +2182,252 @@ export const useGetColumnStatsApiV1V2DatasourcesDatasourceIdStatsPost = <
 
   return useMutation(mutationOptions);
 };
+/**
+ * Sync schema and register/update datasets.
+
+Discovers all tables from the data source and upserts them
+into the datasets table. Soft-deletes datasets that no longer exist.
+ * @summary Sync Datasource Schema
+ */
+export const syncDatasourceSchemaApiV1V2DatasourcesDatasourceIdSyncPost = (
+  datasourceId: string,
+) => {
+  return customInstance<SyncResponse>({
+    url: `/api/v1/v2/datasources/${datasourceId}/sync`,
+    method: "POST",
+  });
+};
+
+export const getSyncDatasourceSchemaApiV1V2DatasourcesDatasourceIdSyncPostMutationOptions =
+  <TError = HTTPValidationError, TContext = unknown>(options?: {
+    mutation?: UseMutationOptions<
+      Awaited<
+        ReturnType<
+          typeof syncDatasourceSchemaApiV1V2DatasourcesDatasourceIdSyncPost
+        >
+      >,
+      TError,
+      { datasourceId: string },
+      TContext
+    >;
+  }): UseMutationOptions<
+    Awaited<
+      ReturnType<
+        typeof syncDatasourceSchemaApiV1V2DatasourcesDatasourceIdSyncPost
+      >
+    >,
+    TError,
+    { datasourceId: string },
+    TContext
+  > => {
+    const { mutation: mutationOptions } = options ?? {};
+
+    const mutationFn: MutationFunction<
+      Awaited<
+        ReturnType<
+          typeof syncDatasourceSchemaApiV1V2DatasourcesDatasourceIdSyncPost
+        >
+      >,
+      { datasourceId: string }
+    > = (props) => {
+      const { datasourceId } = props ?? {};
+
+      return syncDatasourceSchemaApiV1V2DatasourcesDatasourceIdSyncPost(
+        datasourceId,
+      );
+    };
+
+    return { mutationFn, ...mutationOptions };
+  };
+
+export type SyncDatasourceSchemaApiV1V2DatasourcesDatasourceIdSyncPostMutationResult =
+  NonNullable<
+    Awaited<
+      ReturnType<
+        typeof syncDatasourceSchemaApiV1V2DatasourcesDatasourceIdSyncPost
+      >
+    >
+  >;
+
+export type SyncDatasourceSchemaApiV1V2DatasourcesDatasourceIdSyncPostMutationError =
+  HTTPValidationError;
+
+/**
+ * @summary Sync Datasource Schema
+ */
+export const useSyncDatasourceSchemaApiV1V2DatasourcesDatasourceIdSyncPost = <
+  TError = HTTPValidationError,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<
+      ReturnType<
+        typeof syncDatasourceSchemaApiV1V2DatasourcesDatasourceIdSyncPost
+      >
+    >,
+    TError,
+    { datasourceId: string },
+    TContext
+  >;
+}): UseMutationResult<
+  Awaited<
+    ReturnType<
+      typeof syncDatasourceSchemaApiV1V2DatasourcesDatasourceIdSyncPost
+    >
+  >,
+  TError,
+  { datasourceId: string },
+  TContext
+> => {
+  const mutationOptions =
+    getSyncDatasourceSchemaApiV1V2DatasourcesDatasourceIdSyncPostMutationOptions(
+      options,
+    );
+
+  return useMutation(mutationOptions);
+};
+/**
+ * List datasets for a datasource.
+ * @summary List Datasource Datasets
+ */
+export const listDatasourceDatasetsApiV1V2DatasourcesDatasourceIdDatasetsGet = (
+  datasourceId: string,
+  params?: ListDatasourceDatasetsApiV1V2DatasourcesDatasourceIdDatasetsGetParams,
+  signal?: AbortSignal,
+) => {
+  return customInstance<DatasourceDatasetsResponse>({
+    url: `/api/v1/v2/datasources/${datasourceId}/datasets`,
+    method: "GET",
+    params,
+    signal,
+  });
+};
+
+export const getListDatasourceDatasetsApiV1V2DatasourcesDatasourceIdDatasetsGetQueryKey =
+  (
+    datasourceId: string,
+    params?: ListDatasourceDatasetsApiV1V2DatasourcesDatasourceIdDatasetsGetParams,
+  ) => {
+    return [
+      `/api/v1/v2/datasources/${datasourceId}/datasets`,
+      ...(params ? [params] : []),
+    ] as const;
+  };
+
+export const getListDatasourceDatasetsApiV1V2DatasourcesDatasourceIdDatasetsGetQueryOptions =
+  <
+    TData = Awaited<
+      ReturnType<
+        typeof listDatasourceDatasetsApiV1V2DatasourcesDatasourceIdDatasetsGet
+      >
+    >,
+    TError = HTTPValidationError,
+  >(
+    datasourceId: string,
+    params?: ListDatasourceDatasetsApiV1V2DatasourcesDatasourceIdDatasetsGetParams,
+    options?: {
+      query?: Partial<
+        UseQueryOptions<
+          Awaited<
+            ReturnType<
+              typeof listDatasourceDatasetsApiV1V2DatasourcesDatasourceIdDatasetsGet
+            >
+          >,
+          TError,
+          TData
+        >
+      >;
+    },
+  ) => {
+    const { query: queryOptions } = options ?? {};
+
+    const queryKey =
+      queryOptions?.queryKey ??
+      getListDatasourceDatasetsApiV1V2DatasourcesDatasourceIdDatasetsGetQueryKey(
+        datasourceId,
+        params,
+      );
+
+    const queryFn: QueryFunction<
+      Awaited<
+        ReturnType<
+          typeof listDatasourceDatasetsApiV1V2DatasourcesDatasourceIdDatasetsGet
+        >
+      >
+    > = ({ signal }) =>
+      listDatasourceDatasetsApiV1V2DatasourcesDatasourceIdDatasetsGet(
+        datasourceId,
+        params,
+        signal,
+      );
+
+    return {
+      queryKey,
+      queryFn,
+      enabled: !!datasourceId,
+      ...queryOptions,
+    } as UseQueryOptions<
+      Awaited<
+        ReturnType<
+          typeof listDatasourceDatasetsApiV1V2DatasourcesDatasourceIdDatasetsGet
+        >
+      >,
+      TError,
+      TData
+    > & { queryKey: QueryKey };
+  };
+
+export type ListDatasourceDatasetsApiV1V2DatasourcesDatasourceIdDatasetsGetQueryResult =
+  NonNullable<
+    Awaited<
+      ReturnType<
+        typeof listDatasourceDatasetsApiV1V2DatasourcesDatasourceIdDatasetsGet
+      >
+    >
+  >;
+export type ListDatasourceDatasetsApiV1V2DatasourcesDatasourceIdDatasetsGetQueryError =
+  HTTPValidationError;
+
+/**
+ * @summary List Datasource Datasets
+ */
+export const useListDatasourceDatasetsApiV1V2DatasourcesDatasourceIdDatasetsGet =
+  <
+    TData = Awaited<
+      ReturnType<
+        typeof listDatasourceDatasetsApiV1V2DatasourcesDatasourceIdDatasetsGet
+      >
+    >,
+    TError = HTTPValidationError,
+  >(
+    datasourceId: string,
+    params?: ListDatasourceDatasetsApiV1V2DatasourcesDatasourceIdDatasetsGetParams,
+    options?: {
+      query?: Partial<
+        UseQueryOptions<
+          Awaited<
+            ReturnType<
+              typeof listDatasourceDatasetsApiV1V2DatasourcesDatasourceIdDatasetsGet
+            >
+          >,
+          TError,
+          TData
+        >
+      >;
+    },
+  ): UseQueryResult<TData, TError> & { queryKey: QueryKey } => {
+    const queryOptions =
+      getListDatasourceDatasetsApiV1V2DatasourcesDatasourceIdDatasetsGetQueryOptions(
+        datasourceId,
+        params,
+        options,
+      );
+
+    const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+      queryKey: QueryKey;
+    };
+
+    query.queryKey = queryOptions.queryKey;
+
+    return query;
+  };

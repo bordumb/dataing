@@ -20,6 +20,7 @@ from dataing.adapters.datasource.errors import (
 from dataing.adapters.datasource.registry import register_adapter
 from dataing.adapters.datasource.types import (
     AdapterCapabilities,
+    Column,
     ConfigField,
     ConfigSchema,
     ConnectionTestResult,
@@ -31,6 +32,7 @@ from dataing.adapters.datasource.types import (
     SchemaResponse,
     SourceCategory,
     SourceType,
+    Table,
 )
 
 STRIPE_OBJECTS: dict[str, dict[str, Any]] = {
@@ -353,42 +355,43 @@ class StripeAdapter(APIAdapter):
             return [o.strip() for o in objects_config.split(",")]
         return list(STRIPE_OBJECTS.keys())
 
-    async def describe_object(self, object_name: str) -> dict[str, Any]:
+    async def describe_object(self, object_name: str) -> Table:
         """Get schema for a Stripe object."""
         obj_def = STRIPE_OBJECTS.get(object_name)
         if not obj_def:
-            return {
-                "name": object_name,
-                "table_type": "object",
-                "native_type": "STRIPE_OBJECT",
-                "native_path": object_name,
-                "columns": [],
-            }
+            return Table(
+                name=object_name,
+                table_type="object",
+                native_type="STRIPE_OBJECT",
+                native_path=object_name,
+                columns=[],
+            )
 
         columns = []
         for col in obj_def["columns"]:
             columns.append(
-                {
-                    "name": col["name"],
-                    "data_type": col["type"],
-                    "native_type": col["type"].value,
-                    "nullable": not col.get("pk", False),
-                    "is_primary_key": col.get("pk", False),
-                    "is_partition_key": False,
-                }
+                Column(
+                    name=col["name"],
+                    data_type=col["type"],
+                    native_type=col["type"].value,
+                    nullable=not col.get("pk", False),
+                    is_primary_key=col.get("pk", False),
+                    is_partition_key=False,
+                )
             )
 
-        return {
-            "name": object_name,
-            "table_type": "object",
-            "native_type": "STRIPE_OBJECT",
-            "native_path": object_name,
-            "columns": columns,
-        }
+        return Table(
+            name=object_name,
+            table_type="object",
+            native_type="STRIPE_OBJECT",
+            native_path=object_name,
+            columns=columns,
+        )
 
     async def query_object(
         self,
         object_name: str,
+        query: str | None = None,
         limit: int = 100,
     ) -> QueryResult:
         """Query records from a Stripe object."""

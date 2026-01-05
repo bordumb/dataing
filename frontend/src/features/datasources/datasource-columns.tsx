@@ -1,5 +1,6 @@
 import { ColumnDef } from '@tanstack/react-table'
 import { MoreHorizontal, Trash2 } from 'lucide-react'
+import { Link } from 'react-router-dom'
 
 import { Badge } from '@/components/ui/Badge'
 import { Button } from '@/components/ui/Button'
@@ -91,6 +92,20 @@ export const datasourceColumns: ColumnDef<DataSource>[] = [
         {formatDate(row.getValue('created_at'))}
       </span>
     ),
+  },
+  {
+    id: 'datasets',
+    header: 'Datasets',
+    cell: ({ row }) => {
+      const datasource = row.original
+      return (
+        <Link to={`/datasources/${datasource.id}/datasets`}>
+          <Button variant="outline" size="sm">
+            See Datasets
+          </Button>
+        </Link>
+      )
+    },
   },
   {
     id: 'actions',

@@ -232,7 +232,8 @@ def get_orchestrator(request: Request) -> InvestigationOrchestrator:
     Returns:
         The configured InvestigationOrchestrator.
     """
-    return request.app.state.orchestrator
+    orchestrator: InvestigationOrchestrator = request.app.state.orchestrator
+    return orchestrator
 
 
 def get_investigations(request: Request) -> dict[str, dict[str, Any]]:
@@ -257,7 +258,8 @@ def get_app_db(request: Request) -> AppDatabase:
     Returns:
         The configured AppDatabase.
     """
-    return request.app.state.app_db
+    app_db: AppDatabase = request.app.state.app_db
+    return app_db
 
 
 async def get_tenant_adapter(

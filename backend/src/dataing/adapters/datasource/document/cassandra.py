@@ -296,9 +296,10 @@ class CassandraAdapter(DocumentAdapter):
 
     async def scan_collection(
         self,
-        name: str,
+        collection: str,
         filter: dict[str, Any] | None = None,
         limit: int = 100,
+        skip: int = 0,
     ) -> QueryResult:
         """Scan a Cassandra table."""
         if not self._connected or not self._session:
@@ -307,7 +308,9 @@ class CassandraAdapter(DocumentAdapter):
         start_time = time.time()
         try:
             keyspace = self._config.get("keyspace", "")
-            full_table = f"{keyspace}.{name}" if keyspace and "." not in name else name
+            full_table = (
+                f"{keyspace}.{collection}" if keyspace and "." not in collection else collection
+            )
 
             cql = f"SELECT * FROM {full_table}"
 

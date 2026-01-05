@@ -16,11 +16,12 @@ from dataing.adapters.datasource.errors import (
     QueryTimeoutError,
     SchemaFetchFailedError,
 )
-from dataing.adapters.datasource.filesystem.base import FileSystemAdapter
+from dataing.adapters.datasource.filesystem.base import FileInfo, FileSystemAdapter
 from dataing.adapters.datasource.registry import register_adapter
 from dataing.adapters.datasource.type_mapping import normalize_type
 from dataing.adapters.datasource.types import (
     AdapterCapabilities,
+    Column,
     ConfigField,
     ConfigSchema,
     ConnectionTestResult,
@@ -31,6 +32,7 @@ from dataing.adapters.datasource.types import (
     SchemaResponse,
     SourceCategory,
     SourceType,
+    Table,
 )
 
 LOCAL_FILE_CONFIG_SCHEMA = ConfigSchema(
@@ -204,18 +206,23 @@ class LocalFileAdapter(FileSystemAdapter):
                 error_code="CONNECTION_FAILED",
             )
 
-    async def list_files(self, pattern: str = "*") -> list[dict[str, Any]]:
+    async def list_files(
+        self,
+        pattern: str = "*",
+        recursive: bool = True,
+    ) -> list[FileInfo]:
         """List files in the local directory."""
         if not self._connected:
             raise ConnectionFailedError(message="Not connected to local filesystem")
 
         try:
             base_path = self._get_base_path()
-            recursive = self._config.get("recursive", False)
+            # Use parameter if provided, otherwise fall back to config
+            do_recursive = recursive if recursive else self._config.get("recursive", False)
 
-            files = []
+            files: list[FileInfo] = []
 
-            if recursive:
+            if do_recursive:
                 for root, _, filenames in os.walk(base_path):
                     for filename in filenames:
                         if self._matches_pattern(filename, pattern):
@@ -223,13 +230,13 @@ class LocalFileAdapter(FileSystemAdapter):
                             try:
                                 size = os.path.getsize(filepath)
                             except Exception:
-                                size = None
+                                size = 0
                             files.append(
-                                {
-                                    "path": filepath,
-                                    "name": filename,
-                                    "size": size,
-                                }
+                                FileInfo(
+                                    path=filepath,
+                                    name=filename,
+                                    size_bytes=size,
+                                )
                             )
             else:
                 for entry in os.listdir(base_path):
@@ -238,13 +245,13 @@ class LocalFileAdapter(FileSystemAdapter):
                         try:
                             size = os.path.getsize(filepath)
                         except Exception:
-                            size = None
+                            size = 0
                         files.append(
-                            {
-                                "path": filepath,
-                                "name": entry,
-                                "size": size,
-                            }
+                            FileInfo(
+                                path=filepath,
+                                name=entry,
+                                size_bytes=size,
+                            )
                         )
 
             return files
@@ -334,25 +341,29 @@ class LocalFileAdapter(FileSystemAdapter):
         result: str = normalize_type(type_str, SourceType.DUCKDB).value
         return result
 
-    async def infer_schema(self, path: str) -> dict[str, Any]:
+    async def infer_schema(
+        self,
+        path: str,
+        file_format: str | None = None,
+    ) -> Table:
         """Infer schema from a local file."""
         if not self._connected or not self._conn:
             raise ConnectionFailedError(message="Not connected to local filesystem")
 
         try:
-            file_format = self._config.get("file_format", "auto")
+            fmt = file_format or self._config.get("file_format", "auto")
 
-            if file_format == "auto":
+            if fmt == "auto":
                 if path.endswith(".parquet"):
-                    file_format = "parquet"
+                    fmt = "parquet"
                 elif path.endswith(".csv"):
-                    file_format = "csv"
+                    fmt = "csv"
                 else:
-                    file_format = "json"
+                    fmt = "json"
 
-            if file_format == "parquet":
+            if fmt == "parquet":
                 sql = f"DESCRIBE SELECT * FROM read_parquet('{path}')"
-            elif file_format == "csv":
+            elif fmt == "csv":
                 sql = f"DESCRIBE SELECT * FROM read_csv_auto('{path}')"
             else:
                 sql = f"DESCRIBE SELECT * FROM read_json_auto('{path}')"
@@ -365,14 +376,14 @@ class LocalFileAdapter(FileSystemAdapter):
                 col_name = row[0]
                 col_type = row[1]
                 columns.append(
-                    {
-                        "name": col_name,
-                        "data_type": normalize_type(col_type, SourceType.DUCKDB),
-                        "native_type": col_type,
-                        "nullable": True,
-                        "is_primary_key": False,
-                        "is_partition_key": False,
-                    }
+                    Column(
+                        name=col_name,
+                        data_type=normalize_type(col_type, SourceType.DUCKDB),
+                        native_type=col_type,
+                        nullable=True,
+                        is_primary_key=False,
+                        is_partition_key=False,
+                    )
                 )
 
             filename = os.path.basename(path)
@@ -383,14 +394,14 @@ class LocalFileAdapter(FileSystemAdapter):
             except Exception:
                 size = None
 
-            return {
-                "name": table_name,
-                "table_type": "file",
-                "native_type": f"LOCAL_{file_format.upper()}_FILE",
-                "native_path": path,
-                "columns": columns,
-                "size_bytes": size,
-            }
+            return Table(
+                name=table_name,
+                table_type="file",
+                native_type=f"LOCAL_{fmt.upper()}_FILE",
+                native_path=path,
+                columns=columns,
+                size_bytes=size,
+            )
 
         except Exception as e:
             raise SchemaFetchFailedError(
@@ -472,26 +483,26 @@ class LocalFileAdapter(FileSystemAdapter):
                     pass
 
             if filter and filter.table_pattern:
-                all_files = [f for f in all_files if filter.table_pattern in f["name"]]
+                all_files = [f for f in all_files if filter.table_pattern in f.name]
 
             if filter and filter.max_tables:
                 all_files = all_files[: filter.max_tables]
 
-            tables = []
+            tables: list[Table] = []
             for file_info in all_files:
                 try:
-                    table_def = await self.infer_schema(file_info["path"])
+                    table_def = await self.infer_schema(file_info.path)
                     tables.append(table_def)
                 except Exception:
                     tables.append(
-                        {
-                            "name": file_info["name"].rsplit(".", 1)[0],
-                            "table_type": "file",
-                            "native_type": "LOCAL_FILE",
-                            "native_path": file_info["path"],
-                            "columns": [],
-                            "size_bytes": file_info.get("size"),
-                        }
+                        Table(
+                            name=file_info.name.rsplit(".", 1)[0],
+                            table_type="file",
+                            native_type="LOCAL_FILE",
+                            native_path=file_info.path,
+                            columns=[],
+                            size_bytes=file_info.size_bytes,
+                        )
                     )
 
             base_path = self._get_base_path()

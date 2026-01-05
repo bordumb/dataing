@@ -25,8 +25,10 @@ from .exceptions import CircuitBreakerTripped, SchemaDiscoveryError
 from .state import Event, InvestigationState
 
 if TYPE_CHECKING:
+    from dataing.adapters.datasource.sql.base import SQLAdapter
+
     from ..safety.circuit_breaker import CircuitBreaker
-    from .interfaces import ContextEngine, DatabaseAdapter, LLMClient
+    from .interfaces import ContextEngine, LLMClient
 
 logger = structlog.get_logger()
 
@@ -61,7 +63,7 @@ class InvestigationOrchestrator:
 
     def __init__(
         self,
-        db: DatabaseAdapter,
+        db: SQLAdapter | None,
         llm: LLMClient,
         context_engine: ContextEngine,
         circuit_breaker: CircuitBreaker,
@@ -70,7 +72,8 @@ class InvestigationOrchestrator:
         """Initialize the orchestrator.
 
         Args:
-            db: Database adapter for executing queries (fallback).
+            db: Database adapter for executing queries (fallback). Can be None
+                if adapters are always provided per-investigation.
             llm: LLM client for generating hypotheses and queries.
             context_engine: Engine for gathering investigation context.
             circuit_breaker: Safety circuit breaker.
@@ -82,12 +85,12 @@ class InvestigationOrchestrator:
         self.circuit_breaker = circuit_breaker
         self.config = config or OrchestratorConfig()
         # Will be set per-investigation when using tenant data source
-        self._current_adapter: DatabaseAdapter | None = None
+        self._current_adapter: SQLAdapter | None = None
 
     async def run_investigation(
         self,
         state: InvestigationState,
-        data_adapter: DatabaseAdapter | None = None,
+        data_adapter: SQLAdapter | None = None,
     ) -> Finding:
         """Execute a complete investigation.
 

@@ -234,7 +234,10 @@ class AnthropicClient:
                     system=system,
                     messages=cast(list[MessageParam], messages),
                 )
-                return response.content[0].text
+                block = response.content[0]
+                if hasattr(block, "text"):
+                    return block.text
+                return ""
             except anthropic.RateLimitError as e:
                 if attempt < max_retries - 1:
                     await asyncio.sleep(2**attempt)

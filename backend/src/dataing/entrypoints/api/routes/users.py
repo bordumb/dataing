@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Annotated, Literal
+from typing import Annotated, Any, Literal
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Response
@@ -178,6 +178,9 @@ async def create_user(
         request.role,
     )
 
+    if result is None:
+        raise HTTPException(status_code=500, detail="Failed to create user")
+
     return UserResponse(
         id=str(result["id"]),
         email=result["email"],
@@ -200,8 +203,8 @@ async def update_user(
     Requires admin scope.
     """
     # Build update query dynamically
-    updates = []
-    args = [user_id, auth.tenant_id]
+    updates: list[str] = []
+    args: list[Any] = [user_id, auth.tenant_id]
     idx = 3
 
     if request.name is not None:

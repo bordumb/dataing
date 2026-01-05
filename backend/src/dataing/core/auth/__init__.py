@@ -1,5 +1,6 @@
 """Auth domain types and utilities."""
 
+from dataing.core.auth.password import hash_password, verify_password
 from dataing.core.auth.types import (
     Organization,
     OrgMembership,
@@ -18,4 +19,6 @@ __all__ = [
     "TeamMembership",
     "OrgRole",
     "TokenPayload",
+    "hash_password",
+    "verify_password",
 ]

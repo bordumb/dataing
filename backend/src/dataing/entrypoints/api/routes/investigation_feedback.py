@@ -15,7 +15,7 @@ from dataing.adapters.feedback import EventType, FeedbackAdapter
 from dataing.entrypoints.api.deps import get_app_db, get_feedback_adapter
 from dataing.entrypoints.api.middleware.auth import ApiKeyContext, verify_api_key
 
-router = APIRouter(prefix="/feedback", tags=["feedback"])
+router = APIRouter(prefix="/investigation-feedback", tags=["investigation-feedback"])
 
 AuthDep = Annotated[ApiKeyContext, Depends(verify_api_key)]
 FeedbackAdapterDep = Annotated[FeedbackAdapter, Depends(get_feedback_adapter)]

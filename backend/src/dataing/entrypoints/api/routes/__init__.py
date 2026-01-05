@@ -12,6 +12,7 @@ from dataing.entrypoints.api.routes.investigation_feedback import (
 )
 from dataing.entrypoints.api.routes.investigations import router as investigations_router
 from dataing.entrypoints.api.routes.lineage import router as lineage_router
+from dataing.entrypoints.api.routes.schema_comments import router as schema_comments_router
 from dataing.entrypoints.api.routes.settings import router as settings_router
 from dataing.entrypoints.api.routes.users import router as users_router
 
@@ -29,5 +30,6 @@ api_router.include_router(users_router)
 api_router.include_router(dashboard_router)
 api_router.include_router(lineage_router)
 api_router.include_router(investigation_feedback_router)
+api_router.include_router(schema_comments_router)
 
 __all__ = ["api_router"]

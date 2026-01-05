@@ -1,8 +1,9 @@
 'use client'
 
 import { formatDistanceToNow } from 'date-fns'
-import { ThumbsUp, ThumbsDown, Reply } from 'lucide-react'
+import { Reply } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
+import { VoteButtons } from '@/components/VoteButtons'
 import { cn } from '@/lib/utils'
 import type { SchemaCommentResponse, KnowledgeCommentResponse } from '@/lib/api/model'
 
@@ -11,11 +12,11 @@ type Comment = SchemaCommentResponse | KnowledgeCommentResponse
 interface CommentItemProps {
   comment: Comment
   onReply?: () => void
-  onVote?: (vote: 1 | -1) => void
-  onRemoveVote?: () => void
+  onVote: (vote: 1 | -1) => void
+  onRemoveVote: () => void
   onDelete?: () => void
   isNested?: boolean
-  currentUserVote?: 1 | -1 | null
+  userVote: 1 | -1 | null
 }
 
 export function CommentItem({
@@ -25,22 +26,10 @@ export function CommentItem({
   onRemoveVote,
   onDelete,
   isNested = false,
-  currentUserVote = null,
+  userVote,
 }: CommentItemProps) {
   // Suppress unused variable warning - onDelete will be used in future iterations
   void onDelete
-
-  const netVotes = comment.upvotes - comment.downvotes
-
-  const handleVoteClick = (vote: 1 | -1) => {
-    if (currentUserVote === vote) {
-      // Clicking the same vote removes it
-      onRemoveVote?.()
-    } else {
-      // Clicking different vote or no vote - set the vote
-      onVote?.(vote)
-    }
-  }
 
   return (
     <div className={cn('flex flex-col gap-2', isNested && 'ml-6 pl-4 border-l-2 border-muted')}>
@@ -57,37 +46,13 @@ export function CommentItem({
       <div className="text-sm whitespace-pre-wrap">{comment.content}</div>
 
       <div className="flex items-center gap-2">
-        <div className="flex items-center gap-1">
-          <Button
-            variant="ghost"
-            size="sm"
-            className={cn(
-              'h-7 px-2',
-              currentUserVote === 1 && 'text-green-600 bg-green-50'
-            )}
-            onClick={() => handleVoteClick(1)}
-          >
-            <ThumbsUp className="h-3 w-3" />
-          </Button>
-          <span className={cn(
-            'text-xs font-medium min-w-[20px] text-center',
-            netVotes > 0 && 'text-green-600',
-            netVotes < 0 && 'text-red-600'
-          )}>
-            {netVotes}
-          </span>
-          <Button
-            variant="ghost"
-            size="sm"
-            className={cn(
-              'h-7 px-2',
-              currentUserVote === -1 && 'text-red-600 bg-red-50'
-            )}
-            onClick={() => handleVoteClick(-1)}
-          >
-            <ThumbsDown className="h-3 w-3" />
-          </Button>
-        </div>
+        <VoteButtons
+          upvotes={comment.upvotes}
+          downvotes={comment.downvotes}
+          userVote={userVote}
+          onVote={onVote}
+          onRemoveVote={onRemoveVote}
+        />
 
         {onReply && (
           <Button variant="ghost" size="sm" className="h-7 px-2" onClick={onReply}>

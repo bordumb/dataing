@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useCallback } from 'react'
+import { useState } from 'react'
 import { CommentItem } from './comment-item'
 import { CommentEditor } from './comment-editor'
 import type { SchemaCommentResponse, KnowledgeCommentResponse } from '@/lib/api/model'
@@ -14,6 +14,7 @@ interface CommentThreadProps {
   onRemoveVote: (commentId: string) => void
   onDelete?: (commentId: string) => void
   isSubmitting?: boolean
+  getVote: (commentId: string) => 1 | -1 | null
 }
 
 export function CommentThread({
@@ -23,20 +24,9 @@ export function CommentThread({
   onRemoveVote,
   onDelete,
   isSubmitting,
+  getVote,
 }: CommentThreadProps) {
   const [replyingTo, setReplyingTo] = useState<string | null>(null)
-  // Track user's votes locally for optimistic UI
-  const [userVotes, setUserVotes] = useState<Record<string, 1 | -1 | null>>({})
-
-  const handleVote = useCallback((commentId: string, vote: 1 | -1) => {
-    setUserVotes((prev) => ({ ...prev, [commentId]: vote }))
-    onVote(commentId, vote)
-  }, [onVote])
-
-  const handleRemoveVote = useCallback((commentId: string) => {
-    setUserVotes((prev) => ({ ...prev, [commentId]: null }))
-    onRemoveVote(commentId)
-  }, [onRemoveVote])
 
   // Build thread structure from flat list
   const rootComments = comments.filter((c) => !c.parent_id)
@@ -51,10 +41,10 @@ export function CommentThread({
         comment={comment}
         isNested={isNested}
         onReply={() => setReplyingTo(comment.id)}
-        onVote={(vote) => handleVote(comment.id, vote)}
-        onRemoveVote={() => handleRemoveVote(comment.id)}
+        onVote={(vote) => onVote(comment.id, vote)}
+        onRemoveVote={() => onRemoveVote(comment.id)}
         onDelete={onDelete ? () => onDelete(comment.id) : undefined}
-        currentUserVote={userVotes[comment.id] ?? null}
+        userVote={getVote(comment.id)}
       />
 
       {replyingTo === comment.id && (

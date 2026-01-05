@@ -13,6 +13,7 @@ import {
   useCreateSchemaComment,
 } from '@/lib/api/schema-comments'
 import { useVoteOnComment, useRemoveVote } from '@/lib/api/comment-votes'
+import { useVoteState } from '@/lib/hooks/useVoteState'
 
 interface CommentSlidePanelProps {
   datasetId: string
@@ -30,7 +31,8 @@ export function CommentSlidePanel({
   const { data: comments = [], isLoading, isError } = useSchemaComments(datasetId, fieldName)
   const createComment = useCreateSchemaComment(datasetId)
   const voteOnComment = useVoteOnComment(datasetId, 'schema')
-  const removeVote = useRemoveVote(datasetId, 'schema')
+  const removeVoteMutation = useRemoveVote(datasetId, 'schema')
+  const { getVote, setVote } = useVoteState(datasetId)
 
   const handleCreateComment = (content: string, parentId?: string) => {
     createComment.mutate({
@@ -41,11 +43,13 @@ export function CommentSlidePanel({
   }
 
   const handleVote = (commentId: string, vote: 1 | -1) => {
+    setVote(commentId, vote)
     voteOnComment.mutate({ commentId, vote: { vote } })
   }
 
   const handleRemoveVote = (commentId: string) => {
-    removeVote.mutate(commentId)
+    setVote(commentId, null)
+    removeVoteMutation.mutate(commentId)
   }
 
   return (
@@ -102,6 +106,7 @@ export function CommentSlidePanel({
                 onVote={handleVote}
                 onRemoveVote={handleRemoveVote}
                 isSubmitting={createComment.isPending}
+                getVote={getVote}
               />
             )}
           </div>

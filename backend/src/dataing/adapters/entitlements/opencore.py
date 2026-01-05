@@ -1,6 +1,6 @@
 """OpenCore entitlements adapter - default free tier with no external dependencies."""
 
-from dataing.core.entitlements import PLAN_FEATURES, Feature, Plan
+from dataing.core.entitlements.features import PLAN_FEATURES, Feature, Plan
 
 
 class OpenCoreAdapter:

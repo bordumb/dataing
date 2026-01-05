@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import Annotated, Literal
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Response
 from pydantic import BaseModel, Field
 
 from dataing.adapters.db.app_db import AppDatabase
@@ -24,14 +24,14 @@ class VoteCreate(BaseModel):
     vote: Literal[1, -1] = Field(..., description="1 for upvote, -1 for downvote")
 
 
-@router.post("/{comment_type}/{comment_id}/vote", status_code=204)
+@router.post("/{comment_type}/{comment_id}/vote", status_code=204, response_class=Response)
 async def vote_on_comment(
     comment_type: Literal["schema", "knowledge"],
     comment_id: UUID,
     body: VoteCreate,
     auth: AuthDep,
     db: DbDep,
-) -> None:
+) -> Response:
     """Vote on a comment."""
     # Verify comment exists
     if comment_type == "schema":
@@ -52,15 +52,16 @@ async def vote_on_comment(
         user_id=user_id,
         vote=body.vote,
     )
+    return Response(status_code=204)
 
 
-@router.delete("/{comment_type}/{comment_id}/vote", status_code=204)
+@router.delete("/{comment_type}/{comment_id}/vote", status_code=204, response_class=Response)
 async def remove_vote(
     comment_type: Literal["schema", "knowledge"],
     comment_id: UUID,
     auth: AuthDep,
     db: DbDep,
-) -> None:
+) -> Response:
     """Remove vote from a comment."""
     user_id = auth.user_id if auth.user_id else auth.tenant_id
 
@@ -72,3 +73,4 @@ async def remove_vote(
     )
     if not deleted:
         raise HTTPException(status_code=404, detail="Vote not found")
+    return Response(status_code=204)

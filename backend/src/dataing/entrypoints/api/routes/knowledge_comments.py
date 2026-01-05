@@ -6,7 +6,7 @@ from datetime import datetime
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Response
 from pydantic import BaseModel, Field
 
 from dataing.adapters.db.app_db import AppDatabase
@@ -104,13 +104,13 @@ async def update_knowledge_comment(
     return KnowledgeCommentResponse(**comment)
 
 
-@router.delete("/{comment_id}", status_code=204)
+@router.delete("/{comment_id}", status_code=204, response_class=Response)
 async def delete_knowledge_comment(
     dataset_id: UUID,
     comment_id: UUID,
     auth: AuthDep,
     db: DbDep,
-) -> None:
+) -> Response:
     """Delete a knowledge comment."""
     existing = await db.get_knowledge_comment(
         tenant_id=auth.tenant_id,
@@ -124,3 +124,4 @@ async def delete_knowledge_comment(
     )
     if not deleted:
         raise HTTPException(status_code=404, detail="Comment not found")
+    return Response(status_code=204)

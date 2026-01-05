@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime
+from typing import Literal
 from uuid import UUID
 
 
@@ -48,8 +49,8 @@ class CommentVote:
 
     id: UUID
     tenant_id: UUID
-    comment_type: str
+    comment_type: Literal["schema", "knowledge"]
     comment_id: UUID
     user_id: UUID
-    vote: int
+    vote: Literal[-1, 1]
     created_at: datetime

@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING
 
 from pydantic_ai import Agent
 from pydantic_ai.models.anthropic import AnthropicModel
+from pydantic_ai.output import PromptedOutput
 
 from dataing.core.domain_types import (
     AnomalyAlert,
@@ -52,24 +53,26 @@ class AnthropicClient:
         self._model = AnthropicModel(model)
 
         # Pre-configure agents for each task
+        # Using PromptedOutput mode enables chain-of-thought reasoning before structured output,
+        # which significantly improves quality for complex analytical tasks compared to tool mode.
         self._hypothesis_agent: Agent[None, HypothesesResponse] = Agent(
             model=self._model,
-            output_type=HypothesesResponse,
+            output_type=PromptedOutput(HypothesesResponse),
             retries=max_retries,
         )
         self._interpretation_agent: Agent[None, InterpretationResponse] = Agent(
             model=self._model,
-            output_type=InterpretationResponse,
+            output_type=PromptedOutput(InterpretationResponse),
             retries=max_retries,
         )
         self._synthesis_agent: Agent[None, SynthesisResponse] = Agent(
             model=self._model,
-            output_type=SynthesisResponse,
+            output_type=PromptedOutput(SynthesisResponse),
             retries=max_retries,
         )
         self._query_agent: Agent[None, QueryResponse] = Agent(
             model=self._model,
-            output_type=QueryResponse,
+            output_type=PromptedOutput(QueryResponse),
             retries=max_retries,
         )
 

@@ -10,6 +10,9 @@ import {
   ChevronUp,
   LogOut,
   Shield,
+  Users,
+  Tag,
+  Lock,
 } from 'lucide-react'
 
 import {
@@ -68,6 +71,21 @@ const settingsNavItems = [
     title: 'Single Sign-On',
     url: '/settings/sso',
     icon: Shield,
+  },
+  {
+    title: 'Teams',
+    url: '/settings/teams',
+    icon: Users,
+  },
+  {
+    title: 'Tags',
+    url: '/settings/tags',
+    icon: Tag,
+  },
+  {
+    title: 'Permissions',
+    url: '/settings/permissions',
+    icon: Lock,
   },
   {
     title: 'Notifications',

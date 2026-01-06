@@ -15,6 +15,9 @@ import { DataSourcePage } from '@/features/datasources/datasource-page'
 import { DatasetListPage, DatasetDetailPage } from '@/features/datasets'
 import { SettingsPage } from '@/features/settings/settings-page'
 import { SSOSettingsPage } from '@/features/settings/sso'
+import { TeamsSettingsPage } from '@/features/settings/teams'
+import { TagsSettingsPage } from '@/features/settings/tags'
+import { PermissionsSettingsPage } from '@/features/settings/permissions'
 import { UsagePage } from '@/features/usage/usage-page'
 import { LoginPage } from '@/features/auth/login-page'
 import { SSOLoginPage } from '@/features/auth/sso-login-page'
@@ -128,6 +131,30 @@ function App() {
                       element={
                         <FeatureErrorBoundary feature="sso settings">
                           <SSOSettingsPage />
+                        </FeatureErrorBoundary>
+                      }
+                    />
+                    <Route
+                      path="settings/teams"
+                      element={
+                        <FeatureErrorBoundary feature="teams settings">
+                          <TeamsSettingsPage />
+                        </FeatureErrorBoundary>
+                      }
+                    />
+                    <Route
+                      path="settings/tags"
+                      element={
+                        <FeatureErrorBoundary feature="tags settings">
+                          <TagsSettingsPage />
+                        </FeatureErrorBoundary>
+                      }
+                    />
+                    <Route
+                      path="settings/permissions"
+                      element={
+                        <FeatureErrorBoundary feature="permissions settings">
+                          <PermissionsSettingsPage />
                         </FeatureErrorBoundary>
                       }
                     />

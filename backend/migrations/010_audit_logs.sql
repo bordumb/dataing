@@ -31,6 +31,13 @@ CREATE TABLE IF NOT EXISTS audit_logs (
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+-- Add missing columns if table already existed (idempotent)
+DO $$ BEGIN
+    ALTER TABLE audit_logs ADD COLUMN IF NOT EXISTS resource_name VARCHAR(255);
+EXCEPTION
+    WHEN duplicate_column THEN null;
+END $$;
+
 -- Indexes for common query patterns
 CREATE INDEX IF NOT EXISTS idx_audit_logs_tenant_timestamp
     ON audit_logs(tenant_id, timestamp DESC);

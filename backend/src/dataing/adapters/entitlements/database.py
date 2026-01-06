@@ -144,7 +144,7 @@ class DatabaseEntitlementsAdapter:
 
             elif feature == Feature.MAX_DATASOURCES:
                 # Count datasources for org's tenant
-                query = "SELECT COUNT(*) FROM datasources WHERE tenant_id = $1"
+                query = "SELECT COUNT(*) FROM data_sources WHERE tenant_id = $1"
                 count = await conn.fetchval(query, str(org_id))
                 return count or 0
 

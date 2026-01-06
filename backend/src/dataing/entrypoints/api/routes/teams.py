@@ -9,6 +9,7 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, Response, status
 from pydantic import BaseModel
 
+from dataing.adapters.audit import audited
 from dataing.adapters.db.app_db import AppDatabase
 from dataing.adapters.rbac import TeamsRepository
 from dataing.entrypoints.api.deps import get_app_db
@@ -90,6 +91,7 @@ async def list_teams(
 
 
 @router.post("/", response_model=TeamResponse, status_code=status.HTTP_201_CREATED)
+@audited(action="team.create", resource_type="team")
 async def create_team(
     body: TeamCreate,
     auth: AdminScopeDep,
@@ -135,6 +137,7 @@ async def get_team(
 
 
 @router.put("/{team_id}", response_model=TeamResponse)
+@audited(action="team.update", resource_type="team")
 async def update_team(
     team_id: UUID,
     body: TeamUpdate,
@@ -168,6 +171,7 @@ async def update_team(
 
 
 @router.delete("/{team_id}", status_code=status.HTTP_204_NO_CONTENT, response_class=Response)
+@audited(action="team.delete", resource_type="team")
 async def delete_team(
     team_id: UUID,
     auth: AdminScopeDep,
@@ -209,6 +213,7 @@ async def get_team_members(
 
 
 @router.post("/{team_id}/members", status_code=status.HTTP_201_CREATED)
+@audited(action="team.member_add", resource_type="team")
 async def add_team_member(
     team_id: UUID,
     body: TeamMemberAdd,
@@ -238,6 +243,7 @@ async def add_team_member(
     status_code=status.HTTP_204_NO_CONTENT,
     response_class=Response,
 )
+@audited(action="team.member_remove", resource_type="team")
 async def remove_team_member(
     team_id: UUID,
     user_id: UUID,

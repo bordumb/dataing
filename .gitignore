@@ -185,3 +185,6 @@ reports/
 ############################
 
 .worktrees/
+
+# Git worktrees
+.worktrees/

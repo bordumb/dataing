@@ -157,11 +157,14 @@ demo: demo-fixtures
 
     # Run migrations in order
     echo "Running database migrations..."
-    for migration in backend/migrations/0*.sql; do
-        echo "  $(basename $migration)"
-        PGPASSWORD=dataing psql -h localhost -U dataing -d dataing_demo -f "$migration" 2>&1 | grep -E "^(ERROR|NOTICE)" || true
-    done
-    echo "  Done."
+    PGPASSWORD=dataing psql -h localhost -U dataing -d dataing_demo -f backend/migrations/001_initial.sql 2>/dev/null || true
+    PGPASSWORD=dataing psql -h localhost -U dataing -d dataing_demo -f backend/migrations/002_datasets.sql 2>/dev/null || true
+    PGPASSWORD=dataing psql -h localhost -U dataing -d dataing_demo -f backend/migrations/003_investigation_feedback_events.sql 2>/dev/null || true
+    PGPASSWORD=dataing psql -h localhost -U dataing -d dataing_demo -f backend/migrations/004_schema_comments.sql 2>/dev/null || true
+    PGPASSWORD=dataing psql -h localhost -U dataing -d dataing_demo -f backend/migrations/005_knowledge_comments.sql 2>/dev/null || true
+    PGPASSWORD=dataing psql -h localhost -U dataing -d dataing_demo -f backend/migrations/006_comment_votes.sql 2>/dev/null || true
+    PGPASSWORD=dataing psql -h localhost -U dataing -d dataing_demo -f backend/migrations/007_sso_scim_tables.sql 2>/dev/null || true
+    PGPASSWORD=dataing psql -h localhost -U dataing -d dataing_demo -f backend/migrations/008_rbac_tables.sql 2>/dev/null || true
 
     trap 'kill 0' EXIT
 

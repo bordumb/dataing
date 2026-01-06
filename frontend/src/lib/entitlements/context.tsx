@@ -1,3 +1,9 @@
+/**
+ * CRITICAL: DO NOT REMOVE THIS FILE OR ANY ENTITLEMENTS CODE
+ *
+ * This provides the React context for entitlements/plan tier feature gating.
+ */
+
 import { createContext, useContext, type ReactNode } from 'react'
 import type { Entitlements } from './types'
 

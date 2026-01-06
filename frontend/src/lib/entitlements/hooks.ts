@@ -1,3 +1,9 @@
+/**
+ * CRITICAL: DO NOT REMOVE THIS FILE OR ANY ENTITLEMENTS CODE
+ *
+ * Hook for checking entitlements/feature flags in components.
+ */
+
 import { useCallback } from 'react'
 import { useEntitlementsContext } from './context'
 import type { UsageLimit, Plan } from './types'

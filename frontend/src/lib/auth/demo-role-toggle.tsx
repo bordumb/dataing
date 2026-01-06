@@ -1,6 +1,12 @@
 /**
+ * CRITICAL: DO NOT REMOVE THIS FILE
+ *
  * Demo role toggle for testing different permission levels.
- * Only visible in demo mode.
+ * Only visible in development mode.
+ *
+ * Displays in the bottom-LEFT corner (plan toggle is bottom-right).
+ *
+ * NEVER REMOVE THIS - IT IS ESSENTIAL FOR DEMOS AND TESTING
  */
 
 import { Shield, ChevronDown } from 'lucide-react'
@@ -35,7 +41,16 @@ const ROLE_COLORS: Record<OrgRole, string> = {
   owner: 'text-purple-500',
 }
 
+/**
+ * CRITICAL: DO NOT REMOVE THIS COMPONENT
+ *
+ * Renders a role switcher dropdown in the bottom-left corner.
+ * Use to test UI differences between viewer/member/admin/owner roles.
+ */
 export function DemoRoleToggle({ currentRole, onRoleChange }: DemoRoleToggleProps) {
+  // Only show in development
+  if (import.meta.env.PROD) return null
+
   return (
     <div className="fixed bottom-4 left-4 z-50">
       <DropdownMenu>

@@ -15,15 +15,26 @@ import { DataSourcePage } from '@/features/datasources/datasource-page'
 import { DatasetListPage, DatasetDetailPage } from '@/features/datasets'
 import { SettingsPage } from '@/features/settings/settings-page'
 import { UsagePage } from '@/features/usage/usage-page'
-import { JwtLoginPage } from '@/features/auth/jwt-login-page'
-import { PasswordResetRequest } from '@/features/auth/password-reset-request'
-import { PasswordResetConfirm } from '@/features/auth/password-reset-confirm'
-import { AdminPage } from '@/features/admin/admin-page'
+import { NotificationsPage } from '@/features/notifications'
+import { AdminPage } from '@/features/admin'
+import { LoginPage } from '@/features/auth/login-page'
+import { SSOLoginPage } from '@/features/auth/sso-login-page'
+import { SSOCallbackPage } from '@/features/auth/sso-callback-page'
 
-// Auth - Using JWT auth
-import { JwtAuthProvider, RequireJwtAuth, useJwtAuth, DemoRoleToggle } from '@/lib/auth'
+// Auth
+import { AuthProvider, RequireAuth } from '@/lib/auth/context'
+import { DemoRoleToggle } from '@/lib/auth/demo-role-toggle'
+import { DemoRoleProvider, useDemoRoleContext } from '@/lib/auth/demo-role-context'
 
-// Entitlements
+/**
+ * CRITICAL: DO NOT REMOVE THE ENTITLEMENTS IMPORTS OR DEMO TOGGLE
+ *
+ * These provide the demo mode toggles in the bottom-right corner for:
+ * - Plan tiers: free, pro, enterprise
+ *
+ * The toggle is ESSENTIAL for testing and demonstrating feature gating.
+ * Keyboard shortcut: Ctrl+Shift+P to cycle plans
+ */
 import {
   EntitlementsProvider,
   useDemoEntitlements,
@@ -49,31 +60,30 @@ function AppLayout({ children }: { children: React.ReactNode }) {
   )
 }
 
-function DemoRoleToggleWrapper() {
-  const { effectiveRole, setDemoRole, isAuthenticated } = useJwtAuth()
-
-  if (!isAuthenticated || !effectiveRole) return null
-
-  return <DemoRoleToggle currentRole={effectiveRole} onRoleChange={setDemoRole} />
-}
-
+/**
+ * CRITICAL: DO NOT REMOVE THIS COMPONENT
+ *
+ * AppWithEntitlements wraps the app with entitlements context and renders:
+ * - DemoToggle (bottom-right): Plan tiers (free/pro/enterprise)
+ * - DemoRoleToggle (bottom-left): User roles (viewer/member/admin/owner)
+ */
 function AppWithEntitlements() {
   const { entitlements, plan, setPlan } = useDemoEntitlements()
+  const { role, setRole } = useDemoRoleContext()
 
   return (
     <EntitlementsProvider entitlements={entitlements}>
       <Routes>
         {/* Public routes */}
-        <Route path="/login" element={<JwtLoginPage />} />
-        <Route path="/jwt-login" element={<JwtLoginPage />} />
-        <Route path="/password-reset" element={<PasswordResetRequest />} />
-        <Route path="/password-reset/confirm" element={<PasswordResetConfirm />} />
+        <Route path="/login" element={<LoginPage />} />
+        <Route path="/sso-login" element={<SSOLoginPage />} />
+        <Route path="/auth/sso/callback" element={<SSOCallbackPage />} />
 
         {/* Protected routes */}
         <Route
           path="/*"
           element={
-            <RequireJwtAuth>
+            <RequireAuth>
               <AppLayout>
                 <Routes>
                   <Route
@@ -133,14 +143,6 @@ function AppWithEntitlements() {
                     }
                   />
                   <Route
-                    path="settings/*"
-                    element={
-                      <FeatureErrorBoundary feature="settings">
-                        <SettingsPage />
-                      </FeatureErrorBoundary>
-                    }
-                  />
-                  <Route
                     path="usage"
                     element={
                       <FeatureErrorBoundary feature="usage">
@@ -149,7 +151,23 @@ function AppWithEntitlements() {
                     }
                   />
                   <Route
-                    path="admin/*"
+                    path="notifications"
+                    element={
+                      <FeatureErrorBoundary feature="notifications">
+                        <NotificationsPage />
+                      </FeatureErrorBoundary>
+                    }
+                  />
+                  <Route
+                    path="settings"
+                    element={
+                      <FeatureErrorBoundary feature="settings">
+                        <SettingsPage />
+                      </FeatureErrorBoundary>
+                    }
+                  />
+                  <Route
+                    path="admin"
                     element={
                       <FeatureErrorBoundary feature="admin">
                         <AdminPage />
@@ -158,12 +176,15 @@ function AppWithEntitlements() {
                   />
                 </Routes>
               </AppLayout>
-            </RequireJwtAuth>
+            </RequireAuth>
           }
         />
       </Routes>
+      {/* CRITICAL: DO NOT REMOVE - Demo toggles for testing */}
+      {/* Bottom-right: Plan tiers (free/pro/enterprise) */}
       <DemoToggle plan={plan} onPlanChange={setPlan} />
-      <DemoRoleToggleWrapper />
+      {/* Bottom-left: User roles (viewer/member/admin/owner) */}
+      <DemoRoleToggle currentRole={role} onRoleChange={setRole} />
       <Toaster />
     </EntitlementsProvider>
   )
@@ -172,9 +193,11 @@ function AppWithEntitlements() {
 function App() {
   return (
     <ErrorBoundary>
-      <JwtAuthProvider>
-        <AppWithEntitlements />
-      </JwtAuthProvider>
+      <AuthProvider>
+        <DemoRoleProvider>
+          <AppWithEntitlements />
+        </DemoRoleProvider>
+      </AuthProvider>
     </ErrorBoundary>
   )
 }

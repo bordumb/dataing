@@ -5,13 +5,16 @@
  * Autonomous Data Quality Investigation
  * OpenAPI spec version: 2.0.0
  */
+import type { TeamResponseExternalId } from "./teamResponseExternalId";
+import type { TeamResponseMemberCount } from "./teamResponseMemberCount";
 
 /**
- * Team response model.
+ * Team response.
  */
 export interface TeamResponse {
-  created_at: string;
+  external_id: TeamResponseExternalId;
   id: string;
+  is_scim_managed: boolean;
+  member_count?: TeamResponseMemberCount;
   name: string;
-  org_id: string;
 }

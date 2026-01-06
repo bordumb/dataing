@@ -33,7 +33,8 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
-import { useJwtAuth, useRole, OrgSelector } from '@/lib/auth'
+import { useAuth } from '@/lib/auth/context'
+import { useDemoRoleContext } from '@/lib/auth/demo-role-context'
 
 const mainNavItems = [
   {
@@ -56,17 +57,9 @@ const mainNavItems = [
     url: '/usage',
     icon: BarChart3,
   },
-]
-
-const settingsNavItems = [
-  {
-    title: 'Settings',
-    url: '/settings',
-    icon: Settings,
-  },
   {
     title: 'Notifications',
-    url: '/settings/notifications',
+    url: '/notifications',
     icon: Bell,
   },
 ]
@@ -74,8 +67,28 @@ const settingsNavItems = [
 export function AppSidebar() {
   const location = useLocation()
   const { state } = useSidebar()
-  const { user, org, logout } = useJwtAuth()
-  const { isAdmin } = useRole()
+  const { tenant, logout } = useAuth()
+  const { canAccessAdmin } = useDemoRoleContext()
+
+  // Build settings nav items based on role
+  // Admin link only visible to admin/owner roles
+  const settingsNavItems = [
+    {
+      title: 'Settings',
+      url: '/settings',
+      icon: Settings,
+    },
+    // Only show Admin to admin/owner roles
+    ...(canAccessAdmin
+      ? [
+          {
+            title: 'Admin',
+            url: '/admin',
+            icon: Shield,
+          },
+        ]
+      : []),
+  ]
 
   return (
     <Sidebar collapsible="icon">
@@ -150,8 +163,10 @@ export function AppSidebar() {
                 <SidebarMenuItem key={item.url}>
                   <SidebarMenuButton
                     asChild
-                    isActive={location.pathname === item.url ||
-                      (item.url === '/settings' && location.pathname.startsWith('/settings'))}
+                    isActive={
+                      location.pathname === item.url ||
+                      (item.url !== '/settings' && location.pathname.startsWith(item.url))
+                    }
                     tooltip={item.title}
                   >
                     <Link to={item.url}>

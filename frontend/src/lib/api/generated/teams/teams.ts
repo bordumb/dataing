@@ -17,27 +17,29 @@ import type {
 } from "@tanstack/react-query";
 import type {
   AddTeamMemberApiV1TeamsTeamIdMembersPost201,
-  AddTeamMemberApiV1TeamsTeamIdMembersPostParams,
-  CreateTeamRequest,
   HTTPValidationError,
+  TeamCreate,
+  TeamListResponse,
+  TeamMemberAdd,
   TeamResponse,
+  TeamUpdate,
 } from "../../model";
 import { customInstance } from "../../client";
 
 /**
- * List all teams in current organization.
+ * List all teams in the organization.
  * @summary List Teams
  */
 export const listTeamsApiV1TeamsGet = (signal?: AbortSignal) => {
-  return customInstance<TeamResponse[]>({
-    url: `/api/v1/teams`,
+  return customInstance<TeamListResponse>({
+    url: `/api/v1/teams/`,
     method: "GET",
     signal,
   });
 };
 
 export const getListTeamsApiV1TeamsGetQueryKey = () => {
-  return [`/api/v1/teams`] as const;
+  return [`/api/v1/teams/`] as const;
 };
 
 export const getListTeamsApiV1TeamsGetQueryOptions = <
@@ -100,17 +102,17 @@ export const useListTeamsApiV1TeamsGet = <
 };
 
 /**
- * Create a new team (admin only).
+ * Create a new team.
+
+Requires admin scope.
  * @summary Create Team
  */
-export const createTeamApiV1TeamsPost = (
-  createTeamRequest: CreateTeamRequest,
-) => {
+export const createTeamApiV1TeamsPost = (teamCreate: TeamCreate) => {
   return customInstance<TeamResponse>({
-    url: `/api/v1/teams`,
+    url: `/api/v1/teams/`,
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    data: createTeamRequest,
+    data: teamCreate,
   });
 };
 
@@ -121,20 +123,20 @@ export const getCreateTeamApiV1TeamsPostMutationOptions = <
   mutation?: UseMutationOptions<
     Awaited<ReturnType<typeof createTeamApiV1TeamsPost>>,
     TError,
-    { data: CreateTeamRequest },
+    { data: TeamCreate },
     TContext
   >;
 }): UseMutationOptions<
   Awaited<ReturnType<typeof createTeamApiV1TeamsPost>>,
   TError,
-  { data: CreateTeamRequest },
+  { data: TeamCreate },
   TContext
 > => {
   const { mutation: mutationOptions } = options ?? {};
 
   const mutationFn: MutationFunction<
     Awaited<ReturnType<typeof createTeamApiV1TeamsPost>>,
-    { data: CreateTeamRequest }
+    { data: TeamCreate }
   > = (props) => {
     const { data } = props ?? {};
 
@@ -147,7 +149,7 @@ export const getCreateTeamApiV1TeamsPostMutationOptions = <
 export type CreateTeamApiV1TeamsPostMutationResult = NonNullable<
   Awaited<ReturnType<typeof createTeamApiV1TeamsPost>>
 >;
-export type CreateTeamApiV1TeamsPostMutationBody = CreateTeamRequest;
+export type CreateTeamApiV1TeamsPostMutationBody = TeamCreate;
 export type CreateTeamApiV1TeamsPostMutationError = HTTPValidationError;
 
 /**
@@ -160,13 +162,13 @@ export const useCreateTeamApiV1TeamsPost = <
   mutation?: UseMutationOptions<
     Awaited<ReturnType<typeof createTeamApiV1TeamsPost>>,
     TError,
-    { data: CreateTeamRequest },
+    { data: TeamCreate },
     TContext
   >;
 }): UseMutationResult<
   Awaited<ReturnType<typeof createTeamApiV1TeamsPost>>,
   TError,
-  { data: CreateTeamRequest },
+  { data: TeamCreate },
   TContext
 > => {
   const mutationOptions = getCreateTeamApiV1TeamsPostMutationOptions(options);
@@ -174,7 +176,7 @@ export const useCreateTeamApiV1TeamsPost = <
   return useMutation(mutationOptions);
 };
 /**
- * Get a specific team.
+ * Get a team by ID.
  * @summary Get Team
  */
 export const getTeamApiV1TeamsTeamIdGet = (
@@ -266,7 +268,87 @@ export const useGetTeamApiV1TeamsTeamIdGet = <
 };
 
 /**
- * Delete a team (admin only).
+ * Update a team.
+
+Requires admin scope. Cannot update SCIM-managed teams.
+ * @summary Update Team
+ */
+export const updateTeamApiV1TeamsTeamIdPut = (
+  teamId: string,
+  teamUpdate: TeamUpdate,
+) => {
+  return customInstance<TeamResponse>({
+    url: `/api/v1/teams/${teamId}`,
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    data: teamUpdate,
+  });
+};
+
+export const getUpdateTeamApiV1TeamsTeamIdPutMutationOptions = <
+  TError = HTTPValidationError,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof updateTeamApiV1TeamsTeamIdPut>>,
+    TError,
+    { teamId: string; data: TeamUpdate },
+    TContext
+  >;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof updateTeamApiV1TeamsTeamIdPut>>,
+  TError,
+  { teamId: string; data: TeamUpdate },
+  TContext
+> => {
+  const { mutation: mutationOptions } = options ?? {};
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof updateTeamApiV1TeamsTeamIdPut>>,
+    { teamId: string; data: TeamUpdate }
+  > = (props) => {
+    const { teamId, data } = props ?? {};
+
+    return updateTeamApiV1TeamsTeamIdPut(teamId, data);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type UpdateTeamApiV1TeamsTeamIdPutMutationResult = NonNullable<
+  Awaited<ReturnType<typeof updateTeamApiV1TeamsTeamIdPut>>
+>;
+export type UpdateTeamApiV1TeamsTeamIdPutMutationBody = TeamUpdate;
+export type UpdateTeamApiV1TeamsTeamIdPutMutationError = HTTPValidationError;
+
+/**
+ * @summary Update Team
+ */
+export const useUpdateTeamApiV1TeamsTeamIdPut = <
+  TError = HTTPValidationError,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof updateTeamApiV1TeamsTeamIdPut>>,
+    TError,
+    { teamId: string; data: TeamUpdate },
+    TContext
+  >;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof updateTeamApiV1TeamsTeamIdPut>>,
+  TError,
+  { teamId: string; data: TeamUpdate },
+  TContext
+> => {
+  const mutationOptions =
+    getUpdateTeamApiV1TeamsTeamIdPutMutationOptions(options);
+
+  return useMutation(mutationOptions);
+};
+/**
+ * Delete a team.
+
+Requires admin scope. Cannot delete SCIM-managed teams.
  * @summary Delete Team
  */
 export const deleteTeamApiV1TeamsTeamIdDelete = (teamId: string) => {
@@ -337,17 +419,116 @@ export const useDeleteTeamApiV1TeamsTeamIdDelete = <
   return useMutation(mutationOptions);
 };
 /**
- * Add a user to a team (admin only).
+ * Get team members.
+ * @summary Get Team Members
+ */
+export const getTeamMembersApiV1TeamsTeamIdMembersGet = (
+  teamId: string,
+  signal?: AbortSignal,
+) => {
+  return customInstance<string[]>({
+    url: `/api/v1/teams/${teamId}/members`,
+    method: "GET",
+    signal,
+  });
+};
+
+export const getGetTeamMembersApiV1TeamsTeamIdMembersGetQueryKey = (
+  teamId: string,
+) => {
+  return [`/api/v1/teams/${teamId}/members`] as const;
+};
+
+export const getGetTeamMembersApiV1TeamsTeamIdMembersGetQueryOptions = <
+  TData = Awaited<ReturnType<typeof getTeamMembersApiV1TeamsTeamIdMembersGet>>,
+  TError = HTTPValidationError,
+>(
+  teamId: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof getTeamMembersApiV1TeamsTeamIdMembersGet>>,
+        TError,
+        TData
+      >
+    >;
+  },
+) => {
+  const { query: queryOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ??
+    getGetTeamMembersApiV1TeamsTeamIdMembersGetQueryKey(teamId);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getTeamMembersApiV1TeamsTeamIdMembersGet>>
+  > = ({ signal }) => getTeamMembersApiV1TeamsTeamIdMembersGet(teamId, signal);
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!teamId,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof getTeamMembersApiV1TeamsTeamIdMembersGet>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetTeamMembersApiV1TeamsTeamIdMembersGetQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getTeamMembersApiV1TeamsTeamIdMembersGet>>
+>;
+export type GetTeamMembersApiV1TeamsTeamIdMembersGetQueryError =
+  HTTPValidationError;
+
+/**
+ * @summary Get Team Members
+ */
+export const useGetTeamMembersApiV1TeamsTeamIdMembersGet = <
+  TData = Awaited<ReturnType<typeof getTeamMembersApiV1TeamsTeamIdMembersGet>>,
+  TError = HTTPValidationError,
+>(
+  teamId: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof getTeamMembersApiV1TeamsTeamIdMembersGet>>,
+        TError,
+        TData
+      >
+    >;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } => {
+  const queryOptions = getGetTeamMembersApiV1TeamsTeamIdMembersGetQueryOptions(
+    teamId,
+    options,
+  );
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  query.queryKey = queryOptions.queryKey;
+
+  return query;
+};
+
+/**
+ * Add a member to a team.
+
+Requires admin scope.
  * @summary Add Team Member
  */
 export const addTeamMemberApiV1TeamsTeamIdMembersPost = (
   teamId: string,
-  params?: AddTeamMemberApiV1TeamsTeamIdMembersPostParams,
+  teamMemberAdd: TeamMemberAdd,
 ) => {
   return customInstance<AddTeamMemberApiV1TeamsTeamIdMembersPost201>({
     url: `/api/v1/teams/${teamId}/members`,
     method: "POST",
-    params,
+    headers: { "Content-Type": "application/json" },
+    data: teamMemberAdd,
   });
 };
 
@@ -358,24 +539,24 @@ export const getAddTeamMemberApiV1TeamsTeamIdMembersPostMutationOptions = <
   mutation?: UseMutationOptions<
     Awaited<ReturnType<typeof addTeamMemberApiV1TeamsTeamIdMembersPost>>,
     TError,
-    { teamId: string; params?: AddTeamMemberApiV1TeamsTeamIdMembersPostParams },
+    { teamId: string; data: TeamMemberAdd },
     TContext
   >;
 }): UseMutationOptions<
   Awaited<ReturnType<typeof addTeamMemberApiV1TeamsTeamIdMembersPost>>,
   TError,
-  { teamId: string; params?: AddTeamMemberApiV1TeamsTeamIdMembersPostParams },
+  { teamId: string; data: TeamMemberAdd },
   TContext
 > => {
   const { mutation: mutationOptions } = options ?? {};
 
   const mutationFn: MutationFunction<
     Awaited<ReturnType<typeof addTeamMemberApiV1TeamsTeamIdMembersPost>>,
-    { teamId: string; params?: AddTeamMemberApiV1TeamsTeamIdMembersPostParams }
+    { teamId: string; data: TeamMemberAdd }
   > = (props) => {
-    const { teamId, params } = props ?? {};
+    const { teamId, data } = props ?? {};
 
-    return addTeamMemberApiV1TeamsTeamIdMembersPost(teamId, params);
+    return addTeamMemberApiV1TeamsTeamIdMembersPost(teamId, data);
   };
 
   return { mutationFn, ...mutationOptions };
@@ -385,7 +566,8 @@ export type AddTeamMemberApiV1TeamsTeamIdMembersPostMutationResult =
   NonNullable<
     Awaited<ReturnType<typeof addTeamMemberApiV1TeamsTeamIdMembersPost>>
   >;
-
+export type AddTeamMemberApiV1TeamsTeamIdMembersPostMutationBody =
+  TeamMemberAdd;
 export type AddTeamMemberApiV1TeamsTeamIdMembersPostMutationError =
   HTTPValidationError;
 
@@ -399,17 +581,110 @@ export const useAddTeamMemberApiV1TeamsTeamIdMembersPost = <
   mutation?: UseMutationOptions<
     Awaited<ReturnType<typeof addTeamMemberApiV1TeamsTeamIdMembersPost>>,
     TError,
-    { teamId: string; params?: AddTeamMemberApiV1TeamsTeamIdMembersPostParams },
+    { teamId: string; data: TeamMemberAdd },
     TContext
   >;
 }): UseMutationResult<
   Awaited<ReturnType<typeof addTeamMemberApiV1TeamsTeamIdMembersPost>>,
   TError,
-  { teamId: string; params?: AddTeamMemberApiV1TeamsTeamIdMembersPostParams },
+  { teamId: string; data: TeamMemberAdd },
   TContext
 > => {
   const mutationOptions =
     getAddTeamMemberApiV1TeamsTeamIdMembersPostMutationOptions(options);
+
+  return useMutation(mutationOptions);
+};
+/**
+ * Remove a member from a team.
+
+Requires admin scope.
+ * @summary Remove Team Member
+ */
+export const removeTeamMemberApiV1TeamsTeamIdMembersUserIdDelete = (
+  teamId: string,
+  userId: string,
+) => {
+  return customInstance<void>({
+    url: `/api/v1/teams/${teamId}/members/${userId}`,
+    method: "DELETE",
+  });
+};
+
+export const getRemoveTeamMemberApiV1TeamsTeamIdMembersUserIdDeleteMutationOptions =
+  <TError = HTTPValidationError, TContext = unknown>(options?: {
+    mutation?: UseMutationOptions<
+      Awaited<
+        ReturnType<typeof removeTeamMemberApiV1TeamsTeamIdMembersUserIdDelete>
+      >,
+      TError,
+      { teamId: string; userId: string },
+      TContext
+    >;
+  }): UseMutationOptions<
+    Awaited<
+      ReturnType<typeof removeTeamMemberApiV1TeamsTeamIdMembersUserIdDelete>
+    >,
+    TError,
+    { teamId: string; userId: string },
+    TContext
+  > => {
+    const { mutation: mutationOptions } = options ?? {};
+
+    const mutationFn: MutationFunction<
+      Awaited<
+        ReturnType<typeof removeTeamMemberApiV1TeamsTeamIdMembersUserIdDelete>
+      >,
+      { teamId: string; userId: string }
+    > = (props) => {
+      const { teamId, userId } = props ?? {};
+
+      return removeTeamMemberApiV1TeamsTeamIdMembersUserIdDelete(
+        teamId,
+        userId,
+      );
+    };
+
+    return { mutationFn, ...mutationOptions };
+  };
+
+export type RemoveTeamMemberApiV1TeamsTeamIdMembersUserIdDeleteMutationResult =
+  NonNullable<
+    Awaited<
+      ReturnType<typeof removeTeamMemberApiV1TeamsTeamIdMembersUserIdDelete>
+    >
+  >;
+
+export type RemoveTeamMemberApiV1TeamsTeamIdMembersUserIdDeleteMutationError =
+  HTTPValidationError;
+
+/**
+ * @summary Remove Team Member
+ */
+export const useRemoveTeamMemberApiV1TeamsTeamIdMembersUserIdDelete = <
+  TError = HTTPValidationError,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<
+      ReturnType<typeof removeTeamMemberApiV1TeamsTeamIdMembersUserIdDelete>
+    >,
+    TError,
+    { teamId: string; userId: string },
+    TContext
+  >;
+}): UseMutationResult<
+  Awaited<
+    ReturnType<typeof removeTeamMemberApiV1TeamsTeamIdMembersUserIdDelete>
+  >,
+  TError,
+  { teamId: string; userId: string },
+  TContext
+> => {
+  const mutationOptions =
+    getRemoveTeamMemberApiV1TeamsTeamIdMembersUserIdDeleteMutationOptions(
+      options,
+    );
 
   return useMutation(mutationOptions);
 };

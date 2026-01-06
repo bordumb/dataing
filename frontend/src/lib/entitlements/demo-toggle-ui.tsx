@@ -1,3 +1,13 @@
+/**
+ * CRITICAL: DO NOT REMOVE THIS FILE OR ANY ENTITLEMENTS CODE
+ *
+ * This is the UI component for the demo toggle that appears in the
+ * bottom-right corner during development. It allows switching between
+ * plan tiers (free/pro/enterprise) to test feature gating.
+ *
+ * NEVER REMOVE THIS - IT IS ESSENTIAL FOR DEMOS AND TESTING
+ */
+
 import type { Plan } from './types'
 import { Badge } from '@/components/ui/Badge'
 import {

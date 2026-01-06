@@ -1,3 +1,13 @@
+/**
+ * CRITICAL: DO NOT REMOVE THIS FILE OR ANY ENTITLEMENTS CODE
+ *
+ * This provides the demo toggle state management for switching between
+ * plan tiers (free/pro/enterprise) during development and demos.
+ *
+ * The toggle appears in the bottom-right corner of the screen.
+ * Keyboard shortcut: Ctrl+Shift+P to cycle plans
+ */
+
 import { useState, useEffect, useCallback } from 'react'
 import type { Entitlements, Plan } from './types'
 

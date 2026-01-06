@@ -156,6 +156,8 @@ demo: demo-fixtures
     sleep 3
 
     # Run migrations in order
+    # IMPORTANT: Order matters! 007_auth_tables creates organizations/users/teams,
+    # 007_sso_scim adds SSO columns, 008_seed_demo_auth creates demo data
     echo "Running database migrations..."
     PGPASSWORD=dataing psql -h localhost -U dataing -d dataing_demo -f backend/migrations/001_initial.sql 2>/dev/null || true
     PGPASSWORD=dataing psql -h localhost -U dataing -d dataing_demo -f backend/migrations/002_datasets.sql 2>/dev/null || true
@@ -163,8 +165,12 @@ demo: demo-fixtures
     PGPASSWORD=dataing psql -h localhost -U dataing -d dataing_demo -f backend/migrations/004_schema_comments.sql 2>/dev/null || true
     PGPASSWORD=dataing psql -h localhost -U dataing -d dataing_demo -f backend/migrations/005_knowledge_comments.sql 2>/dev/null || true
     PGPASSWORD=dataing psql -h localhost -U dataing -d dataing_demo -f backend/migrations/006_comment_votes.sql 2>/dev/null || true
+    PGPASSWORD=dataing psql -h localhost -U dataing -d dataing_demo -f backend/migrations/007_auth_tables.sql 2>/dev/null || true
     PGPASSWORD=dataing psql -h localhost -U dataing -d dataing_demo -f backend/migrations/007_sso_scim_tables.sql 2>/dev/null || true
     PGPASSWORD=dataing psql -h localhost -U dataing -d dataing_demo -f backend/migrations/008_rbac_tables.sql 2>/dev/null || true
+    PGPASSWORD=dataing psql -h localhost -U dataing -d dataing_demo -f backend/migrations/008_seed_demo_auth.sql 2>/dev/null || true
+    PGPASSWORD=dataing psql -h localhost -U dataing -d dataing_demo -f backend/migrations/009_password_reset_tokens.sql 2>/dev/null || true
+    PGPASSWORD=dataing psql -h localhost -U dataing -d dataing_demo -f backend/migrations/009_seed_multi_org_demo.sql 2>/dev/null || true
     PGPASSWORD=dataing psql -h localhost -U dataing -d dataing_demo -f backend/migrations/010_audit_logs.sql 2>/dev/null || true
 
     trap 'kill 0' EXIT

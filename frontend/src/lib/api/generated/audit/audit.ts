@@ -24,8 +24,11 @@ import { customInstance } from "../../client";
 /**
  * List audit logs with filtering and pagination.
 
+Requires admin scope and Enterprise plan.
+
 Args:
     request: The current request.
+    auth: Authenticated context with admin scope.
     audit_repo: Audit repository dependency.
     page: Page number (1-indexed).
     limit: Number of items per page.
@@ -129,8 +132,11 @@ export const useListAuditLogsApiV1AuditLogsGet = <
 /**
  * Export audit logs as CSV.
 
+Requires admin scope and Enterprise plan.
+
 Args:
     request: The current request.
+    auth: Authenticated context with admin scope.
     audit_repo: Audit repository dependency.
     start_date: Filter entries after this date.
     end_date: Filter entries before this date.
@@ -234,8 +240,11 @@ export const useExportAuditLogsApiV1AuditLogsExportGet = <
 /**
  * Get a single audit log entry.
 
+Requires admin scope and Enterprise plan.
+
 Args:
     request: The current request.
+    auth: Authenticated context with admin scope.
     entry_id: UUID of the audit log entry.
     audit_repo: Audit repository dependency.
 

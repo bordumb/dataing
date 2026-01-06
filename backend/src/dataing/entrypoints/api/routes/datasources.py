@@ -259,7 +259,8 @@ async def list_source_types() -> SourceTypesResponse:
 @router.post("/test", response_model=TestConnectionResponse)
 @audited(action="datasource.test", resource_type="datasource")
 async def test_connection(
-    request: TestConnectionRequest,
+    request: Request,
+    body: TestConnectionRequest,
 ) -> TestConnectionResponse:
     """Test a connection without saving it.
 
@@ -269,21 +270,21 @@ async def test_connection(
     registry = get_registry()
 
     try:
-        source_type = SourceType(request.type)
+        source_type = SourceType(body.type)
     except ValueError:
         raise HTTPException(
             status_code=400,
-            detail=f"Unsupported source type: {request.type}",
+            detail=f"Unsupported source type: {body.type}",
         ) from None
 
     if not registry.is_registered(source_type):
         raise HTTPException(
             status_code=400,
-            detail=f"Source type not available: {request.type}",
+            detail=f"Source type not available: {body.type}",
         )
 
     try:
-        adapter = registry.create(source_type, request.config)
+        adapter = registry.create(source_type, body.config)
         async with adapter:
             result = await adapter.test_connection()
 

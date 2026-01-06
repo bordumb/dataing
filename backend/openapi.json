@@ -7079,8 +7079,16 @@
           "audit"
         ],
         "summary": "List Audit Logs",
-        "description": "List audit logs with filtering and pagination.\n\nArgs:\n    request: The current request.\n    audit_repo: Audit repository dependency.\n    page: Page number (1-indexed).\n    limit: Number of items per page.\n    start_date: Filter entries after this date.\n    end_date: Filter entries before this date.\n    action: Filter by action type.\n    actor_id: Filter by actor UUID.\n    resource_type: Filter by resource type.\n    search: Search in resource_name and action.\n\nReturns:\n    Paginated list of audit log entries.",
+        "description": "List audit logs with filtering and pagination.\n\nRequires admin scope and Enterprise plan.\n\nArgs:\n    request: The current request.\n    auth: Authenticated context with admin scope.\n    audit_repo: Audit repository dependency.\n    page: Page number (1-indexed).\n    limit: Number of items per page.\n    start_date: Filter entries after this date.\n    end_date: Filter entries before this date.\n    action: Filter by action type.\n    actor_id: Filter by actor UUID.\n    resource_type: Filter by resource type.\n    search: Search in resource_name and action.\n\nReturns:\n    Paginated list of audit log entries.",
         "operationId": "list_audit_logs_api_v1_audit_logs_get",
+        "security": [
+          {
+            "APIKeyHeader": []
+          },
+          {
+            "HTTPBearer": []
+          }
+        ],
         "parameters": [
           {
             "name": "page",
@@ -7235,8 +7243,16 @@
           "audit"
         ],
         "summary": "Export Audit Logs",
-        "description": "Export audit logs as CSV.\n\nArgs:\n    request: The current request.\n    audit_repo: Audit repository dependency.\n    start_date: Filter entries after this date.\n    end_date: Filter entries before this date.\n    action: Filter by action type.\n    actor_id: Filter by actor UUID.\n    resource_type: Filter by resource type.\n    search: Search in resource_name and action.\n\nReturns:\n    CSV file as streaming response.",
+        "description": "Export audit logs as CSV.\n\nRequires admin scope and Enterprise plan.\n\nArgs:\n    request: The current request.\n    auth: Authenticated context with admin scope.\n    audit_repo: Audit repository dependency.\n    start_date: Filter entries after this date.\n    end_date: Filter entries before this date.\n    action: Filter by action type.\n    actor_id: Filter by actor UUID.\n    resource_type: Filter by resource type.\n    search: Search in resource_name and action.\n\nReturns:\n    CSV file as streaming response.",
         "operationId": "export_audit_logs_api_v1_audit_logs_export_get",
+        "security": [
+          {
+            "APIKeyHeader": []
+          },
+          {
+            "HTTPBearer": []
+          }
+        ],
         "parameters": [
           {
             "name": "start_date",
@@ -7366,8 +7382,16 @@
           "audit"
         ],
         "summary": "Get Audit Log",
-        "description": "Get a single audit log entry.\n\nArgs:\n    request: The current request.\n    entry_id: UUID of the audit log entry.\n    audit_repo: Audit repository dependency.\n\nReturns:\n    Audit log entry details.\n\nRaises:\n    HTTPException: If entry not found (404).",
+        "description": "Get a single audit log entry.\n\nRequires admin scope and Enterprise plan.\n\nArgs:\n    request: The current request.\n    auth: Authenticated context with admin scope.\n    entry_id: UUID of the audit log entry.\n    audit_repo: Audit repository dependency.\n\nReturns:\n    Audit log entry details.\n\nRaises:\n    HTTPException: If entry not found (404).",
         "operationId": "get_audit_log_api_v1_audit_logs__entry_id__get",
+        "security": [
+          {
+            "APIKeyHeader": []
+          },
+          {
+            "HTTPBearer": []
+          }
+        ],
         "parameters": [
           {
             "name": "entry_id",

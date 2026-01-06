@@ -8,6 +8,7 @@ from dataing.adapters.sso.scim_repository import (
     generate_scim_token,
     hash_token,
 )
+from dataing.adapters.sso.user_repository import SCIMUserRepository
 
 __all__ = [
     "OIDCConfig",
@@ -16,6 +17,7 @@ __all__ = [
     "OIDCUserInfo",
     "SCIMRepository",
     "SCIMToken",
+    "SCIMUserRepository",
     "SSORepository",
     "generate_scim_token",
     "hash_token",

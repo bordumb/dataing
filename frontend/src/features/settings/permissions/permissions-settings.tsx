@@ -14,7 +14,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { EmptyState } from '@/components/shared/empty-state'
-import { Badge } from '@/components/ui/badge'
+import { Badge } from '@/components/ui/Badge'
 import {
   useListPermissionsApiV1PermissionsGet,
   useDeletePermissionApiV1PermissionsGrantIdDelete,
@@ -36,8 +36,8 @@ export function PermissionsSettings() {
         toast.success('Permission revoked successfully')
         setGrantToDelete(null)
       },
-      onError: (error) => {
-        toast.error(`Failed to revoke permission: ${error.message}`)
+      onError: (error: Error) => {
+        toast.error(`Failed to revoke permission: ${error.message || 'Unknown error'}`)
       },
     },
   })
@@ -105,7 +105,7 @@ export function PermissionsSettings() {
       <Card>
         <CardContent className="py-12">
           <EmptyState
-            icon={<Shield className="h-12 w-12" />}
+            icon={Shield}
             title="Failed to load permissions"
             description="There was an error loading permissions. Please try again."
           />
@@ -127,7 +127,7 @@ export function PermissionsSettings() {
         <CardContent>
           {permissions.length === 0 ? (
             <EmptyState
-              icon={<Shield className="h-12 w-12" />}
+              icon={Shield}
               title="No permissions yet"
               description="Permission grants will appear here when you share investigations with users or teams."
             />

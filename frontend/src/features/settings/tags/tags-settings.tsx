@@ -56,8 +56,8 @@ export function TagsSettings() {
         toast.success('Tag created successfully')
         closeCreateDialog()
       },
-      onError: (error) => {
-        toast.error(`Failed to create tag: ${error.message}`)
+      onError: (error: Error) => {
+        toast.error(`Failed to create tag: ${error.message || 'Unknown error'}`)
       },
     },
   })
@@ -69,8 +69,8 @@ export function TagsSettings() {
         toast.success('Tag deleted successfully')
         setTagToDelete(null)
       },
-      onError: (error) => {
-        toast.error(`Failed to delete tag: ${error.message}`)
+      onError: (error: Error) => {
+        toast.error(`Failed to delete tag: ${error.message || 'Unknown error'}`)
       },
     },
   })
@@ -109,7 +109,7 @@ export function TagsSettings() {
       <Card>
         <CardContent className="py-12">
           <EmptyState
-            icon={<Tag className="h-12 w-12" />}
+            icon={Tag}
             title="Failed to load tags"
             description="There was an error loading your tags. Please try again."
           />
@@ -139,7 +139,7 @@ export function TagsSettings() {
         <CardContent>
           {tags.length === 0 ? (
             <EmptyState
-              icon={<Tag className="h-12 w-12" />}
+              icon={Tag}
               title="No tags yet"
               description="Create your first tag to start organizing investigations."
               action={

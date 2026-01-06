@@ -16,7 +16,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { EmptyState } from '@/components/shared/empty-state'
-import { Badge } from '@/components/ui/badge'
+import { Badge } from '@/components/ui/Badge'
 import {
   useListTeamsApiV1TeamsGet,
   useCreateTeamApiV1TeamsPost,
@@ -41,8 +41,8 @@ export function TeamsSettings() {
         toast.success('Team created successfully')
         closeCreateDialog()
       },
-      onError: (error) => {
-        toast.error(`Failed to create team: ${error.message}`)
+      onError: (error: Error) => {
+        toast.error(`Failed to create team: ${error.message || 'Unknown error'}`)
       },
     },
   })
@@ -54,8 +54,8 @@ export function TeamsSettings() {
         toast.success('Team deleted successfully')
         setTeamToDelete(null)
       },
-      onError: (error) => {
-        toast.error(`Failed to delete team: ${error.message}`)
+      onError: (error: Error) => {
+        toast.error(`Failed to delete team: ${error.message || 'Unknown error'}`)
       },
     },
   })
@@ -93,7 +93,7 @@ export function TeamsSettings() {
       <Card>
         <CardContent className="py-12">
           <EmptyState
-            icon={<Users className="h-12 w-12" />}
+            icon={Users}
             title="Failed to load teams"
             description="There was an error loading your teams. Please try again."
           />
@@ -122,7 +122,7 @@ export function TeamsSettings() {
         <CardContent>
           {teams.length === 0 ? (
             <EmptyState
-              icon={<Users className="h-12 w-12" />}
+              icon={Users}
               title="No teams yet"
               description="Create your first team to start organizing users."
               action={

@@ -24,7 +24,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
-import { Badge } from '@/components/ui/badge'
+import { Badge } from '@/components/ui/Badge'
 import { EmptyState } from '@/components/shared/empty-state'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 

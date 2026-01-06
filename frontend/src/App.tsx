@@ -25,6 +25,23 @@ import { SSOCallbackPage } from '@/features/auth/sso-callback-page'
 
 // Auth
 import { AuthProvider, RequireAuth } from '@/lib/auth/context'
+import { DemoRoleToggle } from '@/lib/auth/demo-role-toggle'
+import { useDemoRole } from '@/lib/auth/use-demo-role'
+
+/**
+ * CRITICAL: DO NOT REMOVE THE ENTITLEMENTS IMPORTS OR DEMO TOGGLE
+ *
+ * These provide the demo mode toggles in the bottom-right corner for:
+ * - Plan tiers: free, pro, enterprise
+ *
+ * The toggle is ESSENTIAL for testing and demonstrating feature gating.
+ * Keyboard shortcut: Ctrl+Shift+P to cycle plans
+ */
+import {
+  EntitlementsProvider,
+  useDemoEntitlements,
+  DemoToggle,
+} from '@/lib/entitlements'
 
 function AppLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -45,134 +62,157 @@ function AppLayout({ children }: { children: React.ReactNode }) {
   )
 }
 
+/**
+ * CRITICAL: DO NOT REMOVE THIS COMPONENT
+ *
+ * AppWithEntitlements wraps the app with entitlements context and renders:
+ * - DemoToggle (bottom-right): Plan tiers (free/pro/enterprise)
+ * - DemoRoleToggle (bottom-left): User roles (viewer/member/admin/owner)
+ */
+function AppWithEntitlements() {
+  const { entitlements, plan, setPlan } = useDemoEntitlements()
+  const { role, setRole } = useDemoRole()
+
+  return (
+    <EntitlementsProvider entitlements={entitlements}>
+      <Routes>
+        {/* Public routes */}
+        <Route path="/login" element={<LoginPage />} />
+        <Route path="/sso-login" element={<SSOLoginPage />} />
+        <Route path="/auth/sso/callback" element={<SSOCallbackPage />} />
+
+        {/* Protected routes */}
+        <Route
+          path="/*"
+          element={
+            <RequireAuth>
+              <AppLayout>
+                <Routes>
+                  <Route
+                    index
+                    element={
+                      <FeatureErrorBoundary feature="dashboard">
+                        <DashboardPage />
+                      </FeatureErrorBoundary>
+                    }
+                  />
+                  <Route
+                    path="investigations"
+                    element={
+                      <FeatureErrorBoundary feature="investigations">
+                        <InvestigationList />
+                      </FeatureErrorBoundary>
+                    }
+                  />
+                  <Route
+                    path="investigations/new"
+                    element={
+                      <FeatureErrorBoundary feature="new investigation">
+                        <NewInvestigation />
+                      </FeatureErrorBoundary>
+                    }
+                  />
+                  <Route
+                    path="investigations/:id"
+                    element={
+                      <FeatureErrorBoundary feature="investigation details">
+                        <InvestigationDetail />
+                      </FeatureErrorBoundary>
+                    }
+                  />
+                  <Route
+                    path="datasources"
+                    element={
+                      <FeatureErrorBoundary feature="data sources">
+                        <DataSourcePage />
+                      </FeatureErrorBoundary>
+                    }
+                  />
+                  <Route
+                    path="datasources/:datasourceId/datasets"
+                    element={
+                      <FeatureErrorBoundary feature="datasets">
+                        <DatasetListPage />
+                      </FeatureErrorBoundary>
+                    }
+                  />
+                  <Route
+                    path="datasets/:datasetId"
+                    element={
+                      <FeatureErrorBoundary feature="dataset details">
+                        <DatasetDetailPage />
+                      </FeatureErrorBoundary>
+                    }
+                  />
+                  <Route
+                    path="settings"
+                    element={
+                      <FeatureErrorBoundary feature="settings">
+                        <SettingsPage />
+                      </FeatureErrorBoundary>
+                    }
+                  />
+                  <Route
+                    path="settings/sso"
+                    element={
+                      <FeatureErrorBoundary feature="sso settings">
+                        <SSOSettingsPage />
+                      </FeatureErrorBoundary>
+                    }
+                  />
+                  <Route
+                    path="settings/teams"
+                    element={
+                      <FeatureErrorBoundary feature="teams settings">
+                        <TeamsSettingsPage />
+                      </FeatureErrorBoundary>
+                    }
+                  />
+                  <Route
+                    path="settings/tags"
+                    element={
+                      <FeatureErrorBoundary feature="tags settings">
+                        <TagsSettingsPage />
+                      </FeatureErrorBoundary>
+                    }
+                  />
+                  <Route
+                    path="settings/permissions"
+                    element={
+                      <FeatureErrorBoundary feature="permissions settings">
+                        <PermissionsSettingsPage />
+                      </FeatureErrorBoundary>
+                    }
+                  />
+                  <Route
+                    path="usage"
+                    element={
+                      <FeatureErrorBoundary feature="usage">
+                        <UsagePage />
+                      </FeatureErrorBoundary>
+                    }
+                  />
+                </Routes>
+              </AppLayout>
+            </RequireAuth>
+          }
+        />
+      </Routes>
+      {/* CRITICAL: DO NOT REMOVE - Demo toggles for testing */}
+      {/* Bottom-right: Plan tiers (free/pro/enterprise) */}
+      <DemoToggle plan={plan} onPlanChange={setPlan} />
+      {/* Bottom-left: User roles (viewer/member/admin/owner) */}
+      <DemoRoleToggle currentRole={role} onRoleChange={setRole} />
+      <Toaster />
+    </EntitlementsProvider>
+  )
+}
+
 function App() {
   return (
     <ErrorBoundary>
       <AuthProvider>
-        <Routes>
-          {/* Public routes */}
-          <Route path="/login" element={<LoginPage />} />
-          <Route path="/sso-login" element={<SSOLoginPage />} />
-          <Route path="/auth/sso/callback" element={<SSOCallbackPage />} />
-
-          {/* Protected routes */}
-          <Route
-            path="/*"
-            element={
-              <RequireAuth>
-                <AppLayout>
-                  <Routes>
-                    <Route
-                      index
-                      element={
-                        <FeatureErrorBoundary feature="dashboard">
-                          <DashboardPage />
-                        </FeatureErrorBoundary>
-                      }
-                    />
-                    <Route
-                      path="investigations"
-                      element={
-                        <FeatureErrorBoundary feature="investigations">
-                          <InvestigationList />
-                        </FeatureErrorBoundary>
-                      }
-                    />
-                    <Route
-                      path="investigations/new"
-                      element={
-                        <FeatureErrorBoundary feature="new investigation">
-                          <NewInvestigation />
-                        </FeatureErrorBoundary>
-                      }
-                    />
-                    <Route
-                      path="investigations/:id"
-                      element={
-                        <FeatureErrorBoundary feature="investigation details">
-                          <InvestigationDetail />
-                        </FeatureErrorBoundary>
-                      }
-                    />
-                    <Route
-                      path="datasources"
-                      element={
-                        <FeatureErrorBoundary feature="data sources">
-                          <DataSourcePage />
-                        </FeatureErrorBoundary>
-                      }
-                    />
-                    <Route
-                      path="datasources/:datasourceId/datasets"
-                      element={
-                        <FeatureErrorBoundary feature="datasets">
-                          <DatasetListPage />
-                        </FeatureErrorBoundary>
-                      }
-                    />
-                    <Route
-                      path="datasets/:datasetId"
-                      element={
-                        <FeatureErrorBoundary feature="dataset details">
-                          <DatasetDetailPage />
-                        </FeatureErrorBoundary>
-                      }
-                    />
-                    <Route
-                      path="settings"
-                      element={
-                        <FeatureErrorBoundary feature="settings">
-                          <SettingsPage />
-                        </FeatureErrorBoundary>
-                      }
-                    />
-                    <Route
-                      path="settings/sso"
-                      element={
-                        <FeatureErrorBoundary feature="sso settings">
-                          <SSOSettingsPage />
-                        </FeatureErrorBoundary>
-                      }
-                    />
-                    <Route
-                      path="settings/teams"
-                      element={
-                        <FeatureErrorBoundary feature="teams settings">
-                          <TeamsSettingsPage />
-                        </FeatureErrorBoundary>
-                      }
-                    />
-                    <Route
-                      path="settings/tags"
-                      element={
-                        <FeatureErrorBoundary feature="tags settings">
-                          <TagsSettingsPage />
-                        </FeatureErrorBoundary>
-                      }
-                    />
-                    <Route
-                      path="settings/permissions"
-                      element={
-                        <FeatureErrorBoundary feature="permissions settings">
-                          <PermissionsSettingsPage />
-                        </FeatureErrorBoundary>
-                      }
-                    />
-                    <Route
-                      path="usage"
-                      element={
-                        <FeatureErrorBoundary feature="usage">
-                          <UsagePage />
-                        </FeatureErrorBoundary>
-                      }
-                    />
-                  </Routes>
-                </AppLayout>
-              </RequireAuth>
-            }
-          />
-        </Routes>
-        <Toaster />
+        <AppWithEntitlements />
       </AuthProvider>
     </ErrorBoundary>
   )

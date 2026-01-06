@@ -16,10 +16,13 @@ from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
+from dataing.adapters.db.app_db import AppDatabase
 from dataing.core.domain_types import AnomalyAlert
 from dataing.core.orchestrator import InvestigationOrchestrator
+from dataing.core.rbac import PermissionService
 from dataing.core.state import InvestigationState
 from dataing.entrypoints.api.deps import (
+    get_app_db,
     get_context_engine_for_tenant,
     get_default_tenant_adapter,
     get_investigations,
@@ -36,6 +39,7 @@ logger = structlog.get_logger()
 AuthDep = Annotated[ApiKeyContext, Depends(verify_api_key)]
 OrchestratorDep = Annotated[InvestigationOrchestrator, Depends(get_orchestrator)]
 InvestigationsDep = Annotated[dict[str, dict[str, Any]], Depends(get_investigations)]
+AppDbDep = Annotated[AppDatabase, Depends(get_app_db)]
 
 
 class CreateInvestigationRequest(BaseModel):
@@ -155,6 +159,7 @@ async def create_investigation(
 async def get_investigation(
     investigation_id: str,
     auth: AuthDep,
+    app_db: AppDbDep,
     investigations: InvestigationsDep,
 ) -> InvestigationStatusResponse:
     """Get investigation status and results."""
@@ -166,6 +171,24 @@ async def get_investigation(
     # Check tenant access
     if inv.get("tenant_id") and inv["tenant_id"] != str(auth.tenant_id):
         raise HTTPException(status_code=404, detail="Investigation not found")
+
+    # Check RBAC permissions if user_id is available
+    if auth.user_id:
+        try:
+            inv_uuid = uuid.UUID(investigation_id)
+            async with app_db.acquire() as conn:
+                permission_service = PermissionService(conn)
+                has_access = await permission_service.can_access_investigation(
+                    auth.user_id, inv_uuid
+                )
+                if not has_access:
+                    raise HTTPException(
+                        status_code=403,
+                        detail="You don't have access to this investigation",
+                    )
+        except ValueError:
+            # Invalid UUID, fall back to tenant check only
+            pass
 
     state: InvestigationState = inv["state"]
 
@@ -189,6 +212,7 @@ async def get_investigation(
 async def stream_events(
     investigation_id: str,
     auth: AuthDep,
+    app_db: AppDbDep,
     investigations: InvestigationsDep,
 ) -> StreamingResponse:
     """SSE stream of investigation events.
@@ -204,6 +228,23 @@ async def stream_events(
     # Check tenant access
     if inv.get("tenant_id") and inv["tenant_id"] != str(auth.tenant_id):
         raise HTTPException(status_code=404, detail="Investigation not found")
+
+    # Check RBAC permissions if user_id is available
+    if auth.user_id:
+        try:
+            inv_uuid = uuid.UUID(investigation_id)
+            async with app_db.acquire() as conn:
+                permission_service = PermissionService(conn)
+                has_access = await permission_service.can_access_investigation(
+                    auth.user_id, inv_uuid
+                )
+                if not has_access:
+                    raise HTTPException(
+                        status_code=403,
+                        detail="You don't have access to this investigation",
+                    )
+        except ValueError:
+            pass
 
     async def event_generator() -> AsyncIterator[str]:
         """Generate SSE events."""
@@ -244,10 +285,40 @@ async def stream_events(
 @router.get("/")
 async def list_investigations(
     auth: AuthDep,
+    app_db: AppDbDep,
     investigations: InvestigationsDep,
 ) -> list[dict[str, Any]]:
-    """List all investigations for the current tenant."""
+    """List all investigations for the current tenant.
+
+    Results are filtered by RBAC permissions when user_id is available.
+    Admins and owners see all investigations; members see only those
+    they have access to via direct grants, tags, teams, or datasources.
+    """
     tenant_id = str(auth.tenant_id)
+
+    # First filter by tenant
+    tenant_investigations = [
+        (inv_id, inv)
+        for inv_id, inv in investigations.items()
+        if not inv.get("tenant_id") or inv["tenant_id"] == tenant_id
+    ]
+
+    # If user_id is available, apply RBAC filtering
+    if auth.user_id:
+        async with app_db.acquire() as conn:
+            permission_service = PermissionService(conn)
+            accessible_ids = await permission_service.get_accessible_investigation_ids(
+                auth.user_id, auth.tenant_id
+            )
+
+            # None means admin/owner - show all
+            if accessible_ids is not None:
+                accessible_set = {str(id_) for id_ in accessible_ids}
+                tenant_investigations = [
+                    (inv_id, inv)
+                    for inv_id, inv in tenant_investigations
+                    if inv_id in accessible_set
+                ]
 
     return [
         {
@@ -256,6 +327,5 @@ async def list_investigations(
             "created_at": inv["created_at"].isoformat(),
             "dataset_id": inv["state"].alert.dataset_id,
         }
-        for inv_id, inv in investigations.items()
-        if not inv.get("tenant_id") or inv["tenant_id"] == tenant_id
+        for inv_id, inv in tenant_investigations
     ]

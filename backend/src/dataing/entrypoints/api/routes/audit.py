@@ -11,6 +11,7 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, ConfigDict
 
 from dataing.adapters.audit import AuditRepository
+from dataing.entrypoints.api.middleware.auth import ApiKeyContext, require_scope, verify_api_key
 
 router = APIRouter(prefix="/audit-logs", tags=["audit"])
 
@@ -22,14 +23,16 @@ def get_audit_repo(request: Request) -> AuditRepository:
         request: The current request.
 
     Returns:
-        Audit repository instance.
+        Audit repository instance (created during app startup in deps.py).
     """
-    pool = request.app.state.db_pool
-    return AuditRepository(pool=pool)
+    audit_repo: AuditRepository = request.app.state.audit_repo
+    return audit_repo
 
 
-# Annotated type for dependency injection
+# Annotated types for dependency injection
 AuditRepoDep = Annotated[AuditRepository, Depends(get_audit_repo)]
+AuthDep = Annotated[ApiKeyContext, Depends(verify_api_key)]
+AdminScopeDep = Annotated[ApiKeyContext, Depends(require_scope("admin"))]
 
 
 class AuditLogResponse(BaseModel):
@@ -65,7 +68,7 @@ class AuditLogListResponse(BaseModel):
 
 @router.get("", response_model=AuditLogListResponse)
 async def list_audit_logs(
-    request: Request,
+    auth: AdminScopeDep,
     audit_repo: AuditRepoDep,
     page: Annotated[int, Query(ge=1)] = 1,
     limit: Annotated[int, Query(ge=1, le=100)] = 50,
@@ -78,8 +81,10 @@ async def list_audit_logs(
 ) -> AuditLogListResponse:
     """List audit logs with filtering and pagination.
 
+    Requires admin scope.
+
     Args:
-        request: The current request.
+        auth: Authenticated context with admin scope.
         audit_repo: Audit repository dependency.
         page: Page number (1-indexed).
         limit: Number of items per page.
@@ -93,7 +98,7 @@ async def list_audit_logs(
     Returns:
         Paginated list of audit log entries.
     """
-    tenant_id: UUID = request.state.tenant_id
+    tenant_id = auth.tenant_id
     offset = (page - 1) * limit
 
     entries, total = await audit_repo.list(
@@ -121,7 +126,7 @@ async def list_audit_logs(
 
 @router.get("/export")
 async def export_audit_logs(
-    request: Request,
+    auth: AdminScopeDep,
     audit_repo: AuditRepoDep,
     start_date: datetime | None = None,
     end_date: datetime | None = None,
@@ -132,8 +137,10 @@ async def export_audit_logs(
 ) -> StreamingResponse:
     """Export audit logs as CSV.
 
+    Requires admin scope.
+
     Args:
-        request: The current request.
+        auth: Authenticated context with admin scope.
         audit_repo: Audit repository dependency.
         start_date: Filter entries after this date.
         end_date: Filter entries before this date.
@@ -145,7 +152,7 @@ async def export_audit_logs(
     Returns:
         CSV file as streaming response.
     """
-    tenant_id: UUID = request.state.tenant_id
+    tenant_id = auth.tenant_id
 
     # Fetch all matching entries (up to 10000)
     entries, _ = await audit_repo.list(
@@ -205,14 +212,16 @@ async def export_audit_logs(
 
 @router.get("/{entry_id}", response_model=AuditLogResponse)
 async def get_audit_log(
-    request: Request,
+    auth: AdminScopeDep,
     entry_id: UUID,
     audit_repo: AuditRepoDep,
 ) -> AuditLogResponse:
     """Get a single audit log entry.
 
+    Requires admin scope.
+
     Args:
-        request: The current request.
+        auth: Authenticated context with admin scope.
         entry_id: UUID of the audit log entry.
         audit_repo: Audit repository dependency.
 
@@ -222,7 +231,7 @@ async def get_audit_log(
     Raises:
         HTTPException: If entry not found (404).
     """
-    tenant_id: UUID = request.state.tenant_id
+    tenant_id = auth.tenant_id
 
     entry = await audit_repo.get(tenant_id=tenant_id, entry_id=entry_id)
     if not entry:

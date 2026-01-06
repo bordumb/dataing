@@ -6,9 +6,16 @@ from uuid import uuid4
 
 import pytest
 from dataing.adapters.audit.types import AuditLogEntry
+from dataing.entrypoints.api.middleware.auth import ApiKeyContext
 from dataing.entrypoints.api.routes.audit import get_audit_repo, router
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
+
+
+@pytest.fixture
+def tenant_id():
+    """Return consistent tenant ID for tests."""
+    return uuid4()
 
 
 @pytest.fixture
@@ -18,21 +25,31 @@ def mock_audit_repo() -> AsyncMock:
 
 
 @pytest.fixture
-def app(mock_audit_repo: AsyncMock) -> FastAPI:
+def mock_auth_context(tenant_id):
+    """Create mock auth context with admin scope."""
+    return ApiKeyContext(
+        key_id=uuid4(),
+        tenant_id=tenant_id,
+        tenant_slug="test",
+        tenant_name="Test Tenant",
+        user_id=uuid4(),
+        scopes=["read", "write", "admin"],
+    )
+
+
+@pytest.fixture
+def app(mock_audit_repo: AsyncMock, mock_auth_context: ApiKeyContext) -> FastAPI:
     """Create test app with audit routes."""
+    from dataing.entrypoints.api.middleware.auth import require_scope, verify_api_key
+
     app = FastAPI()
     app.include_router(router, prefix="/api/v1")
+
+    # Override dependencies
     app.dependency_overrides[get_audit_repo] = lambda: mock_audit_repo
-
-    tenant_id = uuid4()
-    user_id = uuid4()
-
-    @app.middleware("http")
-    async def add_state(request, call_next):  # type: ignore[no-untyped-def]
-        request.state.tenant_id = tenant_id
-        request.state.user_id = user_id
-        request.state.user_email = "admin@example.com"
-        return await call_next(request)
+    app.dependency_overrides[verify_api_key] = lambda: mock_auth_context
+    # For require_scope("admin"), override the function factory's returned function
+    app.dependency_overrides[require_scope("admin")] = lambda: mock_auth_context
 
     return app
 

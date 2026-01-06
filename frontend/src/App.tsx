@@ -14,11 +14,9 @@ import { NewInvestigation } from '@/features/investigation/NewInvestigation'
 import { DataSourcePage } from '@/features/datasources/datasource-page'
 import { DatasetListPage, DatasetDetailPage } from '@/features/datasets'
 import { SettingsPage } from '@/features/settings/settings-page'
-import { SSOSettingsPage } from '@/features/settings/sso'
-import { TeamsSettingsPage } from '@/features/settings/teams'
-import { TagsSettingsPage } from '@/features/settings/tags'
-import { PermissionsSettingsPage } from '@/features/settings/permissions'
 import { UsagePage } from '@/features/usage/usage-page'
+import { NotificationsPage } from '@/features/notifications'
+import { AdminPage } from '@/features/admin'
 import { LoginPage } from '@/features/auth/login-page'
 import { SSOLoginPage } from '@/features/auth/sso-login-page'
 import { SSOCallbackPage } from '@/features/auth/sso-callback-page'
@@ -26,7 +24,7 @@ import { SSOCallbackPage } from '@/features/auth/sso-callback-page'
 // Auth
 import { AuthProvider, RequireAuth } from '@/lib/auth/context'
 import { DemoRoleToggle } from '@/lib/auth/demo-role-toggle'
-import { useDemoRole } from '@/lib/auth/use-demo-role'
+import { DemoRoleProvider, useDemoRoleContext } from '@/lib/auth/demo-role-context'
 
 /**
  * CRITICAL: DO NOT REMOVE THE ENTITLEMENTS IMPORTS OR DEMO TOGGLE
@@ -71,7 +69,7 @@ function AppLayout({ children }: { children: React.ReactNode }) {
  */
 function AppWithEntitlements() {
   const { entitlements, plan, setPlan } = useDemoEntitlements()
-  const { role, setRole } = useDemoRole()
+  const { role, setRole } = useDemoRoleContext()
 
   return (
     <EntitlementsProvider entitlements={entitlements}>
@@ -145,6 +143,22 @@ function AppWithEntitlements() {
                     }
                   />
                   <Route
+                    path="usage"
+                    element={
+                      <FeatureErrorBoundary feature="usage">
+                        <UsagePage />
+                      </FeatureErrorBoundary>
+                    }
+                  />
+                  <Route
+                    path="notifications"
+                    element={
+                      <FeatureErrorBoundary feature="notifications">
+                        <NotificationsPage />
+                      </FeatureErrorBoundary>
+                    }
+                  />
+                  <Route
                     path="settings"
                     element={
                       <FeatureErrorBoundary feature="settings">
@@ -153,42 +167,10 @@ function AppWithEntitlements() {
                     }
                   />
                   <Route
-                    path="settings/sso"
+                    path="admin"
                     element={
-                      <FeatureErrorBoundary feature="sso settings">
-                        <SSOSettingsPage />
-                      </FeatureErrorBoundary>
-                    }
-                  />
-                  <Route
-                    path="settings/teams"
-                    element={
-                      <FeatureErrorBoundary feature="teams settings">
-                        <TeamsSettingsPage />
-                      </FeatureErrorBoundary>
-                    }
-                  />
-                  <Route
-                    path="settings/tags"
-                    element={
-                      <FeatureErrorBoundary feature="tags settings">
-                        <TagsSettingsPage />
-                      </FeatureErrorBoundary>
-                    }
-                  />
-                  <Route
-                    path="settings/permissions"
-                    element={
-                      <FeatureErrorBoundary feature="permissions settings">
-                        <PermissionsSettingsPage />
-                      </FeatureErrorBoundary>
-                    }
-                  />
-                  <Route
-                    path="usage"
-                    element={
-                      <FeatureErrorBoundary feature="usage">
-                        <UsagePage />
+                      <FeatureErrorBoundary feature="admin">
+                        <AdminPage />
                       </FeatureErrorBoundary>
                     }
                   />
@@ -212,7 +194,9 @@ function App() {
   return (
     <ErrorBoundary>
       <AuthProvider>
-        <AppWithEntitlements />
+        <DemoRoleProvider>
+          <AppWithEntitlements />
+        </DemoRoleProvider>
       </AuthProvider>
     </ErrorBoundary>
   )

@@ -10,9 +10,6 @@ import {
   ChevronUp,
   LogOut,
   Shield,
-  Users,
-  Tag,
-  Lock,
 } from 'lucide-react'
 
 import {
@@ -37,6 +34,7 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { useAuth } from '@/lib/auth/context'
+import { useDemoRoleContext } from '@/lib/auth/demo-role-context'
 
 const mainNavItems = [
   {
@@ -59,37 +57,9 @@ const mainNavItems = [
     url: '/usage',
     icon: BarChart3,
   },
-]
-
-const settingsNavItems = [
-  {
-    title: 'Settings',
-    url: '/settings',
-    icon: Settings,
-  },
-  {
-    title: 'Single Sign-On',
-    url: '/settings/sso',
-    icon: Shield,
-  },
-  {
-    title: 'Teams',
-    url: '/settings/teams',
-    icon: Users,
-  },
-  {
-    title: 'Tags',
-    url: '/settings/tags',
-    icon: Tag,
-  },
-  {
-    title: 'Permissions',
-    url: '/settings/permissions',
-    icon: Lock,
-  },
   {
     title: 'Notifications',
-    url: '/settings/notifications',
+    url: '/notifications',
     icon: Bell,
   },
 ]
@@ -98,6 +68,27 @@ export function AppSidebar() {
   const location = useLocation()
   const { state } = useSidebar()
   const { tenant, logout } = useAuth()
+  const { canAccessAdmin } = useDemoRoleContext()
+
+  // Build settings nav items based on role
+  // Admin link only visible to admin/owner roles
+  const settingsNavItems = [
+    {
+      title: 'Settings',
+      url: '/settings',
+      icon: Settings,
+    },
+    // Only show Admin to admin/owner roles
+    ...(canAccessAdmin
+      ? [
+          {
+            title: 'Admin',
+            url: '/admin',
+            icon: Shield,
+          },
+        ]
+      : []),
+  ]
 
   return (
     <Sidebar collapsible="icon">

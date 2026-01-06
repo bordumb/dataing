@@ -35,6 +35,8 @@ import {
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { useAuth } from '@/lib/auth/context'
 import { useDemoRoleContext } from '@/lib/auth/demo-role-context'
+// IMPORTANT: OrgSelector is critical for multi-tenant support - DO NOT REMOVE
+import { OrgSelector } from '@/lib/auth/org-selector'
 
 const mainNavItems = [
   {
@@ -108,6 +110,15 @@ export function AppSidebar() {
                 </div>
               </Link>
             </SidebarMenuButton>
+          </SidebarMenuItem>
+          {/*
+           * IMPORTANT: OrgSelector dropdown for multi-tenant organization switching
+           * This component is CRITICAL for users with multiple organization memberships
+           * DO NOT REMOVE - it allows users to switch between organizations
+           * The component auto-hides when user has only one org membership
+           */}
+          <SidebarMenuItem>
+            <OrgSelector />
           </SidebarMenuItem>
         </SidebarMenu>
       </SidebarHeader>

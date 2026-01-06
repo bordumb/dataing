@@ -46,16 +46,24 @@ async def verify_api_key(
     if bearer:
         try:
             payload = decode_token(bearer.credentials)
+            # Build scopes based on user's role
+            # admin/owner roles get full access including admin operations
+            scopes = ["read", "write"]
+            if payload.role in ("admin", "owner"):
+                scopes.append("admin")
             context = ApiKeyContext(
                 key_id=UUID("00000000-0000-0000-0000-000000000000"),  # Placeholder for JWT auth
                 tenant_id=UUID(payload.org_id),
                 tenant_slug="",  # Not available in JWT
                 tenant_name="",  # Not available in JWT
                 user_id=UUID(payload.sub),
-                scopes=["read", "write"],  # JWT users get full access
+                scopes=scopes,
             )
             request.state.auth_context = context
-            logger.debug(f"jwt_verified: user_id={payload.sub}, org_id={payload.org_id}")
+            logger.debug(
+                f"jwt_verified: user_id={payload.sub}, org_id={payload.org_id}, "
+                f"role={payload.role}, scopes={scopes}"
+            )
             return context
         except TokenError as e:
             logger.warning(f"jwt_validation_failed: {e}")

@@ -96,13 +96,14 @@ class TestGetUserById:
 
     async def test_returns_user(self, repository: SCIMUserRepository, mock_conn: MagicMock) -> None:
         """Returns user when found."""
+        org_id = uuid4()
         user_id = uuid4()
         now = datetime.now(UTC)
 
         mock_conn.fetchrow = AsyncMock(
             return_value={
                 "id": user_id,
-                "tenant_id": uuid4(),
+                "tenant_id": org_id,
                 "email": "test@example.com",
                 "name": "Test User",
                 "role": "member",
@@ -112,7 +113,7 @@ class TestGetUserById:
             }
         )
 
-        user = await repository.get_user_by_id(user_id)
+        user = await repository.get_user_by_id(org_id, user_id)
 
         assert user is not None
         assert user["id"] == user_id
@@ -123,7 +124,7 @@ class TestGetUserById:
         """Returns None when user not found."""
         mock_conn.fetchrow = AsyncMock(return_value=None)
 
-        user = await repository.get_user_by_id(uuid4())
+        user = await repository.get_user_by_id(uuid4(), uuid4())
 
         assert user is None
 
@@ -209,13 +210,14 @@ class TestUpdateUser:
 
     async def test_updates_user(self, repository: SCIMUserRepository, mock_conn: MagicMock) -> None:
         """Updates user fields."""
+        org_id = uuid4()
         user_id = uuid4()
         now = datetime.now(UTC)
 
         mock_conn.fetchrow = AsyncMock(
             return_value={
                 "id": user_id,
-                "tenant_id": uuid4(),
+                "tenant_id": org_id,
                 "email": "new@example.com",
                 "name": "New Name",
                 "role": "member",
@@ -225,7 +227,9 @@ class TestUpdateUser:
             }
         )
 
-        user = await repository.update_user(user_id, email="new@example.com", name="New Name")
+        user = await repository.update_user(
+            org_id, user_id, email="new@example.com", name="New Name"
+        )
 
         assert user is not None
         assert user["email"] == "new@example.com"
@@ -237,7 +241,7 @@ class TestUpdateUser:
         """Returns None when user not found."""
         mock_conn.fetchrow = AsyncMock(return_value=None)
 
-        user = await repository.update_user(uuid4(), email="new@example.com")
+        user = await repository.update_user(uuid4(), uuid4(), email="new@example.com")
 
         assert user is None
 
@@ -251,7 +255,7 @@ class TestDeactivateUser:
         """Deactivates a user."""
         mock_conn.execute = AsyncMock(return_value="UPDATE 1")
 
-        result = await repository.deactivate_user(uuid4())
+        result = await repository.deactivate_user(uuid4(), uuid4())
 
         assert result is True
 
@@ -261,7 +265,7 @@ class TestDeactivateUser:
         """Returns False when user not found."""
         mock_conn.execute = AsyncMock(return_value="UPDATE 0")
 
-        result = await repository.deactivate_user(uuid4())
+        result = await repository.deactivate_user(uuid4(), uuid4())
 
         assert result is False
 
@@ -344,7 +348,7 @@ class TestUpdateUserRole:
         """Updates user's role."""
         mock_conn.execute = AsyncMock(return_value="UPDATE 1")
 
-        result = await repository.update_user_role(uuid4(), "admin")
+        result = await repository.update_user_role(uuid4(), uuid4(), "admin")
 
         assert result is True
 
@@ -354,6 +358,6 @@ class TestUpdateUserRole:
         """Returns False when user not found."""
         mock_conn.execute = AsyncMock(return_value="UPDATE 0")
 
-        result = await repository.update_user_role(uuid4(), "admin")
+        result = await repository.update_user_role(uuid4(), uuid4(), "admin")
 
         assert result is False

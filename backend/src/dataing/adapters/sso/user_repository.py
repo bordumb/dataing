@@ -72,10 +72,11 @@ class SCIMUserRepository:
 
         return dict(row)
 
-    async def get_user_by_id(self, user_id: UUID) -> dict[str, Any] | None:
-        """Get user by ID.
+    async def get_user_by_id(self, org_id: UUID, user_id: UUID) -> dict[str, Any] | None:
+        """Get user by ID within an organization.
 
         Args:
+            org_id: Organization/tenant ID.
             user_id: User ID.
 
         Returns:
@@ -84,9 +85,10 @@ class SCIMUserRepository:
         row = await self._conn.fetchrow(
             """
             SELECT id, tenant_id, email, name, role, is_active, created_at, updated_at
-            FROM users WHERE id = $1
+            FROM users WHERE id = $1 AND tenant_id = $2
             """,
             user_id,
+            org_id,
         )
         if not row:
             return None
@@ -144,14 +146,16 @@ class SCIMUserRepository:
 
     async def update_user(
         self,
+        org_id: UUID,
         user_id: UUID,
         email: str | None = None,
         name: str | None = None,
         is_active: bool | None = None,
     ) -> dict[str, Any] | None:
-        """Update a user.
+        """Update a user within an organization.
 
         Args:
+            org_id: Organization/tenant ID.
             user_id: User ID.
             email: New email address.
             name: New display name.
@@ -161,8 +165,8 @@ class SCIMUserRepository:
             Updated user data if found, None otherwise.
         """
         updates = []
-        params: list[Any] = [user_id]
-        idx = 2
+        params: list[Any] = [user_id, org_id]
+        idx = 3
 
         if email is not None:
             updates.append(f"email = ${idx}")
@@ -180,13 +184,13 @@ class SCIMUserRepository:
             idx += 1
 
         if not updates:
-            return await self.get_user_by_id(user_id)
+            return await self.get_user_by_id(org_id, user_id)
 
         updates.append("updated_at = NOW()")
 
         query = f"""
             UPDATE users SET {', '.join(updates)}
-            WHERE id = $1
+            WHERE id = $1 AND tenant_id = $2
             RETURNING id, tenant_id, email, name, role, is_active, created_at, updated_at
         """
 
@@ -195,18 +199,21 @@ class SCIMUserRepository:
             return None
         return dict(row)
 
-    async def deactivate_user(self, user_id: UUID) -> bool:
+    async def deactivate_user(self, org_id: UUID, user_id: UUID) -> bool:
         """Deactivate a user (soft delete).
 
         Args:
+            org_id: Organization/tenant ID.
             user_id: User ID.
 
         Returns:
             True if deactivated, False if not found.
         """
         result: str = await self._conn.execute(
-            "UPDATE users SET is_active = false, updated_at = NOW() WHERE id = $1",
+            "UPDATE users SET is_active = false, updated_at = NOW() "
+            "WHERE id = $1 AND tenant_id = $2",
             user_id,
+            org_id,
         )
         return result == "UPDATE 1"
 
@@ -266,10 +273,11 @@ class SCIMUserRepository:
 
         return [dict(row) for row in rows], total or 0
 
-    async def update_user_role(self, user_id: UUID, role: str) -> bool:
+    async def update_user_role(self, org_id: UUID, user_id: UUID, role: str) -> bool:
         """Update user's role.
 
         Args:
+            org_id: Organization/tenant ID.
             user_id: User ID.
             role: New role.
 
@@ -277,8 +285,9 @@ class SCIMUserRepository:
             True if updated, False if not found.
         """
         result: str = await self._conn.execute(
-            "UPDATE users SET role = $2, updated_at = NOW() WHERE id = $1",
+            "UPDATE users SET role = $2, updated_at = NOW() WHERE id = $1 AND tenant_id = $3",
             user_id,
             role,
+            org_id,
         )
         return result == "UPDATE 1"

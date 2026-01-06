@@ -156,14 +156,15 @@ async def _record_audit(
         logger.warning("Audit repository not configured, skipping audit log")
         return
 
-    # Extract actor info from request state (set by auth middleware)
-    tenant_id = getattr(request.state, "tenant_id", None)
-    actor_id = getattr(request.state, "user_id", None)
-    actor_email = getattr(request.state, "user_email", None)
-
-    if tenant_id is None:
-        logger.warning("No tenant_id in request state, skipping audit log")
+    # Extract actor info from auth_context (set by auth middleware)
+    auth_context = getattr(request.state, "auth_context", None)
+    if auth_context is None:
+        logger.warning("No auth_context in request state, skipping audit log")
         return
+
+    tenant_id = auth_context.tenant_id
+    actor_id = auth_context.user_id
+    actor_email = None  # Not available in ApiKeyContext, could be added later
 
     # Extract resource info
     resource_id, resource_name = _extract_resource_info(result, kwargs)

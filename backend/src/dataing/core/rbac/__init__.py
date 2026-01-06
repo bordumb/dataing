@@ -1,5 +1,6 @@
 """RBAC core domain."""
 
+from dataing.core.rbac.permission_service import PermissionService
 from dataing.core.rbac.types import (
     AccessType,
     GranteeType,
@@ -16,6 +17,7 @@ __all__ = [
     "GranteeType",
     "Permission",
     "PermissionGrant",
+    "PermissionService",
     "ResourceTag",
     "Role",
     "Team",

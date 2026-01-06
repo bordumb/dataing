@@ -23,12 +23,12 @@ import { SettingsPage } from '@/features/settings/settings-page'
 import { UsagePage } from '@/features/usage/usage-page'
 import { NotificationsPage } from '@/features/notifications'
 import { AdminPage } from '@/features/admin'
-import { LoginPage } from '@/features/auth/login-page'
+import { JwtLoginPage } from '@/features/auth/jwt-login-page'
 import { SSOLoginPage } from '@/features/auth/sso-login-page'
 import { SSOCallbackPage } from '@/features/auth/sso-callback-page'
 
 // Auth
-import { AuthProvider, RequireAuth } from '@/lib/auth/context'
+import { JwtAuthProvider, RequireJwtAuth } from '@/lib/auth/jwt-context'
 import { DemoRoleToggle } from '@/lib/auth/demo-role-toggle'
 import { DemoRoleProvider, useDemoRoleContext } from '@/lib/auth/demo-role-context'
 
@@ -91,7 +91,7 @@ function AppWithEntitlements() {
     <EntitlementsProvider entitlements={entitlements}>
       <Routes>
         {/* Public routes */}
-        <Route path="/login" element={<LoginPage />} />
+        <Route path="/login" element={<JwtLoginPage />} />
         <Route path="/sso-login" element={<SSOLoginPage />} />
         <Route path="/auth/sso/callback" element={<SSOCallbackPage />} />
 
@@ -99,7 +99,7 @@ function AppWithEntitlements() {
         <Route
           path="/*"
           element={
-            <RequireAuth>
+            <RequireJwtAuth>
               <AppLayout>
                 <Routes>
                   <Route
@@ -192,7 +192,7 @@ function AppWithEntitlements() {
                   />
                 </Routes>
               </AppLayout>
-            </RequireAuth>
+            </RequireJwtAuth>
           }
         />
       </Routes>
@@ -210,11 +210,11 @@ function AppWithEntitlements() {
 function App() {
   return (
     <ErrorBoundary>
-      <AuthProvider>
+      <JwtAuthProvider>
         <DemoRoleProvider>
           <AppWithEntitlements />
         </DemoRoleProvider>
-      </AuthProvider>
+      </JwtAuthProvider>
     </ErrorBoundary>
   )
 }

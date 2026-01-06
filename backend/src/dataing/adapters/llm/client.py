@@ -47,7 +47,6 @@ class AnthropicClient:
             max_retries: Max retries on validation failure.
         """
         self._model = AnthropicModel(model, api_key=api_key)
-        self._max_retries = max_retries
 
         # Pre-configure agents for each task
         self._hypothesis_agent: Agent[None, HypothesesResponse] = Agent(
@@ -136,7 +135,7 @@ class AnthropicClient:
             LLMError: If query generation fails.
         """
         if previous_error:
-            prompt = self._build_reflexion_prompt(hypothesis, schema, previous_error)
+            prompt = self._build_reflexion_prompt(hypothesis, previous_error)
             system = self._build_reflexion_system_prompt(schema)
         else:
             prompt = self._build_query_prompt(hypothesis)
@@ -339,7 +338,6 @@ CRITICAL: Only use tables and columns from the schema above."""
     def _build_reflexion_prompt(
         self,
         hypothesis: Hypothesis,
-        schema: SchemaResponse,
         previous_error: str,
     ) -> str:
         """Build user prompt for reflexion."""

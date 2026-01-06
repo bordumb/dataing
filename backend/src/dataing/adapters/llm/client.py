@@ -254,10 +254,28 @@ class AnthropicClient:
     # Prompt Building Methods
     # -------------------------------------------------------------------------
 
+    def _get_metric_explanation(self, metric_name: str) -> str:
+        """Get human-readable explanation for a metric type."""
+        explanations = {
+            "null_count": "count of NULL values - investigate what causes missing data",
+            "row_count": "total row count - investigate missing or extra records",
+            "volume": "data volume - investigate data loss or unexpected growth",
+            "duplicate_count": "duplicate records - investigate what causes duplicates",
+            "freshness": "data freshness - investigate delays in data arrival",
+            "completeness": "data completeness - investigate missing required fields",
+        }
+        return explanations.get(metric_name, f"metric measuring {metric_name}")
+
     def _build_hypothesis_system_prompt(self, num_hypotheses: int) -> str:
         """Build system prompt for hypothesis generation."""
         return f"""You are a data quality investigator. Given an anomaly alert and database context,
 generate {num_hypotheses} hypotheses about what could have caused the anomaly.
+
+CRITICAL: Pay close attention to the METRIC NAME in the alert:
+- "null_count": Investigate what causes NULL values (app bugs, missing required fields, ETL drops)
+- "row_count" or "volume": Investigate missing/extra records (filtering bugs, data loss, duplicates)
+- "duplicate_count": Investigate what causes duplicate records
+- Other metrics: Investigate value changes, data corruption, calculation errors
 
 HYPOTHESIS CATEGORIES:
 - upstream_dependency: Source table missing data, late arrival, schema change
@@ -267,11 +285,12 @@ HYPOTHESIS CATEGORIES:
 - expected_variance: Seasonality, holiday, known business event
 
 Each hypothesis MUST:
-1. Have a clear, specific title (10-200 characters)
-2. Include reasoning for why this could be the cause (at least 20 characters)
-3. Suggest a SQL query to investigate using ONLY provided schema tables
-4. Include LIMIT clause in all queries
-5. Use only SELECT statements (no mutations)
+1. DIRECTLY address the specific metric in the alert (e.g., if null_count, focus on NULL causes)
+2. Have a clear, specific title (10-200 characters)
+3. Include reasoning for why this could be the cause (at least 20 characters)
+4. Suggest a SQL query to investigate using ONLY provided schema tables
+5. Include LIMIT clause in all queries
+6. Use only SELECT statements (no mutations)
 
 Generate diverse hypotheses covering multiple categories when plausible."""
 
@@ -288,19 +307,25 @@ Generate diverse hypotheses covering multiple categories when plausible."""
 {context.lineage.to_prompt_string()}
 """
 
+        metric_explanation = self._get_metric_explanation(alert.metric_name)
+
         return f"""## Anomaly Alert
 - Dataset: {alert.dataset_id}
-- Metric: {alert.metric_name}
+- Metric: {alert.metric_name} ({metric_explanation})
 - Expected: {alert.expected_value}
 - Actual: {alert.actual_value}
 - Deviation: {alert.deviation_pct}%
 - Anomaly Date: {alert.anomaly_date}
 - Severity: {alert.severity}
 
+FOCUS: The anomaly is about {alert.metric_name}. Your hypotheses MUST explain why
+{alert.metric_name} went from {alert.expected_value} to {alert.actual_value}
+(a {alert.deviation_pct}% deviation).
+
 ## Available Schema
 {context.schema.to_prompt_string()}
 {lineage_section}
-Generate hypotheses to investigate this anomaly."""
+Generate hypotheses to investigate this {alert.metric_name} anomaly."""
 
     def _build_query_system_prompt(self, schema: SchemaResponse) -> str:
         """Build system prompt for query generation."""
@@ -394,14 +419,20 @@ Analyze whether these results support or refute the hypothesis."""
         """Build system prompt for synthesis."""
         return """You are synthesizing investigation findings to determine root cause.
 
+CRITICAL: Your root cause MUST directly explain the specific metric anomaly.
+- If the anomaly is "null_count", root cause must explain what caused NULL values
+- If the anomaly is "row_count", root cause must explain missing/extra records
+- Do NOT suggest unrelated issues as root cause
+
 Review all evidence and determine:
-1. The most likely root cause (be specific, at least 20 characters, or null if inconclusive)
+1. The most likely root cause that DIRECTLY explains the metric anomaly (be specific, at least
+   20 characters, or null if inconclusive)
 2. Confidence level (0.0-1.0)
 3. Key supporting evidence
 4. Recommended actions (1-5 actionable items)
 
 CONFIDENCE GUIDELINES:
-- 0.9+: Strong evidence with clear causation
+- 0.9+: Strong evidence with clear causation linking to the specific metric
 - 0.7-0.9: Good evidence, likely correct
 - 0.5-0.7: Some evidence, but uncertain
 - <0.5: Weak evidence, inconclusive (set root_cause to null)"""

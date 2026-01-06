@@ -115,6 +115,7 @@ def audited(
             # Record audit log if we have a request
             if request is not None:
                 try:
+                    logger.info(f"audit_decorator: recording {action}")
                     await _record_audit(
                         request=request,
                         action=action,
@@ -122,9 +123,12 @@ def audited(
                         result=result,
                         kwargs=dict(kwargs),
                     )
+                    logger.info(f"audit_decorator: recorded {action} successfully")
                 except Exception as e:
                     # Log but don't fail the request
-                    logger.error(f"Failed to record audit log: {e}")
+                    logger.error(f"Failed to record audit log: {e}", exc_info=True)
+            else:
+                logger.warning(f"audit_decorator: no request found for {action}")
 
             typed_result: R = result
             return typed_result

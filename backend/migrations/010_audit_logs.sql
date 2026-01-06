@@ -32,11 +32,18 @@ CREATE TABLE IF NOT EXISTS audit_logs (
 );
 
 -- Add missing columns if table already existed (idempotent)
-DO $$ BEGIN
-    ALTER TABLE audit_logs ADD COLUMN IF NOT EXISTS resource_name VARCHAR(255);
-EXCEPTION
-    WHEN duplicate_column THEN null;
-END $$;
+-- This handles schema evolution when table was created before all columns were added
+ALTER TABLE audit_logs ADD COLUMN IF NOT EXISTS actor_id UUID;
+ALTER TABLE audit_logs ADD COLUMN IF NOT EXISTS actor_email VARCHAR(255);
+ALTER TABLE audit_logs ADD COLUMN IF NOT EXISTS actor_ip VARCHAR(45);
+ALTER TABLE audit_logs ADD COLUMN IF NOT EXISTS actor_user_agent TEXT;
+ALTER TABLE audit_logs ADD COLUMN IF NOT EXISTS resource_id UUID;
+ALTER TABLE audit_logs ADD COLUMN IF NOT EXISTS resource_name VARCHAR(255);
+ALTER TABLE audit_logs ADD COLUMN IF NOT EXISTS request_method VARCHAR(10);
+ALTER TABLE audit_logs ADD COLUMN IF NOT EXISTS request_path TEXT;
+ALTER TABLE audit_logs ADD COLUMN IF NOT EXISTS status_code INTEGER;
+ALTER TABLE audit_logs ADD COLUMN IF NOT EXISTS changes JSONB;
+ALTER TABLE audit_logs ADD COLUMN IF NOT EXISTS metadata JSONB;
 
 -- Indexes for common query patterns
 CREATE INDEX IF NOT EXISTS idx_audit_logs_tenant_timestamp

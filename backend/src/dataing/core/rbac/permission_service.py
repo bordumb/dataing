@@ -122,7 +122,7 @@ class PermissionService:
         """
         # Check if admin/owner
         role = await self._conn.fetchval(
-            "SELECT role FROM users WHERE id = $1 AND tenant_id = $2",
+            "SELECT role FROM org_memberships WHERE user_id = $1 AND org_id = $2",
             user_id,
             org_id,
         )
@@ -186,7 +186,7 @@ class PermissionService:
     async def get_user_role(self, user_id: UUID, org_id: UUID) -> Role | None:
         """Get user's role in an organization."""
         role_str = await self._conn.fetchval(
-            "SELECT role FROM users WHERE id = $1 AND tenant_id = $2",
+            "SELECT role FROM org_memberships WHERE user_id = $1 AND org_id = $2",
             user_id,
             org_id,
         )

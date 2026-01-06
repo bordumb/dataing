@@ -254,8 +254,15 @@ class AnthropicClient:
     # Prompt Building Methods
     # -------------------------------------------------------------------------
 
-    def _get_metric_explanation(self, metric_name: str) -> str:
+    def _get_metric_explanation(
+        self, metric_name: str, metadata: dict[str, str | int | float | bool] | None = None
+    ) -> str:
         """Get human-readable explanation for a metric type."""
+        affected_column = metadata.get("affected_column") if metadata else None
+
+        if metric_name == "null_count" and affected_column:
+            return f"count of NULL values in the {affected_column} column"
+
         explanations = {
             "null_count": "count of NULL values - investigate what causes missing data",
             "row_count": "total row count - investigate missing or extra records",
@@ -307,7 +314,16 @@ Generate diverse hypotheses covering multiple categories when plausible."""
 {context.lineage.to_prompt_string()}
 """
 
-        metric_explanation = self._get_metric_explanation(alert.metric_name)
+        metric_explanation = self._get_metric_explanation(alert.metric_name, alert.metadata)
+        affected_column = alert.metadata.get("affected_column") if alert.metadata else None
+
+        # Build column-specific guidance if available
+        column_guidance = ""
+        if affected_column:
+            column_guidance = f"""
+IMPORTANT: The anomaly is specifically in the '{affected_column}' column.
+All hypotheses MUST focus on why '{affected_column}' has NULL/missing values.
+Do NOT investigate other columns - focus ONLY on '{affected_column}'."""
 
         return f"""## Anomaly Alert
 - Dataset: {alert.dataset_id}
@@ -317,6 +333,7 @@ Generate diverse hypotheses covering multiple categories when plausible."""
 - Deviation: {alert.deviation_pct}%
 - Anomaly Date: {alert.anomaly_date}
 - Severity: {alert.severity}
+{column_guidance}
 
 FOCUS: The anomaly is about {alert.metric_name}. Your hypotheses MUST explain why
 {alert.metric_name} went from {alert.expected_value} to {alert.actual_value}
@@ -388,6 +405,15 @@ Generate a corrected SQL query that avoids this error."""
     def _build_interpretation_system_prompt(self) -> str:
         """Build system prompt for evidence interpretation."""
         return """You are analyzing query results to determine if they support a hypothesis.
+
+CRITICAL - Understanding "supports hypothesis":
+- If investigating NULLs and query FINDS NULLs → supports=true (we found the problem)
+- If investigating NULLs and query finds NO NULLs → supports=false (not the cause)
+- "Supports" means evidence helps explain the anomaly, NOT that the situation is good
+
+Example: Investigating "null_count spike in user_id"
+- Query finds 485 rows with NULL user_id → supports=true (this IS the problem we're investigating)
+- Query finds 0 rows with NULL user_id → supports=false (not the cause)
 
 Provide:
 1. Whether evidence supports (true), refutes (false), or is inconclusive (null)

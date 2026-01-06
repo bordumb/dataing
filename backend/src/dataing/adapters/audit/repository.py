@@ -43,16 +43,18 @@ class AuditRepository:
             RETURNING id
         """
         async with self._pool.acquire() as conn:
+            # Convert UUIDs to strings at database boundary
+            # Domain model uses UUID, but asyncpg needs str for parameterized queries
             row = await conn.fetchrow(
                 query,
-                entry.tenant_id,
-                entry.actor_id,
+                str(entry.tenant_id),
+                str(entry.actor_id) if entry.actor_id else None,
                 entry.actor_email,
                 entry.actor_ip,
                 entry.actor_user_agent,
                 entry.action,
                 entry.resource_type,
-                entry.resource_id,
+                str(entry.resource_id) if entry.resource_id else None,
                 entry.resource_name,
                 entry.request_method,
                 entry.request_path,
@@ -91,8 +93,9 @@ class AuditRepository:
         Returns:
             Tuple of (entries, total_count).
         """
+        # Convert UUIDs to strings at database boundary
         conditions = ["tenant_id = $1"]
-        params: list[Any] = [tenant_id]
+        params: list[Any] = [str(tenant_id)]
         param_idx = 2
 
         if start_date:
@@ -112,7 +115,7 @@ class AuditRepository:
 
         if actor_id:
             conditions.append(f"actor_id = ${param_idx}")
-            params.append(actor_id)
+            params.append(str(actor_id))
             param_idx += 1
 
         if resource_type:
@@ -178,7 +181,8 @@ class AuditRepository:
         """
         query = "SELECT * FROM audit_logs WHERE tenant_id = $1 AND id = $2"
         async with self._pool.acquire() as conn:
-            row = await conn.fetchrow(query, tenant_id, entry_id)
+            # Convert UUIDs to strings at database boundary
+            row = await conn.fetchrow(query, str(tenant_id), str(entry_id))
 
         if not row:
             return None

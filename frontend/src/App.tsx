@@ -1,3 +1,4 @@
+import { useState, useEffect } from 'react'
 import { Routes, Route } from 'react-router-dom'
 import { Toaster } from '@/components/ui/sonner'
 import { SidebarProvider, SidebarInset, SidebarTrigger } from '@/components/ui/sidebar'
@@ -5,6 +6,11 @@ import { AppSidebar } from '@/components/layout/app-sidebar'
 import { Separator } from '@/components/ui/separator'
 import { ModeToggle } from '@/components/mode-toggle'
 import { ErrorBoundary, FeatureErrorBoundary } from '@/components/error-boundary'
+import {
+  UpgradeRequiredModal,
+  type UpgradeError,
+} from '@/components/shared/upgrade-required-modal'
+import { subscribeToUpgradeError, setUpgradeError } from '@/lib/api/upgrade-error'
 
 // Pages
 import { DashboardPage } from '@/features/dashboard/dashboard-page'
@@ -70,6 +76,16 @@ function AppLayout({ children }: { children: React.ReactNode }) {
 function AppWithEntitlements() {
   const { entitlements, plan, setPlan } = useDemoEntitlements()
   const { role, setRole } = useDemoRoleContext()
+  const [upgradeError, setUpgradeErrorState] = useState<UpgradeError | null>(null)
+
+  useEffect(() => {
+    return subscribeToUpgradeError(setUpgradeErrorState)
+  }, [])
+
+  const handleCloseUpgradeModal = () => {
+    setUpgradeError(null)
+    setUpgradeErrorState(null)
+  }
 
   return (
     <EntitlementsProvider entitlements={entitlements}>
@@ -185,6 +201,7 @@ function AppWithEntitlements() {
       <DemoToggle plan={plan} onPlanChange={setPlan} />
       {/* Bottom-left: User roles (viewer/member/admin/owner) */}
       <DemoRoleToggle currentRole={role} onRoleChange={setRole} />
+      <UpgradeRequiredModal error={upgradeError} onClose={handleCloseUpgradeModal} />
       <Toaster />
     </EntitlementsProvider>
   )

@@ -50,7 +50,18 @@ export const customInstance = async <T>(config: RequestConfig): Promise<T> => {
 
   if (!response.ok) {
     const errorData = await response.json().catch(() => ({}))
-    throw new Error(errorData.detail || `HTTP error ${response.status}`)
+
+    // Check for upgrade-required errors
+    if (response.status === 403 && errorData.detail?.error) {
+      const detail = errorData.detail
+      if (detail.error === 'feature_not_available' || detail.error === 'limit_exceeded') {
+        const { setUpgradeError } = await import('./upgrade-error')
+        setUpgradeError(detail)
+        throw new Error(detail.message)
+      }
+    }
+
+    throw new Error(errorData.detail?.message || errorData.detail || `HTTP error ${response.status}`)
   }
 
   return response.json()

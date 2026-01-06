@@ -9,6 +9,8 @@ Pydantic AI uses these for:
 
 from __future__ import annotations
 
+import re
+
 from pydantic import BaseModel, Field, field_validator
 
 from dataing.core.domain_types import HypothesisCategory
@@ -34,22 +36,39 @@ class HypothesisResponse(BaseModel):
 
     @field_validator("suggested_query")
     @classmethod
-    def validate_query_has_limit(cls, v: str) -> str:
-        """Ensure query has LIMIT clause for safety."""
-        if "LIMIT" not in v.upper():
-            raise ValueError("Query must include LIMIT clause")
-        return v
+    def validate_query_safety(cls, v: str) -> str:
+        """Validate query safety: strip markdown, require LIMIT, block mutations."""
+        # Strip markdown if present
+        if v.startswith("```"):
+            lines = v.strip().split("\n")
+            v = "\n".join(lines[1:-1] if lines[-1] == "```" else lines[1:])
 
-    @field_validator("suggested_query")
-    @classmethod
-    def validate_no_mutations(cls, v: str) -> str:
-        """Ensure query is read-only."""
-        dangerous = ["INSERT", "UPDATE", "DELETE", "DROP", "TRUNCATE", "ALTER"]
-        upper_query = v.upper()
-        for keyword in dangerous:
-            if keyword in upper_query:
-                raise ValueError(f"Query contains forbidden keyword: {keyword}")
-        return v
+        upper_query = v.upper().strip()
+
+        # Ensure query has LIMIT clause for safety
+        if "LIMIT" not in upper_query:
+            raise ValueError("Query must include LIMIT clause")
+
+        # Ensure query is read-only using word boundary regex to avoid false positives
+        dangerous = [
+            "INSERT",
+            "UPDATE",
+            "DELETE",
+            "DROP",
+            "TRUNCATE",
+            "ALTER",
+            "CREATE",
+            "MERGE",
+            "GRANT",
+            "REVOKE",
+            "EXEC",
+            "EXECUTE",
+        ]
+        pattern = r"\b(" + "|".join(dangerous) + r")\b"
+        if re.search(pattern, upper_query):
+            raise ValueError("Query contains forbidden SQL operation")
+
+        return v.strip()
 
 
 class HypothesesResponse(BaseModel):

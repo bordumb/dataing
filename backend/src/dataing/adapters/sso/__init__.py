@@ -1,5 +1,6 @@
 """SSO adapters."""
 
+from dataing.adapters.sso.group_repository import SCIMGroupRepository
 from dataing.adapters.sso.oidc_provider import OIDCConfig, OIDCProvider, OIDCTokens, OIDCUserInfo
 from dataing.adapters.sso.repository import SSORepository
 from dataing.adapters.sso.scim_repository import (
@@ -15,6 +16,7 @@ __all__ = [
     "OIDCProvider",
     "OIDCTokens",
     "OIDCUserInfo",
+    "SCIMGroupRepository",
     "SCIMRepository",
     "SCIMToken",
     "SCIMUserRepository",

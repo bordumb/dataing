@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 from typing import TYPE_CHECKING
 
 from pydantic_ai import Agent
@@ -46,7 +47,9 @@ class AnthropicClient:
             model: Model to use.
             max_retries: Max retries on validation failure.
         """
-        self._model = AnthropicModel(model, api_key=api_key)
+        # Pydantic AI reads API key from environment variable
+        os.environ["ANTHROPIC_API_KEY"] = api_key
+        self._model = AnthropicModel(model)
 
         # Pre-configure agents for each task
         self._hypothesis_agent: Agent[None, HypothesesResponse] = Agent(

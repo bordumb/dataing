@@ -33,7 +33,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
-import { useAuth } from '@/lib/auth/context'
+import { useJwtAuth } from '@/lib/auth/jwt-context'
 import { useDemoRoleContext } from '@/lib/auth/demo-role-context'
 // IMPORTANT: OrgSelector is critical for multi-tenant support - DO NOT REMOVE
 import { OrgSelector } from '@/lib/auth/org-selector'
@@ -69,7 +69,7 @@ const mainNavItems = [
 export function AppSidebar() {
   const location = useLocation()
   const { state } = useSidebar()
-  const { logout, tenant } = useAuth()
+  const { logout, org } = useJwtAuth()
   const { canAccessAdmin } = useDemoRoleContext()
 
   // Build settings nav items based on role
@@ -105,7 +105,7 @@ export function AppSidebar() {
                 <div className="grid flex-1 text-left text-sm leading-tight">
                   <span className="truncate font-semibold">Dataing</span>
                   <span className="truncate text-xs text-muted-foreground">
-                    {tenant?.name ?? 'Data Quality'}
+                    {org?.name ?? 'Data Quality'}
                   </span>
                 </div>
               </Link>
@@ -201,15 +201,15 @@ export function AppSidebar() {
                 >
                   <Avatar className="h-8 w-8 rounded-lg">
                     <AvatarFallback className="rounded-lg">
-                      {tenant?.name?.charAt(0) ?? 'U'}
+                      {org?.name?.charAt(0) ?? 'U'}
                     </AvatarFallback>
                   </Avatar>
                   <div className="grid flex-1 text-left text-sm leading-tight">
                     <span className="truncate font-semibold">
-                      {tenant?.name ?? 'User'}
+                      {org?.name ?? 'User'}
                     </span>
                     <span className="truncate text-xs">
-                      {tenant?.slug ?? 'Organization'}
+                      {org?.slug ?? 'Organization'}
                     </span>
                   </div>
                   <ChevronUp className="ml-auto size-4" />

@@ -16,8 +16,23 @@ from dataing.entrypoints.api.routes.knowledge_comments import (
     router as knowledge_comments_router,
 )
 from dataing.entrypoints.api.routes.lineage import router as lineage_router
+from dataing.entrypoints.api.routes.permissions import (
+    investigation_permissions_router,
+)
+from dataing.entrypoints.api.routes.permissions import (
+    router as permissions_router,
+)
 from dataing.entrypoints.api.routes.schema_comments import router as schema_comments_router
+from dataing.entrypoints.api.routes.scim import router as scim_router
 from dataing.entrypoints.api.routes.settings import router as settings_router
+from dataing.entrypoints.api.routes.sso import router as sso_router
+from dataing.entrypoints.api.routes.tags import (
+    investigation_tags_router,
+)
+from dataing.entrypoints.api.routes.tags import (
+    router as tags_router,
+)
+from dataing.entrypoints.api.routes.teams import router as teams_router
 from dataing.entrypoints.api.routes.users import router as users_router
 
 # Create main API router
@@ -37,5 +52,16 @@ api_router.include_router(investigation_feedback_router)
 api_router.include_router(schema_comments_router)
 api_router.include_router(knowledge_comments_router)
 api_router.include_router(comment_votes_router)
+
+# RBAC routes
+api_router.include_router(teams_router)
+api_router.include_router(tags_router)
+api_router.include_router(permissions_router)
+api_router.include_router(investigation_tags_router)
+api_router.include_router(investigation_permissions_router)
+
+# SSO/SCIM routes
+api_router.include_router(sso_router)
+api_router.include_router(scim_router)
 
 __all__ = ["api_router"]

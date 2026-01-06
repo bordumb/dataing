@@ -13,6 +13,7 @@ from uuid import UUID
 from cryptography.fernet import Fernet
 from fastapi import Request
 
+from dataing.adapters.audit import AuditRepository
 from dataing.adapters.auth.recovery_admin import AdminContactRecoveryAdapter
 from dataing.adapters.auth.recovery_console import ConsoleRecoveryAdapter
 from dataing.adapters.auth.recovery_email import EmailPasswordRecoveryAdapter
@@ -84,6 +85,10 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     # Setup application database
     app_db = AppDatabase(settings.app_database_url)
     await app_db.connect()
+
+    # Create audit repository
+    audit_repo = AuditRepository(pool=app_db.pool)
+    app.state.audit_repo = audit_repo
 
     llm = AnthropicClient(
         api_key=settings.anthropic_api_key,

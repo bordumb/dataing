@@ -10,6 +10,7 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, Header, HTTPException, Query, status
 from pydantic import BaseModel
 
+from dataing.adapters.audit import audited
 from dataing.core.scim import (
     SCIMError,
     SCIMGroup,
@@ -170,6 +171,7 @@ async def get_user(
 
 
 @router.post("/Users", status_code=status.HTTP_201_CREATED)
+@audited(action="scim.user_provision", resource_type="scim_user")
 async def create_user(
     body: SCIMUserCreateRequest,
     org_id: Annotated[UUID, Depends(validate_scim_token)],
@@ -212,6 +214,7 @@ async def create_user(
 
 
 @router.put("/Users/{user_id}")
+@audited(action="scim.user_update", resource_type="scim_user")
 async def replace_user(
     user_id: str,
     body: SCIMUserUpdateRequest,
@@ -237,6 +240,7 @@ async def replace_user(
 
 
 @router.delete("/Users/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
+@audited(action="scim.user_deprovision", resource_type="scim_user")
 async def delete_user(
     user_id: str,
     org_id: Annotated[UUID, Depends(validate_scim_token)],
@@ -312,6 +316,7 @@ async def get_group(
 
 
 @router.post("/Groups", status_code=status.HTTP_201_CREATED)
+@audited(action="scim.group_create", resource_type="scim_group")
 async def create_group(
     body: SCIMGroupCreateRequest,
     org_id: Annotated[UUID, Depends(validate_scim_token)],
@@ -345,6 +350,7 @@ async def create_group(
 
 
 @router.delete("/Groups/{group_id}", status_code=status.HTTP_204_NO_CONTENT)
+@audited(action="scim.group_delete", resource_type="scim_group")
 async def delete_group(
     group_id: str,
     org_id: Annotated[UUID, Depends(validate_scim_token)],

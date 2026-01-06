@@ -9,6 +9,7 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, Response
 from pydantic import BaseModel, Field
 
+from dataing.adapters.audit import audited
 from dataing.adapters.db.app_db import AppDatabase
 from dataing.entrypoints.api.deps import get_app_db
 from dataing.entrypoints.api.middleware.auth import ApiKeyContext, verify_api_key
@@ -66,6 +67,7 @@ async def list_schema_comments(
 
 
 @router.post("", status_code=201, response_model=SchemaCommentResponse)
+@audited(action="schema_comment.create", resource_type="schema_comment")
 async def create_schema_comment(
     dataset_id: UUID,
     body: SchemaCommentCreate,
@@ -89,6 +91,7 @@ async def create_schema_comment(
 
 
 @router.patch("/{comment_id}", response_model=SchemaCommentResponse)
+@audited(action="schema_comment.update", resource_type="schema_comment")
 async def update_schema_comment(
     dataset_id: UUID,
     comment_id: UUID,
@@ -110,6 +113,7 @@ async def update_schema_comment(
 
 
 @router.delete("/{comment_id}", status_code=204, response_class=Response)
+@audited(action="schema_comment.delete", resource_type="schema_comment")
 async def delete_schema_comment(
     dataset_id: UUID,
     comment_id: UUID,

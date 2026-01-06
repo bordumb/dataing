@@ -1,0 +1,41 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: audit-log-cleanup
+  labels:
+    app: dataing
+    component: audit-cleanup
+spec:
+  # Run at 3 AM UTC daily
+  schedule: "0 3 * * *"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          restartPolicy: OnFailure
+          containers:
+          - name: cleanup
+            image: dataing-backend:latest
+            imagePullPolicy: IfNotPresent
+            command:
+              - python
+              - -m
+              - dataing.jobs.audit_cleanup
+            env:
+              - name: DATABASE_URL
+                valueFrom:
+                  secretKeyRef:
+                    name: dataing-secrets
+                    key: database-url
+              - name: AUDIT_RETENTION_DAYS
+                value: "730"
+            resources:
+              requests:
+                memory: "128Mi"
+                cpu: "100m"
+              limits:
+                memory: "256Mi"
+                cpu: "200m"

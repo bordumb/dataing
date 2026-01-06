@@ -3,6 +3,7 @@
 from fastapi import APIRouter
 
 from dataing.entrypoints.api.routes.approvals import router as approvals_router
+from dataing.entrypoints.api.routes.audit import router as audit_router
 from dataing.entrypoints.api.routes.auth import router as auth_router
 from dataing.entrypoints.api.routes.comment_votes import router as comment_votes_router
 from dataing.entrypoints.api.routes.dashboard import router as dashboard_router
@@ -66,5 +67,8 @@ api_router.include_router(investigation_permissions_router)
 # SSO/SCIM routes
 api_router.include_router(sso_router)
 api_router.include_router(scim_router)
+
+# Audit routes
+api_router.include_router(audit_router)
 
 __all__ = ["api_router"]

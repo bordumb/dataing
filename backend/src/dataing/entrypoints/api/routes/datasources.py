@@ -17,6 +17,7 @@ from cryptography.fernet import Fernet
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from pydantic import BaseModel, Field
 
+from dataing.adapters.audit import audited
 from dataing.adapters.datasource import (
     SchemaFilter,
     SourceType,
@@ -254,6 +255,7 @@ async def list_source_types() -> SourceTypesResponse:
 
 
 @router.post("/test", response_model=TestConnectionResponse)
+@audited(action="datasource.test", resource_type="datasource")
 async def test_connection(
     request: TestConnectionRequest,
 ) -> TestConnectionResponse:
@@ -297,6 +299,7 @@ async def test_connection(
 
 
 @router.post("/", response_model=DataSourceResponse, status_code=201)
+@audited(action="datasource.create", resource_type="datasource")
 async def create_datasource(
     request: CreateDataSourceRequest,
     auth: WriteScopeDep,
@@ -497,6 +500,7 @@ async def get_datasource(
 
 
 @router.delete("/{datasource_id}", status_code=204, response_class=Response)
+@audited(action="datasource.delete", resource_type="datasource")
 async def delete_datasource(
     datasource_id: UUID,
     auth: WriteScopeDep,
@@ -512,6 +516,7 @@ async def delete_datasource(
 
 
 @router.post("/{datasource_id}/test", response_model=TestConnectionResponse)
+@audited(action="datasource.test_connection", resource_type="datasource")
 async def test_datasource_connection(
     datasource_id: UUID,
     auth: AuthDep,
@@ -802,6 +807,7 @@ async def get_column_stats(
 
 
 @router.post("/{datasource_id}/sync", response_model=SyncResponse)
+@audited(action="datasource.sync", resource_type="datasource")
 async def sync_datasource_schema(
     datasource_id: UUID,
     auth: AuthDep,

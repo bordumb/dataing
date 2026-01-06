@@ -35,6 +35,8 @@ import {
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { useAuth } from '@/lib/auth/context'
 import { useDemoRoleContext } from '@/lib/auth/demo-role-context'
+// IMPORTANT: OrgSelector is critical for multi-tenant support - DO NOT REMOVE
+import { OrgSelector } from '@/lib/auth/org-selector'
 
 const mainNavItems = [
   {
@@ -67,7 +69,7 @@ const mainNavItems = [
 export function AppSidebar() {
   const location = useLocation()
   const { state } = useSidebar()
-  const { tenant, logout } = useAuth()
+  const { logout, tenant } = useAuth()
   const { canAccessAdmin } = useDemoRoleContext()
 
   // Build settings nav items based on role
@@ -103,12 +105,18 @@ export function AppSidebar() {
                 <div className="grid flex-1 text-left text-sm leading-tight">
                   <span className="truncate font-semibold">Dataing</span>
                   <span className="truncate text-xs text-muted-foreground">
-                    {org?.name ?? 'Data Quality'}
+                    {tenant?.name ?? 'Data Quality'}
                   </span>
                 </div>
               </Link>
             </SidebarMenuButton>
           </SidebarMenuItem>
+          {/*
+           * IMPORTANT: OrgSelector dropdown for multi-tenant organization switching
+           * This component is CRITICAL for users with multiple organization memberships
+           * DO NOT REMOVE - it allows users to switch between organizations
+           * The component auto-hides when user has only one org membership
+           */}
           <SidebarMenuItem>
             <OrgSelector />
           </SidebarMenuItem>
@@ -180,28 +188,6 @@ export function AppSidebar() {
           </SidebarGroupContent>
         </SidebarGroup>
 
-        {/* Admin - only visible for admin+ roles */}
-        {isAdmin && (
-          <SidebarGroup>
-            <SidebarGroupLabel>Admin</SidebarGroupLabel>
-            <SidebarGroupContent>
-              <SidebarMenu>
-                <SidebarMenuItem>
-                  <SidebarMenuButton
-                    asChild
-                    isActive={location.pathname.startsWith('/admin')}
-                    tooltip="Admin"
-                  >
-                    <Link to="/admin">
-                      <Shield className="size-4" />
-                      <span>Admin</span>
-                    </Link>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              </SidebarMenu>
-            </SidebarGroupContent>
-          </SidebarGroup>
-        )}
       </SidebarContent>
 
       <SidebarFooter>
@@ -215,15 +201,15 @@ export function AppSidebar() {
                 >
                   <Avatar className="h-8 w-8 rounded-lg">
                     <AvatarFallback className="rounded-lg">
-                      {user?.name?.charAt(0) ?? 'U'}
+                      {tenant?.name?.charAt(0) ?? 'U'}
                     </AvatarFallback>
                   </Avatar>
                   <div className="grid flex-1 text-left text-sm leading-tight">
                     <span className="truncate font-semibold">
-                      {user?.name ?? 'User'}
+                      {tenant?.name ?? 'User'}
                     </span>
                     <span className="truncate text-xs">
-                      {org?.name ?? 'Organization'}
+                      {tenant?.slug ?? 'Organization'}
                     </span>
                   </div>
                   <ChevronUp className="ml-auto size-4" />

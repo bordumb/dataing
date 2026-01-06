@@ -9,6 +9,7 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, Response, status
 from pydantic import BaseModel
 
+from dataing.adapters.audit import audited
 from dataing.adapters.db.app_db import AppDatabase
 from dataing.adapters.rbac import TagsRepository
 from dataing.entrypoints.api.deps import get_app_db
@@ -86,6 +87,7 @@ async def list_tags(
 
 
 @router.post("/", response_model=TagResponse, status_code=status.HTTP_201_CREATED)
+@audited(action="tag.create", resource_type="tag")
 async def create_tag(
     body: TagCreate,
     auth: AdminScopeDep,
@@ -136,6 +138,7 @@ async def get_tag(
 
 
 @router.put("/{tag_id}", response_model=TagResponse)
+@audited(action="tag.update", resource_type="tag")
 async def update_tag(
     tag_id: UUID,
     body: TagUpdate,
@@ -174,6 +177,7 @@ async def update_tag(
 
 
 @router.delete("/{tag_id}", status_code=status.HTTP_204_NO_CONTENT, response_class=Response)
+@audited(action="tag.delete", resource_type="tag")
 async def delete_tag(
     tag_id: UUID,
     auth: AdminScopeDep,
@@ -228,6 +232,7 @@ async def get_investigation_tags(
 
 
 @investigation_tags_router.post("/", status_code=status.HTTP_201_CREATED)
+@audited(action="investigation_tag.add", resource_type="investigation")
 async def add_investigation_tag(
     investigation_id: UUID,
     body: InvestigationTagAdd,
@@ -260,6 +265,7 @@ async def add_investigation_tag(
     status_code=status.HTTP_204_NO_CONTENT,
     response_class=Response,
 )
+@audited(action="investigation_tag.remove", resource_type="investigation")
 async def remove_investigation_tag(
     investigation_id: UUID,
     tag_id: UUID,

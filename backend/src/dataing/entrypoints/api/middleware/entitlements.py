@@ -56,6 +56,7 @@ def require_feature(feature: Feature) -> Callable[[F], F]:
                         "feature": feature.value,
                         "message": f"The '{feature.value}' feature requires an Enterprise plan.",
                         "upgrade_url": "/settings/billing",
+                        "contact_sales": True,
                     },
                 )
             return await func(*args, **kwargs)
@@ -113,6 +114,7 @@ def require_under_limit(feature: Feature) -> Callable[[F], F]:
                         "usage": usage,
                         "message": f"You've reached your limit of {limit} for {feature.value}.",
                         "upgrade_url": "/settings/billing",
+                        "contact_sales": False,
                     },
                 )
             return await func(*args, **kwargs)

@@ -19,6 +19,7 @@ from pydantic import BaseModel
 from dataing.adapters.audit import audited
 from dataing.adapters.db.app_db import AppDatabase
 from dataing.core.domain_types import AnomalyAlert
+from dataing.core.entitlements.features import Feature
 from dataing.core.orchestrator import InvestigationOrchestrator
 from dataing.core.rbac import PermissionService
 from dataing.core.state import InvestigationState
@@ -31,6 +32,7 @@ from dataing.entrypoints.api.deps import (
     get_tenant_lineage_adapter,
 )
 from dataing.entrypoints.api.middleware.auth import ApiKeyContext, verify_api_key
+from dataing.entrypoints.api.middleware.entitlements import require_under_limit
 
 router = APIRouter(prefix="/investigations", tags=["investigations"])
 
@@ -76,9 +78,10 @@ class InvestigationStatusResponse(BaseModel):
 
 @router.post("/", response_model=InvestigationResponse)
 @audited(action="investigation.create", resource_type="investigation")
+@require_under_limit(Feature.MAX_INVESTIGATIONS_PER_MONTH)
 async def create_investigation(
-    http_request: Request,
-    request: CreateInvestigationRequest,
+    request: Request,
+    body: CreateInvestigationRequest,
     background_tasks: BackgroundTasks,
     auth: AuthDep,
     orchestrator: OrchestratorDep,
@@ -95,14 +98,14 @@ async def create_investigation(
     investigation_id = str(uuid.uuid4())
 
     alert = AnomalyAlert(
-        dataset_id=request.dataset_id,
-        metric_name=request.metric_name,
-        expected_value=request.expected_value,
-        actual_value=request.actual_value,
-        deviation_pct=request.deviation_pct,
-        anomaly_date=request.anomaly_date,
-        severity=request.severity,
-        metadata=request.metadata,
+        dataset_id=body.dataset_id,
+        metric_name=body.metric_name,
+        expected_value=body.expected_value,
+        actual_value=body.actual_value,
+        deviation_pct=body.deviation_pct,
+        anomaly_date=body.anomaly_date,
+        severity=body.severity,
+        metadata=body.metadata,
     )
 
     state = InvestigationState(
@@ -124,13 +127,13 @@ async def create_investigation(
     async def run_investigation() -> None:
         try:
             # Resolve tenant's data source adapter using AdapterRegistry
-            data_adapter = await get_default_tenant_adapter(http_request, auth.tenant_id)
+            data_adapter = await get_default_tenant_adapter(request, auth.tenant_id)
 
             # Get tenant's lineage adapter if configured
-            lineage_adapter = await get_tenant_lineage_adapter(http_request, auth.tenant_id)
+            lineage_adapter = await get_tenant_lineage_adapter(request, auth.tenant_id)
 
             # Create context engine with tenant's lineage adapter
-            context_engine = get_context_engine_for_tenant(http_request, lineage_adapter)
+            context_engine = get_context_engine_for_tenant(request, lineage_adapter)
 
             # Update orchestrator with tenant-specific context engine
             orchestrator.context_engine = context_engine

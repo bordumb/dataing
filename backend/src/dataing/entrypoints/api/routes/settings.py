@@ -10,6 +10,7 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, Response
 from pydantic import BaseModel, Field, HttpUrl
 
+from dataing.adapters.audit import audited
 from dataing.adapters.db.app_db import AppDatabase
 from dataing.entrypoints.api.deps import get_app_db
 from dataing.entrypoints.api.middleware.auth import ApiKeyContext, require_scope, verify_api_key
@@ -115,6 +116,7 @@ async def get_tenant_settings(
 
 
 @router.patch("/tenant", response_model=TenantSettings)
+@audited(action="settings.update", resource_type="settings")
 async def update_tenant_settings(
     request: UpdateTenantSettingsRequest,
     auth: AdminScopeDep,
@@ -220,6 +222,7 @@ async def list_webhooks(
 
 
 @router.post("/webhooks", response_model=WebhookCreatedResponse, status_code=201)
+@audited(action="webhook.create", resource_type="webhook")
 async def create_webhook(
     request: CreateWebhookRequest,
     auth: WriteScopeDep,
@@ -248,6 +251,7 @@ async def create_webhook(
 
 
 @router.delete("/webhooks/{webhook_id}", status_code=204, response_class=Response)
+@audited(action="webhook.delete", resource_type="webhook")
 async def delete_webhook(
     webhook_id: UUID,
     auth: WriteScopeDep,
@@ -325,6 +329,7 @@ async def list_api_keys(
 
 
 @router.post("/api-keys", response_model=ApiKeyCreatedResponse, status_code=201)
+@audited(action="api_key.create", resource_type="api_key")
 async def create_api_key(
     request: CreateApiKeyRequest,
     auth: AdminScopeDep,
@@ -355,6 +360,7 @@ async def create_api_key(
 
 
 @router.delete("/api-keys/{key_id}", status_code=204, response_class=Response)
+@audited(action="api_key.revoke", resource_type="api_key")
 async def revoke_api_key(
     key_id: UUID,
     auth: AdminScopeDep,

@@ -9,6 +9,7 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, Response
 from pydantic import BaseModel, EmailStr, Field
 
+from dataing.adapters.audit import audited
 from dataing.adapters.db.app_db import AppDatabase
 from dataing.core.auth.types import OrgRole as AuthOrgRole
 from dataing.entrypoints.api.deps import get_app_db
@@ -186,6 +187,7 @@ class InviteUserRequest(BaseModel):
 
 
 @router.post("/invite", status_code=201)
+@audited(action="user.invite", resource_type="user")
 async def invite_user(
     body: InviteUserRequest,
     auth: RequireAdmin,
@@ -281,6 +283,7 @@ async def get_user(
 
 
 @router.post("/", response_model=UserResponse, status_code=201)
+@audited(action="user.create", resource_type="user")
 async def create_user(
     request: CreateUserRequest,
     auth: AdminScopeDep,
@@ -327,6 +330,7 @@ async def create_user(
 
 
 @router.patch("/{user_id}", response_model=UserResponse)
+@audited(action="user.update", resource_type="user")
 async def update_user(
     user_id: UUID,
     request: UpdateUserRequest,
@@ -380,6 +384,7 @@ async def update_user(
 
 
 @router.delete("/{user_id}", status_code=204, response_class=Response)
+@audited(action="user.deactivate", resource_type="user")
 async def deactivate_user(
     user_id: UUID,
     auth: AdminScopeDep,
@@ -409,6 +414,7 @@ async def deactivate_user(
 
 
 @router.patch("/{user_id}/role")
+@audited(action="user.role_update", resource_type="user")
 async def update_member_role(
     user_id: UUID,
     body: UpdateRoleRequest,
@@ -452,6 +458,7 @@ async def update_member_role(
 
 
 @router.post("/{user_id}/remove")
+@audited(action="user.remove", resource_type="user")
 async def remove_org_member(
     user_id: UUID,
     auth: RequireAdmin,

@@ -16,6 +16,7 @@ from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
+from dataing.adapters.audit import audited
 from dataing.adapters.db.app_db import AppDatabase
 from dataing.core.domain_types import AnomalyAlert
 from dataing.core.orchestrator import InvestigationOrchestrator
@@ -74,6 +75,7 @@ class InvestigationStatusResponse(BaseModel):
 
 
 @router.post("/", response_model=InvestigationResponse)
+@audited(action="investigation.create", resource_type="investigation")
 async def create_investigation(
     http_request: Request,
     request: CreateInvestigationRequest,

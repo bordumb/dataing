@@ -10,6 +10,7 @@ from uuid import UUID
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 
+from dataing.adapters.audit import audited
 from dataing.adapters.db.app_db import AppDatabase
 from dataing.adapters.investigation_feedback import EventType, InvestigationFeedbackAdapter
 from dataing.entrypoints.api.deps import get_app_db, get_feedback_adapter
@@ -53,6 +54,7 @@ TARGET_TYPE_TO_EVENT = {
 
 
 @router.post("/", status_code=201, response_model=FeedbackResponse)
+@audited(action="feedback.submit", resource_type="feedback")
 async def submit_feedback(
     body: FeedbackCreate,
     auth: AuthDep,

@@ -9,6 +9,7 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, Response
 from pydantic import BaseModel, Field
 
+from dataing.adapters.audit import audited
 from dataing.adapters.db.app_db import AppDatabase
 from dataing.entrypoints.api.deps import get_app_db
 from dataing.entrypoints.api.middleware.auth import ApiKeyContext, verify_api_key
@@ -62,6 +63,7 @@ async def list_knowledge_comments(
 
 
 @router.post("", status_code=201, response_model=KnowledgeCommentResponse)
+@audited(action="knowledge_comment.create", resource_type="knowledge_comment")
 async def create_knowledge_comment(
     dataset_id: UUID,
     body: KnowledgeCommentCreate,
@@ -84,6 +86,7 @@ async def create_knowledge_comment(
 
 
 @router.patch("/{comment_id}", response_model=KnowledgeCommentResponse)
+@audited(action="knowledge_comment.update", resource_type="knowledge_comment")
 async def update_knowledge_comment(
     dataset_id: UUID,
     comment_id: UUID,
@@ -105,6 +108,7 @@ async def update_knowledge_comment(
 
 
 @router.delete("/{comment_id}", status_code=204, response_class=Response)
+@audited(action="knowledge_comment.delete", resource_type="knowledge_comment")
 async def delete_knowledge_comment(
     dataset_id: UUID,
     comment_id: UUID,

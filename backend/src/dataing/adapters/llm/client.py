@@ -54,22 +54,22 @@ class AnthropicClient:
         # Pre-configure agents for each task
         self._hypothesis_agent: Agent[None, HypothesesResponse] = Agent(
             model=self._model,
-            result_type=HypothesesResponse,
+            output_type=HypothesesResponse,
             retries=max_retries,
         )
         self._interpretation_agent: Agent[None, InterpretationResponse] = Agent(
             model=self._model,
-            result_type=InterpretationResponse,
+            output_type=InterpretationResponse,
             retries=max_retries,
         )
         self._synthesis_agent: Agent[None, SynthesisResponse] = Agent(
             model=self._model,
-            result_type=SynthesisResponse,
+            output_type=SynthesisResponse,
             retries=max_retries,
         )
         self._query_agent: Agent[None, QueryResponse] = Agent(
             model=self._model,
-            result_type=QueryResponse,
+            output_type=QueryResponse,
             retries=max_retries,
         )
 
@@ -98,7 +98,7 @@ class AnthropicClient:
         try:
             result = await self._hypothesis_agent.run(
                 user_prompt,
-                system_prompt=system_prompt,
+                instructions=system_prompt,
             )
 
             return [
@@ -109,7 +109,7 @@ class AnthropicClient:
                     reasoning=h.reasoning,
                     suggested_query=h.suggested_query,
                 )
-                for h in result.data.hypotheses
+                for h in result.output.hypotheses
             ]
 
         except Exception as e:
@@ -147,9 +147,9 @@ class AnthropicClient:
         try:
             result = await self._query_agent.run(
                 prompt,
-                system_prompt=system,
+                instructions=system,
             )
-            query: str = result.data.query
+            query: str = result.output.query
             return query
 
         except Exception as e:
@@ -180,7 +180,7 @@ class AnthropicClient:
         try:
             result = await self._interpretation_agent.run(
                 prompt,
-                system_prompt=system,
+                instructions=system,
             )
 
             return Evidence(
@@ -188,9 +188,9 @@ class AnthropicClient:
                 query=query,
                 result_summary=results.to_summary(),
                 row_count=results.row_count,
-                supports_hypothesis=result.data.supports_hypothesis,
-                confidence=result.data.confidence,
-                interpretation=result.data.interpretation,
+                supports_hypothesis=result.output.supports_hypothesis,
+                confidence=result.output.confidence,
+                interpretation=result.output.interpretation,
             )
 
         except Exception as e:
@@ -228,16 +228,16 @@ class AnthropicClient:
         try:
             result = await self._synthesis_agent.run(
                 prompt,
-                system_prompt=system,
+                instructions=system,
             )
 
             return Finding(
                 investigation_id="",  # Set by orchestrator
-                status="completed" if result.data.root_cause else "inconclusive",
-                root_cause=result.data.root_cause,
-                confidence=result.data.confidence,
+                status="completed" if result.output.root_cause else "inconclusive",
+                root_cause=result.output.root_cause,
+                confidence=result.output.confidence,
                 evidence=evidence,
-                recommendations=result.data.recommendations,
+                recommendations=result.output.recommendations,
                 duration_seconds=0.0,  # Set by orchestrator
             )
 

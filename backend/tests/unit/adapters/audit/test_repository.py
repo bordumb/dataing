@@ -24,8 +24,16 @@ class TestAuditRepository:
         """Create repository with mock pool."""
         return AuditRepository(pool=mock_pool)
 
-    async def test_record_creates_entry(self, repository: AuditRepository) -> None:
+    async def test_record_creates_entry(
+        self, repository: AuditRepository, mock_pool: MagicMock
+    ) -> None:
         """Test recording an audit log entry."""
+        entry_id = uuid4()
+        mock_conn = AsyncMock()
+        mock_conn.fetchrow = AsyncMock(return_value={"id": entry_id})
+        mock_pool.acquire.return_value.__aenter__ = AsyncMock(return_value=mock_conn)
+        mock_pool.acquire.return_value.__aexit__ = AsyncMock(return_value=None)
+
         create = AuditLogCreate(
             tenant_id=uuid4(),
             actor_id=uuid4(),
@@ -36,8 +44,10 @@ class TestAuditRepository:
             resource_name="Engineering",
         )
 
-        # Should not raise
-        await repository.record(create)
+        result = await repository.record(create)
+
+        assert result == entry_id
+        mock_conn.fetchrow.assert_called_once()
 
     async def test_list_returns_entries(
         self, repository: AuditRepository, mock_pool: MagicMock
@@ -58,6 +68,61 @@ class TestAuditRepository:
 
         assert entries == []
         assert total == 0
+
+    async def test_get_returns_entry(
+        self, repository: AuditRepository, mock_pool: MagicMock
+    ) -> None:
+        """Test getting a single audit log entry."""
+        tenant_id = uuid4()
+        entry_id = uuid4()
+        now = datetime.now(UTC)
+        mock_row = {
+            "id": entry_id,
+            "timestamp": now,
+            "tenant_id": tenant_id,
+            "actor_id": uuid4(),
+            "actor_email": "test@example.com",
+            "actor_ip": "127.0.0.1",
+            "actor_user_agent": "TestAgent/1.0",
+            "action": "team.create",
+            "resource_type": "team",
+            "resource_id": uuid4(),
+            "resource_name": "Engineering",
+            "request_method": "POST",
+            "request_path": "/api/teams",
+            "status_code": 201,
+            "changes": {"name": "Engineering"},
+            "metadata": None,
+            "created_at": now,
+        }
+        mock_conn = AsyncMock()
+        mock_conn.fetchrow = AsyncMock(return_value=mock_row)
+        mock_pool.acquire.return_value.__aenter__ = AsyncMock(return_value=mock_conn)
+        mock_pool.acquire.return_value.__aexit__ = AsyncMock(return_value=None)
+
+        result = await repository.get(tenant_id, entry_id)
+
+        assert result is not None
+        assert result.id == entry_id
+        assert result.tenant_id == tenant_id
+        assert result.action == "team.create"
+        mock_conn.fetchrow.assert_called_once()
+
+    async def test_get_returns_none_when_not_found(
+        self, repository: AuditRepository, mock_pool: MagicMock
+    ) -> None:
+        """Test getting a non-existent audit log entry returns None."""
+        tenant_id = uuid4()
+        entry_id = uuid4()
+        mock_conn = AsyncMock()
+        mock_conn.fetchrow = AsyncMock(return_value=None)
+        mock_pool.acquire.return_value.__aenter__ = AsyncMock(return_value=mock_conn)
+        mock_pool.acquire.return_value.__aexit__ = AsyncMock(return_value=None)
+
+        result = await repository.get(tenant_id, entry_id)
+
+        assert result is None
+        mock_conn.fetchrow.assert_called_once()
 
     async def test_delete_before_removes_old_entries(
         self, repository: AuditRepository, mock_pool: MagicMock

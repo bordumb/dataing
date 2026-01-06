@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card'
-import { useAuth } from '@/lib/auth/context'
+import { useJwtAuth } from '@/lib/auth/jwt-context'
 
 type LoginStep = 'email' | 'password' | 'sso-redirect'
 
@@ -24,7 +24,7 @@ export function SSOLoginPage() {
   const [error, setError] = React.useState<string | null>(null)
   const [ssoProvider, setSsoProvider] = React.useState<string | null>(null)
 
-  const { login, isAuthenticated } = useAuth()
+  const { login, isAuthenticated } = useJwtAuth()
   const navigate = useNavigate()
   const location = useLocation()
 

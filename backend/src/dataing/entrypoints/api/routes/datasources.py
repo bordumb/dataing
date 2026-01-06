@@ -14,7 +14,7 @@ from uuid import UUID
 
 import structlog
 from cryptography.fernet import Fernet
-from fastapi import APIRouter, Depends, HTTPException, Query, Response
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
 from pydantic import BaseModel, Field
 
 from dataing.adapters.audit import audited
@@ -24,12 +24,14 @@ from dataing.adapters.datasource import (
     get_registry,
 )
 from dataing.adapters.db.app_db import AppDatabase
+from dataing.core.entitlements.features import Feature
 from dataing.entrypoints.api.deps import get_app_db
 from dataing.entrypoints.api.middleware.auth import (
     ApiKeyContext,
     require_scope,
     verify_api_key,
 )
+from dataing.entrypoints.api.middleware.entitlements import require_under_limit
 
 logger = structlog.get_logger(__name__)
 
@@ -257,7 +259,8 @@ async def list_source_types() -> SourceTypesResponse:
 @router.post("/test", response_model=TestConnectionResponse)
 @audited(action="datasource.test", resource_type="datasource")
 async def test_connection(
-    request: TestConnectionRequest,
+    request: Request,
+    body: TestConnectionRequest,
 ) -> TestConnectionResponse:
     """Test a connection without saving it.
 
@@ -267,21 +270,21 @@ async def test_connection(
     registry = get_registry()
 
     try:
-        source_type = SourceType(request.type)
+        source_type = SourceType(body.type)
     except ValueError:
         raise HTTPException(
             status_code=400,
-            detail=f"Unsupported source type: {request.type}",
+            detail=f"Unsupported source type: {body.type}",
         ) from None
 
     if not registry.is_registered(source_type):
         raise HTTPException(
             status_code=400,
-            detail=f"Source type not available: {request.type}",
+            detail=f"Source type not available: {body.type}",
         )
 
     try:
-        adapter = registry.create(source_type, request.config)
+        adapter = registry.create(source_type, body.config)
         async with adapter:
             result = await adapter.test_connection()
 
@@ -300,8 +303,10 @@ async def test_connection(
 
 @router.post("/", response_model=DataSourceResponse, status_code=201)
 @audited(action="datasource.create", resource_type="datasource")
+@require_under_limit(Feature.MAX_DATASOURCES)
 async def create_datasource(
-    request: CreateDataSourceRequest,
+    request: Request,
+    body: CreateDataSourceRequest,
     auth: WriteScopeDep,
     app_db: AppDbDep,
 ) -> DataSourceResponse:
@@ -312,22 +317,22 @@ async def create_datasource(
     registry = get_registry()
 
     try:
-        source_type = SourceType(request.type)
+        source_type = SourceType(body.type)
     except ValueError:
         raise HTTPException(
             status_code=400,
-            detail=f"Unsupported source type: {request.type}",
+            detail=f"Unsupported source type: {body.type}",
         ) from None
 
     if not registry.is_registered(source_type):
         raise HTTPException(
             status_code=400,
-            detail=f"Source type not available: {request.type}",
+            detail=f"Source type not available: {body.type}",
         )
 
     # Test connection first
     try:
-        adapter = registry.create(source_type, request.config)
+        adapter = registry.create(source_type, body.config)
         async with adapter:
             result = await adapter.test_connection()
             if not result.success:
@@ -343,15 +348,15 @@ async def create_datasource(
 
     # Encrypt config
     encryption_key = get_encryption_key()
-    encrypted_config = _encrypt_config(request.config, encryption_key)
+    encrypted_config = _encrypt_config(body.config, encryption_key)
 
     # Save to database
     db_result = await app_db.create_data_source(
         tenant_id=auth.tenant_id,
-        name=request.name,
-        type=request.type,
+        name=body.name,
+        type=body.type,
         connection_config_encrypted=encrypted_config,
-        is_default=request.is_default,
+        is_default=body.is_default,
     )
 
     # Update health check status
@@ -359,7 +364,7 @@ async def create_datasource(
 
     # Auto-sync schema to register datasets
     try:
-        adapter = registry.create(source_type, request.config)
+        adapter = registry.create(source_type, body.config)
         async with adapter:
             schema = await adapter.get_schema(SchemaFilter(max_tables=10000))
 

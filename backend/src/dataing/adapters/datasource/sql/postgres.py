@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import time
 from typing import Any
+from urllib.parse import quote_plus
 
 from dataing.adapters.datasource.errors import (
     AccessDeniedError,
@@ -181,13 +182,17 @@ class PostgresAdapter(SQLAdapter):
     def _build_dsn(self) -> str:
         """Build PostgreSQL DSN from config."""
         host = self._config.get("host", "localhost")
-        port = self._config.get("port", 5432)
+        port = int(self._config.get("port", 5432))
         database = self._config.get("database", "postgres")
-        username = self._config.get("username", "")
-        password = self._config.get("password", "")
+        username = str(self._config.get("username", ""))
+        password = str(self._config.get("password", ""))
         ssl_mode = self._config.get("ssl_mode", "prefer")
 
-        return f"postgresql://{username}:{password}@{host}:{port}/{database}?sslmode={ssl_mode}"
+        # URL-encode credentials to handle special characters like @, :, /
+        encoded_username = quote_plus(username) if username else ""
+        encoded_password = quote_plus(password) if password else ""
+
+        return f"postgresql://{encoded_username}:{encoded_password}@{host}:{port}/{database}?sslmode={ssl_mode}"
 
     async def connect(self) -> None:
         """Establish connection to PostgreSQL."""

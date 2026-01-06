@@ -4,7 +4,7 @@ import { Search, Loader2, AlertCircle } from 'lucide-react'
 
 import { Button } from '@/components/ui/Button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card'
-import { useAuth } from '@/lib/auth/context'
+import { useJwtAuth } from '@/lib/auth/jwt-context'
 
 type CallbackStatus = 'processing' | 'success' | 'error'
 
@@ -12,7 +12,7 @@ export function SSOCallbackPage() {
   const [status, setStatus] = React.useState<CallbackStatus>('processing')
   const [error, setError] = React.useState<string | null>(null)
 
-  const { login } = useAuth()
+  const { login } = useJwtAuth()
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
 

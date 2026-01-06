@@ -1,7 +1,7 @@
 {
   "name": "volume_drop",
   "description": "CDN misconfiguration blocked tracking pixel for EU users",
-  "created_at": "2026-01-06T05:39:10.483132Z",
+  "created_at": "2026-01-06T17:50:08.506767Z",
   "simulation_period": {
     "start": "2026-01-08",
     "end": "2026-01-14"

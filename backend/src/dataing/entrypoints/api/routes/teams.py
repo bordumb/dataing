@@ -12,8 +12,10 @@ from pydantic import BaseModel
 from dataing.adapters.audit import audited
 from dataing.adapters.db.app_db import AppDatabase
 from dataing.adapters.rbac import TeamsRepository
+from dataing.core.entitlements.features import Feature
 from dataing.entrypoints.api.deps import get_app_db
 from dataing.entrypoints.api.middleware.auth import ApiKeyContext, require_scope, verify_api_key
+from dataing.entrypoints.api.middleware.entitlements import require_under_limit
 
 logger = logging.getLogger(__name__)
 
@@ -217,6 +219,7 @@ async def get_team_members(
 
 @router.post("/{team_id}/members", status_code=status.HTTP_201_CREATED)
 @audited(action="team.member_add", resource_type="team")
+@require_under_limit(Feature.MAX_SEATS)
 async def add_team_member(
     request: Request,
     team_id: UUID,

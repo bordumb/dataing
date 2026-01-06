@@ -20,6 +20,7 @@ from dataing.adapters.auth.recovery_email import EmailPasswordRecoveryAdapter
 from dataing.adapters.context import ContextEngine
 from dataing.adapters.datasource import BaseAdapter, get_registry
 from dataing.adapters.db.app_db import AppDatabase
+from dataing.adapters.entitlements import DatabaseEntitlementsAdapter
 from dataing.adapters.investigation_feedback import InvestigationFeedbackAdapter
 from dataing.adapters.lineage import BaseLineageAdapter, LineageAdapter, get_lineage_registry
 from dataing.adapters.llm.client import AnthropicClient
@@ -89,6 +90,10 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     # Create audit repository
     audit_repo = AuditRepository(pool=app_db.pool)
     app.state.audit_repo = audit_repo
+
+    # Create entitlements adapter for plan-based feature gating
+    entitlements_adapter = DatabaseEntitlementsAdapter(pool=app_db.pool)
+    app.state.entitlements_adapter = entitlements_adapter
 
     llm = AnthropicClient(
         api_key=settings.anthropic_api_key,
@@ -606,3 +611,16 @@ def get_frontend_url(request: Request) -> str:
     """
     frontend_url: str = request.app.state.frontend_url
     return frontend_url
+
+
+def get_entitlements_adapter(request: Request) -> DatabaseEntitlementsAdapter:
+    """Get entitlements adapter from app state.
+
+    Args:
+        request: The current request.
+
+    Returns:
+        The configured entitlements adapter for plan-based feature gating.
+    """
+    adapter: DatabaseEntitlementsAdapter = request.app.state.entitlements_adapter
+    return adapter

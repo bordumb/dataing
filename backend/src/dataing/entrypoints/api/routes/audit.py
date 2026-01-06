@@ -11,7 +11,9 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, ConfigDict
 
 from dataing.adapters.audit import AuditRepository
+from dataing.core.entitlements.features import Feature
 from dataing.entrypoints.api.middleware.auth import ApiKeyContext, require_scope, verify_api_key
+from dataing.entrypoints.api.middleware.entitlements import require_feature
 
 router = APIRouter(prefix="/audit-logs", tags=["audit"])
 
@@ -67,7 +69,9 @@ class AuditLogListResponse(BaseModel):
 
 
 @router.get("", response_model=AuditLogListResponse)
+@require_feature(Feature.AUDIT_LOGS)
 async def list_audit_logs(
+    request: Request,
     auth: AdminScopeDep,
     audit_repo: AuditRepoDep,
     page: Annotated[int, Query(ge=1)] = 1,
@@ -81,9 +85,10 @@ async def list_audit_logs(
 ) -> AuditLogListResponse:
     """List audit logs with filtering and pagination.
 
-    Requires admin scope.
+    Requires admin scope and Enterprise plan.
 
     Args:
+        request: The current request.
         auth: Authenticated context with admin scope.
         audit_repo: Audit repository dependency.
         page: Page number (1-indexed).
@@ -125,7 +130,9 @@ async def list_audit_logs(
 
 
 @router.get("/export")
+@require_feature(Feature.AUDIT_LOGS)
 async def export_audit_logs(
+    request: Request,
     auth: AdminScopeDep,
     audit_repo: AuditRepoDep,
     start_date: datetime | None = None,
@@ -137,9 +144,10 @@ async def export_audit_logs(
 ) -> StreamingResponse:
     """Export audit logs as CSV.
 
-    Requires admin scope.
+    Requires admin scope and Enterprise plan.
 
     Args:
+        request: The current request.
         auth: Authenticated context with admin scope.
         audit_repo: Audit repository dependency.
         start_date: Filter entries after this date.
@@ -211,16 +219,19 @@ async def export_audit_logs(
 
 
 @router.get("/{entry_id}", response_model=AuditLogResponse)
+@require_feature(Feature.AUDIT_LOGS)
 async def get_audit_log(
+    request: Request,
     auth: AdminScopeDep,
     entry_id: UUID,
     audit_repo: AuditRepoDep,
 ) -> AuditLogResponse:
     """Get a single audit log entry.
 
-    Requires admin scope.
+    Requires admin scope and Enterprise plan.
 
     Args:
+        request: The current request.
         auth: Authenticated context with admin scope.
         entry_id: UUID of the audit log entry.
         audit_repo: Audit repository dependency.

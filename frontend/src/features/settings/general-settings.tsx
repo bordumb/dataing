@@ -2,11 +2,10 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { Label } from '@/components/ui/label'
-import { useAuth } from '@/lib/auth/context'
+import { useJwtAuth } from '@/lib/auth/jwt-context'
 
 export function GeneralSettings() {
-  // Use API key auth context (tenant) instead of JWT auth (org)
-  const { tenant } = useAuth()
+  const { org } = useJwtAuth()
 
   return (
     <Card>
@@ -21,7 +20,7 @@ export function GeneralSettings() {
           <Label htmlFor="org-name">Organization Name</Label>
           <Input
             id="org-name"
-            defaultValue={tenant?.name ?? ''}
+            defaultValue={org?.name ?? ''}
             placeholder="Your organization"
           />
         </div>
@@ -29,7 +28,7 @@ export function GeneralSettings() {
           <Label htmlFor="org-slug">Organization Slug</Label>
           <Input
             id="org-slug"
-            defaultValue={tenant?.slug ?? ''}
+            defaultValue={org?.slug ?? ''}
             placeholder="your-org"
             disabled
           />

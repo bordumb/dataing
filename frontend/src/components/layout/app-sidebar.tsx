@@ -67,7 +67,7 @@ const mainNavItems = [
 export function AppSidebar() {
   const location = useLocation()
   const { state } = useSidebar()
-  const { tenant, logout } = useAuth()
+  const { logout } = useAuth()
   const { canAccessAdmin } = useDemoRoleContext()
 
   // Build settings nav items based on role

@@ -1,6 +1,19 @@
-"""LLM adapters implementing the LLMClient protocol."""
+"""LLM adapter module."""
 
 from .client import AnthropicClient
-from .prompt_manager import PromptManager
+from .response_models import (
+    HypothesesResponse,
+    HypothesisResponse,
+    InterpretationResponse,
+    QueryResponse,
+    SynthesisResponse,
+)
 
-__all__ = ["AnthropicClient", "PromptManager"]
+__all__ = [
+    "AnthropicClient",
+    "HypothesesResponse",
+    "HypothesisResponse",
+    "InterpretationResponse",
+    "QueryResponse",
+    "SynthesisResponse",
+]

@@ -177,20 +177,28 @@ async def get_investigation(
     if inv.get("tenant_id") and inv["tenant_id"] != str(auth.tenant_id):
         raise HTTPException(status_code=404, detail="Investigation not found")
 
-    # Check RBAC permissions if user_id is available
+    # Check RBAC permissions if user_id is available and investigation is persisted
+    # Note: In-memory investigations (not yet persisted) rely on tenant check above
     if auth.user_id:
         try:
             inv_uuid = uuid.UUID(investigation_id)
             async with app_db.acquire() as conn:
-                permission_service = PermissionService(conn)
-                has_access = await permission_service.can_access_investigation(
-                    auth.user_id, inv_uuid
+                # Check if investigation exists in DB before RBAC check
+                exists = await conn.fetchval(
+                    "SELECT EXISTS(SELECT 1 FROM investigations WHERE id = $1)",
+                    inv_uuid,
                 )
-                if not has_access:
-                    raise HTTPException(
-                        status_code=403,
-                        detail="You don't have access to this investigation",
+                if exists:
+                    permission_service = PermissionService(conn)
+                    has_access = await permission_service.can_access_investigation(
+                        auth.user_id, inv_uuid
                     )
+                    if not has_access:
+                        raise HTTPException(
+                            status_code=403,
+                            detail="You don't have access to this investigation",
+                        )
+                # If not in DB, rely on tenant check above (in-memory investigation)
         except ValueError:
             # Invalid UUID, fall back to tenant check only
             pass
@@ -234,20 +242,25 @@ async def stream_events(
     if inv.get("tenant_id") and inv["tenant_id"] != str(auth.tenant_id):
         raise HTTPException(status_code=404, detail="Investigation not found")
 
-    # Check RBAC permissions if user_id is available
+    # Check RBAC permissions if user_id is available and investigation is persisted
     if auth.user_id:
         try:
             inv_uuid = uuid.UUID(investigation_id)
             async with app_db.acquire() as conn:
-                permission_service = PermissionService(conn)
-                has_access = await permission_service.can_access_investigation(
-                    auth.user_id, inv_uuid
+                exists = await conn.fetchval(
+                    "SELECT EXISTS(SELECT 1 FROM investigations WHERE id = $1)",
+                    inv_uuid,
                 )
-                if not has_access:
-                    raise HTTPException(
-                        status_code=403,
-                        detail="You don't have access to this investigation",
+                if exists:
+                    permission_service = PermissionService(conn)
+                    has_access = await permission_service.can_access_investigation(
+                        auth.user_id, inv_uuid
                     )
+                    if not has_access:
+                        raise HTTPException(
+                            status_code=403,
+                            detail="You don't have access to this investigation",
+                        )
         except ValueError:
             pass
 

@@ -48,9 +48,9 @@ class PermissionService:
             """
             SELECT EXISTS (
                 -- Role-based (owner/admin see everything in their org)
-                SELECT 1 FROM users u
-                JOIN investigations i ON i.tenant_id = u.tenant_id
-                WHERE u.id = $1 AND i.id = $2 AND u.role IN ('owner', 'admin')
+                SELECT 1 FROM org_memberships om
+                JOIN investigations i ON i.tenant_id = om.org_id
+                WHERE om.user_id = $1 AND i.id = $2 AND om.role IN ('owner', 'admin')
 
                 UNION ALL
 

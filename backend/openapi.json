@@ -8119,9 +8119,12 @@
             "type": "string",
             "title": "Dataset Id"
           },
-          "metric_name": {
+          "metric_spec": {
+            "$ref": "#/components/schemas/MetricSpecRequest"
+          },
+          "anomaly_type": {
             "type": "string",
-            "title": "Metric Name"
+            "title": "Anomaly Type"
           },
           "expected_value": {
             "type": "number",
@@ -8143,6 +8146,39 @@
             "type": "string",
             "title": "Severity",
             "default": "medium"
+          },
+          "source_system": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source System"
+          },
+          "source_alert_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Alert Id"
+          },
+          "source_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Url"
           },
           "metadata": {
             "anyOf": [
@@ -8175,14 +8211,15 @@
         "type": "object",
         "required": [
           "dataset_id",
-          "metric_name",
+          "metric_spec",
+          "anomaly_type",
           "expected_value",
           "actual_value",
           "deviation_pct",
           "anomaly_date"
         ],
         "title": "CreateInvestigationRequest",
-        "description": "Request body for creating an investigation."
+        "description": "Request body for creating an investigation.\n\nThis API performs ROOT CAUSE ANALYSIS, not anomaly detection.\nThe upstream anomaly detector must provide structured metric_spec."
       },
       "CreateUserRequest": {
         "properties": {
@@ -9558,6 +9595,49 @@
         ],
         "title": "LoginRequest",
         "description": "Login request body."
+      },
+      "MetricSpecRequest": {
+        "properties": {
+          "metric_type": {
+            "type": "string",
+            "title": "Metric Type"
+          },
+          "expression": {
+            "type": "string",
+            "title": "Expression"
+          },
+          "display_name": {
+            "type": "string",
+            "title": "Display Name"
+          },
+          "columns_referenced": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Columns Referenced",
+            "default": []
+          },
+          "source_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Url"
+          }
+        },
+        "type": "object",
+        "required": [
+          "metric_type",
+          "expression",
+          "display_name"
+        ],
+        "title": "MetricSpecRequest",
+        "description": "Structured metric specification from upstream anomaly detector."
       },
       "ModifyRequest": {
         "properties": {

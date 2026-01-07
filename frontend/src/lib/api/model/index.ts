@@ -308,3 +308,8 @@ export * from "./webhookCreatedResponse";
 export * from "./webhookResponse";
 export * from "./webhookResponseLastStatus";
 export * from "./webhookResponseLastTriggeredAt";
+export * from "./createInvestigationRequestSourceAlertId";
+export * from "./createInvestigationRequestSourceSystem";
+export * from "./createInvestigationRequestSourceUrl";
+export * from "./metricSpecRequest";
+export * from "./metricSpecRequestSourceUrl";

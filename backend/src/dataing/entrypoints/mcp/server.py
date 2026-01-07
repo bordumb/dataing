@@ -22,7 +22,7 @@ from dataing.adapters.context.engine import DefaultContextEngine
 from dataing.adapters.datasource import get_registry
 from dataing.adapters.datasource.sql.base import SQLAdapter
 from dataing.adapters.llm.client import AnthropicClient
-from dataing.core.domain_types import AnomalyAlert
+from dataing.core.domain_types import AnomalyAlert, MetricSpec
 from dataing.core.orchestrator import InvestigationOrchestrator, OrchestratorConfig
 from dataing.core.state import InvestigationState
 from dataing.safety.circuit_breaker import CircuitBreaker, CircuitBreakerConfig
@@ -69,9 +69,13 @@ def create_server(
                             "type": "string",
                             "description": "The affected table (e.g., 'schema.table_name')",
                         },
-                        "metric_name": {
+                        "column_name": {
                             "type": "string",
-                            "description": "The metric that deviated (e.g., 'row_count')",
+                            "description": "The column with the anomaly (e.g., 'user_id')",
+                        },
+                        "anomaly_type": {
+                            "type": "string",
+                            "description": "Type of anomaly (null_rate, row_count, freshness)",
                         },
                         "expected_value": {
                             "type": "number",
@@ -92,7 +96,8 @@ def create_server(
                     },
                     "required": [
                         "dataset_id",
-                        "metric_name",
+                        "column_name",
+                        "anomaly_type",
                         "expected_value",
                         "actual_value",
                         "deviation_pct",
@@ -158,9 +163,16 @@ async def _investigate_anomaly(
     Returns:
         List of TextContent with findings.
     """
+    # Build structured metric spec from MCP tool args
+    metric_spec = MetricSpec.from_column(
+        column_name=args["column_name"],
+        display_name=f"{args['anomaly_type']} on {args['column_name']}",
+    )
+
     alert = AnomalyAlert(
         dataset_id=args["dataset_id"],
-        metric_name=args["metric_name"],
+        metric_spec=metric_spec,
+        anomaly_type=args["anomaly_type"],
         expected_value=args["expected_value"],
         actual_value=args["actual_value"],
         deviation_pct=args["deviation_pct"],

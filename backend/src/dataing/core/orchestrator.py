@@ -121,7 +121,7 @@ class InvestigationOrchestrator:
         log = logger.bind(
             investigation_id=state.id,
             dataset=state.alert.dataset_id,
-            metric=state.alert.metric_name,
+            metric=state.alert.metric_spec.display_name,
             using_tenant_adapter=data_adapter is not None,
         )
         log.info("Starting investigation")

@@ -254,24 +254,38 @@ class AnthropicClient:
     # Prompt Building Methods
     # -------------------------------------------------------------------------
 
-    def _get_metric_explanation(
-        self, metric_name: str, metadata: dict[str, str | int | float | bool] | None = None
-    ) -> str:
-        """Get human-readable explanation for a metric type."""
-        affected_column = metadata.get("affected_column") if metadata else None
+    def _build_metric_context(self, alert: AnomalyAlert) -> str:
+        """Build context string based on metric_spec type.
 
-        if metric_name == "null_count" and affected_column:
-            return f"count of NULL values in the {affected_column} column"
+        This is the key win from structured MetricSpec - different prompt
+        framing based on what kind of metric we're investigating.
+        """
+        spec = alert.metric_spec
 
-        explanations = {
-            "null_count": "count of NULL values - investigate what causes missing data",
-            "row_count": "total row count - investigate missing or extra records",
-            "volume": "data volume - investigate data loss or unexpected growth",
-            "duplicate_count": "duplicate records - investigate what causes duplicates",
-            "freshness": "data freshness - investigate delays in data arrival",
-            "completeness": "data completeness - investigate missing required fields",
-        }
-        return explanations.get(metric_name, f"metric measuring {metric_name}")
+        if spec.metric_type == "column":
+            return f"""The anomaly is on column `{spec.expression}` in table `{alert.dataset_id}`.
+Investigate why this column's {alert.anomaly_type} changed.
+Focus on: NULL introduction, upstream joins, filtering changes, application bugs.
+All hypotheses MUST focus on the `{spec.expression}` column specifically."""
+
+        elif spec.metric_type == "sql_expression":
+            cols = ", ".join(spec.columns_referenced) if spec.columns_referenced else "unknown"
+            return f"""The anomaly is on a computed metric: {spec.expression}
+This expression references columns: {cols}
+Investigate why this calculation's result changed.
+Focus on: input column changes, expression logic errors, upstream data shifts."""
+
+        elif spec.metric_type == "dbt_metric":
+            url_info = f"\nDefinition: {spec.source_url}" if spec.source_url else ""
+            return f"""The anomaly is on dbt metric `{spec.expression}`.{url_info}
+Investigate the metric's upstream models and their data quality.
+Focus on: upstream model failures, source data changes, metric definition issues."""
+
+        else:  # description
+            return f"""The anomaly is described as: {spec.expression}
+This is a free-text description. Infer which columns/tables are involved
+from the schema and investigate accordingly.
+Focus on: matching the description to actual schema elements."""
 
     def _build_hypothesis_system_prompt(self, num_hypotheses: int) -> str:
         """Build system prompt for hypothesis generation."""
@@ -314,35 +328,27 @@ Generate diverse hypotheses covering multiple categories when plausible."""
 {context.lineage.to_prompt_string()}
 """
 
-        metric_explanation = self._get_metric_explanation(alert.metric_name, alert.metadata)
-        affected_column = alert.metadata.get("affected_column") if alert.metadata else None
-
-        # Build column-specific guidance if available
-        column_guidance = ""
-        if affected_column:
-            column_guidance = f"""
-IMPORTANT: The anomaly is specifically in the '{affected_column}' column.
-All hypotheses MUST focus on why '{affected_column}' has NULL/missing values.
-Do NOT investigate other columns - focus ONLY on '{affected_column}'."""
+        # Build structured context based on metric type
+        metric_context = self._build_metric_context(alert)
 
         return f"""## Anomaly Alert
 - Dataset: {alert.dataset_id}
-- Metric: {alert.metric_name} ({metric_explanation})
+- Metric: {alert.metric_spec.display_name}
+- Anomaly Type: {alert.anomaly_type}
 - Expected: {alert.expected_value}
 - Actual: {alert.actual_value}
 - Deviation: {alert.deviation_pct}%
 - Anomaly Date: {alert.anomaly_date}
 - Severity: {alert.severity}
-{column_guidance}
 
-FOCUS: The anomaly is about {alert.metric_name}. Your hypotheses MUST explain why
-{alert.metric_name} went from {alert.expected_value} to {alert.actual_value}
-(a {alert.deviation_pct}% deviation).
+## What To Investigate
+{metric_context}
 
 ## Available Schema
 {context.schema.to_prompt_string()}
 {lineage_section}
-Generate hypotheses to investigate this {alert.metric_name} anomaly."""
+Generate hypotheses to investigate why {alert.metric_spec.display_name} deviated
+from {alert.expected_value} to {alert.actual_value} ({alert.deviation_pct}% change)."""
 
     def _build_query_system_prompt(self, schema: SchemaResponse) -> str:
         """Build system prompt for query generation."""
@@ -480,12 +486,19 @@ CONFIDENCE GUIDELINES:
             ]
         )
 
+        # Include metric context for synthesis
+        metric_context = self._build_metric_context(alert)
+
         return f"""## Original Anomaly
 - Dataset: {alert.dataset_id}
-- Metric: {alert.metric_name} deviated by {alert.deviation_pct}%
+- Metric: {alert.metric_spec.display_name} deviated by {alert.deviation_pct}%
+- Anomaly Type: {alert.anomaly_type}
 - Expected: {alert.expected_value}
 - Actual: {alert.actual_value}
 - Date: {alert.anomaly_date}
+
+## What Was Investigated
+{metric_context}
 
 ## Investigation Findings
 {evidence_text}

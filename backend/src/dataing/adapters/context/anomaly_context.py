@@ -96,19 +96,27 @@ class AnomalyContext:
         logger.info(
             "confirming_anomaly",
             dataset=anomaly.dataset_id,
-            metric=anomaly.metric_name,
+            metric=anomaly.metric_spec.display_name,
+            anomaly_type=anomaly.anomaly_type,
             date=anomaly.anomaly_date,
         )
 
-        # Parse metric name to determine what to check
-        metric_parts = anomaly.metric_name.lower().split("_")
-        is_null_rate = "null" in metric_parts
-        column_name = self._extract_column_name(anomaly.metric_name, anomaly.dataset_id)
+        # Use structured metric_spec to determine what to check
+        spec = anomaly.metric_spec
+        is_null_rate = "null" in anomaly.anomaly_type.lower()
+
+        # Get column name from metric_spec
+        if spec.metric_type == "column":
+            column_name = spec.expression
+        elif spec.columns_referenced:
+            column_name = spec.columns_referenced[0]
+        else:
+            column_name = self._extract_column_name(spec.display_name, anomaly.dataset_id)
 
         try:
             if is_null_rate:
                 return await self._confirm_null_rate_anomaly(adapter, anomaly, column_name)
-            elif "row_count" in anomaly.metric_name.lower():
+            elif "row_count" in anomaly.anomaly_type.lower():
                 return await self._confirm_row_count_anomaly(adapter, anomaly)
             else:
                 # Generic metric confirmation

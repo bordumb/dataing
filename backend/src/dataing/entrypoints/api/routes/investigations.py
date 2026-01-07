@@ -18,7 +18,7 @@ from pydantic import BaseModel
 
 from dataing.adapters.audit import audited
 from dataing.adapters.db.app_db import AppDatabase
-from dataing.core.domain_types import AnomalyAlert
+from dataing.core.domain_types import AnomalyAlert, MetricSpec
 from dataing.core.entitlements.features import Feature
 from dataing.core.orchestrator import InvestigationOrchestrator
 from dataing.core.rbac import PermissionService
@@ -45,16 +45,34 @@ InvestigationsDep = Annotated[dict[str, dict[str, Any]], Depends(get_investigati
 AppDbDep = Annotated[AppDatabase, Depends(get_app_db)]
 
 
+class MetricSpecRequest(BaseModel):
+    """Structured metric specification from upstream anomaly detector."""
+
+    metric_type: str  # "column", "sql_expression", "dbt_metric", "description"
+    expression: str  # The metric definition
+    display_name: str  # Human-readable name
+    columns_referenced: list[str] = []  # Columns involved
+    source_url: str | None = None  # Link to metric definition
+
+
 class CreateInvestigationRequest(BaseModel):
-    """Request body for creating an investigation."""
+    """Request body for creating an investigation.
+
+    This API performs ROOT CAUSE ANALYSIS, not anomaly detection.
+    The upstream anomaly detector must provide structured metric_spec.
+    """
 
     dataset_id: str
-    metric_name: str
+    metric_spec: MetricSpecRequest  # Structured metric specification
+    anomaly_type: str  # null_rate, row_count, freshness, custom
     expected_value: float
     actual_value: float
     deviation_pct: float
     anomaly_date: str
     severity: str = "medium"
+    source_system: str | None = None  # monte_carlo, great_expectations, dbt
+    source_alert_id: str | None = None
+    source_url: str | None = None
     metadata: dict[str, str | int | float | bool] | None = None
 
 
@@ -97,14 +115,27 @@ async def create_investigation(
     """
     investigation_id = str(uuid.uuid4())
 
+    # Convert request to domain types
+    metric_spec = MetricSpec(
+        metric_type=body.metric_spec.metric_type,
+        expression=body.metric_spec.expression,
+        display_name=body.metric_spec.display_name,
+        columns_referenced=body.metric_spec.columns_referenced,
+        source_url=body.metric_spec.source_url,
+    )
+
     alert = AnomalyAlert(
         dataset_id=body.dataset_id,
-        metric_name=body.metric_name,
+        metric_spec=metric_spec,
+        anomaly_type=body.anomaly_type,
         expected_value=body.expected_value,
         actual_value=body.actual_value,
         deviation_pct=body.deviation_pct,
         anomaly_date=body.anomaly_date,
         severity=body.severity,
+        source_system=body.source_system,
+        source_alert_id=body.source_alert_id,
+        source_url=body.source_url,
         metadata=body.metadata,
     )
 

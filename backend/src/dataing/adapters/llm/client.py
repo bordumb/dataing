@@ -1,59 +1,80 @@
-"""Anthropic Claude implementation of LLMClient."""
+"""Anthropic Claude implementation with Pydantic AI structured outputs."""
 
 from __future__ import annotations
 
-import asyncio
-import json
-import re
-import uuid
-from typing import Any, cast
+import os
+from typing import TYPE_CHECKING
 
-import anthropic
-from anthropic.types import MessageParam
+from pydantic_ai import Agent
+from pydantic_ai.models.anthropic import AnthropicModel
+from pydantic_ai.output import PromptedOutput
 
-from dataing.adapters.datasource.types import QueryResult, SchemaResponse
 from dataing.core.domain_types import (
     AnomalyAlert,
     Evidence,
     Finding,
     Hypothesis,
-    HypothesisCategory,
     InvestigationContext,
 )
 from dataing.core.exceptions import LLMError
 
-from .prompt_manager import PromptManager
+from .response_models import (
+    HypothesesResponse,
+    InterpretationResponse,
+    QueryResponse,
+    SynthesisResponse,
+)
+
+if TYPE_CHECKING:
+    from dataing.adapters.datasource.types import QueryResult, SchemaResponse
 
 
 class AnthropicClient:
-    """Anthropic Claude implementation of LLMClient.
+    """Anthropic Claude implementation with structured outputs.
 
-    Uses Claude for:
-    - Hypothesis generation
-    - Query generation with reflexion
-    - Evidence interpretation
-    - Finding synthesis
-
-    Attributes:
-        model: The Claude model to use.
+    Uses Pydantic AI for type-safe, validated LLM responses.
     """
 
     def __init__(
         self,
         api_key: str,
         model: str = "claude-sonnet-4-20250514",
-        prompt_manager: PromptManager | None = None,
+        max_retries: int = 3,
     ) -> None:
         """Initialize the Anthropic client.
 
         Args:
             api_key: Anthropic API key.
-            model: Model to use (default: claude-sonnet-4-20250514).
-            prompt_manager: Optional custom prompt manager.
+            model: Model to use.
+            max_retries: Max retries on validation failure.
         """
-        self.client = anthropic.AsyncAnthropic(api_key=api_key)
-        self.model = model
-        self.prompt_manager = prompt_manager or PromptManager()
+        # Pydantic AI reads API key from environment variable
+        os.environ["ANTHROPIC_API_KEY"] = api_key
+        self._model = AnthropicModel(model)
+
+        # Pre-configure agents for each task
+        # Using PromptedOutput mode enables chain-of-thought reasoning before structured output,
+        # which significantly improves quality for complex analytical tasks compared to tool mode.
+        self._hypothesis_agent: Agent[None, HypothesesResponse] = Agent(
+            model=self._model,
+            output_type=PromptedOutput(HypothesesResponse),
+            retries=max_retries,
+        )
+        self._interpretation_agent: Agent[None, InterpretationResponse] = Agent(
+            model=self._model,
+            output_type=PromptedOutput(InterpretationResponse),
+            retries=max_retries,
+        )
+        self._synthesis_agent: Agent[None, SynthesisResponse] = Agent(
+            model=self._model,
+            output_type=PromptedOutput(SynthesisResponse),
+            retries=max_retries,
+        )
+        self._query_agent: Agent[None, QueryResponse] = Agent(
+            model=self._model,
+            output_type=PromptedOutput(QueryResponse),
+            retries=max_retries,
+        )
 
     async def generate_hypotheses(
         self,
@@ -69,21 +90,36 @@ class AnthropicClient:
             num_hypotheses: Target number of hypotheses.
 
         Returns:
-            List of generated hypotheses.
+            List of validated Hypothesis objects.
 
         Raises:
-            LLMError: If LLM call fails.
+            LLMError: If LLM call fails after retries.
         """
-        messages, system = self.prompt_manager.render_messages(
-            "hypothesis",
-            alert=alert,
-            schema_context=context.schema.to_prompt_string(),
-            lineage_context=context.lineage.to_prompt_string() if context.lineage else "",
-            num_hypotheses=num_hypotheses,
-        )
+        system_prompt = self._build_hypothesis_system_prompt(num_hypotheses)
+        user_prompt = self._build_hypothesis_user_prompt(alert, context)
 
-        response = await self._call_with_retry(messages, system)
-        return self._parse_hypotheses(response)
+        try:
+            result = await self._hypothesis_agent.run(
+                user_prompt,
+                instructions=system_prompt,
+            )
+
+            return [
+                Hypothesis(
+                    id=h.id,
+                    title=h.title,
+                    category=h.category,
+                    reasoning=h.reasoning,
+                    suggested_query=h.suggested_query,
+                )
+                for h in result.output.hypotheses
+            ]
+
+        except Exception as e:
+            raise LLMError(
+                f"Hypothesis generation failed: {e}",
+                retryable=False,
+            ) from e
 
     async def generate_query(
         self,
@@ -99,26 +135,31 @@ class AnthropicClient:
             previous_error: Error from previous attempt (for reflexion).
 
         Returns:
-            SQL query string.
+            Validated SQL query string.
 
         Raises:
-            LLMError: If LLM call fails.
+            LLMError: If query generation fails.
         """
-        # Use reflexion template if there was a previous error
-        template = "reflexion" if previous_error else "query"
+        if previous_error:
+            prompt = self._build_reflexion_prompt(hypothesis, previous_error)
+            system = self._build_reflexion_system_prompt(schema)
+        else:
+            prompt = self._build_query_prompt(hypothesis)
+            system = self._build_query_system_prompt(schema)
 
-        messages, system = self.prompt_manager.render_messages(
-            template,
-            hypothesis=hypothesis,
-            schema_context=schema.to_prompt_string(),
-            available_tables=schema.get_table_names(),
-            previous_error=previous_error,
-            previous_query=hypothesis.suggested_query if previous_error else None,
-            error_message=previous_error,
-        )
+        try:
+            result = await self._query_agent.run(
+                prompt,
+                instructions=system,
+            )
+            query: str = result.output.query
+            return query
 
-        response = await self._call_with_retry(messages, system)
-        return self._extract_sql(response)
+        except Exception as e:
+            raise LLMError(
+                f"Query generation failed: {e}",
+                retryable=True,
+            ) from e
 
     async def interpret_evidence(
         self,
@@ -134,30 +175,38 @@ class AnthropicClient:
             results: The query results.
 
         Returns:
-            Evidence with interpretation and confidence.
-
-        Raises:
-            LLMError: If LLM call fails.
+            Evidence with validated interpretation.
         """
-        messages, system = self.prompt_manager.render_messages(
-            "interpretation",
-            hypothesis=hypothesis,
-            query=query,
-            result={"row_count": results.row_count, "summary": results.to_summary()},
-        )
+        prompt = self._build_interpretation_prompt(hypothesis, query, results)
+        system = self._build_interpretation_system_prompt()
 
-        response = await self._call_with_retry(messages, system)
-        interpretation = self._parse_interpretation(response)
+        try:
+            result = await self._interpretation_agent.run(
+                prompt,
+                instructions=system,
+            )
 
-        return Evidence(
-            hypothesis_id=hypothesis.id,
-            query=query,
-            result_summary=results.to_summary(),
-            row_count=results.row_count,
-            supports_hypothesis=interpretation.get("supports_hypothesis"),
-            confidence=interpretation.get("confidence", 0.5),
-            interpretation=interpretation.get("interpretation", ""),
-        )
+            return Evidence(
+                hypothesis_id=hypothesis.id,
+                query=query,
+                result_summary=results.to_summary(),
+                row_count=results.row_count,
+                supports_hypothesis=result.output.supports_hypothesis,
+                confidence=result.output.confidence,
+                interpretation=result.output.interpretation,
+            )
+
+        except Exception as e:
+            # Return low-confidence evidence on failure rather than crashing
+            return Evidence(
+                hypothesis_id=hypothesis.id,
+                query=query,
+                result_summary=results.to_summary(),
+                row_count=results.row_count,
+                supports_hypothesis=None,
+                confidence=0.3,
+                interpretation=f"Interpretation failed: {e}",
+            )
 
     async def synthesize_findings(
         self,
@@ -171,218 +220,287 @@ class AnthropicClient:
             evidence: All collected evidence.
 
         Returns:
-            Finding with root cause and recommendations.
+            Finding with validated root cause and recommendations.
 
         Raises:
-            LLMError: If LLM call fails.
+            LLMError: If synthesis fails.
         """
-        # Format evidence for the prompt
-        evidence_data = [
-            {
-                "hypothesis_id": e.hypothesis_id,
-                "query": e.query,
-                "interpretation": e.interpretation,
-                "confidence": e.confidence,
-                "supports_hypothesis": e.supports_hypothesis,
-            }
-            for e in evidence
-        ]
+        prompt = self._build_synthesis_prompt(alert, evidence)
+        system = self._build_synthesis_system_prompt()
 
-        messages, system = self.prompt_manager.render_messages(
-            "synthesis",
-            alert=alert,
-            evidence=evidence_data,
-        )
+        try:
+            result = await self._synthesis_agent.run(
+                prompt,
+                instructions=system,
+            )
 
-        response = await self._call_with_retry(messages, system)
-        synthesis = self._parse_synthesis(response)
+            return Finding(
+                investigation_id="",  # Set by orchestrator
+                status="completed" if result.output.root_cause else "inconclusive",
+                root_cause=result.output.root_cause,
+                confidence=result.output.confidence,
+                evidence=evidence,
+                recommendations=result.output.recommendations,
+                duration_seconds=0.0,  # Set by orchestrator
+            )
 
-        return Finding(
-            investigation_id="",  # Will be set by orchestrator
-            status="completed" if synthesis.get("root_cause") else "inconclusive",
-            root_cause=synthesis.get("root_cause"),
-            confidence=synthesis.get("confidence", 0.0),
-            evidence=evidence,
-            recommendations=synthesis.get("recommendations", []),
-            duration_seconds=0.0,  # Will be set by orchestrator
-        )
+        except Exception as e:
+            raise LLMError(
+                f"Synthesis failed: {e}",
+                retryable=False,
+            ) from e
 
-    async def _call_with_retry(
+    # -------------------------------------------------------------------------
+    # Prompt Building Methods
+    # -------------------------------------------------------------------------
+
+    def _build_metric_context(self, alert: AnomalyAlert) -> str:
+        """Build context string based on metric_spec type.
+
+        This is the key win from structured MetricSpec - different prompt
+        framing based on what kind of metric we're investigating.
+        """
+        spec = alert.metric_spec
+
+        if spec.metric_type == "column":
+            return f"""The anomaly is on column `{spec.expression}` in table `{alert.dataset_id}`.
+Investigate why this column's {alert.anomaly_type} changed.
+Focus on: NULL introduction, upstream joins, filtering changes, application bugs.
+All hypotheses MUST focus on the `{spec.expression}` column specifically."""
+
+        elif spec.metric_type == "sql_expression":
+            cols = ", ".join(spec.columns_referenced) if spec.columns_referenced else "unknown"
+            return f"""The anomaly is on a computed metric: {spec.expression}
+This expression references columns: {cols}
+Investigate why this calculation's result changed.
+Focus on: input column changes, expression logic errors, upstream data shifts."""
+
+        elif spec.metric_type == "dbt_metric":
+            url_info = f"\nDefinition: {spec.source_url}" if spec.source_url else ""
+            return f"""The anomaly is on dbt metric `{spec.expression}`.{url_info}
+Investigate the metric's upstream models and their data quality.
+Focus on: upstream model failures, source data changes, metric definition issues."""
+
+        else:  # description
+            return f"""The anomaly is described as: {spec.expression}
+This is a free-text description. Infer which columns/tables are involved
+from the schema and investigate accordingly.
+Focus on: matching the description to actual schema elements."""
+
+    def _build_hypothesis_system_prompt(self, num_hypotheses: int) -> str:
+        """Build system prompt for hypothesis generation."""
+        return f"""You are a data quality investigator. Given an anomaly alert and database context,
+generate {num_hypotheses} hypotheses about what could have caused the anomaly.
+
+CRITICAL: Pay close attention to the METRIC NAME in the alert:
+- "null_count": Investigate what causes NULL values (app bugs, missing required fields, ETL drops)
+- "row_count" or "volume": Investigate missing/extra records (filtering bugs, data loss, duplicates)
+- "duplicate_count": Investigate what causes duplicate records
+- Other metrics: Investigate value changes, data corruption, calculation errors
+
+HYPOTHESIS CATEGORIES:
+- upstream_dependency: Source table missing data, late arrival, schema change
+- transformation_bug: ETL logic error, incorrect aggregation, wrong join
+- data_quality: Nulls, duplicates, invalid values, schema drift
+- infrastructure: Job failure, timeout, resource exhaustion
+- expected_variance: Seasonality, holiday, known business event
+
+Each hypothesis MUST:
+1. DIRECTLY address the specific metric in the alert (e.g., if null_count, focus on NULL causes)
+2. Have a clear, specific title (10-200 characters)
+3. Include reasoning for why this could be the cause (at least 20 characters)
+4. Suggest a SQL query to investigate using ONLY provided schema tables
+5. Include LIMIT clause in all queries
+6. Use only SELECT statements (no mutations)
+
+Generate diverse hypotheses covering multiple categories when plausible."""
+
+    def _build_hypothesis_user_prompt(
         self,
-        messages: list[dict[str, str]],
-        system: str,
-        max_retries: int = 3,
+        alert: AnomalyAlert,
+        context: InvestigationContext,
     ) -> str:
-        """Call LLM with exponential backoff on rate limits.
+        """Build user prompt for hypothesis generation."""
+        lineage_section = ""
+        if context.lineage:
+            lineage_section = f"""
+## Data Lineage
+{context.lineage.to_prompt_string()}
+"""
 
-        Args:
-            messages: Messages to send.
-            system: System prompt.
-            max_retries: Maximum retry attempts.
+        # Build structured context based on metric type
+        metric_context = self._build_metric_context(alert)
 
-        Returns:
-            Response text.
+        return f"""## Anomaly Alert
+- Dataset: {alert.dataset_id}
+- Metric: {alert.metric_spec.display_name}
+- Anomaly Type: {alert.anomaly_type}
+- Expected: {alert.expected_value}
+- Actual: {alert.actual_value}
+- Deviation: {alert.deviation_pct}%
+- Anomaly Date: {alert.anomaly_date}
+- Severity: {alert.severity}
 
-        Raises:
-            LLMError: If all retries fail.
-        """
-        for attempt in range(max_retries):
-            try:
-                response = await self.client.messages.create(
-                    model=self.model,
-                    max_tokens=4096,
-                    system=system,
-                    messages=cast(list[MessageParam], messages),
-                )
-                block = response.content[0]
-                if hasattr(block, "text"):
-                    return block.text
-                return ""
-            except anthropic.RateLimitError as e:
-                if attempt < max_retries - 1:
-                    await asyncio.sleep(2**attempt)
-                else:
-                    raise LLMError("Rate limit exceeded after retries", retryable=True) from e
-            except anthropic.APIError as e:
-                raise LLMError(f"API error: {e}", retryable=True) from e
-            except Exception as e:
-                raise LLMError(f"LLM call failed: {e}", retryable=False) from e
+## What To Investigate
+{metric_context}
 
-        # This should not be reached, but satisfy type checker
-        raise LLMError("Max retries exceeded", retryable=True)
+## Available Schema
+{context.schema.to_prompt_string()}
+{lineage_section}
+Generate hypotheses to investigate why {alert.metric_spec.display_name} deviated
+from {alert.expected_value} to {alert.actual_value} ({alert.deviation_pct}% change)."""
 
-    def _parse_hypotheses(self, response: str) -> list[Hypothesis]:
-        """Parse hypothesis JSON from LLM response.
+    def _build_query_system_prompt(self, schema: SchemaResponse) -> str:
+        """Build system prompt for query generation."""
+        return f"""You are a SQL expert generating investigative queries.
 
-        Args:
-            response: LLM response text.
+CRITICAL RULES:
+1. Use ONLY tables from the schema: {schema.get_table_names()}
+2. Use ONLY columns that exist in those tables
+3. SELECT queries ONLY - no mutations
+4. Always include LIMIT clause (max 10000)
+5. Use fully qualified table names (schema.table)
 
-        Returns:
-            List of parsed Hypothesis objects.
+SCHEMA:
+{schema.to_prompt_string()}"""
 
-        Raises:
-            LLMError: If parsing fails.
-        """
-        try:
-            # Extract JSON from response (may be wrapped in markdown)
-            json_match = re.search(r"```json\s*(.*?)\s*```", response, re.DOTALL)
-            if json_match:
-                json_str = json_match.group(1)
-            else:
-                # Try to find raw JSON array
-                json_match = re.search(r"\[.*\]", response, re.DOTALL)
-                if json_match:
-                    json_str = json_match.group(0)
-                else:
-                    raise LLMError("No JSON found in response", retryable=False)
+    def _build_query_prompt(self, hypothesis: Hypothesis) -> str:
+        """Build user prompt for query generation."""
+        return f"""Generate a SQL query to test this hypothesis:
 
-            data = json.loads(json_str)
+Hypothesis: {hypothesis.title}
+Category: {hypothesis.category.value}
+Reasoning: {hypothesis.reasoning}
 
-            hypotheses = []
-            for item in data:
-                # Map category string to enum
-                category_str = item.get("category", "data_quality")
-                try:
-                    category = HypothesisCategory(category_str)
-                except ValueError:
-                    category = HypothesisCategory.DATA_QUALITY
+Generate a query that would confirm or refute this hypothesis."""
 
-                hypotheses.append(
-                    Hypothesis(
-                        id=item.get("id", f"h{uuid.uuid4().hex[:8]}"),
-                        title=item.get("title", "Unknown"),
-                        category=category,
-                        reasoning=item.get("reasoning", ""),
-                        suggested_query=item.get("suggested_query", ""),
-                    )
-                )
+    def _build_reflexion_system_prompt(self, schema: SchemaResponse) -> str:
+        """Build system prompt for reflexion (query correction)."""
+        return f"""You are debugging a failed SQL query. Analyze the error and fix the query.
 
-            return hypotheses
+AVAILABLE SCHEMA:
+{schema.to_prompt_string()}
 
-        except json.JSONDecodeError as e:
-            raise LLMError(f"Failed to parse hypotheses JSON: {e}", retryable=False) from e
+COMMON FIXES:
+- "column does not exist": Check column name spelling, use correct table
+- "relation does not exist": Use fully qualified name (schema.table)
+- "type mismatch": Cast values appropriately
+- "syntax error": Check SQL syntax for the target database
 
-    def _extract_sql(self, response: str) -> str:
-        """Extract SQL query from LLM response.
+CRITICAL: Only use tables and columns from the schema above."""
 
-        Args:
-            response: LLM response text.
+    def _build_reflexion_prompt(
+        self,
+        hypothesis: Hypothesis,
+        previous_error: str,
+    ) -> str:
+        """Build user prompt for reflexion."""
+        return f"""The previous query failed. Generate a corrected version.
 
-        Returns:
-            SQL query string.
-        """
-        # Look for SQL in code blocks
-        sql_match = re.search(r"```sql\s*(.*?)\s*```", response, re.DOTALL | re.IGNORECASE)
-        if sql_match:
-            return sql_match.group(1).strip()
+ORIGINAL QUERY:
+{hypothesis.suggested_query}
 
-        # Look for any code block
-        code_match = re.search(r"```\s*(.*?)\s*```", response, re.DOTALL)
-        if code_match:
-            return code_match.group(1).strip()
+ERROR MESSAGE:
+{previous_error}
 
-        # Return the whole response if no code block found
-        # (LLM was asked to return only SQL)
-        return response.strip()
+HYPOTHESIS BEING TESTED:
+{hypothesis.title}
 
-    def _parse_interpretation(self, response: str) -> dict[str, Any]:
-        """Parse interpretation JSON from LLM response.
+Generate a corrected SQL query that avoids this error."""
 
-        Args:
-            response: LLM response text.
+    def _build_interpretation_system_prompt(self) -> str:
+        """Build system prompt for evidence interpretation."""
+        return """You are analyzing query results to determine if they support a hypothesis.
 
-        Returns:
-            Dictionary with interpretation data.
-        """
-        try:
-            json_match = re.search(r"```json\s*(.*?)\s*```", response, re.DOTALL)
-            if json_match:
-                result: dict[str, Any] = json.loads(json_match.group(1))
-                return result
+CRITICAL - Understanding "supports hypothesis":
+- If investigating NULLs and query FINDS NULLs → supports=true (we found the problem)
+- If investigating NULLs and query finds NO NULLs → supports=false (not the cause)
+- "Supports" means evidence helps explain the anomaly, NOT that the situation is good
 
-            # Try raw JSON
-            json_match = re.search(r"\{.*\}", response, re.DOTALL)
-            if json_match:
-                result = json.loads(json_match.group(0))
-                return result
+Example: Investigating "null_count spike in user_id"
+- Query finds 485 rows with NULL user_id → supports=true (this IS the problem we're investigating)
+- Query finds 0 rows with NULL user_id → supports=false (not the cause)
 
-        except json.JSONDecodeError:
-            pass
+Provide:
+1. Whether evidence supports (true), refutes (false), or is inconclusive (null)
+2. Confidence score from 0.0 to 1.0
+3. Brief interpretation explaining your assessment (at least 20 characters)
+4. Key findings as bullet points (max 5)
 
-        # Default interpretation
-        return {
-            "supports_hypothesis": None,
-            "confidence": 0.5,
-            "interpretation": response,
-        }
+Be objective and base your assessment solely on the data returned."""
 
-    def _parse_synthesis(self, response: str) -> dict[str, Any]:
-        """Parse synthesis JSON from LLM response.
+    def _build_interpretation_prompt(
+        self,
+        hypothesis: Hypothesis,
+        query: str,
+        results: QueryResult,
+    ) -> str:
+        """Build user prompt for interpretation."""
+        return f"""HYPOTHESIS: {hypothesis.title}
+REASONING: {hypothesis.reasoning}
 
-        Args:
-            response: LLM response text.
+QUERY EXECUTED:
+{query}
 
-        Returns:
-            Dictionary with synthesis data.
-        """
-        try:
-            json_match = re.search(r"```json\s*(.*?)\s*```", response, re.DOTALL)
-            if json_match:
-                result: dict[str, Any] = json.loads(json_match.group(1))
-                return result
+RESULTS ({results.row_count} rows):
+{results.to_summary()}
 
-            # Try raw JSON
-            json_match = re.search(r"\{.*\}", response, re.DOTALL)
-            if json_match:
-                result = json.loads(json_match.group(0))
-                return result
+Analyze whether these results support or refute the hypothesis."""
 
-        except json.JSONDecodeError:
-            pass
+    def _build_synthesis_system_prompt(self) -> str:
+        """Build system prompt for synthesis."""
+        return """You are synthesizing investigation findings to determine root cause.
 
-        # Default synthesis
-        return {
-            "root_cause": None,
-            "confidence": 0.0,
-            "recommendations": ["Unable to determine root cause"],
-        }
+CRITICAL: Your root cause MUST directly explain the specific metric anomaly.
+- If the anomaly is "null_count", root cause must explain what caused NULL values
+- If the anomaly is "row_count", root cause must explain missing/extra records
+- Do NOT suggest unrelated issues as root cause
+
+Review all evidence and determine:
+1. The most likely root cause that DIRECTLY explains the metric anomaly (be specific, at least
+   20 characters, or null if inconclusive)
+2. Confidence level (0.0-1.0)
+3. Key supporting evidence
+4. Recommended actions (1-5 actionable items)
+
+CONFIDENCE GUIDELINES:
+- 0.9+: Strong evidence with clear causation linking to the specific metric
+- 0.7-0.9: Good evidence, likely correct
+- 0.5-0.7: Some evidence, but uncertain
+- <0.5: Weak evidence, inconclusive (set root_cause to null)"""
+
+    def _build_synthesis_prompt(
+        self,
+        alert: AnomalyAlert,
+        evidence: list[Evidence],
+    ) -> str:
+        """Build user prompt for synthesis."""
+        evidence_text = "\n\n".join(
+            [
+                f"""### Hypothesis: {e.hypothesis_id}
+- Query: {e.query[:200]}...
+- Interpretation: {e.interpretation}
+- Confidence: {e.confidence}
+- Supports hypothesis: {e.supports_hypothesis}"""
+                for e in evidence
+            ]
+        )
+
+        # Include metric context for synthesis
+        metric_context = self._build_metric_context(alert)
+
+        return f"""## Original Anomaly
+- Dataset: {alert.dataset_id}
+- Metric: {alert.metric_spec.display_name} deviated by {alert.deviation_pct}%
+- Anomaly Type: {alert.anomaly_type}
+- Expected: {alert.expected_value}
+- Actual: {alert.actual_value}
+- Date: {alert.anomaly_date}
+
+## What Was Investigated
+{metric_context}
+
+## Investigation Findings
+{evidence_text}
+
+Synthesize these findings into a root cause determination."""

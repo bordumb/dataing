@@ -6,17 +6,28 @@
  * OpenAPI spec version: 2.0.0
  */
 import type { CreateInvestigationRequestMetadata } from "./createInvestigationRequestMetadata";
+import type { MetricSpecRequest } from "./metricSpecRequest";
+import type { CreateInvestigationRequestSourceAlertId } from "./createInvestigationRequestSourceAlertId";
+import type { CreateInvestigationRequestSourceSystem } from "./createInvestigationRequestSourceSystem";
+import type { CreateInvestigationRequestSourceUrl } from "./createInvestigationRequestSourceUrl";
 
 /**
  * Request body for creating an investigation.
+
+This API performs ROOT CAUSE ANALYSIS, not anomaly detection.
+The upstream anomaly detector must provide structured metric_spec.
  */
 export interface CreateInvestigationRequest {
   actual_value: number;
   anomaly_date: string;
+  anomaly_type: string;
   dataset_id: string;
   deviation_pct: number;
   expected_value: number;
   metadata?: CreateInvestigationRequestMetadata;
-  metric_name: string;
+  metric_spec: MetricSpecRequest;
   severity?: string;
+  source_alert_id?: CreateInvestigationRequestSourceAlertId;
+  source_system?: CreateInvestigationRequestSourceSystem;
+  source_url?: CreateInvestigationRequestSourceUrl;
 }

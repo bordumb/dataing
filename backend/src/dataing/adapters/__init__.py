@@ -19,12 +19,10 @@ from .lineage import (
     get_lineage_registry,
 )
 from .llm.client import AnthropicClient
-from .llm.prompt_manager import PromptManager
 
 __all__ = [
     # LLM adapters
     "AnthropicClient",
-    "PromptManager",
     # Context adapters
     "DefaultContextEngine",
     # Lineage adapters

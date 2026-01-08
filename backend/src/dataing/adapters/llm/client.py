@@ -305,13 +305,25 @@ HYPOTHESIS CATEGORIES:
 - infrastructure: Job failure, timeout, resource exhaustion
 - expected_variance: Seasonality, holiday, known business event
 
-Each hypothesis MUST:
-1. DIRECTLY address the specific metric in the alert (e.g., if null_count, focus on NULL causes)
-2. Have a clear, specific title (10-200 characters)
-3. Include reasoning for why this could be the cause (at least 20 characters)
-4. Suggest a SQL query to investigate using ONLY provided schema tables
-5. Include LIMIT clause in all queries
-6. Use only SELECT statements (no mutations)
+REQUIRED FIELDS FOR EACH HYPOTHESIS:
+
+1. id: Unique identifier like 'h1', 'h2', etc.
+2. title: Short, specific title describing the potential cause (10-200 chars)
+3. category: One of the categories listed above
+4. reasoning: Why this could be the cause (20+ chars)
+5. suggested_query: SQL query to investigate (must include LIMIT, SELECT only)
+6. expected_if_true: What query results would CONFIRM this hypothesis
+   - Be specific about counts, patterns, or values you expect to see
+   - Example: "Multiple rows with NULL user_id clustered after 03:00 UTC"
+   - Example: "Row count drops >50% compared to previous day"
+7. expected_if_false: What query results would REFUTE this hypothesis
+   - Example: "Zero NULL user_ids, or NULLs evenly distributed across all times"
+   - Example: "Row count consistent with historical average"
+
+TESTABILITY IS CRITICAL:
+- A good hypothesis is FALSIFIABLE - the query can definitively prove it wrong
+- The expected_if_true and expected_if_false should be mutually exclusive
+- Avoid vague expectations like "some issues found" or "data looks wrong"
 
 Generate diverse hypotheses covering multiple categories when plausible."""
 
@@ -413,19 +425,28 @@ Generate a corrected SQL query that avoids this error."""
         return """You are analyzing query results to determine if they support a hypothesis.
 
 CRITICAL - Understanding "supports hypothesis":
-- If investigating NULLs and query FINDS NULLs → supports=true (we found the problem)
-- If investigating NULLs and query finds NO NULLs → supports=false (not the cause)
+- If investigating NULLs and query FINDS NULLs -> supports=true (we found the problem)
+- If investigating NULLs and query finds NO NULLs -> supports=false (not the cause)
 - "Supports" means evidence helps explain the anomaly, NOT that the situation is good
 
 Example: Investigating "null_count spike in user_id"
-- Query finds 485 rows with NULL user_id → supports=true (this IS the problem we're investigating)
-- Query finds 0 rows with NULL user_id → supports=false (not the cause)
+- Query finds 485 rows with NULL user_id -> supports=true (this IS the problem we're investigating)
+- Query finds 0 rows with NULL user_id -> supports=false (not the cause)
 
-Provide:
-1. Whether evidence supports (true), refutes (false), or is inconclusive (null)
-2. Confidence score from 0.0 to 1.0
-3. Brief interpretation explaining your assessment (at least 20 characters)
-4. Key findings as bullet points (max 5)
+REQUIRED FIELDS:
+1. supports_hypothesis: True if evidence supports, False if refutes, None if inconclusive
+2. confidence: Score from 0.0 to 1.0
+3. interpretation: What the results reveal about the ROOT CAUSE, not just the symptom
+   - BAD: "Found 485 NULL user_ids" (just describes symptom)
+   - GOOD: "485 NULL user_ids appearing after 03:14 UTC suggests upstream users ETL stopped"
+4. causal_chain: The cause-and-effect explanation connecting upstream cause to observation
+   - REQUIRED: Explain WHAT upstream change led to this observation
+   - Example: "users ETL stopped at 03:14 -> stale users table -> orders JOIN produces NULLs"
+   - NOT: "NULL values found" (this is just restating the symptom)
+5. key_findings: Specific findings with data points (counts, timestamps, table names)
+6. next_investigation_step: If inconclusive, what query or check would determine root cause?
+   - Example: "Query logs table for users ETL job status between 03:00-04:00 UTC"
+   - Only needed when supports_hypothesis is None
 
 Be objective and base your assessment solely on the data returned."""
 
@@ -456,18 +477,38 @@ CRITICAL: Your root cause MUST directly explain the specific metric anomaly.
 - If the anomaly is "row_count", root cause must explain missing/extra records
 - Do NOT suggest unrelated issues as root cause
 
-Review all evidence and determine:
-1. The most likely root cause that DIRECTLY explains the metric anomaly (be specific, at least
-   20 characters, or null if inconclusive)
-2. Confidence level (0.0-1.0)
-3. Key supporting evidence
-4. Recommended actions (1-5 actionable items)
+REQUIRED FIELDS:
 
-CONFIDENCE GUIDELINES:
-- 0.9+: Strong evidence with clear causation linking to the specific metric
-- 0.7-0.9: Good evidence, likely correct
-- 0.5-0.7: Some evidence, but uncertain
-- <0.5: Weak evidence, inconclusive (set root_cause to null)"""
+1. root_cause: The UPSTREAM cause, not the symptom (20+ chars, or null if inconclusive)
+   - BAD: "NULL user_ids in orders table" (this is the symptom)
+   - GOOD: "users ETL job timed out at 03:14 UTC due to API rate limiting"
+
+2. confidence: Score from 0.0 to 1.0
+   - 0.9+: Strong evidence with clear causation
+   - 0.7-0.9: Good evidence, likely correct
+   - 0.5-0.7: Some evidence, but uncertain
+   - <0.5: Weak evidence, inconclusive (set root_cause to null)
+
+3. causal_chain: Step-by-step list from root cause to observed symptom (2-6 steps)
+   - Example: ["API rate limit hit", "users ETL job timeout", "users table stale after 03:14",
+     "orders JOIN produces NULLs", "null_count metric spikes"]
+   - Each step must logically lead to the next
+
+4. estimated_onset: When the issue started (timestamp or relative time)
+   - Example: "03:14 UTC" or "approximately 6 hours ago" or "since 2024-01-15 batch"
+   - Use evidence timestamps to determine this
+
+5. affected_scope: Blast radius - what else is affected?
+   - Example: "orders table, downstream_report_daily, customer_analytics dashboard"
+   - Consider downstream tables, reports, and consumers
+
+6. supporting_evidence: Specific evidence with data points (1-10 items)
+
+7. recommendations: Actionable items with specific targets (1-5 items)
+   - BAD: "Investigate the issue" or "Fix the data" (too vague)
+   - GOOD: "Re-run stg_users job: airflow trigger_dag stg_users --backfill 2024-01-15"
+   - GOOD: "Add NULL check constraint to orders.user_id column"
+   - GOOD: "Contact data-platform team to increase API rate limits for users sync"""
 
     def _build_synthesis_prompt(
         self,

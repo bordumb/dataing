@@ -22,6 +22,7 @@ from uuid import UUID
 import structlog
 
 from dataing.adapters.investigation_feedback import EventType
+from dataing.adapters.llm.response_models import InterpretationResponse, SynthesisResponse
 
 from .domain_types import Evidence, Finding, Hypothesis, InvestigationContext
 from .exceptions import CircuitBreakerTripped, SchemaDiscoveryError
@@ -29,9 +30,11 @@ from .state import Event, InvestigationState
 
 if TYPE_CHECKING:
     from dataing.adapters.datasource.sql.base import SQLAdapter
+    from dataing.adapters.training.repository import TrainingSignalRepository
 
     from ..safety.circuit_breaker import CircuitBreaker
     from .interfaces import ContextEngine, InvestigationFeedbackEmitter, LLMClient
+    from .quality.protocol import QualityValidator
 
 logger = structlog.get_logger()
 
@@ -46,6 +49,9 @@ class OrchestratorConfig:
         max_retries_per_hypothesis: Maximum retry attempts per hypothesis.
         query_timeout_seconds: Timeout for individual queries.
         high_confidence_threshold: Stop early if confidence exceeds this.
+        validation_enabled: Whether to validate LLM outputs.
+        validation_pass_threshold: Minimum score to pass validation.
+        validation_max_retries: Maximum retries on validation failure.
     """
 
     max_hypotheses: int = 5
@@ -53,6 +59,9 @@ class OrchestratorConfig:
     max_retries_per_hypothesis: int = 2
     query_timeout_seconds: int = 30
     high_confidence_threshold: float = 0.85
+    validation_enabled: bool = True
+    validation_pass_threshold: float = 0.6
+    validation_max_retries: int = 2
 
 
 class InvestigationOrchestrator:
@@ -72,6 +81,8 @@ class InvestigationOrchestrator:
         circuit_breaker: CircuitBreaker,
         config: OrchestratorConfig | None = None,
         feedback: InvestigationFeedbackEmitter | None = None,
+        validator: QualityValidator | None = None,
+        training_repo: TrainingSignalRepository | None = None,
     ) -> None:
         """Initialize the orchestrator.
 
@@ -83,6 +94,8 @@ class InvestigationOrchestrator:
             circuit_breaker: Safety circuit breaker.
             config: Optional orchestrator configuration.
             feedback: Optional feedback emitter for event logging.
+            validator: Optional quality validator for LLM outputs.
+            training_repo: Optional repository for training signal capture.
         """
         self.db = db
         self.llm = llm
@@ -90,6 +103,8 @@ class InvestigationOrchestrator:
         self.circuit_breaker = circuit_breaker
         self.config = config or OrchestratorConfig()
         self.feedback = feedback
+        self.validator = validator
+        self.training_repo = training_repo
         # Will be set per-investigation when using tenant data source
         self._current_adapter: SQLAdapter | None = None
 
@@ -418,6 +433,11 @@ class InvestigationOrchestrator:
 
                 # Interpret results
                 ev = await self.llm.interpret_evidence(hypothesis, query, result)
+
+                # Validate interpretation if enabled
+                if self.config.validation_enabled and self.validator:
+                    ev = await self._validate_interpretation(ev, hypothesis, query, state)
+
                 evidence.append(ev)
 
                 log.info(
@@ -462,6 +482,73 @@ class InvestigationOrchestrator:
 
         return evidence
 
+    async def _validate_interpretation(
+        self,
+        evidence: Evidence,
+        hypothesis: Hypothesis,
+        query: str,
+        state: InvestigationState,
+    ) -> Evidence:
+        """Validate interpretation quality and capture training signal.
+
+        Args:
+            evidence: The evidence to validate.
+            hypothesis: The hypothesis being tested.
+            query: The SQL query that was executed.
+            state: Current investigation state.
+
+        Returns:
+            The original evidence (validation doesn't modify it).
+        """
+        assert self.validator is not None
+
+        # Construct InterpretationResponse from Evidence for validation
+        # Note: Some fields are approximated since Evidence doesn't store all response fields
+        interpretation_response = InterpretationResponse(
+            supports_hypothesis=evidence.supports_hypothesis,
+            confidence=evidence.confidence,
+            interpretation=evidence.interpretation,
+            # Use interpretation as causal_chain since Evidence doesn't store it separately
+            causal_chain=evidence.interpretation[:100] if evidence.interpretation else "",
+            # Extract key findings from interpretation
+            key_findings=[evidence.interpretation[:200]] if evidence.interpretation else ["N/A"],
+            next_investigation_step=None,
+        )
+
+        try:
+            validation_result = await self.validator.validate_interpretation(
+                response=interpretation_response,
+                hypothesis_title=hypothesis.title,
+                query=query,
+            )
+
+            logger.info(
+                f"interpretation_validated passed={validation_result.passed} "
+                f"composite={validation_result.assessment.composite_score:.2f}"
+            )
+
+            # Capture training signal if repository is available
+            if self.training_repo:
+                await self.training_repo.record_signal(
+                    signal_type="interpretation",
+                    tenant_id=state.tenant_id,
+                    investigation_id=UUID(state.id),
+                    input_context={
+                        "hypothesis_title": hypothesis.title,
+                        "hypothesis_reasoning": hypothesis.reasoning,
+                        "query": query,
+                    },
+                    output_response=interpretation_response.model_dump(),
+                    automated_score=validation_result.assessment.composite_score,
+                    automated_dimensions=validation_result.training_signals,
+                )
+
+        except Exception as e:
+            # Log but don't fail the investigation on validation errors
+            logger.warning(f"interpretation_validation_failed error={e}")
+
+        return evidence
+
     async def _synthesize(
         self,
         state: InvestigationState,
@@ -495,6 +582,10 @@ class InvestigationOrchestrator:
             duration_seconds=duration,
         )
 
+        # Validate synthesis if enabled
+        if self.config.validation_enabled and self.validator:
+            await self._validate_synthesis(finding, state)
+
         state.append_event(
             Event(
                 type="synthesis_completed",
@@ -504,3 +595,76 @@ class InvestigationOrchestrator:
         )
 
         return finding
+
+    async def _validate_synthesis(
+        self,
+        finding: Finding,
+        state: InvestigationState,
+    ) -> None:
+        """Validate synthesis quality and capture training signal.
+
+        Args:
+            finding: The finding to validate.
+            state: Current investigation state.
+        """
+        assert self.validator is not None
+
+        # Construct SynthesisResponse from Finding for validation
+        # Note: Some fields are approximated since Finding doesn't store all response fields
+        synthesis_response = SynthesisResponse(
+            root_cause=finding.root_cause,
+            confidence=finding.confidence,
+            # Approximate causal_chain from root_cause
+            causal_chain=(
+                [finding.root_cause, "observed anomaly"]
+                if finding.root_cause
+                else ["unknown cause", "observed anomaly"]
+            ),
+            # Approximate onset from alert date
+            estimated_onset=state.alert.anomaly_date,
+            # Approximate scope from dataset
+            affected_scope=f"Table: {state.alert.dataset_id}",
+            # Use evidence interpretations as supporting evidence
+            supporting_evidence=[
+                ev.interpretation[:200] for ev in finding.evidence if ev.interpretation
+            ]
+            or ["No supporting evidence captured"],
+            recommendations=finding.recommendations,
+        )
+
+        # Build alert summary for validation
+        alert_summary = (
+            f"{state.alert.metric_spec.display_name} anomaly in {state.alert.dataset_id}: "
+            f"expected {state.alert.expected_value}, actual {state.alert.actual_value} "
+            f"({state.alert.deviation_pct}% deviation)"
+        )
+
+        try:
+            validation_result = await self.validator.validate_synthesis(
+                response=synthesis_response,
+                alert_summary=alert_summary,
+            )
+
+            logger.info(
+                f"synthesis_validated passed={validation_result.passed} "
+                f"composite={validation_result.assessment.composite_score:.2f}"
+            )
+
+            # Capture training signal if repository is available
+            if self.training_repo:
+                await self.training_repo.record_signal(
+                    signal_type="synthesis",
+                    tenant_id=state.tenant_id,
+                    investigation_id=UUID(state.id),
+                    input_context={
+                        "alert_summary": alert_summary,
+                        "evidence_count": len(finding.evidence),
+                    },
+                    output_response=synthesis_response.model_dump(),
+                    automated_score=validation_result.assessment.composite_score,
+                    automated_dimensions=validation_result.training_signals,
+                )
+
+        except Exception as e:
+            # Log but don't fail the investigation on validation errors
+            logger.warning(f"synthesis_validation_failed error={e}")

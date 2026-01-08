@@ -1,7 +1,7 @@
 {
   "name": "schema_drift",
   "description": "New product import job inserts price as string with currency",
-  "created_at": "2026-01-06T22:59:47.367070Z",
+  "created_at": "2026-01-08T02:45:09.097635Z",
   "simulation_period": {
     "start": "2026-01-08",
     "end": "2026-01-14"
@@ -20,15 +20,15 @@
       "file": "users.parquet"
     },
     "orders": {
-      "row_count": 3032,
+      "row_count": 3014,
       "file": "orders.parquet"
     },
     "order_items": {
-      "row_count": 4600,
+      "row_count": 4565,
       "file": "order_items.parquet"
     },
     "events": {
-      "row_count": 277617,
+      "row_count": 279514,
       "file": "events.parquet"
     }
   },
@@ -47,7 +47,7 @@
     }
   ],
   "ground_truth": {
-    "string_price_count": 131,
+    "string_price_count": 148,
     "total_products": 500
   }
 }

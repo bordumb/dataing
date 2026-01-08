@@ -73,7 +73,13 @@ export function NewInvestigation() {
     try {
       const result = await createInvestigation.mutateAsync({
         dataset_id: primaryDataset.identifier,
-        metric_name: formData.metric_name,
+        metric_spec: {
+          metric_type: 'column',
+          expression: formData.metric_name,
+          display_name: formData.metric_name,
+          columns_referenced: [],
+        },
+        anomaly_type: formData.metric_name, // e.g., "null_rate", "row_count"
         expected_value: parseFloat(formData.expected_value),
         actual_value: parseFloat(formData.actual_value),
         deviation_pct: parseFloat(formData.deviation_pct),

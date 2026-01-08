@@ -33,6 +33,14 @@ class HypothesisResponse(BaseModel):
     suggested_query: str = Field(
         description="SQL query to investigate this hypothesis. Must include LIMIT clause.",
     )
+    expected_if_true: str = Field(
+        description="What results we expect if this hypothesis is correct",
+        min_length=10,
+    )
+    expected_if_false: str = Field(
+        description="What results we expect if this hypothesis is wrong",
+        min_length=10,
+    )
 
     @field_validator("suggested_query")
     @classmethod
@@ -148,22 +156,52 @@ class InterpretationResponse(BaseModel):
 
 
 class SynthesisResponse(BaseModel):
-    """Final synthesis of all evidence into a finding."""
+    """Final synthesis of investigation findings.
+
+    Requires structured causal chain and impact assessment,
+    not just a root cause string.
+    """
 
     root_cause: str | None = Field(
-        description="Concise description of the root cause, or null if inconclusive"
+        description=(
+            "The UPSTREAM cause, not the symptom. Must explain WHY. "
+            "Example: 'users ETL job timed out at 03:14 UTC due to API rate limiting' "
+            "NOT: 'NULL user_ids in orders table'"
+        )
     )
     confidence: float = Field(
         ge=0.0,
         le=1.0,
-        description="Confidence in the root cause determination",
+        description="Confidence in root cause (0.9+=certain, 0.7-0.9=likely, <0.7=uncertain)",
+    )
+    causal_chain: list[str] = Field(
+        description=(
+            "Step-by-step from root cause to observed symptom. "
+            "Example: ['API rate limit hit', 'users ETL job timeout', "
+            "'users table stale after 03:14', 'orders JOIN produces NULLs']"
+        ),
+        min_length=2,
+        max_length=6,
+    )
+    estimated_onset: str = Field(
+        description="When the issue started (timestamp or relative time, e.g., '03:14 UTC')",
+        min_length=5,
+    )
+    affected_scope: str = Field(
+        description="Blast radius: what else is affected? (downstream tables, reports, consumers)",
+        min_length=10,
     )
     supporting_evidence: list[str] = Field(
-        description="Key evidence points that support this conclusion",
+        description="Specific evidence with data points that supports this conclusion",
+        min_length=1,
         max_length=10,
     )
     recommendations: list[str] = Field(
-        description="Actionable recommendations to fix or prevent the issue",
+        description=(
+            "Actionable recommendations with specific targets. "
+            "Example: 'Re-run stg_users job: airflow trigger_dag stg_users --backfill' "
+            "NOT: 'Investigate the issue'"
+        ),
         min_length=1,
         max_length=5,
     )

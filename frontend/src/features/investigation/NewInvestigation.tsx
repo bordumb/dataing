@@ -303,7 +303,22 @@ export function NewInvestigation() {
 
                 {createInvestigation.error && (
                   <div className="rounded-md bg-destructive/10 p-3 text-sm text-destructive">
-                    Error: {createInvestigation.error.message}
+                    <p className="font-medium">Error:</p>
+                    {(() => {
+                      const err = createInvestigation.error as { detail?: Array<{ loc: string[]; msg: string }> }
+                      if (err.detail && Array.isArray(err.detail)) {
+                        return (
+                          <ul className="mt-1 list-disc pl-4">
+                            {err.detail.map((e, i) => (
+                              <li key={i}>
+                                {e.loc?.slice(1).join('.') || 'field'}: {e.msg}
+                              </li>
+                            ))}
+                          </ul>
+                        )
+                      }
+                      return <p>{String(createInvestigation.error)}</p>
+                    })()}
                   </div>
                 )}
 

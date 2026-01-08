@@ -1100,6 +1100,11 @@ def data_to_dataframes(data: GeneratedData) -> dict[str, pl.DataFrame]:
                 "payment_method": o.payment_method,
                 "created_at": o.created_at,
                 "updated_at": o.updated_at,
+                # New columns for root cause investigation
+                "channel": o.channel,
+                "platform": o.platform,
+                "app_version": o.app_version,
+                "session_id": o.session_id,
             }
             for o in data.orders
         ]
@@ -1133,6 +1138,10 @@ def data_to_dataframes(data: GeneratedData) -> dict[str, pl.DataFrame]:
                 "country": e.country,
                 "created_at": e.created_at,
                 "inserted_at": e.inserted_at if e.inserted_at else e.created_at,
+                # New columns for root cause investigation
+                "channel": e.channel,
+                "platform": e.platform,
+                "app_version": e.app_version,
             }
             for e in data.events
         ]

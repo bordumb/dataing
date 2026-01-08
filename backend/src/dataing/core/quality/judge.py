@@ -20,12 +20,30 @@ if TYPE_CHECKING:
 JUDGE_SYSTEM_PROMPT = """You evaluate root cause analysis quality on three dimensions.
 
 ## Causal Depth (50% weight)
-Evaluate the causal_chain field:
-- 0.0-0.2: Empty or just restates symptom ("NULLs exist")
-- 0.3-0.4: Names a cause but no mechanism ("upstream issue")
-- 0.5-0.6: Cause + effect but missing intermediate steps
-- 0.7-0.8: Full chain but vague on timing/mechanism
-- 0.9-1.0: Complete chain with timing ("ETL timeout at 03:14 -> stale table -> JOIN NULLs")
+
+CRITICAL DISTINCTION:
+- "ETL job failed" is NOT a root cause - it's a HYPOTHESIS
+- "ETL job failed because the source API returned 429 rate limit errors" IS a root cause
+
+A true causal chain must include:
+1. The TRIGGER (what changed? API error, config change, deploy, etc.)
+2. The MECHANISM (how did the trigger cause the symptom?)
+3. The TIMELINE (when did each step occur?)
+
+Scoring:
+- 0.0-0.2: Just confirms symptom exists ("NULLs appeared on Jan 10")
+- 0.3-0.4: Names a cause category without evidence ("ETL failure", "data corruption")
+- 0.5-0.6: Names a specific component but no trigger ("users ETL job stopped")
+- 0.7-0.8: Has trigger + mechanism but vague timing ("API timeout caused ETL to fail")
+- 0.9-1.0: Complete: trigger + mechanism + timeline
+  ("API rate limit at 03:14 -> ETL timeout -> users table stale -> JOIN NULLs")
+
+RED FLAGS (cap score at 0.4):
+- Uses vague cause categories: "data corruption", "infrastructure failure", "ETL malfunction"
+- Says "suggests", "indicates", "consistent with" without concrete evidence
+- No specific component names (which job? which table? which API?)
+- No timestamps more precise than the day
+- trigger_identified field is empty or vague
 
 ## Specificity (30% weight)
 Evaluate key_findings and supporting_evidence:
@@ -43,7 +61,14 @@ Evaluate recommendations:
 - 0.7-0.8: "Check CloudWatch for stg_users job failures around 03:14 UTC"
 - 0.9-1.0: "Run: airflow trigger_dag stg_users --conf '{\\"backfill\\": true}'"
 
-Be calibrated: most responses score 0.4-0.7. Reserve 0.9+ for exceptional quality.
+## Differentiation Bonus/Penalty
+If differentiating_evidence is present:
+- Specific and unique ("Error code ETL-5012 in job logs"): +0.1 bonus to composite
+- Vague ("Pattern matches known failure signature"): no change
+- Empty/null when confidence > 0.7: -0.1 penalty to composite
+
+Be calibrated: most responses score 0.3-0.6. Reserve 0.8+ for responses with
+concrete triggers, mechanisms, and timelines. Be HARSH on vague cause categories.
 
 Always identify the lowest_dimension and provide a specific improvement_suggestion
 (at least 20 characters) that explains how to improve that dimension."""
@@ -94,6 +119,10 @@ class LLMJudgeValidator:
         Returns:
             ValidationResult with pass/fail and dimensional scores.
         """
+        # Get optional fields safely
+        trigger = getattr(response, "trigger_identified", None) or "NOT PROVIDED"
+        diff_evidence = getattr(response, "differentiating_evidence", None) or "NOT PROVIDED"
+
         prompt = f"""Evaluate this interpretation:
 
 HYPOTHESIS TESTED: {hypothesis_title}
@@ -102,11 +131,14 @@ QUERY RUN: {query}
 RESPONSE:
 - interpretation: {response.interpretation}
 - causal_chain: {response.causal_chain}
+- trigger_identified: {trigger}
+- differentiating_evidence: {diff_evidence}
 - confidence: {response.confidence}
 - key_findings: {response.key_findings}
 - supports_hypothesis: {response.supports_hypothesis}
 
-Score each dimension and identify what needs improvement."""
+Score each dimension. Apply differentiation bonus/penalty based on differentiating_evidence.
+Identify what needs improvement."""
 
         result = await self.judge.run(prompt)
 

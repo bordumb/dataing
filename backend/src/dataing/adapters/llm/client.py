@@ -429,24 +429,39 @@ CRITICAL - Understanding "supports hypothesis":
 - If investigating NULLs and query finds NO NULLs -> supports=false (not the cause)
 - "Supports" means evidence helps explain the anomaly, NOT that the situation is good
 
-Example: Investigating "null_count spike in user_id"
-- Query finds 485 rows with NULL user_id -> supports=true (this IS the problem we're investigating)
-- Query finds 0 rows with NULL user_id -> supports=false (not the cause)
+IMPORTANT: Do not just confirm that the symptom exists. Your job is to:
+1. Identify the TRIGGER (what specific change caused this?)
+2. Explain the MECHANISM (how did that trigger lead to this symptom?)
+3. Provide TIMELINE (when did each step in the causal chain occur?)
+
+If you cannot identify a specific trigger from the data, say so and suggest
+what additional query would help find it.
+
+BAD interpretation: "The results confirm NULL user_ids appeared on Jan 10,
+suggesting an ETL failure."
+
+GOOD interpretation: "The NULLs began at exactly 03:14 UTC on Jan 10, which
+correlates with the users ETL job's last successful run at 03:12 UTC. The
+2-minute gap and sudden onset suggest the job failed mid-execution. To
+confirm, we should query the ETL job logs for errors around 03:14 UTC."
 
 REQUIRED FIELDS:
 1. supports_hypothesis: True if evidence supports, False if refutes, None if inconclusive
 2. confidence: Score from 0.0 to 1.0
 3. interpretation: What the results reveal about the ROOT CAUSE, not just the symptom
-   - BAD: "Found 485 NULL user_ids" (just describes symptom)
-   - GOOD: "485 NULL user_ids appearing after 03:14 UTC suggests upstream users ETL stopped"
-4. causal_chain: The cause-and-effect explanation connecting upstream cause to observation
-   - REQUIRED: Explain WHAT upstream change led to this observation
-   - Example: "users ETL stopped at 03:14 -> stale users table -> orders JOIN produces NULLs"
-   - NOT: "NULL values found" (this is just restating the symptom)
-5. key_findings: Specific findings with data points (counts, timestamps, table names)
-6. next_investigation_step: If inconclusive, what query or check would determine root cause?
-   - Example: "Query logs table for users ETL job status between 03:00-04:00 UTC"
-   - Only needed when supports_hypothesis is None
+4. causal_chain: MUST include (1) TRIGGER, (2) MECHANISM, (3) TIMELINE
+   - BAD: "ETL job failed causing NULLs"
+   - GOOD: "API rate limit at 03:14 UTC -> users ETL timeout -> stale table -> JOIN NULLs"
+5. trigger_identified: The specific trigger (API error, deploy, config change, etc.)
+   - Leave null if cannot identify from data, but MUST then provide next_investigation_step
+   - BAD: "data corruption", "infrastructure failure" (too vague)
+   - GOOD: "API returned 429 at 03:14", "deploy of commit abc123"
+6. differentiating_evidence: What in the data points to THIS hypothesis over alternatives?
+   - What makes this cause more likely than other hypotheses?
+   - Leave null if no differentiating evidence found
+7. key_findings: Specific findings with data points (counts, timestamps, table names)
+8. next_investigation_step: REQUIRED if confidence < 0.8 OR trigger_identified is null
+   - What specific query would help identify the trigger?
 
 Be objective and base your assessment solely on the data returned."""
 

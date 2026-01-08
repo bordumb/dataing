@@ -121,8 +121,8 @@ class QueryResponse(BaseModel):
 class InterpretationResponse(BaseModel):
     """LLM interpretation of query results.
 
-    The causal_chain field forces the LLM to articulate cause-and-effect,
-    not just confirm that an issue exists.
+    Forces the LLM to articulate cause-and-effect with specific trigger,
+    mechanism, and timeline - not just confirm that an issue exists.
     """
 
     supports_hypothesis: bool | None = Field(
@@ -139,10 +139,29 @@ class InterpretationResponse(BaseModel):
     )
     causal_chain: str = Field(
         description=(
-            "The cause-and-effect explanation: what upstream change led to this observation? "
-            "Example: 'users ETL stopped at 03:14 -> stale table -> JOIN produces NULLs'"
+            "MUST include: (1) TRIGGER - what changed, (2) MECHANISM - how it caused the symptom, "
+            "(3) TIMELINE - when each step occurred. "
+            "BAD: 'ETL job failed causing NULLs'. "
+            "GOOD: 'API rate limit at 03:14 UTC -> users ETL job timeout after 30s -> "
+            "users table missing records after user_id 50847 -> orders JOIN produces NULLs'"
         ),
         min_length=30,
+    )
+    trigger_identified: str | None = Field(
+        default=None,
+        description=(
+            "The specific trigger that started the causal chain. "
+            "Must be concrete: 'API returned 429 at 03:14', 'deploy of commit abc123', "
+            "'config change to batch_size'. NOT: 'something failed', 'data corruption occurred'"
+        ),
+    )
+    differentiating_evidence: str | None = Field(
+        default=None,
+        description=(
+            "Evidence that supports THIS hypothesis over alternatives. "
+            "What in the data specifically points to this cause and not others? "
+            "Example: 'Error code ETL-5012 only appears in users job logs'"
+        ),
     )
     key_findings: list[str] = Field(
         description="Specific findings with data points (counts, timestamps, table names)",
@@ -151,7 +170,10 @@ class InterpretationResponse(BaseModel):
     )
     next_investigation_step: str | None = Field(
         default=None,
-        description="If inconclusive: what query or check would help determine the root cause?",
+        description=(
+            "Required if confidence < 0.8 or trigger_identified is empty. "
+            "What specific query or check would help identify the trigger?"
+        ),
     )
 
 

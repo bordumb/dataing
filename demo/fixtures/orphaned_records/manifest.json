@@ -1,7 +1,7 @@
 {
   "name": "orphaned_records",
   "description": "User deletion job ran before order archival",
-  "created_at": "2026-01-06T22:59:50.053264Z",
+  "created_at": "2026-01-08T02:27:21.023225Z",
   "simulation_period": {
     "start": "2026-01-08",
     "end": "2026-01-14"
@@ -16,19 +16,19 @@
       "file": "products.parquet"
     },
     "users": {
-      "row_count": 9966,
+      "row_count": 9962,
       "file": "users.parquet"
     },
     "orders": {
-      "row_count": 3032,
+      "row_count": 3014,
       "file": "orders.parquet"
     },
     "order_items": {
-      "row_count": 4600,
+      "row_count": 4565,
       "file": "order_items.parquet"
     },
     "events": {
-      "row_count": 277617,
+      "row_count": 279514,
       "file": "events.parquet"
     }
   },
@@ -48,42 +48,46 @@
   ],
   "ground_truth": {
     "affected_order_ids": [
-      "081fc41a-c068-4198-af80-5d4f2202f966",
-      "00dd3e3d-3dd3-4b3e-a1e5-de51649804bd",
-      "68e27f77-583b-4f72-9093-e70a280585e8",
-      "dfb94647-c99f-4db7-921b-1609f34f0de1",
-      "3ab50c24-0974-4a29-bb01-1f16b6d5411a",
-      "77f44756-a4e1-4601-8dab-f6b9026171e1",
-      "92d853ab-d08a-48c4-b418-ae6cb8d255a0",
-      "86812e7e-6a17-42cd-a1dc-f4dd334da85b",
-      "55a6151e-76e5-4cb2-8adc-ba57a074e99d",
-      "0f27683d-3f3b-49d4-b572-a178e8d8e6d9",
-      "7ecb38c1-ab15-4883-b93c-d2526b221045",
-      "5b3fa693-c7a1-4e96-a158-5efa1b68eba6",
-      "2465914c-2d01-469b-9b36-594300f9b9b7",
-      "ba8e5910-b33f-4998-8103-e7d096852327",
-      "d326c334-dfee-40c0-aea5-151b992c8d08",
-      "78f92002-77ba-4a5a-a2fe-b5a7f7a95ab2",
-      "15ca727d-ec0f-46f9-beb1-7187f93bec77",
-      "8ca64b12-2e93-4d2d-b971-866bfdf5197f",
-      "e86ad078-01ff-41ac-9d8d-088c3b2bac4b",
-      "41e3d913-5181-49c0-9b20-2f53816a7c5e",
-      "874d5d5f-557d-4319-8c0c-24c5141a3762",
-      "ece67ef8-d008-4e71-a840-79a553eea0ae",
-      "f6354af8-7cbf-41f3-8099-636b03cf33bc",
-      "e1966033-6f33-4a16-ba93-fdf0d13886c7",
-      "7f9890c2-dd29-49b0-8cf9-92c154ab9e9f",
-      "df27a054-47aa-4c82-acf4-e5148a787eb7",
-      "c3f6eefb-1ac1-4130-8a22-11c387314f83",
-      "faa4977c-13c4-44f7-99ee-32b823e253f0",
-      "ea1d95a2-cf8f-45a8-a525-56ac46d2620b",
-      "145b3124-85a9-4d0d-8f99-150a932849f2",
-      "01dc6b7d-b6d4-40f8-977c-fc34abfb08be",
-      "229cc301-9e0a-4d17-b019-05568d1bcd92",
-      "03e78674-ddb7-4979-88e5-188ecbb398df",
-      "725e4737-9e6a-4b5b-b386-0f0920a82e0b"
+      "baac53de-7329-4b19-b2f1-43702a9d1e91",
+      "94be5bd5-a055-4326-96c4-0b5e03094787",
+      "fbee6aad-de6a-43d8-916a-c60e15a30aae",
+      "c64134a0-0cd7-4002-85b1-7e1fbc115c88",
+      "86d1153d-1515-4cbe-8b69-d4a4830eda0f",
+      "d3d3b06f-46b1-4dab-b8db-599b62f6910b",
+      "fac9ce0f-5c78-4c7b-982d-4b8220ce0827",
+      "63e80e9b-104b-4252-ade9-49975f1a9e9d",
+      "070d6a4b-b7dc-458b-b686-cc2ebac7cb5b",
+      "ccf9b4dc-159b-4e24-8461-d299792e43fa",
+      "cda16065-11c7-48de-978d-87c2ec45ab59",
+      "653a5536-a103-4dad-bbf3-f9fb38ea30c4",
+      "10640462-acc2-4092-868e-c74127959c1d",
+      "db172f8c-9bd5-48ba-9ae3-8ac15256f2d6",
+      "cac47585-90e7-4ff0-b395-fa621947c6c8",
+      "22f796b2-c5f0-44a8-8a0f-09ce1442714a",
+      "3e32cf76-20fd-4f58-99ab-524ecf733cbc",
+      "7fc96d4f-8ff9-4575-910e-c6ffa1d29736",
+      "609114c4-d315-4720-bffd-68bd5c48e893",
+      "3715758a-43a6-4dd3-a84b-1ac643ca7af4",
+      "b63fa26d-3edd-4228-909e-14fa2e7baf8e",
+      "ad0ed056-a716-4ca8-af99-bf961f08174f",
+      "dca544e6-8fe4-41c1-a2c8-0df2faed885b",
+      "3b853ba5-7d9d-43c3-a334-d00b7ba684f9",
+      "c584f489-bef5-435d-8e2d-e001f553fc33",
+      "2dcaa6e4-b216-4002-a804-83c69c1d6840",
+      "8a353031-3bf0-44d8-93ca-d651f8fe97c4",
+      "3173f4d2-2d15-4bf9-b1f4-0496ef76c68e",
+      "4f4f529c-2cda-41ff-8415-2dec3d3b1a29",
+      "47f523c0-0241-4f0e-8592-35a73a215852",
+      "38000c7a-2672-4f1b-ae76-f279ccfda820",
+      "7c5055ac-640d-4d6e-85ca-cc1eb242e418",
+      "3922f99e-263c-494c-b13d-96f96c7a82c6",
+      "d962d376-5077-41e8-b1ee-74c80dfe6d90",
+      "5bb00e9b-8531-4f10-8e3e-7e9ccd16723a",
+      "22c788ae-3878-4277-bf4b-05b06eaaa157",
+      "f24651fa-2f46-4be8-920b-a1f179de85cb",
+      "11ac7e3e-cefa-45d5-baf2-a3e69a3ea26a"
     ],
-    "orphaned_order_count": 34,
-    "deleted_user_count": 34
+    "orphaned_order_count": 38,
+    "deleted_user_count": 38
   }
 }

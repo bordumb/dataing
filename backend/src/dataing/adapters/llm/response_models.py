@@ -111,7 +111,11 @@ class QueryResponse(BaseModel):
 
 
 class InterpretationResponse(BaseModel):
-    """LLM interpretation of query results."""
+    """LLM interpretation of query results.
+
+    The causal_chain field forces the LLM to articulate cause-and-effect,
+    not just confirm that an issue exists.
+    """
 
     supports_hypothesis: bool | None = Field(
         description="True if evidence supports, False if refutes, None if inconclusive"
@@ -122,13 +126,24 @@ class InterpretationResponse(BaseModel):
         description="Confidence score from 0.0 (no confidence) to 1.0 (certain)",
     )
     interpretation: str = Field(
-        description="Human-readable explanation of what the results show",
-        min_length=20,
+        description="What the results reveal about the ROOT CAUSE, not just the symptom",
+        min_length=50,
+    )
+    causal_chain: str = Field(
+        description=(
+            "The cause-and-effect explanation: what upstream change led to this observation? "
+            "Example: 'users ETL stopped at 03:14 -> stale table -> JOIN produces NULLs'"
+        ),
+        min_length=30,
     )
     key_findings: list[str] = Field(
-        default_factory=list,
-        description="Bullet points of the most important findings",
+        description="Specific findings with data points (counts, timestamps, table names)",
+        min_length=1,
         max_length=5,
+    )
+    next_investigation_step: str | None = Field(
+        default=None,
+        description="If inconclusive: what query or check would help determine the root cause?",
     )
 
 

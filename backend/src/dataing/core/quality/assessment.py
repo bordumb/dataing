@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import statistics
+
 from pydantic import BaseModel, Field, computed_field
 
 
@@ -78,3 +80,76 @@ class ValidationResult(BaseModel):
             "actionability": self.assessment.actionability,
             "composite": self.assessment.composite_score,
         }
+
+
+class HypothesisSetAssessment(BaseModel):
+    """Assessment of interpretation quality across hypothesis set.
+
+    This class detects when the LLM is confirming rather than testing
+    hypotheses. Good investigations should show variance - some hypotheses
+    supported, others refuted.
+
+    Attributes:
+        interpretations: Quality assessments for each interpretation.
+    """
+
+    interpretations: list[QualityAssessment]
+
+    @computed_field  # type: ignore[prop-decorator]
+    @property
+    def discrimination_score(self) -> float:
+        """Do interpretations differentiate between hypotheses?
+
+        If all hypotheses score similarly, the LLM is confirming
+        rather than testing. Good interpretations should have
+        variance - some hypotheses supported, others refuted.
+
+        Returns:
+            Score from 0-1 where higher means better discrimination.
+        """
+        if len(self.interpretations) < 2:
+            return 1.0
+
+        confidence_values = [i.composite_score for i in self.interpretations]
+        variance = statistics.variance(confidence_values)
+
+        # Low variance = all same = bad (confirming everything)
+        # High variance = differentiated = good (actually testing)
+        # Normalize: variance of 0.1+ is good
+        return min(1.0, variance / 0.1)
+
+    @computed_field  # type: ignore[prop-decorator]
+    @property
+    def all_supporting_penalty(self) -> float:
+        """Penalty if all hypotheses claim support.
+
+        In a good investigation, at least one hypothesis should
+        be refuted or inconclusive.
+
+        Returns:
+            Multiplier: 1.0 if diverse, 0.5 if all high scores.
+        """
+        if not self.interpretations:
+            return 1.0
+
+        # If all scores > 0.7, apply penalty
+        high_scores = sum(1 for i in self.interpretations if i.composite_score > 0.7)
+        if high_scores == len(self.interpretations):
+            return 0.5  # Cut scores in half
+        return 1.0
+
+    @computed_field  # type: ignore[prop-decorator]
+    @property
+    def adjusted_composite(self) -> float:
+        """Average composite score adjusted for discrimination and confirmation bias.
+
+        Returns:
+            Adjusted score accounting for discrimination and all-supporting penalty.
+        """
+        if not self.interpretations:
+            return 0.0
+
+        avg_composite = sum(i.composite_score for i in self.interpretations) / len(
+            self.interpretations
+        )
+        return avg_composite * self.discrimination_score * self.all_supporting_penalty

@@ -22,7 +22,9 @@ interface Dataset {
 }
 
 interface FormData {
-  metric_name: string
+  anomaly_type: string
+  column_name: string
+  display_name: string
   expected_value: string
   actual_value: string
   deviation_pct: string
@@ -42,7 +44,9 @@ export function NewInvestigation() {
     stringToDatePickerValue(new Date().toISOString().split('T')[0])
   )
   const [formData, setFormData] = useState<FormData>({
-    metric_name: 'row_count',
+    anomaly_type: 'null_rate',
+    column_name: '',
+    display_name: '',
     expected_value: '',
     actual_value: '',
     deviation_pct: '',
@@ -71,9 +75,20 @@ export function NewInvestigation() {
     if (!dateStr) return
 
     try {
+      // Build display name from column and anomaly type if not provided
+      const displayName =
+        formData.display_name.trim() ||
+        `${formData.anomaly_type} on ${formData.column_name || primaryDataset.identifier}`
+
       const result = await createInvestigation.mutateAsync({
         dataset_id: primaryDataset.identifier,
-        metric_name: formData.metric_name,
+        metric_spec: {
+          metric_type: 'column',
+          expression: formData.column_name || primaryDataset.identifier,
+          display_name: displayName,
+          columns_referenced: formData.column_name ? [formData.column_name] : [],
+        },
+        anomaly_type: formData.anomaly_type,
         expected_value: parseFloat(formData.expected_value),
         actual_value: parseFloat(formData.actual_value),
         deviation_pct: parseFloat(formData.deviation_pct),
@@ -216,14 +231,51 @@ export function NewInvestigation() {
 
                 <div className="grid gap-4 sm:grid-cols-2">
                   <div>
-                    <label className="mb-1.5 block text-sm font-medium">Metric Name</label>
-                    <Input
-                      name="metric_name"
-                      value={formData.metric_name}
+                    <label className="mb-1.5 block text-sm font-medium">
+                      Anomaly Type <span className="text-destructive">*</span>
+                    </label>
+                    <select
+                      name="anomaly_type"
+                      value={formData.anomaly_type}
                       onChange={handleChange}
-                      placeholder="row_count"
-                      required
+                      className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                    >
+                      <option value="null_rate">Null Rate - Unexpected NULL values</option>
+                      <option value="row_count">Row Count - Volume anomaly</option>
+                      <option value="freshness">Freshness - Stale data</option>
+                      <option value="duplicate_rate">Duplicate Rate - Unexpected duplicates</option>
+                      <option value="schema_drift">Schema Drift - Column changes</option>
+                      <option value="custom">Custom - Other anomaly type</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="mb-1.5 block text-sm font-medium">
+                      Column Name
+                    </label>
+                    <Input
+                      name="column_name"
+                      value={formData.column_name}
+                      onChange={handleChange}
+                      placeholder="e.g., user_id"
                     />
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      The specific column affected (optional)
+                    </p>
+                  </div>
+                </div>
+
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <div>
+                    <label className="mb-1.5 block text-sm font-medium">Display Name</label>
+                    <Input
+                      name="display_name"
+                      value={formData.display_name}
+                      onChange={handleChange}
+                      placeholder="e.g., null_count on user_id"
+                    />
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      Human-readable label (auto-generated if empty)
+                    </p>
                   </div>
                   <div>
                     <label className="mb-1.5 block text-sm font-medium">Severity</label>
@@ -297,7 +349,22 @@ export function NewInvestigation() {
 
                 {createInvestigation.error && (
                   <div className="rounded-md bg-destructive/10 p-3 text-sm text-destructive">
-                    Error: {createInvestigation.error.message}
+                    <p className="font-medium">Error:</p>
+                    {(() => {
+                      const err = createInvestigation.error as { detail?: Array<{ loc: string[]; msg: string }> }
+                      if (err.detail && Array.isArray(err.detail)) {
+                        return (
+                          <ul className="mt-1 list-disc pl-4">
+                            {err.detail.map((e, i) => (
+                              <li key={i}>
+                                {e.loc?.slice(1).join('.') || 'field'}: {e.msg}
+                              </li>
+                            ))}
+                          </ul>
+                        )
+                      }
+                      return <p>{String(createInvestigation.error)}</p>
+                    })()}
                   </div>
                 )}
 

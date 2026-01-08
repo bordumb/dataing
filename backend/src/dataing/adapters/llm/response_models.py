@@ -33,6 +33,14 @@ class HypothesisResponse(BaseModel):
     suggested_query: str = Field(
         description="SQL query to investigate this hypothesis. Must include LIMIT clause.",
     )
+    expected_if_true: str = Field(
+        description="What results we expect if this hypothesis is correct",
+        min_length=10,
+    )
+    expected_if_false: str = Field(
+        description="What results we expect if this hypothesis is wrong",
+        min_length=10,
+    )
 
     @field_validator("suggested_query")
     @classmethod
@@ -111,7 +119,11 @@ class QueryResponse(BaseModel):
 
 
 class InterpretationResponse(BaseModel):
-    """LLM interpretation of query results."""
+    """LLM interpretation of query results.
+
+    Forces the LLM to articulate cause-and-effect with specific trigger,
+    mechanism, and timeline - not just confirm that an issue exists.
+    """
 
     supports_hypothesis: bool | None = Field(
         description="True if evidence supports, False if refutes, None if inconclusive"
@@ -122,33 +134,96 @@ class InterpretationResponse(BaseModel):
         description="Confidence score from 0.0 (no confidence) to 1.0 (certain)",
     )
     interpretation: str = Field(
-        description="Human-readable explanation of what the results show",
-        min_length=20,
+        description="What the results reveal about the ROOT CAUSE, not just the symptom",
+        min_length=50,
+    )
+    causal_chain: str = Field(
+        description=(
+            "MUST include: (1) TRIGGER - what changed, (2) MECHANISM - how it caused the symptom, "
+            "(3) TIMELINE - when each step occurred. "
+            "BAD: 'ETL job failed causing NULLs'. "
+            "GOOD: 'API rate limit at 03:14 UTC -> users ETL job timeout after 30s -> "
+            "users table missing records after user_id 50847 -> orders JOIN produces NULLs'"
+        ),
+        min_length=30,
+    )
+    trigger_identified: str | None = Field(
+        default=None,
+        description=(
+            "The specific trigger that started the causal chain. "
+            "Must be concrete: 'API returned 429 at 03:14', 'deploy of commit abc123', "
+            "'config change to batch_size'. NOT: 'something failed', 'data corruption occurred'"
+        ),
+    )
+    differentiating_evidence: str | None = Field(
+        default=None,
+        description=(
+            "Evidence that supports THIS hypothesis over alternatives. "
+            "What in the data specifically points to this cause and not others? "
+            "Example: 'Error code ETL-5012 only appears in users job logs'"
+        ),
     )
     key_findings: list[str] = Field(
-        default_factory=list,
-        description="Bullet points of the most important findings",
+        description="Specific findings with data points (counts, timestamps, table names)",
+        min_length=1,
         max_length=5,
+    )
+    next_investigation_step: str | None = Field(
+        default=None,
+        description=(
+            "Required if confidence < 0.8 or trigger_identified is empty. "
+            "What specific query or check would help identify the trigger?"
+        ),
     )
 
 
 class SynthesisResponse(BaseModel):
-    """Final synthesis of all evidence into a finding."""
+    """Final synthesis of investigation findings.
+
+    Requires structured causal chain and impact assessment,
+    not just a root cause string.
+    """
 
     root_cause: str | None = Field(
-        description="Concise description of the root cause, or null if inconclusive"
+        description=(
+            "The UPSTREAM cause, not the symptom. Must explain WHY. "
+            "Example: 'users ETL job timed out at 03:14 UTC due to API rate limiting' "
+            "NOT: 'NULL user_ids in orders table'"
+        )
     )
     confidence: float = Field(
         ge=0.0,
         le=1.0,
-        description="Confidence in the root cause determination",
+        description="Confidence in root cause (0.9+=certain, 0.7-0.9=likely, <0.7=uncertain)",
+    )
+    causal_chain: list[str] = Field(
+        description=(
+            "Step-by-step from root cause to observed symptom. "
+            "Example: ['API rate limit hit', 'users ETL job timeout', "
+            "'users table stale after 03:14', 'orders JOIN produces NULLs']"
+        ),
+        min_length=2,
+        max_length=6,
+    )
+    estimated_onset: str = Field(
+        description="When the issue started (timestamp or relative time, e.g., '03:14 UTC')",
+        min_length=5,
+    )
+    affected_scope: str = Field(
+        description="Blast radius: what else is affected? (downstream tables, reports, consumers)",
+        min_length=10,
     )
     supporting_evidence: list[str] = Field(
-        description="Key evidence points that support this conclusion",
+        description="Specific evidence with data points that supports this conclusion",
+        min_length=1,
         max_length=10,
     )
     recommendations: list[str] = Field(
-        description="Actionable recommendations to fix or prevent the issue",
+        description=(
+            "Actionable recommendations with specific targets. "
+            "Example: 'Re-run stg_users job: airflow trigger_dag stg_users --backfill' "
+            "NOT: 'Investigate the issue'"
+        ),
         min_length=1,
         max_length=5,
     )

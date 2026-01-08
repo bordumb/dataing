@@ -119,6 +119,11 @@ class Order:
     payment_method: str
     created_at: datetime
     updated_at: datetime
+    # Channel and platform info for root cause investigation
+    channel: str  # "mobile_app", "web", "api"
+    platform: str | None  # "ios", "android", None for web
+    app_version: str | None  # "2.3.0", "2.3.1", etc. None for web
+    session_id: str | None  # Links to events table
 
 
 @dataclass
@@ -147,6 +152,10 @@ class Event:
     device_type: str
     country: str
     created_at: datetime
+    # Channel and app info for correlation with orders
+    channel: str = "web"  # "mobile_app", "web", "api"
+    platform: str | None = None  # "ios", "android", None for web
+    app_version: str | None = None  # "2.3.0", "2.3.1", etc. None for web
     # For late-arriving data scenario
     inserted_at: datetime | None = None
 
@@ -403,6 +412,29 @@ def generate_session_events(
         device_type = random.choices(DEVICES, DEVICE_WEIGHTS)[0]
         country = random.choices(COUNTRIES, COUNTRY_WEIGHTS)[0]
 
+    # Determine channel, platform, and app_version based on device and date
+    day = get_day_number(session_start)
+    if device_type == "mobile":
+        # 70% mobile app, 30% mobile web
+        if random.random() < 0.70:
+            channel = "mobile_app"
+            platform = random.choice(["ios", "android"])
+            # App version logic: v2.3.1 released on day 3, causes the bug
+            # Before day 3: everyone on 2.3.0
+            # Day 3+: 60% upgrade to 2.3.1 (phased rollout)
+            if day < 3:
+                app_version = "2.3.0"
+            else:
+                app_version = "2.3.1" if random.random() < 0.60 else "2.3.0"
+        else:
+            channel = "web"
+            platform = None
+            app_version = None
+    else:
+        channel = "web"
+        platform = None
+        app_version = None
+
     # Landing page
     landing_pages = ["/", "/sale", "/new-arrivals", "/categories"]
     referrers = [
@@ -425,6 +457,9 @@ def generate_session_events(
             device_type=device_type,
             country=country,
             created_at=current_time,
+            channel=channel,
+            platform=platform,
+            app_version=app_version,
         )
     )
     current_time += timedelta(seconds=random.randint(5, 30))
@@ -451,6 +486,9 @@ def generate_session_events(
                     device_type=device_type,
                     country=country,
                     created_at=current_time,
+                    channel=channel,
+                    platform=platform,
+                    app_version=app_version,
                 )
             )
         elif action == "browse_category":
@@ -466,6 +504,9 @@ def generate_session_events(
                     device_type=device_type,
                     country=country,
                     created_at=current_time,
+                    channel=channel,
+                    platform=platform,
+                    app_version=app_version,
                 )
             )
         else:  # view_product
@@ -486,6 +527,9 @@ def generate_session_events(
                     device_type=device_type,
                     country=country,
                     created_at=current_time,
+                    channel=channel,
+                    platform=platform,
+                    app_version=app_version,
                 )
             )
 
@@ -509,6 +553,9 @@ def generate_session_events(
                         device_type=device_type,
                         country=country,
                         created_at=current_time,
+                        channel=channel,
+                        platform=platform,
+                        app_version=app_version,
                     )
                 )
 
@@ -531,6 +578,9 @@ def generate_session_events(
                 device_type=device_type,
                 country=country,
                 created_at=current_time,
+                channel=channel,
+                platform=platform,
+                app_version=app_version,
             )
         )
         current_time += timedelta(seconds=random.randint(30, 120))
@@ -550,6 +600,9 @@ def generate_session_events(
                     device_type=device_type,
                     country=country,
                     created_at=current_time,
+                    channel=channel,
+                    platform=platform,
+                    app_version=app_version,
                 )
             )
             current_time += timedelta(seconds=random.randint(30, 90))
@@ -592,6 +645,10 @@ def generate_session_events(
                 payment_method=random.choices(PAYMENT_METHODS, PAYMENT_WEIGHTS)[0],
                 created_at=current_time,
                 updated_at=current_time,
+                channel=channel,
+                platform=platform,
+                app_version=app_version,
+                session_id=session_id,
             )
             orders.append(order)
             order_items.extend(items)
@@ -608,6 +665,9 @@ def generate_session_events(
                     device_type=device_type,
                     country=country,
                     created_at=current_time,
+                    channel=channel,
+                    platform=platform,
+                    app_version=app_version,
                 )
             )
         else:
@@ -624,6 +684,9 @@ def generate_session_events(
                     device_type=device_type,
                     country=country,
                     created_at=current_time,
+                    channel=channel,
+                    platform=platform,
+                    app_version=app_version,
                 )
             )
 
@@ -731,12 +794,15 @@ def inject_null_spike(
     orders: list[Order],
     start_day: int = 3,
     end_day: int = 5,
-    null_rate: float = 0.40,
+    null_rate: float = 0.95,  # High rate for v2.3.1 bug - almost all affected
 ) -> tuple[list[Order], list[str]]:
     """
-    Inject NULL values into orders.user_id.
+    Inject NULL values into orders.user_id for mobile app v2.3.1 only.
 
-    Scenario: Mobile app bug doesn't pass user context to checkout API.
+    Scenario: Mobile app v2.3.1 has a bug where the checkout API call
+    doesn't include the user authentication token, causing NULL user_ids.
+    This only affects mobile_app channel with app_version "2.3.1".
+    Users on v2.3.0 or web are not affected.
     """
     modified = []
     affected_ids = []
@@ -744,12 +810,19 @@ def inject_null_spike(
     for order in orders:
         day = get_day_number(order.created_at)
 
-        if start_day <= day <= end_day and random.random() < null_rate:
-            # Create new order with NULL user_id
+        # Bug only affects mobile app v2.3.1 during the affected period
+        is_buggy_version = (
+            order.channel == "mobile_app"
+            and order.app_version == "2.3.1"
+            and start_day <= day <= end_day
+        )
+
+        if is_buggy_version and random.random() < null_rate:
+            # Create new order with NULL user_id (bug doesn't pass auth token)
             modified.append(
                 Order(
                     order_id=order.order_id,
-                    user_id=None,
+                    user_id=None,  # Bug: auth token not passed
                     status=order.status,
                     total_amount=order.total_amount,
                     discount_amount=order.discount_amount,
@@ -757,6 +830,10 @@ def inject_null_spike(
                     payment_method=order.payment_method,
                     created_at=order.created_at,
                     updated_at=order.updated_at,
+                    channel=order.channel,
+                    platform=order.platform,
+                    app_version=order.app_version,
+                    session_id=order.session_id,
                 )
             )
             affected_ids.append(order.order_id)
@@ -1023,6 +1100,11 @@ def data_to_dataframes(data: GeneratedData) -> dict[str, pl.DataFrame]:
                 "payment_method": o.payment_method,
                 "created_at": o.created_at,
                 "updated_at": o.updated_at,
+                # New columns for root cause investigation
+                "channel": o.channel,
+                "platform": o.platform,
+                "app_version": o.app_version,
+                "session_id": o.session_id,
             }
             for o in data.orders
         ]
@@ -1056,6 +1138,10 @@ def data_to_dataframes(data: GeneratedData) -> dict[str, pl.DataFrame]:
                 "country": e.country,
                 "created_at": e.created_at,
                 "inserted_at": e.inserted_at if e.inserted_at else e.created_at,
+                # New columns for root cause investigation
+                "channel": e.channel,
+                "platform": e.platform,
+                "app_version": e.app_version,
             }
             for e in data.events
         ]
@@ -1168,6 +1254,19 @@ def generate_all_fixtures():
                 "expected_detection": {
                     "pattern_type": "NULL_SPIKE",
                     "confidence": 0.95,
+                },
+                "investigation_hints": {
+                    "differentiating_queries": [
+                        "GROUP BY channel to see mobile_app vs web NULL rates",
+                        "GROUP BY app_version to see v2.3.1 vs v2.3.0 NULL rates",
+                        "GROUP BY platform to see ios vs android patterns",
+                        "JOIN events ON session_id to correlate with app behavior",
+                    ],
+                    "smoking_gun": (
+                        "NULLs occur almost exclusively on channel='mobile_app' "
+                        "AND app_version='2.3.1'. Web and v2.3.0 users unaffected."
+                    ),
+                    "schema_columns": ["channel", "platform", "app_version", "session_id"],
                 },
             }
         ],

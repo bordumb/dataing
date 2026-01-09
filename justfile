@@ -1,14 +1,15 @@
 # dataing v2 - Command Runner
 # Universal task runner replacing Makefiles
+# CE = Community Edition (dataing/), EE = Enterprise Edition (dataing-ee/)
 
 # Default recipe to list available commands
 default:
     @just --list
 
-# Bootstrap backend and frontend
+# Bootstrap dataing and frontend
 setup:
-    @echo "Setting up backend..."
-    cd backend && uv sync
+    @echo "Setting up dataing (CE)..."
+    uv sync
     @echo "Setting up frontend..."
     cd frontend && pnpm install
     @echo "Installing pre-commit hooks..."
@@ -25,72 +26,83 @@ pre-commit-install:
 pre-commit:
     pre-commit run --all-files
 
-# Run development servers in parallel
+# Run development servers in parallel (EE - includes all features)
 dev:
     #!/usr/bin/env bash
     set -euo pipefail
     trap 'kill 0' EXIT
-    (cd backend && uv run fastapi dev src/dataing/entrypoints/api/app.py --host 0.0.0.0 --port 8000) &
+    (uv run fastapi dev dataing-ee/src/dataing_ee/entrypoints/api/app.py --host 0.0.0.0 --port 8000) &
     (cd frontend && pnpm dev --port 3000) &
     wait
 
-# Run backend only
+# Run backend only (EE)
 dev-backend:
-    cd backend && uv run fastapi dev src/dataing/entrypoints/api/app.py --host 0.0.0.0 --port 8000
+    uv run fastapi dev dataing-ee/src/dataing_ee/entrypoints/api/app.py --host 0.0.0.0 --port 8000
+
+# Run CE backend only (no enterprise features)
+dev-backend-ce:
+    uv run fastapi dev dataing/src/dataing/entrypoints/api/app.py --host 0.0.0.0 --port 8000
 
 # Run frontend only
 dev-frontend:
     cd frontend && pnpm dev
 
-# Run all tests
+# Run all tests (CE + EE)
 test:
-    @echo "Running backend tests..."
-    cd backend && uv run pytest
+    @echo "Running dataing tests..."
+    uv run pytest dataing/tests dataing-ee/tests
     @echo "Running frontend tests..."
     cd frontend && pnpm test
 
-# Run backend tests only
-test-backend:
-    cd backend && uv run pytest
+# Run CE tests only
+test-ce:
+    uv run pytest dataing/tests
+
+# Run EE tests only
+test-ee:
+    uv run pytest dataing-ee/tests
 
 # Run frontend tests only
 test-frontend:
     cd frontend && pnpm test
 
-# Run linters
+# Run linters (CE + EE)
 lint:
-    @echo "Linting backend..."
-    cd backend && uv run ruff check . && uv run mypy .
+    @echo "Linting dataing..."
+    uv run ruff check dataing/src dataing-ee/src
+    uv run mypy dataing/src/dataing dataing-ee/src/dataing_ee
     @echo "Linting frontend..."
     cd frontend && pnpm lint
 
 # Format code
 format:
-    cd backend && uv run ruff format .
+    uv run ruff format dataing/src dataing-ee/src
     cd frontend && pnpm format
 
 # Generate OpenAPI client for frontend
 generate-client:
     @echo "Exporting OpenAPI schema from backend..."
-    cd backend && uv run python scripts/export_openapi.py
+    uv run python dataing/scripts/export_openapi.py
     @echo "Generating OpenAPI client..."
     cd frontend && pnpm orval
 
 # Build for production
 build:
-    @echo "Building backend..."
-    cd backend && uv build
+    @echo "Building dataing..."
+    uv build
     @echo "Building frontend..."
     cd frontend && pnpm build
 
 # Run type checking
 typecheck:
-    cd backend && uv run mypy .
+    uv run mypy dataing/src/dataing dataing-ee/src/dataing_ee
     cd frontend && pnpm typecheck
 
 # Clean build artifacts
 clean:
-    rm -rf backend/dist backend/.pytest_cache backend/.ruff_cache
+    rm -rf dist .pytest_cache .ruff_cache .mypy_cache
+    rm -rf dataing/.pytest_cache dataing/.ruff_cache
+    rm -rf dataing-ee/.pytest_cache dataing-ee/.ruff_cache
     rm -rf frontend/dist frontend/node_modules/.cache
 
 # Start docker-compose stack
@@ -138,8 +150,8 @@ demo: demo-fixtures
 
     # Generate OpenAPI client for frontend
     echo "Generating OpenAPI client..."
-    cd backend && uv run python scripts/export_openapi.py
-    cd ../frontend && pnpm orval
+    uv run python dataing/scripts/export_openapi.py
+    cd frontend && pnpm orval
     cd ..
     echo ""
 
@@ -159,19 +171,19 @@ demo: demo-fixtures
     # IMPORTANT: Order matters! 007_auth_tables creates organizations/users/teams,
     # 007_sso_scim adds SSO columns, 008_seed_demo_auth creates demo data
     echo "Running database migrations..."
-    PGPASSWORD=dataing psql -h localhost -U dataing -d dataing_demo -f backend/migrations/001_initial.sql 2>/dev/null || true
-    PGPASSWORD=dataing psql -h localhost -U dataing -d dataing_demo -f backend/migrations/002_datasets.sql 2>/dev/null || true
-    PGPASSWORD=dataing psql -h localhost -U dataing -d dataing_demo -f backend/migrations/003_investigation_feedback_events.sql 2>/dev/null || true
-    PGPASSWORD=dataing psql -h localhost -U dataing -d dataing_demo -f backend/migrations/004_schema_comments.sql 2>/dev/null || true
-    PGPASSWORD=dataing psql -h localhost -U dataing -d dataing_demo -f backend/migrations/005_knowledge_comments.sql 2>/dev/null || true
-    PGPASSWORD=dataing psql -h localhost -U dataing -d dataing_demo -f backend/migrations/006_comment_votes.sql 2>/dev/null || true
-    PGPASSWORD=dataing psql -h localhost -U dataing -d dataing_demo -f backend/migrations/007_auth_tables.sql 2>/dev/null || true
-    PGPASSWORD=dataing psql -h localhost -U dataing -d dataing_demo -f backend/migrations/007_sso_scim_tables.sql 2>/dev/null || true
-    PGPASSWORD=dataing psql -h localhost -U dataing -d dataing_demo -f backend/migrations/008_rbac_tables.sql 2>/dev/null || true
-    PGPASSWORD=dataing psql -h localhost -U dataing -d dataing_demo -f backend/migrations/008_seed_demo_auth.sql 2>/dev/null || true
-    PGPASSWORD=dataing psql -h localhost -U dataing -d dataing_demo -f backend/migrations/009_password_reset_tokens.sql 2>/dev/null || true
-    PGPASSWORD=dataing psql -h localhost -U dataing -d dataing_demo -f backend/migrations/009_seed_multi_org_demo.sql 2>/dev/null || true
-    PGPASSWORD=dataing psql -h localhost -U dataing -d dataing_demo -f backend/migrations/010_audit_logs.sql 2>/dev/null || true
+    PGPASSWORD=dataing psql -h localhost -U dataing -d dataing_demo -f dataing/migrations/001_initial.sql 2>/dev/null || true
+    PGPASSWORD=dataing psql -h localhost -U dataing -d dataing_demo -f dataing/migrations/002_datasets.sql 2>/dev/null || true
+    PGPASSWORD=dataing psql -h localhost -U dataing -d dataing_demo -f dataing/migrations/003_investigation_feedback_events.sql 2>/dev/null || true
+    PGPASSWORD=dataing psql -h localhost -U dataing -d dataing_demo -f dataing/migrations/004_schema_comments.sql 2>/dev/null || true
+    PGPASSWORD=dataing psql -h localhost -U dataing -d dataing_demo -f dataing/migrations/005_knowledge_comments.sql 2>/dev/null || true
+    PGPASSWORD=dataing psql -h localhost -U dataing -d dataing_demo -f dataing/migrations/006_comment_votes.sql 2>/dev/null || true
+    PGPASSWORD=dataing psql -h localhost -U dataing -d dataing_demo -f dataing/migrations/007_auth_tables.sql 2>/dev/null || true
+    PGPASSWORD=dataing psql -h localhost -U dataing -d dataing_demo -f dataing/migrations/007_sso_scim_tables.sql 2>/dev/null || true
+    PGPASSWORD=dataing psql -h localhost -U dataing -d dataing_demo -f dataing/migrations/008_rbac_tables.sql 2>/dev/null || true
+    PGPASSWORD=dataing psql -h localhost -U dataing -d dataing_demo -f dataing/migrations/008_seed_demo_auth.sql 2>/dev/null || true
+    PGPASSWORD=dataing psql -h localhost -U dataing -d dataing_demo -f dataing/migrations/009_password_reset_tokens.sql 2>/dev/null || true
+    PGPASSWORD=dataing psql -h localhost -U dataing -d dataing_demo -f dataing/migrations/009_seed_multi_org_demo.sql 2>/dev/null || true
+    PGPASSWORD=dataing psql -h localhost -U dataing -d dataing_demo -f dataing/migrations/010_audit_logs.sql 2>/dev/null || true
 
     trap 'kill 0' EXIT
 
@@ -200,12 +212,12 @@ demo: demo-fixtures
     export ENCRYPTION_KEY=ZnxhCyx4-ZjziPWtUguwGOFMMiLNioSwso5-qNPAGZI=
 
     # Load .env file if it exists
-    if [ -f backend/.env ]; then
-        export $(grep -v '^#' backend/.env | xargs)
+    if [ -f dataing/.env ]; then
+        export $(grep -v '^#' dataing/.env | xargs)
     fi
 
-    # Start backend
-    (cd backend && uv run fastapi dev src/dataing/entrypoints/api/app.py --host 0.0.0.0 --port 8000) &
+    # Start backend (EE for full features)
+    (uv run fastapi dev dataing-ee/src/dataing_ee/entrypoints/api/app.py --host 0.0.0.0 --port 8000) &
     BACKEND_PID=$!
 
     # Wait for backend to be ready, then sync datasets

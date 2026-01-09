@@ -1,7 +1,7 @@
 {
   "name": "baseline",
   "description": "Clean e-commerce data with no anomalies",
-  "created_at": "2026-01-08T02:45:07.197206Z",
+  "created_at": "2026-01-09T01:16:21.710382Z",
   "simulation_period": {
     "start": "2026-01-08",
     "end": "2026-01-14"

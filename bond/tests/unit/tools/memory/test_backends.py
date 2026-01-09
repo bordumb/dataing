@@ -128,9 +128,8 @@ class TestQdrantMemoryStore:
 
     async def test_store_with_precomputed_embedding(self, store: QdrantMemoryStore) -> None:
         """Test storing memory with pre-computed embedding."""
-        # Get expected dimension from model
-        model = store._get_model(None)
-        dim = model.get_sentence_embedding_dimension() or 384
+        # 384 is the dimension for all-MiniLM-L6-v2 (the default model)
+        dim = 384
         embedding = [0.1] * dim
 
         result = await store.store(

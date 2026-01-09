@@ -1,6 +1,6 @@
 [project]
 name = "bond"
-version = "0.1.0"
+version = "0.0.1"
 description = "Generic agent runtime - a skilled agent that gets things done"
 readme = "README.md"
 requires-python = ">=3.11"

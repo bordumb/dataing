@@ -1,12 +1,14 @@
 """Memory backend implementations.
 
-This module provides concrete implementations of AgentMemoryProtocol.
+This module provides concrete implementations of AgentMemoryProtocol
+using PydanticAI Embedder for non-blocking, instrumented embeddings.
 """
 
 from datetime import UTC, datetime
 from uuid import UUID, uuid4
 
-from qdrant_client import QdrantClient
+from pydantic_ai.embeddings import Embedder
+from qdrant_client import AsyncQdrantClient
 from qdrant_client.models import (
     Distance,
     FieldCondition,
@@ -15,78 +17,102 @@ from qdrant_client.models import (
     PointStruct,
     VectorParams,
 )
-from sentence_transformers import SentenceTransformer
 
 from bond.tools.memory._models import Error, Memory, SearchResult
 
 
 class QdrantMemoryStore:
-    """Qdrant-backed memory store with local embeddings.
+    """Qdrant-backed memory store using PydanticAI Embedder.
 
-    Uses Qdrant for vector storage and sentence-transformers for
-    local embedding generation (no API costs).
+    Benefits over raw sentence-transformers:
+    - Non-blocking embeddings (runs in thread pool via run_in_executor)
+    - Supports OpenAI, Cohere, and Local models seamlessly
+    - Automatic cost/latency tracking via OpenTelemetry
+    - Zero-refactor provider swapping
 
     Example:
-        # In-memory for development/testing
+        # In-memory for development/testing (local embeddings)
         store = QdrantMemoryStore()
 
-        # Persistent for production
+        # Persistent with local embeddings
         store = QdrantMemoryStore(qdrant_url="http://localhost:6333")
 
-        # Custom embedding model
-        store = QdrantMemoryStore(embedding_model="all-mpnet-base-v2")
+        # OpenAI embeddings
+        store = QdrantMemoryStore(
+            embedding_model="openai:text-embedding-3-small",
+            qdrant_url="http://localhost:6333",
+        )
+
+        # Cohere embeddings
+        store = QdrantMemoryStore(
+            embedding_model="cohere:embed-english-v3.0",
+            qdrant_url="http://localhost:6333",
+        )
     """
 
     def __init__(
         self,
         collection_name: str = "memories",
-        embedding_model: str = "all-MiniLM-L6-v2",
+        embedding_model: str = "sentence-transformers:all-MiniLM-L6-v2",
         qdrant_url: str | None = None,
+        qdrant_api_key: str | None = None,
     ) -> None:
         """Initialize the Qdrant memory store.
 
         Args:
             collection_name: Name of the Qdrant collection.
-            embedding_model: Default sentence-transformers model for embeddings.
+            embedding_model: Embedding model string. Supports:
+                - "sentence-transformers:all-MiniLM-L6-v2" (local, default)
+                - "openai:text-embedding-3-small"
+                - "cohere:embed-english-v3.0"
             qdrant_url: Qdrant server URL. None = in-memory (for dev/testing).
+            qdrant_api_key: Optional API key for Qdrant Cloud.
         """
         self._collection = collection_name
-        self._default_model = embedding_model
-        self._models: dict[str, SentenceTransformer] = {}
-        self._client = (
-            QdrantClient(url=qdrant_url) if qdrant_url else QdrantClient(":memory:")
-        )
-        self._ensure_collection()
 
-    def _get_model(self, model_name: str | None) -> SentenceTransformer:
-        """Lazy-load and cache embedding models."""
-        name = model_name or self._default_model
-        if name not in self._models:
-            self._models[name] = SentenceTransformer(name)
-        return self._models[name]
+        # PydanticAI Embedder handles model logic + instrumentation
+        self._embedder = Embedder(embedding_model)
 
-    def _embed(self, text: str, model_name: str | None = None) -> list[float]:
-        """Generate embedding for text."""
-        model = self._get_model(model_name)
-        embedding = model.encode(text)
-        result: list[float] = embedding.tolist()
-        return result
+        # Use AsyncQdrantClient for true async operation
+        if qdrant_url:
+            self._client = AsyncQdrantClient(url=qdrant_url, api_key=qdrant_api_key)
+        else:
+            self._client = AsyncQdrantClient(":memory:")
 
-    def _ensure_collection(self) -> None:
-        """Create collection if it doesn't exist."""
-        collections = [c.name for c in self._client.get_collections().collections]
-        if self._collection not in collections:
-            model = self._get_model(None)
-            dim = model.get_sentence_embedding_dimension()
-            if dim is None:
-                dim = 384  # Default for all-MiniLM-L6-v2
-            self._client.create_collection(
+        self._initialized = False
+
+    async def _ensure_collection(self) -> None:
+        """Lazy init collection with correct dimensions."""
+        if self._initialized:
+            return
+
+        # Determine dimensions dynamically by generating a dummy embedding
+        # Works for ANY provider (OpenAI, Cohere, Local)
+        dummy_result = await self._embedder.embed_query("warmup")
+        dimensions = len(dummy_result.embeddings[0])
+
+        # Check and create collection
+        collections = await self._client.get_collections()
+        exists = any(c.name == self._collection for c in collections.collections)
+
+        if not exists:
+            await self._client.create_collection(
                 self._collection,
                 vectors_config=VectorParams(
-                    size=dim,
+                    size=dimensions,
                     distance=Distance.COSINE,
                 ),
             )
+
+        self._initialized = True
+
+    async def _embed(self, text: str) -> list[float]:
+        """Generate embedding using PydanticAI Embedder.
+
+        This is non-blocking (runs in thread pool) and instrumented.
+        """
+        result = await self._embedder.embed_query(text)
+        return list(result.embeddings[0])
 
     def _build_filters(
         self,
@@ -118,7 +144,11 @@ class QdrantMemoryStore:
     ) -> Memory | Error:
         """Store memory with embedding."""
         try:
-            final_embedding = embedding or self._embed(content, embedding_model)
+            await self._ensure_collection()
+
+            # Use provided embedding or generate one
+            vector = embedding if embedding else await self._embed(content)
+
             memory = Memory(
                 id=uuid4(),
                 content=content,
@@ -127,12 +157,13 @@ class QdrantMemoryStore:
                 conversation_id=conversation_id,
                 tags=tags or [],
             )
-            self._client.upsert(
+
+            await self._client.upsert(
                 self._collection,
-                [
+                points=[
                     PointStruct(
                         id=str(memory.id),
-                        vector=final_embedding,
+                        vector=vector,
                         payload=memory.model_dump(mode="json"),
                     )
                 ],
@@ -153,17 +184,20 @@ class QdrantMemoryStore:
     ) -> list[SearchResult] | Error:
         """Semantic search with optional filtering."""
         try:
-            embedding = self._embed(query, embedding_model)
+            await self._ensure_collection()
+
+            query_vector = await self._embed(query)
             filters = self._build_filters(tags, agent_id)
 
             # Use query_points (qdrant-client >= 1.7.0)
-            response = self._client.query_points(
+            response = await self._client.query_points(
                 self._collection,
-                query=embedding,
+                query=query_vector,
                 limit=top_k,
                 score_threshold=score_threshold,
                 query_filter=filters,
             )
+
             return [
                 SearchResult(memory=Memory(**r.payload), score=r.score)
                 for r in response.points
@@ -174,7 +208,8 @@ class QdrantMemoryStore:
     async def delete(self, memory_id: UUID) -> bool | Error:
         """Delete a memory by ID."""
         try:
-            self._client.delete(
+            await self._ensure_collection()
+            await self._client.delete(
                 self._collection,
                 points_selector=[str(memory_id)],
             )
@@ -185,7 +220,8 @@ class QdrantMemoryStore:
     async def get(self, memory_id: UUID) -> Memory | None | Error:
         """Retrieve a specific memory by ID."""
         try:
-            results = self._client.retrieve(
+            await self._ensure_collection()
+            results = await self._client.retrieve(
                 self._collection,
                 ids=[str(memory_id)],
             )

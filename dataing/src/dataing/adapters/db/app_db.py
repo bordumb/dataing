@@ -630,33 +630,58 @@ class AppDatabase:
         self,
         tenant_id: UUID,
         action: str,
-        user_id: UUID | None = None,
-        api_key_id: UUID | None = None,
+        actor_id: UUID | None = None,
+        actor_email: str | None = None,
+        actor_ip: str | None = None,
+        actor_user_agent: str | None = None,
         resource_type: str | None = None,
-        resource_id: str | None = None,
-        request_id: str | None = None,
-        ip_address: str | None = None,
-        user_agent: str | None = None,
-        request_body: dict[str, Any] | None = None,
-        response_status: int | None = None,
+        resource_id: UUID | None = None,
+        resource_name: str | None = None,
+        request_method: str | None = None,
+        request_path: str | None = None,
+        status_code: int | None = None,
+        changes: dict[str, Any] | None = None,
+        metadata: dict[str, Any] | None = None,
     ) -> None:
-        """Create an audit log entry."""
+        """Create an audit log entry.
+
+        Args:
+            tenant_id: The tenant this log belongs to.
+            action: Action performed (e.g., "teams.created", "investigations.read").
+            actor_id: User ID who performed the action.
+            actor_email: Email of the user who performed the action.
+            actor_ip: IP address of the request.
+            actor_user_agent: User agent string from the request.
+            resource_type: Type of resource affected (e.g., "teams", "investigations").
+            resource_id: ID of the specific resource affected.
+            resource_name: Human-readable name of the resource.
+            request_method: HTTP method (GET, POST, PUT, DELETE).
+            request_path: Full request path.
+            status_code: HTTP response status code.
+            changes: JSON object with request body or changes made.
+            metadata: Additional metadata about the request.
+        """
+        # Convert UUIDs to strings at database boundary (codebase convention)
         await self.execute(
             """INSERT INTO audit_logs
-               (tenant_id, user_id, api_key_id, action, resource_type, resource_id,
-                request_id, ip_address, user_agent, request_body, response_status)
-               VALUES ($1, $2, $3, $4, $5, $6, $7, $8::inet, $9, $10, $11)""",
-            tenant_id,
-            user_id,
-            api_key_id,
+               (tenant_id, action, actor_id, actor_email, actor_ip, actor_user_agent,
+                resource_type, resource_id, resource_name, request_method, request_path,
+                status_code, changes, metadata)
+               VALUES ($1, $2, $3, $4, $5::inet, $6, $7, $8, $9, $10, $11, $12, $13, $14)""",
+            str(tenant_id),
             action,
+            str(actor_id) if actor_id else None,
+            actor_email,
+            actor_ip,
+            actor_user_agent,
             resource_type,
-            resource_id,
-            request_id,
-            ip_address,
-            user_agent,
-            json.dumps(request_body) if request_body else None,
-            response_status,
+            str(resource_id) if resource_id else None,
+            resource_name,
+            request_method,
+            request_path,
+            status_code,
+            json.dumps(changes) if changes else None,
+            json.dumps(metadata) if metadata else None,
         )
 
     # Webhook operations

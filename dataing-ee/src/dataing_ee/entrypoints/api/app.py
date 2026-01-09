@@ -23,14 +23,15 @@ from dataing.adapters.datasource import BaseAdapter
 from dataing.adapters.db.app_db import AppDatabase
 from dataing.adapters.entitlements import DatabaseEntitlementsAdapter
 from dataing.adapters.investigation_feedback import InvestigationFeedbackAdapter
-from dataing.agents import AgentClient
 from dataing.adapters.notifications.email import EmailConfig, EmailNotifier
+from dataing.agents import AgentClient
 from dataing.core.auth.recovery import PasswordRecoveryAdapter
 from dataing.core.orchestrator import InvestigationOrchestrator, OrchestratorConfig
 from dataing.entrypoints.api.deps import _seed_demo_data, settings
 from dataing.entrypoints.api.routes import api_router as ce_api_router
 from dataing.safety.circuit_breaker import CircuitBreaker, CircuitBreakerConfig
 from dataing_ee.adapters.audit import AuditRepository
+from dataing_ee.entrypoints.api.middleware.audit import AuditMiddleware
 from dataing_ee.entrypoints.api.routes.audit import router as audit_router
 from dataing_ee.entrypoints.api.routes.scim import router as scim_router
 from dataing_ee.entrypoints.api.routes.settings import router as settings_router
@@ -220,6 +221,9 @@ def create_ee_app() -> FastAPI:
         allow_methods=["*"],
         allow_headers=["*"],
     )
+
+    # Audit logging middleware (EE only)
+    app.add_middleware(AuditMiddleware)
 
     # Include CE API routes
     app.include_router(ce_api_router, prefix="/api/v1")

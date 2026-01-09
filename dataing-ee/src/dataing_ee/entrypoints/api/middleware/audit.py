@@ -84,43 +84,54 @@ class AuditMiddleware(BaseHTTPMiddleware):
             auth_context = getattr(request.state, "auth_context", None)
 
             tenant_id = None
-            user_id = None
-            api_key_id = None
+            actor_id = None
 
             if auth_context:
                 tenant_id = auth_context.tenant_id
-                user_id = auth_context.user_id
-                api_key_id = auth_context.key_id
+                actor_id = auth_context.user_id
 
             # Determine action from method and path
             action = self._get_action(request.method, request.url.path)
 
             # Get resource info from path
-            resource_type, resource_id = self._parse_resource(request.url.path)
+            resource_type, resource_id_str = self._parse_resource(request.url.path)
+
+            # Try to parse resource_id as UUID
+            resource_id = None
+            if resource_id_str:
+                try:
+                    resource_id = uuid.UUID(resource_id_str)
+                except ValueError:
+                    pass  # Not a valid UUID, leave as None
 
             # Get client info
-            ip_address = request.client.host if request.client else None
-            user_agent = request.headers.get("user-agent", "")[:500]
+            actor_ip = request.client.host if request.client else None
+            actor_user_agent = request.headers.get("user-agent", "")[:500]
+
+            # Get request details
+            request_method = request.method
+            request_path = str(request.url.path)
 
             # Sanitize body
             sanitized_body = self._sanitize_body(body)
 
             # Get database from app state
-            db = getattr(request.app.state, "db", None)
+            db = getattr(request.app.state, "app_db", None)
 
             if db and tenant_id:
                 await db.create_audit_log(
                     tenant_id=tenant_id,
                     action=action,
-                    user_id=user_id,
-                    api_key_id=api_key_id,
+                    actor_id=actor_id,
+                    actor_ip=actor_ip,
+                    actor_user_agent=actor_user_agent,
                     resource_type=resource_type,
                     resource_id=resource_id,
-                    request_id=request_id,
-                    ip_address=ip_address,
-                    user_agent=user_agent,
-                    request_body=sanitized_body,
-                    response_status=status_code,
+                    request_method=request_method,
+                    request_path=request_path,
+                    status_code=status_code,
+                    changes=sanitized_body,
+                    metadata={"request_id": request_id},
                 )
             else:
                 # Just log to structlog if no DB or no tenant
@@ -128,10 +139,10 @@ class AuditMiddleware(BaseHTTPMiddleware):
                     "audit_log",
                     action=action,
                     resource_type=resource_type,
-                    resource_id=resource_id,
+                    resource_id=resource_id_str,
                     request_id=request_id,
                     status_code=status_code,
-                    ip=ip_address,
+                    ip=actor_ip,
                 )
 
         except Exception as e:

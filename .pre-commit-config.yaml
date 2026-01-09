@@ -88,6 +88,8 @@ repos:
           (?x)^(
             node_modules/.*|
             demo/fixtures/.*|
+            tests/.*|
+            .*\/tests\/.*|
             .*\.lock$|
             uv\.lock$|
             pnpm-lock\.yaml$|

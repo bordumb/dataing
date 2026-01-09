@@ -1,5 +1,6 @@
 """Audit log repository."""
 
+import json
 from datetime import datetime
 from typing import Any
 from uuid import UUID
@@ -10,6 +11,24 @@ from asyncpg import Pool
 from dataing_ee.adapters.audit.types import AuditLogCreate, AuditLogEntry
 
 logger = structlog.get_logger()
+
+
+def _parse_json_field(value: Any) -> dict[str, Any] | None:
+    """Parse a JSON field that may be a string or dict.
+
+    asyncpg returns JSONB as strings by default unless a codec is configured.
+    This helper handles both cases.
+    """
+    if value is None:
+        return None
+    if isinstance(value, dict):
+        return value
+    if isinstance(value, str):
+        try:
+            return json.loads(value)  # type: ignore[no-any-return]
+        except json.JSONDecodeError:
+            return None
+    return None
 
 
 class AuditRepository:
@@ -159,8 +178,8 @@ class AuditRepository:
                 request_method=row["request_method"],
                 request_path=row["request_path"],
                 status_code=row["status_code"],
-                changes=row["changes"],
-                metadata=row["metadata"],
+                changes=_parse_json_field(row["changes"]),
+                metadata=_parse_json_field(row["metadata"]),
                 created_at=row["created_at"],
             )
             for row in rows
@@ -202,8 +221,8 @@ class AuditRepository:
             request_method=row["request_method"],
             request_path=row["request_path"],
             status_code=row["status_code"],
-            changes=row["changes"],
-            metadata=row["metadata"],
+            changes=_parse_json_field(row["changes"]),
+            metadata=_parse_json_field(row["metadata"]),
             created_at=row["created_at"],
         )
 

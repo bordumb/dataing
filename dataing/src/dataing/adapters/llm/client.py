@@ -2,11 +2,11 @@
 
 from __future__ import annotations
 
-import os
 from typing import TYPE_CHECKING
 
 from pydantic_ai.models.anthropic import AnthropicModel
 from pydantic_ai.output import PromptedOutput
+from pydantic_ai.providers.anthropic import AnthropicProvider
 
 from bond import BondAgent, StreamHandlers
 from dataing.core.domain_types import (
@@ -48,33 +48,35 @@ class AnthropicClient:
             model: Model to use.
             max_retries: Max retries on validation failure.
         """
-        os.environ["ANTHROPIC_API_KEY"] = api_key
-        self._model = AnthropicModel(model)
+        provider = AnthropicProvider(api_key=api_key)
+        self._model = AnthropicModel(model, provider=provider)
 
+        # Empty base instructions: all prompting via dynamic_instructions at runtime.
+        # This ensures PromptedOutput gets the full detailed prompt without conflicts.
         self._hypothesis_agent: BondAgent[HypothesesResponse, None] = BondAgent(
             name="hypothesis-generator",
-            instructions="You are a data quality investigator.",
+            instructions="",
             model=self._model,
             output_type=PromptedOutput(HypothesesResponse),
             max_retries=max_retries,
         )
         self._interpretation_agent: BondAgent[InterpretationResponse, None] = BondAgent(
             name="evidence-interpreter",
-            instructions="You analyze query results for evidence.",
+            instructions="",
             model=self._model,
             output_type=PromptedOutput(InterpretationResponse),
             max_retries=max_retries,
         )
         self._synthesis_agent: BondAgent[SynthesisResponse, None] = BondAgent(
             name="finding-synthesizer",
-            instructions="You synthesize investigation findings.",
+            instructions="",
             model=self._model,
             output_type=PromptedOutput(SynthesisResponse),
             max_retries=max_retries,
         )
         self._query_agent: BondAgent[QueryResponse, None] = BondAgent(
             name="sql-generator",
-            instructions="You are a SQL expert.",
+            instructions="",
             model=self._model,
             output_type=PromptedOutput(QueryResponse),
             max_retries=max_retries,

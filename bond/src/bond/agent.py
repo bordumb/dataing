@@ -3,7 +3,7 @@
 import json
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
-from typing import Any, Generic, TypeVar
+from typing import TYPE_CHECKING, Any, Generic, TypeVar
 
 from pydantic_ai import Agent
 from pydantic_ai.messages import (
@@ -121,14 +121,19 @@ class BondAgent(Generic[T, DepsT]):
         for toolset in self.toolsets:
             all_tools.extend(toolset)
 
-        self._agent = Agent(
-            model=self.model,
-            system_prompt=self.instructions,
-            tools=all_tools,
-            output_type=self.output_type,
-            retries=self.max_retries,
-            deps_type=type(self.deps) if self.deps else None,
-        )
+        # Only pass system_prompt if instructions are non-empty
+        # This matches behavior when using raw Agent without system_prompt
+        agent_kwargs: dict[str, Any] = {
+            "model": self.model,
+            "tools": all_tools,
+            "output_type": self.output_type,
+            "retries": self.max_retries,
+            "deps_type": type(self.deps) if self.deps else None,
+        }
+        if self.instructions:
+            agent_kwargs["system_prompt"] = self.instructions
+
+        self._agent = Agent(**agent_kwargs)
 
     async def ask(
         self,

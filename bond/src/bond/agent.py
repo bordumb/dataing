@@ -142,7 +142,9 @@ class BondAgent(Generic[T, DepsT]):
         Args:
             prompt: The user's message/question.
             handlers: Optional callbacks for streaming events.
-            dynamic_instructions: Override system prompt for this call only.
+            dynamic_instructions: Additional instructions for this call only.
+                Passed to PydanticAI's `instructions` parameter which works
+                better with PromptedOutput for chain-of-thought reasoning.
 
         Returns:
             The agent's response of type T.
@@ -150,25 +152,15 @@ class BondAgent(Generic[T, DepsT]):
         if self._agent is None:
             raise RuntimeError("Agent not initialized")
 
-        active_agent = self._agent
-        if dynamic_instructions and dynamic_instructions != self.instructions:
-            active_agent = Agent(
-                model=self.model,
-                system_prompt=dynamic_instructions,
-                tools=list(self._agent._function_tools.values()),
-                result_type=self.output_type,
-                retries=self.max_retries,
-                deps_type=type(self.deps) if self.deps else None,
-            )
-
         if handlers:
             # Track tool call IDs to names for result lookup
             tool_id_to_name: dict[str, str] = {}
 
-            async with active_agent.run_stream(
+            async with self._agent.run_stream(
                 prompt,
                 deps=self.deps,
                 message_history=self._history,
+                instructions=dynamic_instructions,
             ) as result:
                 async for event in result.stream():
                     # --- 1. BLOCK LIFECYCLE (Open/Close) ---
@@ -238,10 +230,11 @@ class BondAgent(Generic[T, DepsT]):
                 return data
 
         # Non-streaming fallback
-        result = await active_agent.run(
+        result = await self._agent.run(
             prompt,
             deps=self.deps,
             message_history=self._history,
+            instructions=dynamic_instructions,
         )
         self._history = list(result.all_messages())
         non_stream_data: T = result.data

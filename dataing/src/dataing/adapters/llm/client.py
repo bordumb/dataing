@@ -340,6 +340,13 @@ TESTABILITY IS CRITICAL:
 - The expected_if_true and expected_if_false should be mutually exclusive
 - Avoid vague expectations like "some issues found" or "data looks wrong"
 
+DIMENSIONAL ANALYSIS IS ESSENTIAL:
+- Use GROUP BY on categorical columns to segment the data and find patterns
+- Common dimensions: channel, platform, version, region, source, type, category
+- If anomalies cluster in ONE segment (e.g., one app version, one channel), that's the root cause
+- Example: GROUP BY channel, app_version to see if issues are isolated to specific clients
+- Dimensional breakdowns often reveal root causes faster than temporal analysis alone
+
 Generate diverse hypotheses covering multiple categories when plausible."""
 
     def _build_hypothesis_user_prompt(
@@ -387,6 +394,12 @@ CRITICAL RULES:
 3. SELECT queries ONLY - no mutations
 4. Always include LIMIT clause (max 10000)
 5. Use fully qualified table names (schema.table)
+
+INVESTIGATION TECHNIQUES:
+- Use GROUP BY on categorical columns to find patterns (channel, platform, version, region, etc.)
+- Segment analysis often reveals root causes faster than aggregate counts
+- If issues cluster in one segment, that segment IS the root cause
+- Compare affected vs unaffected segments to isolate the problem
 
 SCHEMA:
 {schema.to_prompt_string()}"""

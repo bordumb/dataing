@@ -175,25 +175,32 @@ demo: demo-fixtures
         -p 5432:5432 \
         postgres:16-alpine
     echo "Waiting for PostgreSQL to be ready..."
-    sleep 3
+    for i in {1..30}; do
+        if PGPASSWORD=dataing psql -h localhost -U dataing -d dataing_demo -c "SELECT 1" > /dev/null 2>&1; then
+            echo "PostgreSQL is ready!"
+            break
+        fi
+        sleep 1
+    done
 
     # Run migrations in order
     # IMPORTANT: Order matters! 007_auth_tables creates organizations/users/teams,
     # 007_sso_scim adds SSO columns, 008_seed_demo_auth creates demo data
     echo "Running database migrations..."
-    PGPASSWORD=dataing psql -h localhost -U dataing -d dataing_demo -f dataing/migrations/001_initial.sql 2>/dev/null || true
-    PGPASSWORD=dataing psql -h localhost -U dataing -d dataing_demo -f dataing/migrations/002_datasets.sql 2>/dev/null || true
-    PGPASSWORD=dataing psql -h localhost -U dataing -d dataing_demo -f dataing/migrations/003_investigation_feedback_events.sql 2>/dev/null || true
-    PGPASSWORD=dataing psql -h localhost -U dataing -d dataing_demo -f dataing/migrations/004_schema_comments.sql 2>/dev/null || true
-    PGPASSWORD=dataing psql -h localhost -U dataing -d dataing_demo -f dataing/migrations/005_knowledge_comments.sql 2>/dev/null || true
-    PGPASSWORD=dataing psql -h localhost -U dataing -d dataing_demo -f dataing/migrations/006_comment_votes.sql 2>/dev/null || true
-    PGPASSWORD=dataing psql -h localhost -U dataing -d dataing_demo -f dataing/migrations/007_auth_tables.sql 2>/dev/null || true
-    PGPASSWORD=dataing psql -h localhost -U dataing -d dataing_demo -f dataing/migrations/007_sso_scim_tables.sql 2>/dev/null || true
-    PGPASSWORD=dataing psql -h localhost -U dataing -d dataing_demo -f dataing/migrations/008_rbac_tables.sql 2>/dev/null || true
-    PGPASSWORD=dataing psql -h localhost -U dataing -d dataing_demo -f dataing/migrations/008_seed_demo_auth.sql 2>/dev/null || true
-    PGPASSWORD=dataing psql -h localhost -U dataing -d dataing_demo -f dataing/migrations/009_password_reset_tokens.sql 2>/dev/null || true
-    PGPASSWORD=dataing psql -h localhost -U dataing -d dataing_demo -f dataing/migrations/009_seed_multi_org_demo.sql 2>/dev/null || true
-    PGPASSWORD=dataing psql -h localhost -U dataing -d dataing_demo -f dataing/migrations/010_audit_logs.sql 2>/dev/null || true
+    PGPASSWORD=dataing psql -h localhost -U dataing -d dataing_demo -f dataing/migrations/001_initial.sql 2>&1 | grep -v "^NOTICE:" || true
+    PGPASSWORD=dataing psql -h localhost -U dataing -d dataing_demo -f dataing/migrations/002_datasets.sql 2>&1 | grep -v "^NOTICE:" || true
+    PGPASSWORD=dataing psql -h localhost -U dataing -d dataing_demo -f dataing/migrations/003_investigation_feedback_events.sql 2>&1 | grep -v "^NOTICE:" || true
+    PGPASSWORD=dataing psql -h localhost -U dataing -d dataing_demo -f dataing/migrations/004_schema_comments.sql 2>&1 | grep -v "^NOTICE:" || true
+    PGPASSWORD=dataing psql -h localhost -U dataing -d dataing_demo -f dataing/migrations/005_knowledge_comments.sql 2>&1 | grep -v "^NOTICE:" || true
+    PGPASSWORD=dataing psql -h localhost -U dataing -d dataing_demo -f dataing/migrations/006_comment_votes.sql 2>&1 | grep -v "^NOTICE:" || true
+    PGPASSWORD=dataing psql -h localhost -U dataing -d dataing_demo -f dataing/migrations/007_auth_tables.sql 2>&1 | grep -v "^NOTICE:" || true
+    PGPASSWORD=dataing psql -h localhost -U dataing -d dataing_demo -f dataing/migrations/007_sso_scim_tables.sql 2>&1 | grep -v "^NOTICE:" || true
+    PGPASSWORD=dataing psql -h localhost -U dataing -d dataing_demo -f dataing/migrations/008_rbac_tables.sql 2>&1 | grep -v "^NOTICE:" || true
+    PGPASSWORD=dataing psql -h localhost -U dataing -d dataing_demo -f dataing/migrations/008_seed_demo_auth.sql 2>&1 | grep -v "^NOTICE:" || true
+    PGPASSWORD=dataing psql -h localhost -U dataing -d dataing_demo -f dataing/migrations/009_password_reset_tokens.sql 2>&1 | grep -v "^NOTICE:" || true
+    PGPASSWORD=dataing psql -h localhost -U dataing -d dataing_demo -f dataing/migrations/009_seed_multi_org_demo.sql 2>&1 | grep -v "^NOTICE:" || true
+    PGPASSWORD=dataing psql -h localhost -U dataing -d dataing_demo -f dataing/migrations/010_audit_logs.sql 2>&1 | grep -v "^NOTICE:" || true
+    PGPASSWORD=dataing psql -h localhost -U dataing -d dataing_demo -f dataing/migrations/011_rl_training_signals.sql 2>&1 | grep -v "^NOTICE:" || true
 
     trap 'kill 0' EXIT
 

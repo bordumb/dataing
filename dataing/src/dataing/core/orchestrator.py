@@ -24,6 +24,8 @@ import structlog
 from dataing.adapters.investigation_feedback import EventType
 from dataing.adapters.llm.response_models import InterpretationResponse, SynthesisResponse
 
+from bond import StreamHandlers
+
 from .domain_types import Evidence, Finding, Hypothesis, InvestigationContext
 from .exceptions import CircuitBreakerTripped, SchemaDiscoveryError
 from .state import Event, InvestigationState
@@ -112,6 +114,7 @@ class InvestigationOrchestrator:
         self,
         state: InvestigationState,
         data_adapter: SQLAdapter | None = None,
+        handlers: StreamHandlers | None = None,
     ) -> Finding:
         """Execute a complete investigation.
 
@@ -120,6 +123,7 @@ class InvestigationOrchestrator:
             data_adapter: Optional adapter for tenant's data source.
                          If provided, queries run against this adapter
                          instead of the default self.db.
+            handlers: Optional streaming handlers for real-time updates.
 
         Returns:
             Finding with root cause and recommendations.
@@ -178,15 +182,15 @@ class InvestigationOrchestrator:
                 )
 
             # 2. Generate Hypotheses
-            state, hypotheses = await self._generate_hypotheses(state)
+            state, hypotheses = await self._generate_hypotheses(state, handlers)
             log.info("Hypotheses generated", count=len(hypotheses))
 
             # 3. Investigate Hypotheses (Parallel Fan-Out)
-            evidence = await self._investigate_parallel(state, hypotheses)
+            evidence = await self._investigate_parallel(state, hypotheses, handlers)
             log.info("Investigation complete", evidence_count=len(evidence))
 
             # 4. Synthesize Findings (Fan-In)
-            finding = await self._synthesize(state, evidence, start_time)
+            finding = await self._synthesize(state, evidence, start_time, handlers)
             log.info(
                 "Synthesis complete",
                 root_cause=finding.root_cause,
@@ -300,11 +304,13 @@ class InvestigationOrchestrator:
     async def _generate_hypotheses(
         self,
         state: InvestigationState,
+        handlers: StreamHandlers | None = None,
     ) -> tuple[InvestigationState, list[Hypothesis]]:
         """Generate hypotheses using LLM.
 
         Args:
             state: Current investigation state with context.
+            handlers: Optional streaming handlers for real-time updates.
 
         Returns:
             Tuple of updated state and list of hypotheses.
@@ -320,6 +326,7 @@ class InvestigationOrchestrator:
             alert=state.alert,
             context=context,
             num_hypotheses=self.config.max_hypotheses,
+            handlers=handlers,
         )
 
         for h in hypotheses:
@@ -341,17 +348,19 @@ class InvestigationOrchestrator:
         self,
         state: InvestigationState,
         hypotheses: list[Hypothesis],
+        handlers: StreamHandlers | None = None,
     ) -> list[Evidence]:
         """Fan-out: Investigate all hypotheses in parallel.
 
         Args:
             state: Current investigation state.
             hypotheses: List of hypotheses to investigate.
+            handlers: Optional streaming handlers for real-time updates.
 
         Returns:
             List of all evidence collected.
         """
-        tasks = [self._investigate_hypothesis(state, h) for h in hypotheses]
+        tasks = [self._investigate_hypothesis(state, h, handlers) for h in hypotheses]
         results = await asyncio.gather(*tasks, return_exceptions=True)
 
         evidence: list[Evidence] = []
@@ -368,12 +377,14 @@ class InvestigationOrchestrator:
         self,
         state: InvestigationState,
         hypothesis: Hypothesis,
+        handlers: StreamHandlers | None = None,
     ) -> list[Evidence]:
         """Investigate a single hypothesis with retry/reflexion loop.
 
         Args:
             state: Current investigation state.
             hypothesis: The hypothesis to investigate.
+            handlers: Optional streaming handlers for real-time updates.
 
         Returns:
             List of evidence collected for this hypothesis.
@@ -401,6 +412,7 @@ class InvestigationOrchestrator:
                 hypothesis=hypothesis,
                 schema=state.schema_context,
                 previous_error=previous_error,
+                handlers=handlers,
             )
 
             # Check for duplicate query (stall detection)
@@ -432,7 +444,9 @@ class InvestigationOrchestrator:
                 )
 
                 # Interpret results
-                ev = await self.llm.interpret_evidence(hypothesis, query, result)
+                ev = await self.llm.interpret_evidence(
+                    hypothesis, query, result, handlers=handlers
+                )
 
                 # Validate interpretation if enabled
                 if self.config.validation_enabled and self.validator:
@@ -554,6 +568,7 @@ class InvestigationOrchestrator:
         state: InvestigationState,
         evidence: list[Evidence],
         start_time: float,
+        handlers: StreamHandlers | None = None,
     ) -> Finding:
         """Fan-in: Synthesize all evidence into a finding.
 
@@ -561,6 +576,7 @@ class InvestigationOrchestrator:
             state: Current investigation state.
             evidence: All collected evidence.
             start_time: Investigation start time for duration calculation.
+            handlers: Optional streaming handlers for real-time updates.
 
         Returns:
             Finding with root cause and recommendations.
@@ -568,6 +584,7 @@ class InvestigationOrchestrator:
         finding = await self.llm.synthesize_findings(
             alert=state.alert,
             evidence=evidence,
+            handlers=handlers,
         )
 
         # Update finding with investigation metadata

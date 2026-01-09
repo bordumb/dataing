@@ -7,6 +7,7 @@ requires-python = ">=3.11"
 license = { text = "MIT" }
 authors = [{ name = "dataing team" }]
 dependencies = [
+    "bond",
     "fastapi[standard]>=0.109.0",
     "uvicorn[standard]>=0.27.0",
     "pydantic[email]>=2.5.0",
@@ -49,3 +50,6 @@ build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/dataing"]
+
+[tool.uv.sources]
+bond = { path = "../bond", editable = true }

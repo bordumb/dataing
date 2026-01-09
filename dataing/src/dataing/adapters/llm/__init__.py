@@ -1,5 +1,7 @@
 """LLM adapter module."""
 
+from bond import StreamHandlers
+
 from .client import AnthropicClient
 from .response_models import (
     HypothesesResponse,
@@ -11,6 +13,7 @@ from .response_models import (
 
 __all__ = [
     "AnthropicClient",
+    "StreamHandlers",
     "HypothesesResponse",
     "HypothesisResponse",
     "InterpretationResponse",

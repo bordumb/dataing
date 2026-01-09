@@ -1,14 +1,14 @@
-"""Anthropic Claude implementation with Pydantic AI structured outputs."""
+"""Anthropic Claude implementation with BondAgent structured outputs."""
 
 from __future__ import annotations
 
-import os
 from typing import TYPE_CHECKING
 
-from pydantic_ai import Agent
 from pydantic_ai.models.anthropic import AnthropicModel
 from pydantic_ai.output import PromptedOutput
+from pydantic_ai.providers.anthropic import AnthropicProvider
 
+from bond import BondAgent, StreamHandlers
 from dataing.core.domain_types import (
     AnomalyAlert,
     Evidence,
@@ -30,9 +30,9 @@ if TYPE_CHECKING:
 
 
 class AnthropicClient:
-    """Anthropic Claude implementation with structured outputs.
+    """Anthropic Claude implementation with streaming support.
 
-    Uses Pydantic AI for type-safe, validated LLM responses.
+    Uses BondAgent for type-safe, validated LLM responses with optional streaming.
     """
 
     def __init__(
@@ -48,32 +48,38 @@ class AnthropicClient:
             model: Model to use.
             max_retries: Max retries on validation failure.
         """
-        # Pydantic AI reads API key from environment variable
-        os.environ["ANTHROPIC_API_KEY"] = api_key
-        self._model = AnthropicModel(model)
+        provider = AnthropicProvider(api_key=api_key)
+        self._model = AnthropicModel(model, provider=provider)
 
-        # Pre-configure agents for each task
-        # Using PromptedOutput mode enables chain-of-thought reasoning before structured output,
-        # which significantly improves quality for complex analytical tasks compared to tool mode.
-        self._hypothesis_agent: Agent[None, HypothesesResponse] = Agent(
+        # Empty base instructions: all prompting via dynamic_instructions at runtime.
+        # This ensures PromptedOutput gets the full detailed prompt without conflicts.
+        self._hypothesis_agent: BondAgent[HypothesesResponse, None] = BondAgent(
+            name="hypothesis-generator",
+            instructions="",
             model=self._model,
             output_type=PromptedOutput(HypothesesResponse),
-            retries=max_retries,
+            max_retries=max_retries,
         )
-        self._interpretation_agent: Agent[None, InterpretationResponse] = Agent(
+        self._interpretation_agent: BondAgent[InterpretationResponse, None] = BondAgent(
+            name="evidence-interpreter",
+            instructions="",
             model=self._model,
             output_type=PromptedOutput(InterpretationResponse),
-            retries=max_retries,
+            max_retries=max_retries,
         )
-        self._synthesis_agent: Agent[None, SynthesisResponse] = Agent(
+        self._synthesis_agent: BondAgent[SynthesisResponse, None] = BondAgent(
+            name="finding-synthesizer",
+            instructions="",
             model=self._model,
             output_type=PromptedOutput(SynthesisResponse),
-            retries=max_retries,
+            max_retries=max_retries,
         )
-        self._query_agent: Agent[None, QueryResponse] = Agent(
+        self._query_agent: BondAgent[QueryResponse, None] = BondAgent(
+            name="sql-generator",
+            instructions="",
             model=self._model,
             output_type=PromptedOutput(QueryResponse),
-            retries=max_retries,
+            max_retries=max_retries,
         )
 
     async def generate_hypotheses(
@@ -81,6 +87,7 @@ class AnthropicClient:
         alert: AnomalyAlert,
         context: InvestigationContext,
         num_hypotheses: int = 5,
+        handlers: StreamHandlers | None = None,
     ) -> list[Hypothesis]:
         """Generate hypotheses for an anomaly.
 
@@ -88,6 +95,7 @@ class AnthropicClient:
             alert: The anomaly alert to investigate.
             context: Available schema and lineage context.
             num_hypotheses: Target number of hypotheses.
+            handlers: Optional streaming handlers for real-time updates.
 
         Returns:
             List of validated Hypothesis objects.
@@ -99,9 +107,10 @@ class AnthropicClient:
         user_prompt = self._build_hypothesis_user_prompt(alert, context)
 
         try:
-            result = await self._hypothesis_agent.run(
+            result = await self._hypothesis_agent.ask(
                 user_prompt,
-                instructions=system_prompt,
+                dynamic_instructions=system_prompt,
+                handlers=handlers,
             )
 
             return [
@@ -112,7 +121,7 @@ class AnthropicClient:
                     reasoning=h.reasoning,
                     suggested_query=h.suggested_query,
                 )
-                for h in result.output.hypotheses
+                for h in result.hypotheses
             ]
 
         except Exception as e:
@@ -126,6 +135,7 @@ class AnthropicClient:
         hypothesis: Hypothesis,
         schema: SchemaResponse,
         previous_error: str | None = None,
+        handlers: StreamHandlers | None = None,
     ) -> str:
         """Generate SQL query to test a hypothesis.
 
@@ -133,6 +143,7 @@ class AnthropicClient:
             hypothesis: The hypothesis to test.
             schema: Available database schema.
             previous_error: Error from previous attempt (for reflexion).
+            handlers: Optional streaming handlers for real-time updates.
 
         Returns:
             Validated SQL query string.
@@ -148,12 +159,12 @@ class AnthropicClient:
             system = self._build_query_system_prompt(schema)
 
         try:
-            result = await self._query_agent.run(
+            result = await self._query_agent.ask(
                 prompt,
-                instructions=system,
+                dynamic_instructions=system,
+                handlers=handlers,
             )
-            query: str = result.output.query
-            return query
+            return result.query
 
         except Exception as e:
             raise LLMError(
@@ -166,6 +177,7 @@ class AnthropicClient:
         hypothesis: Hypothesis,
         query: str,
         results: QueryResult,
+        handlers: StreamHandlers | None = None,
     ) -> Evidence:
         """Interpret query results as evidence.
 
@@ -173,6 +185,7 @@ class AnthropicClient:
             hypothesis: The hypothesis being tested.
             query: The query that was executed.
             results: The query results.
+            handlers: Optional streaming handlers for real-time updates.
 
         Returns:
             Evidence with validated interpretation.
@@ -181,9 +194,10 @@ class AnthropicClient:
         system = self._build_interpretation_system_prompt()
 
         try:
-            result = await self._interpretation_agent.run(
+            result = await self._interpretation_agent.ask(
                 prompt,
-                instructions=system,
+                dynamic_instructions=system,
+                handlers=handlers,
             )
 
             return Evidence(
@@ -191,9 +205,9 @@ class AnthropicClient:
                 query=query,
                 result_summary=results.to_summary(),
                 row_count=results.row_count,
-                supports_hypothesis=result.output.supports_hypothesis,
-                confidence=result.output.confidence,
-                interpretation=result.output.interpretation,
+                supports_hypothesis=result.supports_hypothesis,
+                confidence=result.confidence,
+                interpretation=result.interpretation,
             )
 
         except Exception as e:
@@ -212,12 +226,14 @@ class AnthropicClient:
         self,
         alert: AnomalyAlert,
         evidence: list[Evidence],
+        handlers: StreamHandlers | None = None,
     ) -> Finding:
         """Synthesize all evidence into a root cause finding.
 
         Args:
             alert: The original anomaly alert.
             evidence: All collected evidence.
+            handlers: Optional streaming handlers for real-time updates.
 
         Returns:
             Finding with validated root cause and recommendations.
@@ -229,18 +245,19 @@ class AnthropicClient:
         system = self._build_synthesis_system_prompt()
 
         try:
-            result = await self._synthesis_agent.run(
+            result = await self._synthesis_agent.ask(
                 prompt,
-                instructions=system,
+                dynamic_instructions=system,
+                handlers=handlers,
             )
 
             return Finding(
                 investigation_id="",  # Set by orchestrator
-                status="completed" if result.output.root_cause else "inconclusive",
-                root_cause=result.output.root_cause,
-                confidence=result.output.confidence,
+                status="completed" if result.root_cause else "inconclusive",
+                root_cause=result.root_cause,
+                confidence=result.confidence,
                 evidence=evidence,
-                recommendations=result.output.recommendations,
+                recommendations=result.recommendations,
                 duration_seconds=0.0,  # Set by orchestrator
             )
 
@@ -325,6 +342,13 @@ TESTABILITY IS CRITICAL:
 - The expected_if_true and expected_if_false should be mutually exclusive
 - Avoid vague expectations like "some issues found" or "data looks wrong"
 
+DIMENSIONAL ANALYSIS IS ESSENTIAL:
+- Use GROUP BY on categorical columns to segment the data and find patterns
+- Common dimensions: channel, platform, version, region, source, type, category
+- If anomalies cluster in ONE segment (e.g., one app version, one channel), that's the root cause
+- Example: GROUP BY channel, app_version to see if issues are isolated to specific clients
+- Dimensional breakdowns often reveal root causes faster than temporal analysis alone
+
 Generate diverse hypotheses covering multiple categories when plausible."""
 
     def _build_hypothesis_user_prompt(
@@ -372,6 +396,12 @@ CRITICAL RULES:
 3. SELECT queries ONLY - no mutations
 4. Always include LIMIT clause (max 10000)
 5. Use fully qualified table names (schema.table)
+
+INVESTIGATION TECHNIQUES:
+- Use GROUP BY on categorical columns to find patterns (channel, platform, version, region, etc.)
+- Segment analysis often reveals root causes faster than aggregate counts
+- If issues cluster in one segment, that segment IS the root cause
+- Compare affected vs unaffected segments to isolate the problem
 
 SCHEMA:
 {schema.to_prompt_string()}"""

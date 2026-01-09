@@ -224,12 +224,14 @@ class AnthropicClient:
         self,
         alert: AnomalyAlert,
         evidence: list[Evidence],
+        handlers: StreamHandlers | None = None,
     ) -> Finding:
         """Synthesize all evidence into a root cause finding.
 
         Args:
             alert: The original anomaly alert.
             evidence: All collected evidence.
+            handlers: Optional streaming handlers for real-time updates.
 
         Returns:
             Finding with validated root cause and recommendations.
@@ -241,18 +243,19 @@ class AnthropicClient:
         system = self._build_synthesis_system_prompt()
 
         try:
-            result = await self._synthesis_agent.run(
+            result = await self._synthesis_agent.ask(
                 prompt,
-                instructions=system,
+                dynamic_instructions=system,
+                handlers=handlers,
             )
 
             return Finding(
                 investigation_id="",  # Set by orchestrator
-                status="completed" if result.output.root_cause else "inconclusive",
-                root_cause=result.output.root_cause,
-                confidence=result.output.confidence,
+                status="completed" if result.root_cause else "inconclusive",
+                root_cause=result.root_cause,
+                confidence=result.confidence,
                 evidence=evidence,
-                recommendations=result.output.recommendations,
+                recommendations=result.recommendations,
                 duration_seconds=0.0,  # Set by orchestrator
             )
 

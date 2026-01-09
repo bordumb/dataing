@@ -23,7 +23,7 @@ spec:
             command:
               - python
               - -m
-              - dataing.jobs.audit_cleanup
+              - dataing_ee.jobs.audit_cleanup
             env:
               - name: DATABASE_URL
                 valueFrom:

@@ -13,6 +13,8 @@ from typing import TYPE_CHECKING, Any, Protocol, runtime_checkable
 from uuid import UUID
 
 if TYPE_CHECKING:
+    from bond import StreamHandlers
+
     from dataing.adapters.datasource.base import BaseAdapter
     from dataing.adapters.datasource.types import QueryResult, SchemaFilter, SchemaResponse
 
@@ -91,6 +93,7 @@ class LLMClient(Protocol):
         alert: AnomalyAlert,
         context: InvestigationContext,
         num_hypotheses: int = 5,
+        handlers: StreamHandlers | None = None,
     ) -> list[Hypothesis]:
         """Generate hypotheses for an anomaly.
 
@@ -98,6 +101,7 @@ class LLMClient(Protocol):
             alert: The anomaly alert to investigate.
             context: Available schema and lineage context.
             num_hypotheses: Target number of hypotheses to generate.
+            handlers: Optional streaming handlers for real-time updates.
 
         Returns:
             List of generated hypotheses.
@@ -112,6 +116,7 @@ class LLMClient(Protocol):
         hypothesis: Hypothesis,
         schema: SchemaResponse,
         previous_error: str | None = None,
+        handlers: StreamHandlers | None = None,
     ) -> str:
         """Generate SQL query to test a hypothesis.
 
@@ -119,6 +124,7 @@ class LLMClient(Protocol):
             hypothesis: The hypothesis to test.
             schema: Available database schema.
             previous_error: Error from previous query attempt (for reflexion).
+            handlers: Optional streaming handlers for real-time updates.
 
         Returns:
             SQL query string.
@@ -133,6 +139,7 @@ class LLMClient(Protocol):
         hypothesis: Hypothesis,
         query: str,
         results: QueryResult,
+        handlers: StreamHandlers | None = None,
     ) -> Evidence:
         """Interpret query results as evidence.
 
@@ -140,6 +147,7 @@ class LLMClient(Protocol):
             hypothesis: The hypothesis being tested.
             query: The query that was executed.
             results: The query results to interpret.
+            handlers: Optional streaming handlers for real-time updates.
 
         Returns:
             Evidence with interpretation and confidence.
@@ -153,12 +161,14 @@ class LLMClient(Protocol):
         self,
         alert: AnomalyAlert,
         evidence: list[Evidence],
+        handlers: StreamHandlers | None = None,
     ) -> Finding:
         """Synthesize all evidence into a root cause finding.
 
         Args:
             alert: The original anomaly alert.
             evidence: All collected evidence.
+            handlers: Optional streaming handlers for real-time updates.
 
         Returns:
             Finding with root cause and recommendations.

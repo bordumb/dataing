@@ -114,12 +114,16 @@ class BondAgent(Generic[T, DepsT]):
     _agent: Agent[DepsT, T] | None = field(default=None, init=False, repr=False)
     _history: list[ModelMessage] = field(default_factory=list, init=False, repr=False)
     _tool_names: dict[str, str] = field(default_factory=dict, init=False, repr=False)
+    _tools: list[Tool[DepsT]] = field(default_factory=list, init=False, repr=False)
 
     def __post_init__(self) -> None:
         """Initialize the underlying PydanticAI agent."""
         all_tools: list[Tool[DepsT]] = []
         for toolset in self.toolsets:
             all_tools.extend(toolset)
+
+        # Store tools for reuse when creating dynamic agents
+        self._tools = all_tools
 
         # Only pass system_prompt if instructions are non-empty
         # This matches behavior when using raw Agent without system_prompt
@@ -160,8 +164,8 @@ class BondAgent(Generic[T, DepsT]):
             active_agent = Agent(
                 model=self.model,
                 system_prompt=dynamic_instructions,
-                tools=list(self._agent._function_tools.values()),
-                result_type=self.output_type,
+                tools=self._tools,
+                output_type=self.output_type,
                 retries=self.max_retries,
                 deps_type=type(self.deps) if self.deps else None,
             )

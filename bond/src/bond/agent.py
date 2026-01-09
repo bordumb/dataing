@@ -125,7 +125,7 @@ class BondAgent(Generic[T, DepsT]):
             model=self.model,
             system_prompt=self.instructions,
             tools=all_tools,
-            result_type=self.output_type,
+            output_type=self.output_type,
             retries=self.max_retries,
             deps_type=type(self.deps) if self.deps else None,
         )

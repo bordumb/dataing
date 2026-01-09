@@ -21,7 +21,7 @@ from mcp.types import TextContent, Tool
 from dataing.adapters.context.engine import DefaultContextEngine
 from dataing.adapters.datasource import get_registry
 from dataing.adapters.datasource.sql.base import SQLAdapter
-from dataing.adapters.llm.client import AnthropicClient
+from dataing.agents import AgentClient
 from dataing.core.domain_types import AnomalyAlert, MetricSpec
 from dataing.core.orchestrator import InvestigationOrchestrator, OrchestratorConfig
 from dataing.core.state import InvestigationState
@@ -31,7 +31,7 @@ from dataing.safety.validator import validate_query
 
 def create_server(
     db: SQLAdapter,
-    llm: AnthropicClient,
+    llm: AgentClient,
 ) -> Server:
     """Create and configure the MCP server.
 

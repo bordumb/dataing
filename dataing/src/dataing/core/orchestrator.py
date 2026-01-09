@@ -22,7 +22,7 @@ from uuid import UUID
 import structlog
 
 from dataing.adapters.investigation_feedback import EventType
-from dataing.adapters.llm.response_models import InterpretationResponse, SynthesisResponse
+from dataing.agents.models import InterpretationResponse, SynthesisResponse
 
 from bond import StreamHandlers
 

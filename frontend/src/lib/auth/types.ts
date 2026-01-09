@@ -20,6 +20,7 @@ export interface Organization {
   id: string
   name: string
   slug: string
+  plan?: string
 }
 
 export interface OrgMembership {
@@ -44,6 +45,7 @@ export interface RegisterRequest {
 
 export interface RefreshRequest {
   refresh_token: string
+  org_id?: string
 }
 
 export interface AuthResponse {
@@ -52,6 +54,7 @@ export interface AuthResponse {
   token_type: string
   user: User
   org: Organization
+  role: OrgRole
 }
 
 export interface JwtPayload {

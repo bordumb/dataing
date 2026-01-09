@@ -10,9 +10,11 @@ export function setUpgradeError(error: UpgradeError | null) {
   listeners.forEach((listener) => listener(error))
 }
 
-export function subscribeToUpgradeError(listener: UpgradeErrorListener) {
+export function subscribeToUpgradeError(listener: UpgradeErrorListener): () => void {
   listeners.add(listener)
-  return () => listeners.delete(listener)
+  return () => {
+    listeners.delete(listener)
+  }
 }
 
 export function getUpgradeError() {

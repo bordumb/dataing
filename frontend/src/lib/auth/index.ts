@@ -6,7 +6,6 @@
 export type {
   AuthResponse,
   AuthState,
-  AuthTokens,
   JwtPayload,
   LoginRequest,
   Organization,

@@ -175,6 +175,7 @@ class AnthropicClient:
         hypothesis: Hypothesis,
         query: str,
         results: QueryResult,
+        handlers: StreamHandlers | None = None,
     ) -> Evidence:
         """Interpret query results as evidence.
 
@@ -182,6 +183,7 @@ class AnthropicClient:
             hypothesis: The hypothesis being tested.
             query: The query that was executed.
             results: The query results.
+            handlers: Optional streaming handlers for real-time updates.
 
         Returns:
             Evidence with validated interpretation.
@@ -190,9 +192,10 @@ class AnthropicClient:
         system = self._build_interpretation_system_prompt()
 
         try:
-            result = await self._interpretation_agent.run(
+            result = await self._interpretation_agent.ask(
                 prompt,
-                instructions=system,
+                dynamic_instructions=system,
+                handlers=handlers,
             )
 
             return Evidence(
@@ -200,9 +203,9 @@ class AnthropicClient:
                 query=query,
                 result_summary=results.to_summary(),
                 row_count=results.row_count,
-                supports_hypothesis=result.output.supports_hypothesis,
-                confidence=result.output.confidence,
-                interpretation=result.output.interpretation,
+                supports_hypothesis=result.supports_hypothesis,
+                confidence=result.confidence,
+                interpretation=result.interpretation,
             )
 
         except Exception as e:

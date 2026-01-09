@@ -5,10 +5,10 @@ from __future__ import annotations
 import os
 from typing import TYPE_CHECKING
 
-from bond import BondAgent, StreamHandlers
 from pydantic_ai.models.anthropic import AnthropicModel
 from pydantic_ai.output import PromptedOutput
 
+from bond import BondAgent, StreamHandlers
 from dataing.core.domain_types import (
     AnomalyAlert,
     Evidence,
@@ -85,6 +85,7 @@ class AnthropicClient:
         alert: AnomalyAlert,
         context: InvestigationContext,
         num_hypotheses: int = 5,
+        handlers: StreamHandlers | None = None,
     ) -> list[Hypothesis]:
         """Generate hypotheses for an anomaly.
 
@@ -92,6 +93,7 @@ class AnthropicClient:
             alert: The anomaly alert to investigate.
             context: Available schema and lineage context.
             num_hypotheses: Target number of hypotheses.
+            handlers: Optional streaming handlers for real-time updates.
 
         Returns:
             List of validated Hypothesis objects.
@@ -103,9 +105,10 @@ class AnthropicClient:
         user_prompt = self._build_hypothesis_user_prompt(alert, context)
 
         try:
-            result = await self._hypothesis_agent.run(
+            result = await self._hypothesis_agent.ask(
                 user_prompt,
-                instructions=system_prompt,
+                dynamic_instructions=system_prompt,
+                handlers=handlers,
             )
 
             return [
@@ -116,7 +119,7 @@ class AnthropicClient:
                     reasoning=h.reasoning,
                     suggested_query=h.suggested_query,
                 )
-                for h in result.output.hypotheses
+                for h in result.hypotheses
             ]
 
         except Exception as e:

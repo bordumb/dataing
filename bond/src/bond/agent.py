@@ -7,9 +7,11 @@ from typing import Any, Generic, TypeVar
 from pydantic_ai import Agent
 from pydantic_ai.messages import (
     ModelMessage,
+    PartStartEvent,
     TextPartDelta,
     ThinkingPartDelta,
     ToolCallPart,
+    ToolCallPartDelta,
 )
 from pydantic_ai.models import Model
 from pydantic_ai.tools import Tool
@@ -20,10 +22,17 @@ DepsT = TypeVar("DepsT")
 
 @dataclass
 class ToolCallEvent:
-    """Event emitted when agent calls a tool."""
+    """Event emitted when agent calls a tool.
+
+    Attributes:
+        name: Tool name (may be partial during streaming if delta=True).
+        args: Tool arguments (may be partial JSON string during streaming).
+        delta: True if this is a partial streaming update, False if complete.
+    """
 
     name: str
-    args: dict[str, Any] | str  # Args might be JSON string during streaming
+    args: dict[str, Any] | str
+    delta: bool = False
 
 
 @dataclass
@@ -32,8 +41,10 @@ class StreamHandlers:
 
     Attributes:
         on_text: Called with each text chunk as it streams.
-        on_tool_call: Called when agent invokes a tool.
+        on_tool_call: Called when agent invokes a tool (both deltas and complete).
         on_thinking: Called with thinking/reasoning content (extended thinking).
+        on_node_start: Called when a new block starts (text, tool-call, thinking).
+                       Useful for UI to know when to start a new "bubble".
         json_mode: If True, callbacks receive JSON-serializable dicts
                    instead of objects (useful for WebSocket/SSE).
     """
@@ -41,6 +52,7 @@ class StreamHandlers:
     on_text: Callable[[str], None] | None = None
     on_tool_call: Callable[[ToolCallEvent], None] | None = None
     on_thinking: Callable[[str], None] | None = None
+    on_node_start: Callable[[str], None] | None = None
     json_mode: bool = False
 
 
@@ -50,6 +62,8 @@ class BondAgent(Generic[T, DepsT]):
 
     A BondAgent provides:
     - Streaming responses with callbacks for text, tool calls, and thinking
+    - Real-time streaming of tool call arguments as they form
+    - Block start notifications for UI rendering
     - Message history management
     - Dynamic instruction override
     - Toolset composition
@@ -66,8 +80,9 @@ class BondAgent(Generic[T, DepsT]):
 
         handlers = StreamHandlers(
             on_text=lambda t: print(t, end=""),
-            on_tool_call=lambda tc: print(f"[Tool: {tc.name}]"),
+            on_tool_call=lambda tc: print(f"[Tool: {tc.name}]" if not tc.delta else ""),
             on_thinking=lambda t: print(f"[Thinking: {t}]"),
+            on_node_start=lambda kind: print(f"[New {kind} block]"),
         )
 
         response = await agent.ask("Remember my preference", handlers=handlers)
@@ -111,7 +126,7 @@ class BondAgent(Generic[T, DepsT]):
 
         Args:
             prompt: The user's message/question.
-            handlers: Optional callbacks for streaming events (text, tool calls, thinking).
+            handlers: Optional callbacks for streaming events.
             dynamic_instructions: Override system prompt for this call only.
 
         Returns:
@@ -121,7 +136,6 @@ class BondAgent(Generic[T, DepsT]):
             raise RuntimeError("Agent not initialized")
 
         # Handle dynamic instructions - clone agent if changed
-        # Note: Re-init has performance cost but is safe for generic wrapper
         active_agent = self._agent
         if dynamic_instructions and dynamic_instructions != self.instructions:
             active_agent = Agent(
@@ -134,47 +148,65 @@ class BondAgent(Generic[T, DepsT]):
             )
 
         if handlers:
-            # Use raw stream() to capture all event types (text, tools, thinking)
-            # stream_text() only yields text and swallows tool calls
             async with active_agent.run_stream(
                 prompt,
                 deps=self.deps,
                 message_history=self._history,
             ) as result:
                 async for node in result.stream():
-                    # Handle text deltas
-                    if isinstance(node, TextPartDelta):
+                    # 1. Part Start Event (New Block)
+                    # Useful for UI to know "start a new bubble"
+                    if isinstance(node, PartStartEvent):
+                        if handlers.on_node_start:
+                            kind = "unknown"
+                            if hasattr(node.part, "part_kind"):
+                                kind = node.part.part_kind
+                            handlers.on_node_start(kind)
+
+                    # 2. Text Delta (Standard Typing)
+                    elif isinstance(node, TextPartDelta):
                         if handlers.on_text:
                             handlers.on_text(node.content_delta)
 
-                    # Handle tool calls (fully formed parts)
+                    # 3. Thinking Delta (Deep Reasoning)
+                    elif isinstance(node, ThinkingPartDelta):
+                        if handlers.on_thinking and node.content_delta:
+                            handlers.on_thinking(node.content_delta)
+
+                    # 4. Tool Call Delta (Streaming arguments being typed)
+                    # See JSON arguments forming in real-time
+                    elif isinstance(node, ToolCallPartDelta):
+                        if handlers.on_tool_call:
+                            name = node.tool_name_delta or ""
+                            args = node.args_delta or ""
+                            if name or args:
+                                handlers.on_tool_call(
+                                    ToolCallEvent(name=name, args=args, delta=True)
+                                )
+
+                    # 5. Tool Call Complete (Fully formed, about to execute)
                     elif isinstance(node, ToolCallPart):
                         if handlers.on_tool_call:
                             if handlers.json_mode:
-                                # Convert args to dict for JSON serialization
                                 args = (
                                     node.args
                                     if isinstance(node.args, str)
                                     else dict(node.args)
                                 )
                                 handlers.on_tool_call(
-                                    ToolCallEvent(name=node.tool_name, args=args)
+                                    ToolCallEvent(name=node.tool_name, args=args, delta=False)
                                 )
                             else:
                                 handlers.on_tool_call(
-                                    ToolCallEvent(name=node.tool_name, args=node.args)
+                                    ToolCallEvent(
+                                        name=node.tool_name, args=node.args, delta=False
+                                    )
                                 )
 
-                    # Handle thinking/reasoning (extended thinking models)
-                    elif isinstance(node, ThinkingPartDelta):
-                        if handlers.on_thinking:
-                            handlers.on_thinking(node.content_delta)
-
-                # Update history after completion
                 self._history = list(result.all_messages())
-
                 data: T = result.data
                 return data
+
         # Non-streaming execution
         result = await active_agent.run(
             prompt,

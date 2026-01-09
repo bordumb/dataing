@@ -54,9 +54,16 @@ repos:
         pass_filenames: false
         types: [python]
 
-  # Frontend: ESLint and Prettier
+  # Frontend: TypeScript, ESLint and Prettier
   - repo: local
     hooks:
+      - id: tsc
+        name: tsc (frontend)
+        entry: bash -c 'cd frontend && pnpm tsc --noEmit'
+        language: system
+        files: ^frontend/src/.*\.(ts|tsx)$
+        pass_filenames: false
+
       - id: eslint
         name: eslint (frontend)
         entry: bash -c 'cd frontend && pnpm lint --fix'
@@ -122,5 +129,5 @@ ci:
   autoupdate_branch: ''
   autoupdate_commit_msg: '[pre-commit.ci] pre-commit autoupdate'
   autoupdate_schedule: weekly
-  skip: [mypy, eslint, prettier]  # Skip hooks that need full project context in CI
+  skip: [mypy, tsc, eslint, prettier]  # Skip hooks that need full project context in CI
   submodules: false

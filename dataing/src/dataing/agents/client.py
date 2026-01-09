@@ -137,7 +137,7 @@ class AgentClient:
 
     async def generate_query(
         self,
-        hyp: Hypothesis,
+        hypothesis: Hypothesis,
         schema: SchemaResponse,
         previous_error: str | None = None,
         handlers: StreamHandlers | None = None,
@@ -145,7 +145,7 @@ class AgentClient:
         """Generate SQL query to test a hypothesis.
 
         Args:
-            hyp: The hypothesis to test.
+            hypothesis: The hypothesis to test.
             schema: Available database schema.
             previous_error: Error from previous attempt (for reflexion).
             handlers: Optional streaming handlers for real-time updates.
@@ -157,10 +157,10 @@ class AgentClient:
             LLMError: If query generation fails.
         """
         if previous_error:
-            prompt = reflexion.build_user(hypothesis=hyp, previous_error=previous_error)
+            prompt = reflexion.build_user(hypothesis=hypothesis, previous_error=previous_error)
             system = reflexion.build_system(schema=schema)
         else:
-            prompt = query.build_user(hypothesis=hyp)
+            prompt = query.build_user(hypothesis=hypothesis)
             system = query.build_system(schema=schema)
 
         try:
@@ -180,7 +180,7 @@ class AgentClient:
 
     async def interpret_evidence(
         self,
-        hyp: Hypothesis,
+        hypothesis: Hypothesis,
         sql: str,
         results: QueryResult,
         handlers: StreamHandlers | None = None,
@@ -188,7 +188,7 @@ class AgentClient:
         """Interpret query results as evidence.
 
         Args:
-            hyp: The hypothesis being tested.
+            hypothesis: The hypothesis being tested.
             sql: The query that was executed.
             results: The query results.
             handlers: Optional streaming handlers for real-time updates.
@@ -196,7 +196,7 @@ class AgentClient:
         Returns:
             Evidence with validated interpretation.
         """
-        prompt = interpretation.build_user(hypothesis=hyp, query=sql, results=results)
+        prompt = interpretation.build_user(hypothesis=hypothesis, query=sql, results=results)
         system = interpretation.build_system()
 
         try:
@@ -207,7 +207,7 @@ class AgentClient:
             )
 
             return Evidence(
-                hypothesis_id=hyp.id,
+                hypothesis_id=hypothesis.id,
                 query=sql,
                 result_summary=results.to_summary(),
                 row_count=results.row_count,
@@ -219,7 +219,7 @@ class AgentClient:
         except Exception as e:
             # Return low-confidence evidence on failure rather than crashing
             return Evidence(
-                hypothesis_id=hyp.id,
+                hypothesis_id=hypothesis.id,
                 query=sql,
                 result_summary=results.to_summary(),
                 row_count=results.row_count,

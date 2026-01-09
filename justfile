@@ -228,8 +228,10 @@ demo: demo-fixtures
     # Stable demo encryption key (valid Fernet key)
     export ENCRYPTION_KEY=ZnxhCyx4-ZjziPWtUguwGOFMMiLNioSwso5-qNPAGZI=
 
-    # Load .env file if it exists
-    if [ -f dataing/.env ]; then
+    # Load .env file if it exists (check both root and dataing/)
+    if [ -f .env ]; then
+        export $(grep -v '^#' .env | xargs)
+    elif [ -f dataing/.env ]; then
         export $(grep -v '^#' dataing/.env | xargs)
     fi
 

@@ -1,11 +1,11 @@
-"""Anthropic Claude implementation with Pydantic AI structured outputs."""
+"""Anthropic Claude implementation with BondAgent structured outputs."""
 
 from __future__ import annotations
 
 import os
 from typing import TYPE_CHECKING
 
-from pydantic_ai import Agent
+from bond import BondAgent, StreamHandlers
 from pydantic_ai.models.anthropic import AnthropicModel
 from pydantic_ai.output import PromptedOutput
 
@@ -30,9 +30,9 @@ if TYPE_CHECKING:
 
 
 class AnthropicClient:
-    """Anthropic Claude implementation with structured outputs.
+    """Anthropic Claude implementation with streaming support.
 
-    Uses Pydantic AI for type-safe, validated LLM responses.
+    Uses BondAgent for type-safe, validated LLM responses with optional streaming.
     """
 
     def __init__(
@@ -48,32 +48,36 @@ class AnthropicClient:
             model: Model to use.
             max_retries: Max retries on validation failure.
         """
-        # Pydantic AI reads API key from environment variable
         os.environ["ANTHROPIC_API_KEY"] = api_key
         self._model = AnthropicModel(model)
 
-        # Pre-configure agents for each task
-        # Using PromptedOutput mode enables chain-of-thought reasoning before structured output,
-        # which significantly improves quality for complex analytical tasks compared to tool mode.
-        self._hypothesis_agent: Agent[None, HypothesesResponse] = Agent(
+        self._hypothesis_agent: BondAgent[HypothesesResponse, None] = BondAgent(
+            name="hypothesis-generator",
+            instructions="You are a data quality investigator.",
             model=self._model,
             output_type=PromptedOutput(HypothesesResponse),
-            retries=max_retries,
+            max_retries=max_retries,
         )
-        self._interpretation_agent: Agent[None, InterpretationResponse] = Agent(
+        self._interpretation_agent: BondAgent[InterpretationResponse, None] = BondAgent(
+            name="evidence-interpreter",
+            instructions="You analyze query results for evidence.",
             model=self._model,
             output_type=PromptedOutput(InterpretationResponse),
-            retries=max_retries,
+            max_retries=max_retries,
         )
-        self._synthesis_agent: Agent[None, SynthesisResponse] = Agent(
+        self._synthesis_agent: BondAgent[SynthesisResponse, None] = BondAgent(
+            name="finding-synthesizer",
+            instructions="You synthesize investigation findings.",
             model=self._model,
             output_type=PromptedOutput(SynthesisResponse),
-            retries=max_retries,
+            max_retries=max_retries,
         )
-        self._query_agent: Agent[None, QueryResponse] = Agent(
+        self._query_agent: BondAgent[QueryResponse, None] = BondAgent(
+            name="sql-generator",
+            instructions="You are a SQL expert.",
             model=self._model,
             output_type=PromptedOutput(QueryResponse),
-            retries=max_retries,
+            max_retries=max_retries,
         )
 
     async def generate_hypotheses(

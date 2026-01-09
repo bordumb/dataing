@@ -11,7 +11,7 @@ from pydantic_ai.models.anthropic import AnthropicModel
 from .assessment import QualityAssessment, ValidationResult
 
 if TYPE_CHECKING:
-    from dataing.adapters.llm.response_models import (
+    from dataing.agents.models import (
         InterpretationResponse,
         SynthesisResponse,
     )

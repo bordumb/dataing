@@ -6,8 +6,10 @@ Protocol interfaces defined in the core module.
 Adapters are organized by type:
 - datasource/: Data source adapters (PostgreSQL, DuckDB, MongoDB, etc.)
 - lineage/: Lineage adapters (dbt, OpenLineage, Airflow, Dagster, DataHub, etc.)
-- llm/: LLM client adapters (Anthropic)
 - context/: Context gathering adapters
+
+Note: LLM agents have been promoted to first-class citizens in the
+dataing.agents package.
 """
 
 from .context.engine import DefaultContextEngine
@@ -18,11 +20,8 @@ from .lineage import (
     LineageGraph,
     get_lineage_registry,
 )
-from .llm.client import AnthropicClient
 
 __all__ = [
-    # LLM adapters
-    "AnthropicClient",
     # Context adapters
     "DefaultContextEngine",
     # Lineage adapters

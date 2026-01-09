@@ -3,7 +3,7 @@
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
-from dataing.adapters.llm.response_models import InterpretationResponse
+from dataing.agents.models import InterpretationResponse
 from dataing.core.quality import LLMJudgeValidator, QualityAssessment
 
 

@@ -23,7 +23,7 @@ from dataing.adapters.db.app_db import AppDatabase
 from dataing.adapters.entitlements import DatabaseEntitlementsAdapter
 from dataing.adapters.investigation_feedback import InvestigationFeedbackAdapter
 from dataing.adapters.lineage import BaseLineageAdapter, LineageAdapter, get_lineage_registry
-from dataing.adapters.llm.client import AnthropicClient
+from dataing.agents import AgentClient
 from dataing.adapters.notifications.email import EmailConfig, EmailNotifier
 from dataing.core.auth.recovery import PasswordRecoveryAdapter
 from dataing.core.orchestrator import InvestigationOrchestrator, OrchestratorConfig
@@ -95,7 +95,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     entitlements_adapter = DatabaseEntitlementsAdapter(pool=app_db.pool)
     app.state.entitlements_adapter = entitlements_adapter
 
-    llm = AnthropicClient(
+    llm = AgentClient(
         api_key=settings.anthropic_api_key,
         model=settings.llm_model,
     )

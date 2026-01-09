@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Protocol, runtime_checkable
 
 if TYPE_CHECKING:
-    from dataing.adapters.llm.response_models import (
+    from dataing.agents.models import (
         InterpretationResponse,
         SynthesisResponse,
     )

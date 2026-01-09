@@ -1,9 +1,13 @@
-"""LLM adapter module."""
+"""Investigation agents package.
+
+This package contains the LLM agents used in the investigation workflow.
+Agents are first-class domain concepts, not infrastructure adapters.
+"""
 
 from bond import StreamHandlers
 
-from .client import AnthropicClient
-from .response_models import (
+from .client import AgentClient
+from .models import (
     HypothesesResponse,
     HypothesisResponse,
     InterpretationResponse,
@@ -12,7 +16,7 @@ from .response_models import (
 )
 
 __all__ = [
-    "AnthropicClient",
+    "AgentClient",
     "StreamHandlers",
     "HypothesesResponse",
     "HypothesisResponse",

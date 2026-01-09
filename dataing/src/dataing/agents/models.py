@@ -1,4 +1,4 @@
-"""Structured response models for LLM outputs.
+"""Response models for investigation agents.
 
 These models define the exact schema expected from the LLM.
 Pydantic AI uses these for:

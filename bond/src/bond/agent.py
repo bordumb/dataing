@@ -1,11 +1,16 @@
 """Core agent runtime."""
 
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
 from typing import Any, Generic, TypeVar
 
 from pydantic_ai import Agent
-from pydantic_ai.messages import ModelMessage
+from pydantic_ai.messages import (
+    ModelMessage,
+    TextPartDelta,
+    ThinkingPartDelta,
+    ToolCallPart,
+)
 from pydantic_ai.models import Model
 from pydantic_ai.tools import Tool
 
@@ -18,7 +23,7 @@ class ToolCallEvent:
     """Event emitted when agent calls a tool."""
 
     name: str
-    args: dict[str, Any]
+    args: dict[str, Any] | str  # Args might be JSON string during streaming
 
 
 @dataclass
@@ -28,7 +33,7 @@ class StreamHandlers:
     Attributes:
         on_text: Called with each text chunk as it streams.
         on_tool_call: Called when agent invokes a tool.
-        on_thinking: Called with thinking/reasoning content.
+        on_thinking: Called with thinking/reasoning content (extended thinking).
         json_mode: If True, callbacks receive JSON-serializable dicts
                    instead of objects (useful for WebSocket/SSE).
     """
@@ -44,7 +49,7 @@ class BondAgent(Generic[T, DepsT]):
     """Generic agent runtime wrapping PydanticAI.
 
     A BondAgent provides:
-    - Streaming responses with callbacks
+    - Streaming responses with callbacks for text, tool calls, and thinking
     - Message history management
     - Dynamic instruction override
     - Toolset composition
@@ -59,13 +64,20 @@ class BondAgent(Generic[T, DepsT]):
             deps=QdrantMemoryStore(),
         )
 
+        handlers = StreamHandlers(
+            on_text=lambda t: print(t, end=""),
+            on_tool_call=lambda tc: print(f"[Tool: {tc.name}]"),
+            on_thinking=lambda t: print(f"[Thinking: {t}]"),
+        )
+
         response = await agent.ask("Remember my preference", handlers=handlers)
     """
 
     name: str
     instructions: str
     model: str | Model
-    toolsets: list[list[Tool[DepsT]]] = field(default_factory=list)
+    # Sequence for broader compatibility (lists, tuples, FunctionToolset)
+    toolsets: Sequence[Sequence[Tool[DepsT]]] = field(default_factory=list)
     deps: DepsT | None = None
     output_type: type[T] = str  # type: ignore[assignment]
     max_retries: int = 3
@@ -75,7 +87,6 @@ class BondAgent(Generic[T, DepsT]):
 
     def __post_init__(self) -> None:
         """Initialize the underlying PydanticAI agent."""
-        # Flatten toolsets into single list
         all_tools: list[Tool[DepsT]] = []
         for toolset in self.toolsets:
             all_tools.extend(toolset)
@@ -100,7 +111,7 @@ class BondAgent(Generic[T, DepsT]):
 
         Args:
             prompt: The user's message/question.
-            handlers: Optional callbacks for streaming events.
+            handlers: Optional callbacks for streaming events (text, tool calls, thinking).
             dynamic_instructions: Override system prompt for this call only.
 
         Returns:
@@ -109,15 +120,13 @@ class BondAgent(Generic[T, DepsT]):
         if self._agent is None:
             raise RuntimeError("Agent not initialized")
 
-        # Build effective system prompt
-        effective_prompt = dynamic_instructions or self.instructions
-
-        # Create a temporary agent if dynamic instructions differ
-        agent = self._agent
+        # Handle dynamic instructions - clone agent if changed
+        # Note: Re-init has performance cost but is safe for generic wrapper
+        active_agent = self._agent
         if dynamic_instructions and dynamic_instructions != self.instructions:
-            agent = Agent(
+            active_agent = Agent(
                 model=self.model,
-                system_prompt=effective_prompt,
+                system_prompt=dynamic_instructions,
                 tools=list(self._agent._function_tools.values()),
                 result_type=self.output_type,
                 retries=self.max_retries,
@@ -125,31 +134,56 @@ class BondAgent(Generic[T, DepsT]):
             )
 
         if handlers:
-            # Use streaming
-            async with agent.run_stream(
+            # Use raw stream() to capture all event types (text, tools, thinking)
+            # stream_text() only yields text and swallows tool calls
+            async with active_agent.run_stream(
                 prompt,
                 deps=self.deps,
                 message_history=self._history,
             ) as result:
-                async for event in result.stream_text(delta=True):
-                    if handlers.on_text:
-                        handlers.on_text(event)
+                async for node in result.stream():
+                    # Handle text deltas
+                    if isinstance(node, TextPartDelta):
+                        if handlers.on_text:
+                            handlers.on_text(node.content_delta)
+
+                    # Handle tool calls (fully formed parts)
+                    elif isinstance(node, ToolCallPart):
+                        if handlers.on_tool_call:
+                            if handlers.json_mode:
+                                # Convert args to dict for JSON serialization
+                                args = (
+                                    node.args
+                                    if isinstance(node.args, str)
+                                    else dict(node.args)
+                                )
+                                handlers.on_tool_call(
+                                    ToolCallEvent(name=node.tool_name, args=args)
+                                )
+                            else:
+                                handlers.on_tool_call(
+                                    ToolCallEvent(name=node.tool_name, args=node.args)
+                                )
+
+                    # Handle thinking/reasoning (extended thinking models)
+                    elif isinstance(node, ThinkingPartDelta):
+                        if handlers.on_thinking:
+                            handlers.on_thinking(node.content_delta)
 
                 # Update history after completion
                 self._history = list(result.all_messages())
 
                 data: T = result.data
                 return data
-        else:
-            # Non-streaming
-            result = await agent.run(
-                prompt,
-                deps=self.deps,
-                message_history=self._history,
-            )
-            self._history = list(result.all_messages())
-            data = result.data
-            return data
+        # Non-streaming execution
+        result = await active_agent.run(
+            prompt,
+            deps=self.deps,
+            message_history=self._history,
+        )
+        self._history = list(result.all_messages())
+        non_stream_data: T = result.data
+        return non_stream_data
 
     def get_message_history(self) -> list[ModelMessage]:
         """Get current conversation history."""
@@ -175,11 +209,11 @@ class BondAgent(Generic[T, DepsT]):
         Returns:
             A new BondAgent with the same configuration but different history.
         """
-        clone = BondAgent(
+        clone: BondAgent[T, DepsT] = BondAgent(
             name=self.name,
             instructions=self.instructions,
             model=self.model,
-            toolsets=self.toolsets,
+            toolsets=list(self.toolsets),
             deps=self.deps,
             output_type=self.output_type,
             max_retries=self.max_retries,

@@ -133,6 +133,7 @@ class AnthropicClient:
         hypothesis: Hypothesis,
         schema: SchemaResponse,
         previous_error: str | None = None,
+        handlers: StreamHandlers | None = None,
     ) -> str:
         """Generate SQL query to test a hypothesis.
 
@@ -140,6 +141,7 @@ class AnthropicClient:
             hypothesis: The hypothesis to test.
             schema: Available database schema.
             previous_error: Error from previous attempt (for reflexion).
+            handlers: Optional streaming handlers for real-time updates.
 
         Returns:
             Validated SQL query string.
@@ -155,12 +157,12 @@ class AnthropicClient:
             system = self._build_query_system_prompt(schema)
 
         try:
-            result = await self._query_agent.run(
+            result = await self._query_agent.ask(
                 prompt,
-                instructions=system,
+                dynamic_instructions=system,
+                handlers=handlers,
             )
-            query: str = result.output.query
-            return query
+            return result.query
 
         except Exception as e:
             raise LLMError(

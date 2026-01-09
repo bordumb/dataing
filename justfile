@@ -148,6 +148,16 @@ demo: demo-fixtures
     echo "Starting demo stack..."
     echo ""
 
+    # Ensure Python dependencies are installed
+    uv sync --quiet
+
+    # Ensure frontend dependencies are installed
+    if [ ! -d "frontend/node_modules" ]; then
+        echo "Installing frontend dependencies..."
+        cd frontend && pnpm install
+        cd ..
+    fi
+
     # Generate OpenAPI client for frontend
     echo "Generating OpenAPI client..."
     uv run python dataing/scripts/export_openapi.py

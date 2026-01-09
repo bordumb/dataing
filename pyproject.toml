@@ -31,6 +31,9 @@ dependencies = [
     "bcrypt>=5.0.0",
     "pyjwt>=2.10.1",
     "pytest-asyncio>=1.3.0",
+    # Bond agent runtime dependencies
+    "qdrant-client>=1.7.0",
+    "sentence-transformers>=2.2.0",
 ]
 
 [project.optional-dependencies]
@@ -64,7 +67,7 @@ packages = ["dataing/src/dataing"]
 
 [tool.mypy]
 python_version = "3.11"
-files = ["dataing/src/dataing", "dataing-ee/src/dataing_ee"]
+files = ["bond/src/bond", "dataing/src/dataing", "dataing-ee/src/dataing_ee"]
 # Strict mode flags (equivalent to --strict but with SQLAlchemy-compatible settings)
 warn_unused_configs = true
 disallow_untyped_calls = true
@@ -101,10 +104,20 @@ module = [
 disallow_untyped_decorators = false
 disallow_untyped_calls = false
 
+[[tool.mypy.overrides]]
+module = ["bond.tools.memory.backends"]
+# sentence_transformers doesn't have type stubs
+disallow_untyped_calls = false
+
+[[tool.mypy.overrides]]
+module = ["bond.agent"]
+# PydanticAI Agent internals
+disallow_any_generics = false
+
 [tool.ruff]
 target-version = "py311"
 line-length = 100
-src = ["dataing/src", "dataing-ee/src"]
+src = ["bond/src", "dataing/src", "dataing-ee/src"]
 
 [tool.ruff.lint]
 select = [
@@ -124,8 +137,8 @@ convention = "google"
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
-testpaths = ["dataing/tests", "dataing-ee/tests"]
-addopts = "-v --cov=dataing/src/dataing --cov=dataing-ee/src/dataing_ee --cov-report=term-missing"
+testpaths = ["bond/tests", "dataing/tests", "dataing-ee/tests"]
+addopts = "-v --cov=bond/src/bond --cov=dataing/src/dataing --cov=dataing-ee/src/dataing_ee --cov-report=term-missing"
 
 [dependency-groups]
 dev = [

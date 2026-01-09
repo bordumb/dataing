@@ -162,7 +162,7 @@ errors.txt
 chainlit.md
 .datadr/
 .deepeval/
-investigations/
+/investigations/
 *.investigation.json
 
 ############################

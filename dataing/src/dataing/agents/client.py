@@ -169,7 +169,8 @@ class AgentClient:
                 dynamic_instructions=system,
                 handlers=handlers,
             )
-            return result.query
+            sql_query: str = result.query
+            return sql_query
 
         except Exception as e:
             raise LLMError(

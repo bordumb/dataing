@@ -224,9 +224,9 @@ class BondAgent(Generic[T, DepsT]):
                 self._history = list(result.all_messages())
 
                 if handlers.on_complete:
-                    handlers.on_complete(result.response)
+                    handlers.on_complete(result.output)
 
-                data: T = result.response
+                data: T = result.output
                 return data
 
         # Non-streaming fallback
@@ -237,7 +237,7 @@ class BondAgent(Generic[T, DepsT]):
             instructions=dynamic_instructions,
         )
         self._history = list(result.all_messages())
-        non_stream_data: T = result.response
+        non_stream_data: T = result.output
         return non_stream_data
 
     def get_message_history(self) -> list[ModelMessage]:

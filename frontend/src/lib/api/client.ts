@@ -1,3 +1,6 @@
+// API base URL - empty for same-origin (dev), set VITE_API_URL for production
+const API_BASE_URL = import.meta.env.VITE_API_URL || ''
+
 // Storage keys for authentication
 const ACCESS_TOKEN_KEY = 'dataing_access_token' // pragma: allowlist secret
 const API_KEY_STORAGE_KEY = 'dataing_api_key' // pragma: allowlist secret (legacy)
@@ -37,7 +40,7 @@ export const customInstance = async <T>(config: RequestConfig): Promise<T> => {
   }
 
   // URL already includes /api/v1 prefix from generated code
-  const response = await fetch(`${url}${queryString}`, {
+  const response = await fetch(`${API_BASE_URL}${url}${queryString}`, {
     method,
     headers: {
       'Content-Type': 'application/json',

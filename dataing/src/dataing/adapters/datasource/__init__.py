@@ -43,6 +43,7 @@ from dataing.adapters.datasource.sql.mysql import MySQLAdapter
 from dataing.adapters.datasource.sql.postgres import PostgresAdapter
 from dataing.adapters.datasource.sql.redshift import RedshiftAdapter
 from dataing.adapters.datasource.sql.snowflake import SnowflakeAdapter
+from dataing.adapters.datasource.sql.sqlite import SQLiteAdapter
 from dataing.adapters.datasource.sql.trino import TrinoAdapter
 from dataing.adapters.datasource.type_mapping import normalize_type
 from dataing.adapters.datasource.types import (
@@ -78,6 +79,7 @@ __all__ = [
     "SnowflakeAdapter",
     "BigQueryAdapter",
     "RedshiftAdapter",
+    "SQLiteAdapter",
     # Document/NoSQL Adapters
     "MongoDBAdapter",
     "DynamoDBAdapter",

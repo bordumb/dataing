@@ -55,7 +55,5 @@ CREATE INDEX IF NOT EXISTS idx_audit_logs_action
 CREATE INDEX IF NOT EXISTS idx_audit_logs_resource
     ON audit_logs(tenant_id, resource_type, resource_id);
 
--- Partial index for recent logs (most common queries)
-CREATE INDEX IF NOT EXISTS idx_audit_logs_recent
-    ON audit_logs(tenant_id, timestamp DESC)
-    WHERE timestamp > NOW() - INTERVAL '30 days';
+-- Note: Partial index for recent logs removed because NOW() is not immutable.
+-- The idx_audit_logs_tenant_timestamp index handles time-based queries efficiently.

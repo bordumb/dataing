@@ -173,7 +173,7 @@ demo: demo-fixtures
         -e POSTGRES_USER=dataing \
         -e POSTGRES_PASSWORD=dataing \
         -p 5432:5432 \
-        postgres:16-alpine
+        pgvector/pgvector:pg16
     echo "Waiting for PostgreSQL to be ready..."
     for i in {1..30}; do
         if PGPASSWORD=dataing psql -h localhost -U dataing -d dataing_demo -c "SELECT 1" > /dev/null 2>&1; then
@@ -201,6 +201,7 @@ demo: demo-fixtures
     PGPASSWORD=dataing psql -h localhost -U dataing -d dataing_demo -f dataing/migrations/009_seed_multi_org_demo.sql 2>&1 | grep -v "^NOTICE:" || true
     PGPASSWORD=dataing psql -h localhost -U dataing -d dataing_demo -f dataing/migrations/010_audit_logs.sql 2>&1 | grep -v "^NOTICE:" || true
     PGPASSWORD=dataing psql -h localhost -U dataing -d dataing_demo -f dataing/migrations/011_rl_training_signals.sql 2>&1 | grep -v "^NOTICE:" || true
+    PGPASSWORD=dataing psql -h localhost -U dataing -d dataing_demo -f dataing/migrations/012_agent_memories.sql 2>&1 | grep -v "^NOTICE:" || true
 
     trap 'kill 0' EXIT
 
@@ -259,7 +260,7 @@ demo: demo-fixtures
     (cd frontend && pnpm dev --port 3000) &
     wait
 
-# Stop demo (kills all processes and removes containers)
+# Stop demo (kills all processes and removes containers/volumes)
 demo-stop:
     #!/usr/bin/env bash
     echo "Stopping demo services..."
@@ -273,9 +274,12 @@ demo-stop:
     lsof -ti:8000 | xargs kill -9 2>/dev/null || true
     lsof -ti:3000 | xargs kill -9 2>/dev/null || true
 
-    # Stop and remove postgres container
+    # Stop and remove postgres container (docker run approach)
     docker stop dataing-demo-postgres 2>/dev/null || true
     docker rm -f dataing-demo-postgres 2>/dev/null || true
+
+    # Stop docker-compose stack with volume cleanup
+    docker-compose -f demo/docker-compose.demo.yml down -v 2>/dev/null || true
 
     echo "Demo stopped."
 
@@ -283,9 +287,9 @@ demo-stop:
 demo-docker: demo-fixtures
     docker-compose -f demo/docker-compose.demo.yml up --build
 
-# Stop demo Docker Compose
+# Stop demo Docker Compose (with volume cleanup)
 demo-docker-down:
-    docker-compose -f demo/docker-compose.demo.yml down
+    docker-compose -f demo/docker-compose.demo.yml down -v
 
 # Clean demo data (fixtures and database)
 demo-clean:

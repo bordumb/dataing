@@ -1,6 +1,6 @@
-"""Memory backend implementations.
+"""Qdrant memory backend implementation.
 
-This module provides concrete implementations of AgentMemoryProtocol
+This module provides a Qdrant-backed implementation of AgentMemoryProtocol
 using PydanticAI Embedder for non-blocking, instrumented embeddings.
 """
 
@@ -40,12 +40,6 @@ class QdrantMemoryStore:
         # OpenAI embeddings
         store = QdrantMemoryStore(
             embedding_model="openai:text-embedding-3-small",
-            qdrant_url="http://localhost:6333",
-        )
-
-        # Cohere embeddings
-        store = QdrantMemoryStore(
-            embedding_model="cohere:embed-english-v3.0",
             qdrant_url="http://localhost:6333",
         )
     """
@@ -116,11 +110,15 @@ class QdrantMemoryStore:
 
     def _build_filters(
         self,
+        tenant_id: UUID,
         tags: list[str] | None,
         agent_id: str | None,
-    ) -> Filter | None:
+    ) -> Filter:
         """Build Qdrant filter from parameters."""
-        conditions: list[FieldCondition] = []
+        conditions: list[FieldCondition] = [
+            # Always filter by tenant_id for multi-tenant isolation
+            FieldCondition(key="tenant_id", match=MatchValue(value=str(tenant_id)))
+        ]
         if agent_id:
             conditions.append(
                 FieldCondition(key="agent_id", match=MatchValue(value=agent_id))
@@ -130,13 +128,14 @@ class QdrantMemoryStore:
                 conditions.append(
                     FieldCondition(key="tags", match=MatchValue(value=tag))
                 )
-        return Filter(must=conditions) if conditions else None
+        return Filter(must=conditions)
 
     async def store(
         self,
         content: str,
         agent_id: str,
         *,
+        tenant_id: UUID,
         conversation_id: str | None = None,
         tags: list[str] | None = None,
         embedding: list[float] | None = None,
@@ -158,13 +157,17 @@ class QdrantMemoryStore:
                 tags=tags or [],
             )
 
+            # Include tenant_id in payload for filtering
+            payload = memory.model_dump(mode="json")
+            payload["tenant_id"] = str(tenant_id)
+
             await self._client.upsert(
                 self._collection,
                 points=[
                     PointStruct(
                         id=str(memory.id),
                         vector=vector,
-                        payload=memory.model_dump(mode="json"),
+                        payload=payload,
                     )
                 ],
             )
@@ -176,6 +179,7 @@ class QdrantMemoryStore:
         self,
         query: str,
         *,
+        tenant_id: UUID,
         top_k: int = 10,
         score_threshold: float | None = None,
         tags: list[str] | None = None,
@@ -187,7 +191,7 @@ class QdrantMemoryStore:
             await self._ensure_collection()
 
             query_vector = await self._embed(query)
-            filters = self._build_filters(tags, agent_id)
+            filters = self._build_filters(tenant_id, tags, agent_id)
 
             # Use query_points (qdrant-client >= 1.7.0)
             response = await self._client.query_points(
@@ -199,26 +203,47 @@ class QdrantMemoryStore:
             )
 
             return [
-                SearchResult(memory=Memory(**r.payload), score=r.score)
+                SearchResult(
+                    memory=Memory(
+                        id=UUID(r.payload["id"]),
+                        content=r.payload["content"],
+                        created_at=datetime.fromisoformat(r.payload["created_at"]),
+                        agent_id=r.payload["agent_id"],
+                        conversation_id=r.payload.get("conversation_id"),
+                        tags=r.payload.get("tags", []),
+                    ),
+                    score=r.score,
+                )
                 for r in response.points
             ]
         except Exception as e:
             return Error(description=f"Failed to search memories: {e}")
 
-    async def delete(self, memory_id: UUID) -> bool | Error:
-        """Delete a memory by ID."""
+    async def delete(self, memory_id: UUID, *, tenant_id: UUID) -> bool | Error:
+        """Delete a memory by ID (scoped to tenant)."""
         try:
             await self._ensure_collection()
+
+            # Use filter to ensure tenant isolation
             await self._client.delete(
                 self._collection,
-                points_selector=[str(memory_id)],
+                points_selector=Filter(
+                    must=[
+                        FieldCondition(
+                            key="id", match=MatchValue(value=str(memory_id))
+                        ),
+                        FieldCondition(
+                            key="tenant_id", match=MatchValue(value=str(tenant_id))
+                        ),
+                    ]
+                ),
             )
             return True
         except Exception as e:
             return Error(description=f"Failed to delete memory: {e}")
 
-    async def get(self, memory_id: UUID) -> Memory | None | Error:
-        """Retrieve a specific memory by ID."""
+    async def get(self, memory_id: UUID, *, tenant_id: UUID) -> Memory | None | Error:
+        """Retrieve a specific memory by ID (scoped to tenant)."""
         try:
             await self._ensure_collection()
             results = await self._client.retrieve(
@@ -226,7 +251,18 @@ class QdrantMemoryStore:
                 ids=[str(memory_id)],
             )
             if results:
-                return Memory(**results[0].payload)
+                payload = results[0].payload
+                # Verify tenant ownership
+                if payload.get("tenant_id") != str(tenant_id):
+                    return None
+                return Memory(
+                    id=UUID(payload["id"]),
+                    content=payload["content"],
+                    created_at=datetime.fromisoformat(payload["created_at"]),
+                    agent_id=payload["agent_id"],
+                    conversation_id=payload.get("conversation_id"),
+                    tags=payload.get("tags", []),
+                )
             return None
         except Exception as e:
             return Error(description=f"Failed to retrieve memory: {e}")

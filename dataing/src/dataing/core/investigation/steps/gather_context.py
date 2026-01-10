@@ -6,15 +6,65 @@ It's the first step in any investigation.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any
+from typing import Any, Protocol
 
 from dataing.core.investigation.entities import InvestigationContext
 from dataing.core.investigation.values import ExecutionSignal, StepType
 
 from .protocol import Step, StepResult
 
-if TYPE_CHECKING:
-    from dataing.core.interfaces import ContextEngine
+
+class SchemaLike(Protocol):
+    """Protocol for schema objects."""
+
+    def is_empty(self) -> bool:
+        """Return True if schema has no tables."""
+        ...
+
+    def to_dict(self) -> dict[str, Any]:
+        """Return schema as dictionary."""
+        ...
+
+
+class LineageLike(Protocol):
+    """Protocol for lineage objects."""
+
+    def to_dict(self) -> dict[str, Any]:
+        """Return lineage as dictionary."""
+        ...
+
+
+class GatheredContext(Protocol):
+    """Protocol for gathered context from data source."""
+
+    @property
+    def schema(self) -> SchemaLike:
+        """Return schema object."""
+        ...
+
+    @property
+    def lineage(self) -> LineageLike | None:
+        """Return lineage object or None."""
+        ...
+
+
+class ContextEngineProtocol(Protocol):
+    """Protocol for context engine used by GatherContextStep.
+
+    This defines the interface that the new investigation system expects.
+    It differs from the legacy ContextEngine interface in core/interfaces.py.
+    """
+
+    async def gather(self, *, alert_summary: str) -> GatheredContext:
+        """Gather schema and lineage context.
+
+        Args:
+            alert_summary: Summary of the alert to investigate.
+
+        Returns:
+            GatheredContext with schema and optional lineage.
+        """
+        ...
 
 
 class ContextBundle:
@@ -45,7 +95,7 @@ class GatherContextStep(Step[None, ContextBundle]):
 
     step_type = StepType.GATHER_CONTEXT
 
-    def __init__(self, context_engine: ContextEngine) -> None:
+    def __init__(self, context_engine: ContextEngineProtocol) -> None:
         """Initialize the step.
 
         Args:
@@ -75,7 +125,9 @@ class GatherContextStep(Step[None, ContextBundle]):
             return StepResult(
                 context=context,
                 signal=ExecutionSignal.FAIL,
-                output=ContextBundle(schema_info={"error": f"Context gathering failed: {e}"}),
+                output=ContextBundle(
+                    schema_info={"error": f"Context gathering failed: {e}"}
+                ),
             )
 
         # Fail fast on empty schema

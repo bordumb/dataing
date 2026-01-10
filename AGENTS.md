@@ -17,7 +17,7 @@ Backend and frontend communicate via a generated OpenAPI client; database change
 
 ```mermaid
 flowchart LR
-  FE[Frontend (Vite/React)] -->|OpenAPI client| API[FastAPI service]
+  FE[Frontend - Vite/React] -->|OpenAPI client| API[FastAPI service]
   API --> DB[(Database)]
   MIG[SQL migrations] --> DB
 ```

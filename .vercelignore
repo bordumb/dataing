@@ -1,0 +1,19 @@
+# Everything except frontend
+*
+!/frontend
+!/frontend/**
+
+# Ignore node artifacts
+**/node_modules
+**/.next
+**/dist
+
+# Python / backend junk
+**/.venv
+**/__pycache__
+**/.pytest_cache
+**/*.pyc
+
+# Git + tooling
+.git
+.env*

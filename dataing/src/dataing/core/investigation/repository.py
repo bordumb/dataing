@@ -113,6 +113,7 @@ class InvestigationRepository(Protocol):
         parent_snapshot_id: UUID | None = None,
         created_by: UUID | None = None,
         trigger: str = "system",
+        step_cursor: dict[str, Any] | None = None,
     ) -> Snapshot:
         """Create a new snapshot."""
         ...

@@ -1,7 +1,8 @@
 """Tests for new investigation orchestrator."""
 
+from typing import Any
 from unittest.mock import AsyncMock, MagicMock
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 import pytest
 
@@ -576,3 +577,369 @@ class TestOrchestratorLocking:
         # acquire_lock should be called with the generated worker_id
         call_args = mock_repository.acquire_lock.call_args
         assert call_args[0][1] == orchestrator.worker_id
+
+
+class TestOrchestratorBranching:
+    """Tests for orchestrator BRANCH signal handling."""
+
+    @pytest.fixture
+    def branch_step(self, sample_context: InvestigationContext) -> MagicMock:
+        """Create mock step that returns BRANCH signal."""
+        from dataing.core.investigation.steps.protocol import BranchRequest, BranchSpec
+
+        step = MagicMock(spec=Step)
+        step.step_type = StepType.GENERATE_HYPOTHESES
+        step.can_execute.return_value = True
+        step.execute = AsyncMock(
+            return_value=StepResult(
+                context=sample_context,
+                signal=ExecutionSignal.BRANCH,
+                branch_request=BranchRequest(
+                    branch_type=BranchType.HYPOTHESIS,
+                    branches=[
+                        BranchSpec(name="hypothesis-1", data={"hypothesis_id": "h1"}),
+                        BranchSpec(name="hypothesis-2", data={"hypothesis_id": "h2"}),
+                    ],
+                    merge_step=StepType.SYNTHESIZE,
+                    child_start_step=StepType.GENERATE_QUERY,
+                ),
+            )
+        )
+        return step
+
+    @pytest.fixture
+    def hypothesis_snapshot(
+        self,
+        sample_snapshot: Snapshot,
+        sample_context: InvestigationContext,
+    ) -> Snapshot:
+        """Create snapshot at GENERATE_HYPOTHESES step."""
+        return Snapshot(
+            id=sample_snapshot.id,
+            investigation_id=sample_snapshot.investigation_id,
+            branch_id=sample_snapshot.branch_id,
+            version=sample_snapshot.version,
+            step=StepType.GENERATE_HYPOTHESES,
+            context=sample_context,
+        )
+
+    @pytest.fixture
+    def branch_registry(self, branch_step: MagicMock) -> StepRegistry:
+        """Create registry with branch step."""
+        reg = StepRegistry()
+        reg.register(branch_step)
+        return reg
+
+    @pytest.fixture
+    def mock_branch_repository(
+        self,
+        hypothesis_snapshot: Snapshot,
+        sample_branch: Branch,
+    ) -> AsyncMock:
+        """Create mock repository for branching tests."""
+        repo = AsyncMock()
+        repo.get_snapshot.return_value = hypothesis_snapshot
+        repo.get_branch.return_value = sample_branch
+
+        # Mock create_branch to return new branches with unique IDs
+        child_branch_counter = [0]
+
+        async def create_branch_side_effect(
+            investigation_id: UUID,
+            branch_type: BranchType,
+            name: str,
+            parent_branch_id: UUID | None = None,
+            forked_from_snapshot_id: UUID | None = None,
+            owner_user_id: UUID | None = None,
+        ) -> Branch:
+            child_branch_counter[0] += 1
+            return Branch(
+                id=uuid4(),
+                investigation_id=investigation_id,
+                branch_type=branch_type,
+                name=name,
+                parent_branch_id=parent_branch_id,
+                forked_from_snapshot_id=forked_from_snapshot_id,
+                status=BranchStatus.ACTIVE,
+            )
+
+        repo.create_branch.side_effect = create_branch_side_effect
+
+        # Mock create_snapshot to return new snapshots
+        async def create_snapshot_side_effect(
+            investigation_id: UUID,
+            branch_id: UUID,
+            version: VersionId,
+            step: StepType,
+            context: InvestigationContext,
+            parent_snapshot_id: UUID | None = None,
+            created_by: UUID | None = None,
+            trigger: str = "system",
+            step_cursor: dict[str, Any] | None = None,
+        ) -> Snapshot:
+            return Snapshot(
+                id=uuid4(),
+                investigation_id=investigation_id,
+                branch_id=branch_id,
+                version=version,
+                step=step,
+                context=context,
+                parent_snapshot_id=parent_snapshot_id,
+                step_cursor=step_cursor or {},
+            )
+
+        repo.create_snapshot.side_effect = create_snapshot_side_effect
+
+        return repo
+
+    @pytest.mark.asyncio
+    async def test_tick_branch_creates_child_branches(
+        self,
+        mock_branch_repository: AsyncMock,
+        branch_registry: StepRegistry,
+        sample_branch: Branch,
+    ) -> None:
+        """tick() with BRANCH signal creates child branches for each BranchSpec."""
+        orchestrator = InvestigationOrchestrator(
+            repository=mock_branch_repository,
+            registry=branch_registry,
+        )
+
+        await orchestrator.tick(sample_branch.id)
+
+        # Should create 2 child branches (one per BranchSpec)
+        assert mock_branch_repository.create_branch.call_count == 2
+
+        # Verify branch parameters
+        calls = mock_branch_repository.create_branch.call_args_list
+        assert calls[0].kwargs["name"] == "hypothesis-1"
+        assert calls[0].kwargs["branch_type"] == BranchType.HYPOTHESIS
+        assert calls[0].kwargs["parent_branch_id"] == sample_branch.id
+        assert calls[1].kwargs["name"] == "hypothesis-2"
+        assert calls[1].kwargs["branch_type"] == BranchType.HYPOTHESIS
+
+    @pytest.mark.asyncio
+    async def test_tick_branch_creates_child_snapshots(
+        self,
+        mock_branch_repository: AsyncMock,
+        branch_registry: StepRegistry,
+        sample_branch: Branch,
+    ) -> None:
+        """tick() with BRANCH signal creates initial snapshot for each child branch."""
+        orchestrator = InvestigationOrchestrator(
+            repository=mock_branch_repository,
+            registry=branch_registry,
+        )
+
+        await orchestrator.tick(sample_branch.id)
+
+        # Should create snapshots for child branches (at child_start_step)
+        # Find calls with GENERATE_QUERY step (child snapshots)
+        snapshot_calls = [
+            call
+            for call in mock_branch_repository.create_snapshot.call_args_list
+            if call.kwargs.get("step") == StepType.GENERATE_QUERY
+        ]
+        assert len(snapshot_calls) == 2
+
+    @pytest.mark.asyncio
+    async def test_tick_branch_sets_merge_point(
+        self,
+        mock_branch_repository: AsyncMock,
+        branch_registry: StepRegistry,
+        sample_branch: Branch,
+    ) -> None:
+        """tick() with BRANCH signal sets merge point on parent branch."""
+        orchestrator = InvestigationOrchestrator(
+            repository=mock_branch_repository,
+            registry=branch_registry,
+        )
+
+        await orchestrator.tick(sample_branch.id)
+
+        mock_branch_repository.set_merge_point.assert_called_once()
+        call_kwargs = mock_branch_repository.set_merge_point.call_args.kwargs
+        assert call_kwargs["parent_branch_id"] == sample_branch.id
+        assert len(call_kwargs["child_branch_ids"]) == 2
+        assert call_kwargs["merge_step"] == StepType.SYNTHESIZE
+
+    @pytest.mark.asyncio
+    async def test_tick_branch_suspends_parent(
+        self,
+        mock_branch_repository: AsyncMock,
+        branch_registry: StepRegistry,
+        sample_branch: Branch,
+    ) -> None:
+        """tick() with BRANCH signal suspends parent branch."""
+        orchestrator = InvestigationOrchestrator(
+            repository=mock_branch_repository,
+            registry=branch_registry,
+        )
+
+        await orchestrator.tick(sample_branch.id)
+
+        mock_branch_repository.update_branch_status.assert_called_once_with(
+            sample_branch.id,
+            BranchStatus.SUSPENDED,
+        )
+
+    @pytest.mark.asyncio
+    async def test_tick_branch_returns_child_ids(
+        self,
+        mock_branch_repository: AsyncMock,
+        branch_registry: StepRegistry,
+        sample_branch: Branch,
+    ) -> None:
+        """tick() with BRANCH signal returns child branch IDs in result."""
+        orchestrator = InvestigationOrchestrator(
+            repository=mock_branch_repository,
+            registry=branch_registry,
+        )
+
+        result = await orchestrator.tick(sample_branch.id)
+
+        assert result.signal == ExecutionSignal.BRANCH
+        assert result.child_branch_ids is not None
+        assert len(result.child_branch_ids) == 2
+
+    @pytest.mark.asyncio
+    async def test_tick_branch_fails_without_branch_request(
+        self,
+        mock_branch_repository: AsyncMock,
+        sample_branch: Branch,
+        sample_context: InvestigationContext,
+    ) -> None:
+        """tick() with BRANCH signal fails if no branch_request provided."""
+        # Create step that returns BRANCH but no branch_request
+        bad_branch_step = MagicMock(spec=Step)
+        bad_branch_step.step_type = StepType.GENERATE_HYPOTHESES
+        bad_branch_step.can_execute.return_value = True
+        bad_branch_step.execute = AsyncMock(
+            return_value=StepResult(
+                context=sample_context,
+                signal=ExecutionSignal.BRANCH,
+                branch_request=None,  # Missing!
+            )
+        )
+
+        registry = StepRegistry()
+        registry.register(bad_branch_step)
+
+        # Update snapshot step type to match
+        hypothesis_snapshot = Snapshot(
+            id=uuid4(),
+            investigation_id=sample_branch.investigation_id,
+            branch_id=sample_branch.id,
+            version=VersionId(major=1, minor=0, patch=0),
+            step=StepType.GENERATE_HYPOTHESES,
+            context=sample_context,
+        )
+        mock_branch_repository.get_snapshot.return_value = hypothesis_snapshot
+
+        orchestrator = InvestigationOrchestrator(
+            repository=mock_branch_repository,
+            registry=registry,
+        )
+
+        result = await orchestrator.tick(sample_branch.id)
+
+        assert result.signal == ExecutionSignal.FAIL
+        assert "branch_request" in (result.error or "").lower()
+
+    @pytest.mark.asyncio
+    async def test_tick_branch_updates_child_branch_heads(
+        self,
+        mock_branch_repository: AsyncMock,
+        branch_registry: StepRegistry,
+        sample_branch: Branch,
+    ) -> None:
+        """tick() with BRANCH signal updates head for each child branch."""
+        orchestrator = InvestigationOrchestrator(
+            repository=mock_branch_repository,
+            registry=branch_registry,
+        )
+
+        await orchestrator.tick(sample_branch.id)
+
+        # Should update branch head for each child branch
+        assert mock_branch_repository.update_branch_head.call_count == 2
+
+    @pytest.mark.asyncio
+    async def test_tick_branch_uses_default_child_start_step(
+        self,
+        mock_branch_repository: AsyncMock,
+        sample_branch: Branch,
+        sample_context: InvestigationContext,
+    ) -> None:
+        """tick() with BRANCH signal uses GENERATE_QUERY as default child start step."""
+        from dataing.core.investigation.steps.protocol import BranchRequest, BranchSpec
+
+        # Create step with no child_start_step specified
+        step = MagicMock(spec=Step)
+        step.step_type = StepType.GENERATE_HYPOTHESES
+        step.can_execute.return_value = True
+        step.execute = AsyncMock(
+            return_value=StepResult(
+                context=sample_context,
+                signal=ExecutionSignal.BRANCH,
+                branch_request=BranchRequest(
+                    branch_type=BranchType.HYPOTHESIS,
+                    branches=[BranchSpec(name="hypothesis-1", data={})],
+                    merge_step=StepType.SYNTHESIZE,
+                    # child_start_step is None
+                ),
+            )
+        )
+
+        registry = StepRegistry()
+        registry.register(step)
+
+        hypothesis_snapshot = Snapshot(
+            id=uuid4(),
+            investigation_id=sample_branch.investigation_id,
+            branch_id=sample_branch.id,
+            version=VersionId(major=1, minor=0, patch=0),
+            step=StepType.GENERATE_HYPOTHESES,
+            context=sample_context,
+        )
+        mock_branch_repository.get_snapshot.return_value = hypothesis_snapshot
+
+        orchestrator = InvestigationOrchestrator(
+            repository=mock_branch_repository,
+            registry=registry,
+        )
+
+        await orchestrator.tick(sample_branch.id)
+
+        # Child snapshot should be at GENERATE_QUERY (default)
+        snapshot_calls = mock_branch_repository.create_snapshot.call_args_list
+        assert any(
+            call.kwargs.get("step") == StepType.GENERATE_QUERY for call in snapshot_calls
+        )
+
+    @pytest.mark.asyncio
+    async def test_tick_branch_stores_branch_data_in_step_cursor(
+        self,
+        mock_branch_repository: AsyncMock,
+        branch_registry: StepRegistry,
+        sample_branch: Branch,
+    ) -> None:
+        """tick() with BRANCH signal stores BranchSpec data in snapshot step_cursor."""
+        orchestrator = InvestigationOrchestrator(
+            repository=mock_branch_repository,
+            registry=branch_registry,
+        )
+
+        await orchestrator.tick(sample_branch.id)
+
+        # Find child snapshot creation calls
+        snapshot_calls = [
+            call
+            for call in mock_branch_repository.create_snapshot.call_args_list
+            if call.kwargs.get("step") == StepType.GENERATE_QUERY
+        ]
+
+        # Verify step_cursor contains branch data
+        step_cursors = [call.kwargs.get("step_cursor", {}) for call in snapshot_calls]
+        hypothesis_ids = [cursor.get("hypothesis_id") for cursor in step_cursors]
+        assert "h1" in hypothesis_ids or "h2" in hypothesis_ids

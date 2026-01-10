@@ -11,7 +11,7 @@ from typing import TYPE_CHECKING, Any
 from uuid import UUID, uuid4
 
 from dataing.core.investigation.registry import StepRegistry
-from dataing.core.investigation.steps.protocol import StepResult
+from dataing.core.investigation.steps.protocol import BranchRequest, StepResult
 from dataing.core.investigation.values import BranchStatus, ExecutionSignal, StepType
 
 if TYPE_CHECKING:
@@ -27,6 +27,7 @@ class TickResult:
     new_snapshot_id: UUID | None = None
     output: Any = None
     error: str | None = None
+    child_branch_ids: list[UUID] | None = None
 
 
 class InvestigationOrchestrator:
@@ -160,8 +161,10 @@ class InvestigationOrchestrator:
             return await self._handle_complete(branch, snapshot, result)
         elif result.signal == ExecutionSignal.FAIL:
             return await self._handle_fail(branch, snapshot, result)
+        elif result.signal == ExecutionSignal.BRANCH:
+            return await self._handle_branch(branch, snapshot, result)
         else:
-            # Other signals (BRANCH, AWAIT_USER, etc.) will be added later
+            # Other signals (AWAIT_USER, etc.) will be added later
             return TickResult(
                 signal=result.signal,
                 output=result.output,
@@ -287,4 +290,77 @@ class InvestigationOrchestrator:
             signal=ExecutionSignal.FAIL,
             new_snapshot_id=new_snapshot.id,
             output=result.output,
+        )
+
+    async def _handle_branch(
+        self,
+        branch: Branch,
+        snapshot: Snapshot,
+        result: StepResult[Any],
+    ) -> TickResult:
+        """Handle BRANCH signal - create child branches for parallel execution.
+
+        Args:
+            branch: Current (parent) branch.
+            snapshot: Current snapshot.
+            result: StepResult from step execution with branch_request.
+
+        Returns:
+            TickResult with child_branch_ids.
+        """
+        # Validate branch_request exists
+        if result.branch_request is None:
+            return TickResult(
+                signal=ExecutionSignal.FAIL,
+                error="BRANCH signal without branch_request",
+            )
+
+        branch_request: BranchRequest = result.branch_request
+
+        # Determine child start step (default to GENERATE_QUERY)
+        child_start_step = branch_request.child_start_step or StepType.GENERATE_QUERY
+
+        # Create child branches and their initial snapshots
+        child_branch_ids: list[UUID] = []
+
+        for spec in branch_request.branches:
+            # Create child branch
+            child_branch = await self.repository.create_branch(
+                investigation_id=snapshot.investigation_id,
+                branch_type=branch_request.branch_type,
+                name=spec.name,
+                parent_branch_id=branch.id,
+                forked_from_snapshot_id=snapshot.id,
+            )
+            child_branch_ids.append(child_branch.id)
+
+            # Create initial snapshot for child branch
+            # Copy context from parent, store branch data in step_cursor
+            child_snapshot = await self.repository.create_snapshot(
+                investigation_id=snapshot.investigation_id,
+                branch_id=child_branch.id,
+                version=snapshot.version.next_minor(),
+                step=child_start_step,
+                context=result.context,
+                parent_snapshot_id=snapshot.id,
+                step_cursor=spec.data,
+            )
+
+            # Update child branch head
+            await self.repository.update_branch_head(child_branch.id, child_snapshot.id)
+
+        # Set merge point on parent branch
+        await self.repository.set_merge_point(
+            parent_branch_id=branch.id,
+            child_branch_ids=child_branch_ids,
+            merge_step=branch_request.merge_step,
+        )
+
+        # Suspend parent branch (waiting for merge)
+        await self.repository.update_branch_status(branch.id, BranchStatus.SUSPENDED)
+
+        return TickResult(
+            signal=ExecutionSignal.BRANCH,
+            output=result.output,
+            child_branch_ids=child_branch_ids,
         )

@@ -24,6 +24,7 @@ class SourceType(str, Enum):
     BIGQUERY = "bigquery"
     REDSHIFT = "redshift"
     DUCKDB = "duckdb"
+    SQLITE = "sqlite"
 
     # NoSQL Databases
     MONGODB = "mongodb"

@@ -77,6 +77,11 @@ class CreateMemoryRequest(BaseModel):
         Field(description="ID of the agent creating this memory"),
     ]
 
+    tenant_id: Annotated[
+        UUID,
+        Field(description="Tenant UUID for multi-tenant isolation"),
+    ]
+
     conversation_id: Annotated[
         str | None,
         Field(description="Optional conversation context"),
@@ -110,6 +115,11 @@ class SearchMemoriesRequest(BaseModel):
         Field(description="Search query text"),
     ]
 
+    tenant_id: Annotated[
+        UUID,
+        Field(description="Tenant UUID for multi-tenant isolation"),
+    ]
+
     top_k: Annotated[
         int,
         Field(description="Maximum number of results to return", ge=1, le=100),
@@ -134,6 +144,34 @@ class SearchMemoriesRequest(BaseModel):
         str | None,
         Field(description="Override default embedding model for this search"),
     ] = None
+
+
+class DeleteMemoryRequest(BaseModel):
+    """Request to delete a memory by ID."""
+
+    memory_id: Annotated[
+        UUID,
+        Field(description="UUID of the memory to delete"),
+    ]
+
+    tenant_id: Annotated[
+        UUID,
+        Field(description="Tenant UUID for multi-tenant isolation"),
+    ]
+
+
+class GetMemoryRequest(BaseModel):
+    """Request to retrieve a memory by ID."""
+
+    memory_id: Annotated[
+        UUID,
+        Field(description="UUID of the memory to retrieve"),
+    ]
+
+    tenant_id: Annotated[
+        UUID,
+        Field(description="Tenant UUID for multi-tenant isolation"),
+    ]
 
 
 class Error(BaseModel):

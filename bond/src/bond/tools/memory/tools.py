@@ -4,14 +4,14 @@ This module provides the agent-facing tool functions that use
 RunContext to access the memory backend via dependency injection.
 """
 
-from uuid import UUID
-
 from pydantic_ai import RunContext
 from pydantic_ai.tools import Tool
 
 from bond.tools.memory._models import (
     CreateMemoryRequest,
+    DeleteMemoryRequest,
     Error,
+    GetMemoryRequest,
     Memory,
     SearchMemoriesRequest,
     SearchResult,
@@ -35,6 +35,7 @@ async def create_memory(
         create_memory({
             "content": "User prefers dark mode and compact view",
             "agent_id": "assistant",
+            "tenant_id": "550e8400-e29b-41d4-a716-446655440000",
             "tags": ["preferences", "ui"]
         })
 
@@ -44,6 +45,7 @@ async def create_memory(
     result: Memory | Error = await ctx.deps.store(
         content=request.content,
         agent_id=request.agent_id,
+        tenant_id=request.tenant_id,
         conversation_id=request.conversation_id,
         tags=request.tags,
         embedding=request.embedding,
@@ -67,6 +69,7 @@ async def search_memories(
     Example:
         search_memories({
             "query": "user interface preferences",
+            "tenant_id": "550e8400-e29b-41d4-a716-446655440000",
             "top_k": 5,
             "tags": ["preferences"]
         })
@@ -77,6 +80,7 @@ async def search_memories(
     """
     result: list[SearchResult] | Error = await ctx.deps.search(
         query=request.query,
+        tenant_id=request.tenant_id,
         top_k=request.top_k,
         score_threshold=request.score_threshold,
         tags=request.tags,
@@ -88,7 +92,7 @@ async def search_memories(
 
 async def delete_memory(
     ctx: RunContext[AgentMemoryProtocol],
-    memory_id: UUID,
+    request: DeleteMemoryRequest,
 ) -> bool | Error:
     """Delete a memory by ID.
 
@@ -98,18 +102,24 @@ async def delete_memory(
         - Correct mistakes: "Remove the incorrect preference"
 
     Example:
-        delete_memory("550e8400-e29b-41d4-a716-446655440000")
+        delete_memory({
+            "memory_id": "550e8400-e29b-41d4-a716-446655440000",
+            "tenant_id": "660e8400-e29b-41d4-a716-446655440000"
+        })
 
     Returns:
         True if deleted, False if not found, or Error if deletion failed.
     """
-    result: bool | Error = await ctx.deps.delete(memory_id)
+    result: bool | Error = await ctx.deps.delete(
+        request.memory_id,
+        tenant_id=request.tenant_id,
+    )
     return result
 
 
 async def get_memory(
     ctx: RunContext[AgentMemoryProtocol],
-    memory_id: UUID,
+    request: GetMemoryRequest,
 ) -> Memory | None | Error:
     """Retrieve a specific memory by ID.
 
@@ -119,12 +129,18 @@ async def get_memory(
         - Check metadata: "What tags does memory X have?"
 
     Example:
-        get_memory("550e8400-e29b-41d4-a716-446655440000")
+        get_memory({
+            "memory_id": "550e8400-e29b-41d4-a716-446655440000",
+            "tenant_id": "660e8400-e29b-41d4-a716-446655440000"
+        })
 
     Returns:
         The Memory if found, None if not found, or Error if retrieval failed.
     """
-    result: Memory | None | Error = await ctx.deps.get(memory_id)
+    result: Memory | None | Error = await ctx.deps.get(
+        request.memory_id,
+        tenant_id=request.tenant_id,
+    )
     return result
 
 

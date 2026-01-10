@@ -1,7 +1,8 @@
 """Memory protocol - interface for memory backends.
 
-This module defines the contract that all memory backends must implement.
-The protocol enables backend swapping without changing tool code.
+All operations are scoped to a tenant for multi-tenant isolation.
+This ensures memories are always scoped correctly and enables
+efficient indexing on tenant boundaries.
 """
 
 from typing import Protocol
@@ -13,17 +14,13 @@ from bond.tools.memory._models import Error, Memory, SearchResult
 class AgentMemoryProtocol(Protocol):
     """Protocol for memory storage backends.
 
-    Implementations must provide async methods for storing, searching,
-    retrieving, and deleting memories. Embedding generation is the
-    backend's responsibility when not provided by the caller.
+    All operations require tenant_id for multi-tenant isolation.
+    This ensures memories are always scoped correctly and enables
+    efficient indexing on tenant boundaries.
 
-    Current implementations:
-        - QdrantMemoryStore: Qdrant vector database with sentence-transformers
-
-    Future implementations:
-        - PineconeMemoryStore
-        - ChromaMemoryStore
-        - PostgresMemoryStore (pgvector)
+    Implementations:
+        - PgVectorMemoryStore: PostgreSQL + pgvector (default)
+        - QdrantMemoryStore: Qdrant vector database
     """
 
     async def store(
@@ -31,6 +28,7 @@ class AgentMemoryProtocol(Protocol):
         content: str,
         agent_id: str,
         *,
+        tenant_id: UUID,
         conversation_id: str | None = None,
         tags: list[str] | None = None,
         embedding: list[float] | None = None,
@@ -41,6 +39,7 @@ class AgentMemoryProtocol(Protocol):
         Args:
             content: The text content to store.
             agent_id: ID of the agent creating this memory.
+            tenant_id: Tenant UUID for multi-tenant isolation (required).
             conversation_id: Optional conversation context.
             tags: Optional tags for filtering.
             embedding: Pre-computed embedding (backend generates if None).
@@ -55,6 +54,7 @@ class AgentMemoryProtocol(Protocol):
         self,
         query: str,
         *,
+        tenant_id: UUID,
         top_k: int = 10,
         score_threshold: float | None = None,
         tags: list[str] | None = None,
@@ -65,6 +65,7 @@ class AgentMemoryProtocol(Protocol):
 
         Args:
             query: Search query text.
+            tenant_id: Tenant UUID for multi-tenant isolation (required).
             top_k: Maximum number of results.
             score_threshold: Minimum similarity score to include.
             tags: Filter by memories with these tags.
@@ -76,22 +77,24 @@ class AgentMemoryProtocol(Protocol):
         """
         ...
 
-    async def delete(self, memory_id: UUID) -> bool | Error:
+    async def delete(self, memory_id: UUID, *, tenant_id: UUID) -> bool | Error:
         """Delete a memory by ID.
 
         Args:
             memory_id: The UUID of the memory to delete.
+            tenant_id: Tenant UUID for multi-tenant isolation (required).
 
         Returns:
             True if deleted, False if not found, or Error on failure.
         """
         ...
 
-    async def get(self, memory_id: UUID) -> Memory | None | Error:
+    async def get(self, memory_id: UUID, *, tenant_id: UUID) -> Memory | None | Error:
         """Retrieve a specific memory by ID.
 
         Args:
             memory_id: The UUID of the memory to retrieve.
+            tenant_id: Tenant UUID for multi-tenant isolation (required).
 
         Returns:
             The Memory if found, None if not found, or Error on failure.

@@ -1,17 +1,23 @@
 """Tests for memory data models."""
 
 from datetime import UTC, datetime
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 import pytest
 
 from bond.tools.memory._models import (
     CreateMemoryRequest,
+    DeleteMemoryRequest,
     Error,
+    GetMemoryRequest,
     Memory,
     SearchMemoriesRequest,
     SearchResult,
 )
+
+
+# Shared test tenant ID
+TEST_TENANT_ID = UUID("550e8400-e29b-41d4-a716-446655440000")
 
 
 class TestMemory:
@@ -68,9 +74,11 @@ class TestCreateMemoryRequest:
         request = CreateMemoryRequest(
             content="Remember this",
             agent_id="agent-1",
+            tenant_id=TEST_TENANT_ID,
         )
         assert request.content == "Remember this"
         assert request.agent_id == "agent-1"
+        assert request.tenant_id == TEST_TENANT_ID
         assert request.embedding is None
         assert request.embedding_model is None
 
@@ -80,11 +88,20 @@ class TestCreateMemoryRequest:
         request = CreateMemoryRequest(
             content="Remember this",
             agent_id="agent-1",
+            tenant_id=TEST_TENANT_ID,
             embedding=embedding,
             embedding_model="custom-model",
         )
         assert request.embedding == embedding
         assert request.embedding_model == "custom-model"
+
+    def test_requires_tenant_id(self) -> None:
+        """Test that tenant_id is required."""
+        with pytest.raises(ValueError):
+            CreateMemoryRequest(
+                content="Remember this",
+                agent_id="agent-1",
+            )
 
 
 class TestSearchMemoriesRequest:
@@ -92,8 +109,12 @@ class TestSearchMemoriesRequest:
 
     def test_creates_request_with_defaults(self) -> None:
         """Test request creation with default values."""
-        request = SearchMemoriesRequest(query="find something")
+        request = SearchMemoriesRequest(
+            query="find something",
+            tenant_id=TEST_TENANT_ID,
+        )
         assert request.query == "find something"
+        assert request.tenant_id == TEST_TENANT_ID
         assert request.top_k == 10
         assert request.score_threshold is None
         assert request.tags is None
@@ -101,16 +122,71 @@ class TestSearchMemoriesRequest:
     def test_validates_top_k_range(self) -> None:
         """Test that top_k is validated."""
         # Valid range
-        request = SearchMemoriesRequest(query="test", top_k=50)
+        request = SearchMemoriesRequest(
+            query="test",
+            tenant_id=TEST_TENANT_ID,
+            top_k=50,
+        )
         assert request.top_k == 50
 
         # Invalid: too low
         with pytest.raises(ValueError):
-            SearchMemoriesRequest(query="test", top_k=0)
+            SearchMemoriesRequest(
+                query="test",
+                tenant_id=TEST_TENANT_ID,
+                top_k=0,
+            )
 
         # Invalid: too high
         with pytest.raises(ValueError):
-            SearchMemoriesRequest(query="test", top_k=101)
+            SearchMemoriesRequest(
+                query="test",
+                tenant_id=TEST_TENANT_ID,
+                top_k=101,
+            )
+
+    def test_requires_tenant_id(self) -> None:
+        """Test that tenant_id is required."""
+        with pytest.raises(ValueError):
+            SearchMemoriesRequest(query="find something")
+
+
+class TestDeleteMemoryRequest:
+    """Tests for DeleteMemoryRequest model."""
+
+    def test_creates_request(self) -> None:
+        """Test request creation."""
+        memory_id = uuid4()
+        request = DeleteMemoryRequest(
+            memory_id=memory_id,
+            tenant_id=TEST_TENANT_ID,
+        )
+        assert request.memory_id == memory_id
+        assert request.tenant_id == TEST_TENANT_ID
+
+    def test_requires_tenant_id(self) -> None:
+        """Test that tenant_id is required."""
+        with pytest.raises(ValueError):
+            DeleteMemoryRequest(memory_id=uuid4())
+
+
+class TestGetMemoryRequest:
+    """Tests for GetMemoryRequest model."""
+
+    def test_creates_request(self) -> None:
+        """Test request creation."""
+        memory_id = uuid4()
+        request = GetMemoryRequest(
+            memory_id=memory_id,
+            tenant_id=TEST_TENANT_ID,
+        )
+        assert request.memory_id == memory_id
+        assert request.tenant_id == TEST_TENANT_ID
+
+    def test_requires_tenant_id(self) -> None:
+        """Test that tenant_id is required."""
+        with pytest.raises(ValueError):
+            GetMemoryRequest(memory_id=uuid4())
 
 
 class TestError:

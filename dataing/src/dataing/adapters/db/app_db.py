@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
@@ -13,6 +14,11 @@ import structlog
 
 logger = structlog.get_logger()
 
+# Retry configuration for database connection
+MAX_RETRIES = 10
+INITIAL_BACKOFF = 1.0  # seconds
+MAX_BACKOFF = 30.0  # seconds
+
 
 class AppDatabase:
     """Application database for storing tenants, users, investigations, etc."""
@@ -23,14 +29,50 @@ class AppDatabase:
         self.pool: asyncpg.Pool[asyncpg.Connection[asyncpg.Record]] | None = None
 
     async def connect(self) -> None:
-        """Create connection pool."""
-        self.pool = await asyncpg.create_pool(
-            self.dsn,
-            min_size=2,
-            max_size=10,
-            command_timeout=60,
+        """Create connection pool with retry logic.
+
+        Uses exponential backoff to handle container startup race conditions
+        where the database may not be immediately available.
+        """
+        backoff = INITIAL_BACKOFF
+        last_error: Exception | None = None
+
+        for attempt in range(1, MAX_RETRIES + 1):
+            try:
+                self.pool = await asyncpg.create_pool(
+                    self.dsn,
+                    min_size=2,
+                    max_size=10,
+                    command_timeout=60,
+                )
+                logger.info(
+                    "app_database_connected",
+                    dsn=self.dsn.split("@")[-1],
+                    attempt=attempt,
+                )
+                return
+            except (OSError, asyncpg.PostgresError) as e:
+                last_error = e
+                logger.warning(
+                    "app_database_connection_failed",
+                    attempt=attempt,
+                    max_retries=MAX_RETRIES,
+                    backoff_seconds=backoff,
+                    error=str(e),
+                )
+                if attempt < MAX_RETRIES:
+                    await asyncio.sleep(backoff)
+                    backoff = min(backoff * 2, MAX_BACKOFF)
+
+        # All retries exhausted
+        logger.error(
+            "app_database_connection_exhausted",
+            max_retries=MAX_RETRIES,
+            error=str(last_error),
         )
-        logger.info("app_database_connected", dsn=self.dsn.split("@")[-1])
+        raise ConnectionError(
+            f"Failed to connect to database after {MAX_RETRIES} attempts: {last_error}"
+        ) from last_error
 
     async def close(self) -> None:
         """Close connection pool."""

@@ -301,6 +301,46 @@ DUCKDB_TYPE_MAP: dict[str, NormalizedType] = {
     "json": NormalizedType.JSON,
 }
 
+# SQLite type mappings
+# SQLite has dynamic typing, but these are the common declared types
+SQLITE_TYPE_MAP: dict[str, NormalizedType] = {
+    # Integer types
+    "integer": NormalizedType.INTEGER,
+    "int": NormalizedType.INTEGER,
+    "tinyint": NormalizedType.INTEGER,
+    "smallint": NormalizedType.INTEGER,
+    "mediumint": NormalizedType.INTEGER,
+    "bigint": NormalizedType.INTEGER,
+    "int2": NormalizedType.INTEGER,
+    "int8": NormalizedType.INTEGER,
+    # Float types
+    "real": NormalizedType.FLOAT,
+    "double": NormalizedType.FLOAT,
+    "double precision": NormalizedType.FLOAT,
+    "float": NormalizedType.FLOAT,
+    # Decimal/Numeric types
+    "numeric": NormalizedType.DECIMAL,
+    "decimal": NormalizedType.DECIMAL,
+    # String types
+    "text": NormalizedType.STRING,
+    "varchar": NormalizedType.STRING,
+    "character": NormalizedType.STRING,
+    "char": NormalizedType.STRING,
+    "nchar": NormalizedType.STRING,
+    "nvarchar": NormalizedType.STRING,
+    "clob": NormalizedType.STRING,
+    # Binary types
+    "blob": NormalizedType.BINARY,
+    # Boolean (SQLite stores as INTEGER 0/1)
+    "boolean": NormalizedType.BOOLEAN,
+    "bool": NormalizedType.BOOLEAN,
+    # Date/Time types
+    "date": NormalizedType.DATE,
+    "datetime": NormalizedType.DATETIME,
+    "timestamp": NormalizedType.TIMESTAMP,
+    "time": NormalizedType.TIME,
+}
+
 # MongoDB type mappings
 MONGODB_TYPE_MAP: dict[str, NormalizedType] = {
     "string": NormalizedType.STRING,
@@ -429,6 +469,7 @@ SOURCE_TYPE_MAPS: dict[SourceType, dict[str, NormalizedType]] = {
     SourceType.TRINO: TRINO_TYPE_MAP,
     SourceType.REDSHIFT: POSTGRESQL_TYPE_MAP,  # Redshift is PostgreSQL-based
     SourceType.DUCKDB: DUCKDB_TYPE_MAP,
+    SourceType.SQLITE: SQLITE_TYPE_MAP,
     SourceType.MONGODB: MONGODB_TYPE_MAP,
     SourceType.DYNAMODB: DYNAMODB_TYPE_MAP,
     SourceType.CASSANDRA: POSTGRESQL_TYPE_MAP,  # Similar enough

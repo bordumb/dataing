@@ -5,6 +5,7 @@ The orchestrator handles persistence, locking, and flow control.
 """
 
 from .gather_context import ContextBundle, GatherContextStep
+from .generate_hypotheses import GenerateHypothesesStep
 from .protocol import BranchRequest, BranchSpec, Step, StepResult
 
 __all__ = [
@@ -14,4 +15,5 @@ __all__ = [
     "BranchSpec",
     "GatherContextStep",
     "ContextBundle",
+    "GenerateHypothesesStep",
 ]

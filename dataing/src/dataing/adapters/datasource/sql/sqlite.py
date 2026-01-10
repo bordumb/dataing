@@ -6,6 +6,8 @@ file-based data investigations. Uses Python's built-in sqlite3 module.
 
 from __future__ import annotations
 
+import logging
+import re
 import sqlite3
 import time
 from pathlib import Path
@@ -32,6 +34,12 @@ from dataing.adapters.datasource.types import (
     SourceCategory,
     SourceType,
 )
+
+logger = logging.getLogger(__name__)
+
+# Constants for SQLite's single-catalog/single-schema model
+DEFAULT_CATALOG = "default"
+DEFAULT_SCHEMA = "main"
 
 SQLITE_CONFIG_SCHEMA = ConfigSchema(
     field_groups=[
@@ -112,7 +120,7 @@ class SQLiteAdapter(SQLAdapter):
 
     def _build_uri(self) -> str:
         """Build SQLite URI from config."""
-        path = self._config.get("path", "")
+        path: str = self._config.get("path", "")
         read_only = self._config.get("read_only", True)
 
         if path.startswith("file:"):
@@ -196,6 +204,8 @@ class SQLiteAdapter(SQLAdapter):
 
         start_time = time.time()
         try:
+            # Note: busy_timeout only handles database lock contention, not query
+            # execution time. SQLite does not support query-level timeouts natively.
             self._conn.execute(f"PRAGMA busy_timeout = {timeout_seconds * 1000}")
 
             cursor = self._conn.execute(sql)
@@ -254,8 +264,8 @@ class SQLiteAdapter(SQLAdapter):
         tables = []
         for row in cursor:
             tables.append({
-                "table_catalog": "default",
-                "table_schema": "main",
+                "table_catalog": DEFAULT_CATALOG,
+                "table_schema": DEFAULT_SCHEMA,
                 "table_name": row["name"],
                 "table_type": row["type"].upper(),
             })
@@ -282,7 +292,6 @@ class SQLiteAdapter(SQLAdapter):
             if filter:
                 if filter.table_pattern:
                     pattern = filter.table_pattern.replace("%", ".*").replace("_", ".")
-                    import re
                     table_rows = [
                         r for r in table_rows
                         if re.match(pattern, r["name"], re.IGNORECASE)
@@ -297,6 +306,8 @@ class SQLiteAdapter(SQLAdapter):
                 table_name = table_row["name"]
                 table_type = "view" if table_row["type"] == "view" else "table"
 
+                # table_name comes from sqlite_master query above (trusted source),
+                # not from user input, so this is safe from SQL injection
                 col_cursor = self._conn.execute(f"PRAGMA table_info('{table_name}')")
                 col_rows = col_cursor.fetchall()
                 col_cursor.close()
@@ -323,10 +334,10 @@ class SQLiteAdapter(SQLAdapter):
 
             catalogs = [
                 {
-                    "name": "default",
+                    "name": DEFAULT_CATALOG,
                     "schemas": [
                         {
-                            "name": "main",
+                            "name": DEFAULT_SCHEMA,
                             "tables": tables,
                         }
                     ],
@@ -377,14 +388,17 @@ class SQLiteAdapter(SQLAdapter):
                     total = row.get("total_count", 0)
                     non_null = row.get("non_null_count", 0)
                     null_count = total - non_null if total else 0
+                    min_val = row.get("min_value")
+                    max_val = row.get("max_value")
                     stats[col] = {
                         "null_count": null_count,
                         "null_rate": null_count / total if total > 0 else 0.0,
                         "distinct_count": row.get("distinct_count"),
-                        "min_value": str(row.get("min_value")) if row.get("min_value") is not None else None,
-                        "max_value": str(row.get("max_value")) if row.get("max_value") is not None else None,
+                        "min_value": str(min_val) if min_val is not None else None,
+                        "max_value": str(max_val) if max_val is not None else None,
                     }
-            except Exception:
+            except Exception as e:
+                logger.debug(f"Failed to get stats for column {col}: {e}")
                 stats[col] = {
                     "null_count": 0,
                     "null_rate": 0.0,

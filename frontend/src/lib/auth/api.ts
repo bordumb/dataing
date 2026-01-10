@@ -10,7 +10,9 @@ import type {
   RegisterRequest,
 } from './types'
 
-const API_BASE = '/api/v1/auth'
+// API base URL - empty for same-origin (dev), set VITE_API_URL for production
+const API_URL = import.meta.env.VITE_API_URL || ''
+const API_BASE = `${API_URL}/api/v1/auth`
 
 class AuthApiError extends Error {
   constructor(

@@ -194,6 +194,7 @@ class BaseAdapter(ABC):
             SourceType.BIGQUERY,
             SourceType.REDSHIFT,
             SourceType.DUCKDB,
+            SourceType.SQLITE,
             SourceType.MONGODB,
             SourceType.DYNAMODB,
             SourceType.CASSANDRA,

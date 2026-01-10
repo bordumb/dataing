@@ -138,6 +138,7 @@ CREATE TABLE branch_messages (
 CREATE INDEX idx_messages_branch ON branch_messages(branch_id, created_at);
 
 -- Approval requests
+DROP TABLE IF EXISTS approval_requests CASCADE;
 CREATE TABLE approval_requests (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     branch_id UUID NOT NULL REFERENCES investigation_branches(id) ON DELETE CASCADE,
@@ -203,3 +204,12 @@ CREATE TABLE root_cause_patterns (
 );
 
 CREATE INDEX idx_patterns_tenant ON root_cause_patterns(tenant_id) WHERE status = 'active';
+
+-- =============================================================================
+-- Triggers
+-- =============================================================================
+
+-- Auto-update updated_at for investigation_branches
+CREATE TRIGGER update_investigation_branches_updated_at
+    BEFORE UPDATE ON investigation_branches
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();

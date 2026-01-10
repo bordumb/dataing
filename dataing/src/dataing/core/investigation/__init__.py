@@ -5,6 +5,7 @@ including entities, value objects, and the step abstraction.
 """
 
 from .entities import Branch, Investigation, InvestigationContext, Snapshot
+from .registry import StepRegistry
 from .repository import ExecutionLock, InvestigationRepository
 from .values import (
     BranchStatus,
@@ -29,4 +30,6 @@ __all__ = [
     # Repository
     "InvestigationRepository",
     "ExecutionLock",
+    # Registry
+    "StepRegistry",
 ]

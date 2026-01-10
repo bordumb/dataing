@@ -339,3 +339,240 @@ class TestInvestigationOrchestrator:
 
         assert result.signal == ExecutionSignal.FAIL
         assert "preconditions not met" in (result.error or "").lower()
+
+
+class TestOrchestratorLocking:
+    """Tests for orchestrator lock acquisition and release."""
+
+    @pytest.mark.asyncio
+    async def test_tick_acquires_lock_before_execution(
+        self,
+        mock_repository: AsyncMock,
+        registry: StepRegistry,
+        sample_branch: Branch,
+        mock_step: MagicMock,
+    ) -> None:
+        """tick() acquires lock before executing step."""
+        from dataing.core.investigation.repository import ExecutionLock
+
+        lock = ExecutionLock(
+            branch_id=sample_branch.id,
+            locked_by="test-worker",
+            expires_at="2024-01-01T00:00:00Z",
+        )
+        mock_repository.acquire_lock.return_value = lock
+
+        orchestrator = InvestigationOrchestrator(
+            repository=mock_repository,
+            registry=registry,
+            worker_id="test-worker",
+        )
+
+        await orchestrator.tick(sample_branch.id)
+
+        # Lock should be acquired before step execution
+        mock_repository.acquire_lock.assert_called_once_with(
+            sample_branch.id,
+            "test-worker",
+            300,  # default TTL
+        )
+
+    @pytest.mark.asyncio
+    async def test_tick_releases_lock_after_success(
+        self,
+        mock_repository: AsyncMock,
+        registry: StepRegistry,
+        sample_branch: Branch,
+    ) -> None:
+        """tick() releases lock after successful execution."""
+        from dataing.core.investigation.repository import ExecutionLock
+
+        lock = ExecutionLock(
+            branch_id=sample_branch.id,
+            locked_by="test-worker",
+            expires_at="2024-01-01T00:00:00Z",
+        )
+        mock_repository.acquire_lock.return_value = lock
+        mock_repository.release_lock.return_value = True
+
+        orchestrator = InvestigationOrchestrator(
+            repository=mock_repository,
+            registry=registry,
+            worker_id="test-worker",
+        )
+
+        await orchestrator.tick(sample_branch.id)
+
+        mock_repository.release_lock.assert_called_once_with(
+            sample_branch.id,
+            "test-worker",
+        )
+
+    @pytest.mark.asyncio
+    async def test_tick_releases_lock_on_error(
+        self,
+        mock_repository: AsyncMock,
+        registry: StepRegistry,
+        sample_branch: Branch,
+        mock_step: MagicMock,
+    ) -> None:
+        """tick() releases lock even when step execution fails."""
+        from dataing.core.investigation.repository import ExecutionLock
+
+        lock = ExecutionLock(
+            branch_id=sample_branch.id,
+            locked_by="test-worker",
+            expires_at="2024-01-01T00:00:00Z",
+        )
+        mock_repository.acquire_lock.return_value = lock
+        mock_repository.release_lock.return_value = True
+
+        # Make step raise an exception
+        mock_step.execute.side_effect = RuntimeError("Step failed")
+
+        orchestrator = InvestigationOrchestrator(
+            repository=mock_repository,
+            registry=registry,
+            worker_id="test-worker",
+        )
+
+        # Should not raise, just return FAIL
+        result = await orchestrator.tick(sample_branch.id)
+
+        # Lock should still be released
+        mock_repository.release_lock.assert_called_once_with(
+            sample_branch.id,
+            "test-worker",
+        )
+        assert result.signal == ExecutionSignal.FAIL
+
+    @pytest.mark.asyncio
+    async def test_tick_fails_when_lock_not_acquired(
+        self,
+        mock_repository: AsyncMock,
+        registry: StepRegistry,
+        sample_branch: Branch,
+        mock_step: MagicMock,
+    ) -> None:
+        """tick() returns FAIL when lock cannot be acquired."""
+        mock_repository.acquire_lock.return_value = None  # Lock not acquired
+
+        orchestrator = InvestigationOrchestrator(
+            repository=mock_repository,
+            registry=registry,
+            worker_id="test-worker",
+        )
+
+        result = await orchestrator.tick(sample_branch.id)
+
+        assert result.signal == ExecutionSignal.FAIL
+        assert "lock" in (result.error or "").lower()
+        # Step should not have been executed
+        mock_step.execute.assert_not_called()
+        # Release should not be called since lock wasn't acquired
+        mock_repository.release_lock.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_tick_uses_worker_id_from_init(
+        self,
+        mock_repository: AsyncMock,
+        registry: StepRegistry,
+        sample_branch: Branch,
+    ) -> None:
+        """tick() uses the worker_id provided at initialization."""
+        from dataing.core.investigation.repository import ExecutionLock
+
+        custom_worker_id = "custom-worker-12345"
+        lock = ExecutionLock(
+            branch_id=sample_branch.id,
+            locked_by=custom_worker_id,
+            expires_at="2024-01-01T00:00:00Z",
+        )
+        mock_repository.acquire_lock.return_value = lock
+        mock_repository.release_lock.return_value = True
+
+        orchestrator = InvestigationOrchestrator(
+            repository=mock_repository,
+            registry=registry,
+            worker_id=custom_worker_id,
+        )
+
+        await orchestrator.tick(sample_branch.id)
+
+        mock_repository.acquire_lock.assert_called_once_with(
+            sample_branch.id,
+            custom_worker_id,
+            300,
+        )
+        mock_repository.release_lock.assert_called_once_with(
+            sample_branch.id,
+            custom_worker_id,
+        )
+
+    @pytest.mark.asyncio
+    async def test_tick_uses_custom_ttl(
+        self,
+        mock_repository: AsyncMock,
+        registry: StepRegistry,
+        sample_branch: Branch,
+    ) -> None:
+        """tick() uses the lock_ttl_seconds provided at initialization."""
+        from dataing.core.investigation.repository import ExecutionLock
+
+        custom_ttl = 600  # 10 minutes
+        lock = ExecutionLock(
+            branch_id=sample_branch.id,
+            locked_by="test-worker",
+            expires_at="2024-01-01T00:00:00Z",
+        )
+        mock_repository.acquire_lock.return_value = lock
+        mock_repository.release_lock.return_value = True
+
+        orchestrator = InvestigationOrchestrator(
+            repository=mock_repository,
+            registry=registry,
+            worker_id="test-worker",
+            lock_ttl_seconds=custom_ttl,
+        )
+
+        await orchestrator.tick(sample_branch.id)
+
+        mock_repository.acquire_lock.assert_called_once_with(
+            sample_branch.id,
+            "test-worker",
+            custom_ttl,
+        )
+
+    @pytest.mark.asyncio
+    async def test_default_worker_id_is_generated(
+        self,
+        mock_repository: AsyncMock,
+        registry: StepRegistry,
+        sample_branch: Branch,
+    ) -> None:
+        """Worker ID is auto-generated if not provided."""
+        from dataing.core.investigation.repository import ExecutionLock
+
+        lock = ExecutionLock(
+            branch_id=sample_branch.id,
+            locked_by="auto-generated",
+            expires_at="2024-01-01T00:00:00Z",
+        )
+        mock_repository.acquire_lock.return_value = lock
+        mock_repository.release_lock.return_value = True
+
+        orchestrator = InvestigationOrchestrator(
+            repository=mock_repository,
+            registry=registry,
+            # No worker_id provided - should auto-generate
+        )
+
+        # Should have a worker_id attribute
+        assert orchestrator.worker_id is not None
+        assert len(orchestrator.worker_id) > 0
+
+        await orchestrator.tick(sample_branch.id)
+
+        # acquire_lock should be called with the generated worker_id
+        call_args = mock_repository.acquire_lock.call_args
+        assert call_args[0][1] == orchestrator.worker_id

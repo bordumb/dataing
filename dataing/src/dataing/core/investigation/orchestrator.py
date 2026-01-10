@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
-from uuid import UUID
+from uuid import UUID, uuid4
 
 from dataing.core.investigation.registry import StepRegistry
 from dataing.core.investigation.steps.protocol import StepResult
@@ -40,18 +40,55 @@ class InvestigationOrchestrator:
         self,
         repository: InvestigationRepository,
         registry: StepRegistry,
+        worker_id: str | None = None,
+        lock_ttl_seconds: int = 300,
     ) -> None:
         """Initialize orchestrator.
 
         Args:
             repository: Repository for persistence operations.
             registry: Registry of step implementations.
+            worker_id: Unique identifier for this worker. Auto-generated if not provided.
+            lock_ttl_seconds: Lock time-to-live in seconds. Defaults to 300 (5 minutes).
         """
         self.repository = repository
         self.registry = registry
+        self.worker_id = worker_id if worker_id is not None else uuid4().hex
+        self.lock_ttl_seconds = lock_ttl_seconds
 
     async def tick(self, branch_id: UUID) -> TickResult:
         """Execute one step on a branch.
+
+        Args:
+            branch_id: ID of the branch to process.
+
+        Returns:
+            TickResult with signal and any output/error.
+        """
+        # Acquire lock before any processing
+        lock = await self.repository.acquire_lock(
+            branch_id,
+            self.worker_id,
+            self.lock_ttl_seconds,
+        )
+        if lock is None:
+            return TickResult(
+                signal=ExecutionSignal.FAIL,
+                error=f"Could not acquire lock for branch: {branch_id}",
+            )
+
+        try:
+            return await self._tick_inner(branch_id)
+        except Exception as e:
+            return TickResult(
+                signal=ExecutionSignal.FAIL,
+                error=f"Step execution failed: {e}",
+            )
+        finally:
+            await self.repository.release_lock(branch_id, self.worker_id)
+
+    async def _tick_inner(self, branch_id: UUID) -> TickResult:
+        """Execute one step on a branch (inner implementation).
 
         Args:
             branch_id: ID of the branch to process.

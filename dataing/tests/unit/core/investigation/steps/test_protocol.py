@@ -72,7 +72,7 @@ class TestStepResult:
             signal=ExecutionSignal.CONTINUE,
         )
         with pytest.raises(FrozenInstanceError):
-            result.signal = ExecutionSignal.FAIL  # type: ignore[misc]
+            result.signal = ExecutionSignal.FAIL
 
 
 class TestBranchRequest:

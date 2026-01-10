@@ -1,33 +1,51 @@
 # Repository Guidelines
 
+## Contributor Paths
+- Internal contributors: work from a branch, link the internal issue, and request review from the owning team.
+- External contributors: open a PR from a fork, keep changes focused, and avoid infra/secrets updates.
+
 ## Project Structure & Module Organization
-- `backend/src/dataing/`: FastAPI service (core domain, adapters, entrypoints); `backend/migrations/` holds SQL migrations.
-- `frontend/src/`: React + Vite app; feature modules live in `frontend/src/features/` and shared UI in `frontend/src/components/ui/`.
-- `tests/`: backend tests organized by `unit/`, `integration/`, and `e2e/`.
+- `backend/src/dataing/`: FastAPI service (core domain, adapters, entrypoints).
+- `backend/migrations/`: SQL migrations.
+- `frontend/src/`: React + Vite app; feature modules in `frontend/src/features/`, shared UI in `frontend/src/components/ui/`.
+- `tests/`: backend tests organized into `unit/`, `integration/`, and `e2e/`.
 - `demo/`: demo fixtures and generator; `docs/`: MkDocs site; `scripts/`: helper scripts.
-- `dashboard/`: Next.js app not referenced by the `just` commands.
+- `dashboard/`: Next.js app (not wired into the `just` commands).
+
+## Architecture Overview
+Backend and frontend communicate via a generated OpenAPI client; database changes flow through SQL migrations.
+
+```mermaid
+flowchart LR
+  FE[Frontend (Vite/React)] -->|OpenAPI client| API[FastAPI service]
+  API --> DB[(Database)]
+  MIG[SQL migrations] --> DB
+```
 
 ## Build, Test, and Development Commands
 Use the root `justfile` as the canonical task runner:
-- `just setup` installs backend (uv) and frontend (pnpm) deps and pre-commit hooks.
-- `just dev`, `just dev-backend`, `just dev-frontend` run dev servers (backend 8000, frontend 3000/5173).
-- `just test`, `just test-backend`, `just test-frontend` run pytest and Vitest.
-- `just lint`, `just format`, `just typecheck` enforce ruff/mypy and ESLint/Prettier.
-- `just generate-client` exports OpenAPI and regenerates the frontend API client.
-- `just demo` spins up the demo stack and fixtures; `just build` creates production builds.
+- `just setup`: install backend deps (uv), frontend deps (pnpm), and pre-commit hooks.
+- `just dev`: run both dev servers; `just dev-backend` (FastAPI on 8000) and `just dev-frontend` (Vite on 3000/5173).
+- `just test`: run all tests; `just test-backend` (pytest) and `just test-frontend` (Vitest).
+- `just lint`, `just format`, `just typecheck`: run ruff/mypy and ESLint/Prettier checks.
+- `just generate-client`: export OpenAPI schema and regenerate the frontend API client.
+- `just demo`: spin up the demo stack and fixtures; `just build`: production builds.
 
 ## Coding Style & Naming Conventions
-- Python: 4-space indent, `ruff format` with 100-char lines, Google-style docstrings (public methods and `__init__` require docstrings). Mypy is strict; prefer explicit types and `raise ... from e` in except blocks.
-- TypeScript: strict mode, ESLint + Prettier; default 2-space indentation.
-- Naming: `snake_case` for Python, `PascalCase` for classes, `camelCase` for TS/JS symbols; tests use `test_*.py`.
+- Python: 4-space indentation; `ruff format` with 100-char lines; Google-style docstrings for public methods and `__init__`.
+- Mypy is strict; prefer explicit types and `raise ... from e` in except blocks.
+- TypeScript: strict mode, 2-space indentation, ESLint + Prettier.
+- Naming: `snake_case` (Python), `PascalCase` (classes), `camelCase` (TS/JS); tests are `test_*.py` and `*.test.ts(x)`.
 
 ## Testing Guidelines
-- Backend uses `pytest` + `pytest-asyncio` with coverage over `backend/src/dataing`. Place tests in `tests/unit`, `tests/integration`, or `tests/e2e`.
-- Frontend uses Vitest (`pnpm test`); name files `*.test.ts(x)` so they are picked up.
+- Backend: `pytest` + `pytest-asyncio`, coverage focused on `backend/src/dataing/`.
+- Place backend tests in `tests/unit/`, `tests/integration/`, or `tests/e2e/`.
+- Frontend: Vitest via `pnpm test` or `just test-frontend`.
 
 ## Commit & Pull Request Guidelines
-- Commit history favors Conventional Commits (`feat:`, `fix:`, `docs:`, `chore:`). Use that format unless updating older "Add ..." style areas.
-- PRs should include a clear description, testing notes/commands run, linked issues, and screenshots for UI changes.
+- Prefer Conventional Commits (`feat:`, `fix:`, `docs:`, `chore:`). Use existing "Add ..." style where already established.
+- PRs should include a clear description, linked issues, testing commands run, and screenshots for UI changes.
 
 ## Configuration & Demo Notes
-- Backend can read `backend/.env`; demo runs with `dd_demo_12345` via `just demo`.
+- Backend can read `backend/.env`.
+- Demo runs with `dd_demo_12345` via `just demo`.

@@ -133,8 +133,11 @@ class InvestigationOrchestrator:
                 error=f"Step preconditions not met: {snapshot.step}",
             )
 
-        # Execute step
-        result = await step.execute(snapshot.context)
+        # Execute step - pass step_cursor as input_data for branch-specific data
+        result = await step.execute(
+            snapshot.context,
+            snapshot.step_cursor if snapshot.step_cursor else None,
+        )
 
         # Handle signal
         return await self._handle_signal(branch, snapshot, result)

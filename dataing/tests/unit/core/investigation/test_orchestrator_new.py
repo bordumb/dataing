@@ -943,3 +943,134 @@ class TestOrchestratorBranching:
         step_cursors = [call.kwargs.get("step_cursor", {}) for call in snapshot_calls]
         hypothesis_ids = [cursor.get("hypothesis_id") for cursor in step_cursors]
         assert "h1" in hypothesis_ids or "h2" in hypothesis_ids
+
+
+class TestOrchestratorAwaitUser:
+    """Tests for orchestrator AWAIT_USER signal handling."""
+
+    @pytest.fixture
+    def await_user_step(self, sample_context: InvestigationContext) -> MagicMock:
+        """Create mock step that returns AWAIT_USER signal."""
+        step = MagicMock(spec=Step)
+        step.step_type = StepType.CLASSIFY_INTENT
+        step.can_execute.return_value = True
+        step.execute = AsyncMock(
+            return_value=StepResult(
+                context=sample_context,
+                signal=ExecutionSignal.AWAIT_USER,
+                output={"clarification": "The root cause is..."},
+                next_step=StepType.AWAIT_USER,
+            )
+        )
+        return step
+
+    @pytest.fixture
+    def await_user_snapshot(
+        self,
+        sample_snapshot: Snapshot,
+        sample_context: InvestigationContext,
+    ) -> Snapshot:
+        """Create snapshot at CLASSIFY_INTENT step."""
+        return Snapshot(
+            id=sample_snapshot.id,
+            investigation_id=sample_snapshot.investigation_id,
+            branch_id=sample_snapshot.branch_id,
+            version=sample_snapshot.version,
+            step=StepType.CLASSIFY_INTENT,
+            context=sample_context,
+        )
+
+    @pytest.fixture
+    def await_user_registry(self, await_user_step: MagicMock) -> StepRegistry:
+        """Create registry with await_user step."""
+        reg = StepRegistry()
+        reg.register(await_user_step)
+        return reg
+
+    @pytest.fixture
+    def mock_await_user_repository(
+        self,
+        await_user_snapshot: Snapshot,
+        sample_branch: Branch,
+    ) -> AsyncMock:
+        """Create mock repository for await_user tests."""
+        repo = AsyncMock()
+        repo.get_snapshot.return_value = await_user_snapshot
+        repo.get_branch.return_value = sample_branch
+        repo.create_snapshot.return_value = await_user_snapshot
+        return repo
+
+    @pytest.mark.asyncio
+    async def test_tick_await_user_suspends_branch(
+        self,
+        mock_await_user_repository: AsyncMock,
+        await_user_registry: StepRegistry,
+        sample_branch: Branch,
+    ) -> None:
+        """tick() with AWAIT_USER signal suspends the branch."""
+        orchestrator = InvestigationOrchestrator(
+            repository=mock_await_user_repository,
+            registry=await_user_registry,
+        )
+
+        await orchestrator.tick(sample_branch.id)
+
+        mock_await_user_repository.update_branch_status.assert_called_once_with(
+            sample_branch.id,
+            BranchStatus.SUSPENDED,
+        )
+
+    @pytest.mark.asyncio
+    async def test_tick_await_user_creates_snapshot(
+        self,
+        mock_await_user_repository: AsyncMock,
+        await_user_registry: StepRegistry,
+        sample_branch: Branch,
+    ) -> None:
+        """tick() with AWAIT_USER signal creates a snapshot at AWAIT_USER step."""
+        orchestrator = InvestigationOrchestrator(
+            repository=mock_await_user_repository,
+            registry=await_user_registry,
+        )
+
+        await orchestrator.tick(sample_branch.id)
+
+        # Should create snapshot at AWAIT_USER step
+        mock_await_user_repository.create_snapshot.assert_called_once()
+        call_kwargs = mock_await_user_repository.create_snapshot.call_args.kwargs
+        assert call_kwargs["step"] == StepType.AWAIT_USER
+
+    @pytest.mark.asyncio
+    async def test_tick_await_user_returns_signal(
+        self,
+        mock_await_user_repository: AsyncMock,
+        await_user_registry: StepRegistry,
+        sample_branch: Branch,
+    ) -> None:
+        """tick() with AWAIT_USER signal returns the signal in result."""
+        orchestrator = InvestigationOrchestrator(
+            repository=mock_await_user_repository,
+            registry=await_user_registry,
+        )
+
+        result = await orchestrator.tick(sample_branch.id)
+
+        assert result.signal == ExecutionSignal.AWAIT_USER
+        assert result.output == {"clarification": "The root cause is..."}
+
+    @pytest.mark.asyncio
+    async def test_tick_await_user_updates_branch_head(
+        self,
+        mock_await_user_repository: AsyncMock,
+        await_user_registry: StepRegistry,
+        sample_branch: Branch,
+    ) -> None:
+        """tick() with AWAIT_USER signal updates the branch head."""
+        orchestrator = InvestigationOrchestrator(
+            repository=mock_await_user_repository,
+            registry=await_user_registry,
+        )
+
+        await orchestrator.tick(sample_branch.id)
+
+        mock_await_user_repository.update_branch_head.assert_called_once()

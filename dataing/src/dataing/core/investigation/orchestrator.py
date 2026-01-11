@@ -166,8 +166,10 @@ class InvestigationOrchestrator:
             return await self._handle_fail(branch, snapshot, result)
         elif result.signal == ExecutionSignal.BRANCH:
             return await self._handle_branch(branch, snapshot, result)
+        elif result.signal == ExecutionSignal.AWAIT_USER:
+            return await self._handle_await_user(branch, snapshot, result)
         else:
-            # Other signals (AWAIT_USER, etc.) will be added later
+            # Unknown signal
             return TickResult(
                 signal=result.signal,
                 output=result.output,
@@ -366,4 +368,44 @@ class InvestigationOrchestrator:
             signal=ExecutionSignal.BRANCH,
             output=result.output,
             child_branch_ids=child_branch_ids,
+        )
+
+    async def _handle_await_user(
+        self,
+        branch: Branch,
+        snapshot: Snapshot,
+        result: StepResult[Any],
+    ) -> TickResult:
+        """Handle AWAIT_USER signal - suspend branch and wait for input.
+
+        Creates a snapshot at AWAIT_USER step and suspends the branch
+        to wait for user input before continuing.
+
+        Args:
+            branch: Current branch.
+            snapshot: Current snapshot.
+            result: StepResult from step execution.
+
+        Returns:
+            TickResult with AWAIT_USER signal.
+        """
+        # Create snapshot at AWAIT_USER step
+        new_version = snapshot.version.next_patch()
+        new_snapshot = await self.repository.create_snapshot(
+            investigation_id=snapshot.investigation_id,
+            branch_id=branch.id,
+            version=new_version,
+            step=StepType.AWAIT_USER,
+            context=result.context,
+            parent_snapshot_id=snapshot.id,
+        )
+
+        # Update branch head and suspend
+        await self.repository.update_branch_head(branch.id, new_snapshot.id)
+        await self.repository.update_branch_status(branch.id, BranchStatus.SUSPENDED)
+
+        return TickResult(
+            signal=ExecutionSignal.AWAIT_USER,
+            new_snapshot_id=new_snapshot.id,
+            output=result.output,
         )

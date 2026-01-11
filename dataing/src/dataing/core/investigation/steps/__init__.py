@@ -5,6 +5,7 @@ The orchestrator handles persistence, locking, and flow control.
 """
 
 from .check_patterns import CheckPatternsStep, PatternRepositoryProtocol
+from .classify_intent import ClassifyIntentStep, RefinementIntent
 from .execute_query import ExecuteQueryStep
 from .gather_context import ContextBundle, GatherContextStep
 from .generate_hypotheses import GenerateHypothesesStep
@@ -22,6 +23,8 @@ __all__ = [
     "ContextBundle",
     "CheckPatternsStep",
     "PatternRepositoryProtocol",
+    "ClassifyIntentStep",
+    "RefinementIntent",
     "GenerateHypothesesStep",
     "GenerateQueryStep",
     "ExecuteQueryStep",

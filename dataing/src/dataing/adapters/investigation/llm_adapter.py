@@ -217,7 +217,7 @@ class SynthesisLLMAdapter:
             alert_summary: Summary of the anomaly alert.
 
         Returns:
-            Synthesis dict with root_cause, confidence, recommendations.
+            Synthesis dict with all fields from LLM response.
         """
         # Convert evidence dicts to Evidence objects
         evidence_objects = [
@@ -235,16 +235,20 @@ class SynthesisLLMAdapter:
 
         alert = _create_minimal_alert(alert_summary)
 
-        finding = await self._client.synthesize_findings(
+        # Get full synthesis response from LLM
+        synthesis_response = await self._client.synthesize_findings_raw(
             alert=alert,
             evidence=evidence_objects,
         )
 
         return {
-            "root_cause": finding.root_cause,
-            "confidence": finding.confidence,
-            "recommendations": finding.recommendations,
-            "supporting_evidence": [e.interpretation for e in evidence_objects],
+            "root_cause": synthesis_response.root_cause,
+            "confidence": synthesis_response.confidence,
+            "causal_chain": synthesis_response.causal_chain,
+            "estimated_onset": synthesis_response.estimated_onset,
+            "affected_scope": synthesis_response.affected_scope,
+            "recommendations": synthesis_response.recommendations,
+            "supporting_evidence": synthesis_response.supporting_evidence,
         }
 
 

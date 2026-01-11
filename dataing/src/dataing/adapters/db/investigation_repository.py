@@ -443,15 +443,16 @@ class PostgresInvestigationRepository:
         self,
         parent_branch_id: UUID,
     ) -> bool:
-        """Check if all children are ready to merge.
+        """Check if all children are done and ready to merge.
 
-        Returns True if all child branches have status 'completed' or 'merged'.
+        Returns True if all child branches have a terminal status
+        (completed, merged, or abandoned). Abandoned branches don't block merge.
         """
         result = await self.db.fetch_one(
             """
             SELECT COUNT(*) as total,
                    COUNT(*) FILTER (
-                       WHERE ib.status IN ('completed', 'merged')
+                       WHERE ib.status IN ('completed', 'merged', 'abandoned')
                    ) as ready
             FROM branch_merge_points bmp
             JOIN investigation_branches ib ON ib.id = bmp.child_branch_id

@@ -27,6 +27,9 @@ from .models import (
     QueryResponse,
     SynthesisResponse,
 )
+
+# Re-export for type hints in adapters
+__all__ = ["AgentClient", "SynthesisResponse"]
 from .prompts import hypothesis, interpretation, query, reflexion, synthesis
 
 if TYPE_CHECKING:
@@ -249,25 +252,47 @@ class AgentClient:
         Raises:
             LLMError: If synthesis fails.
         """
+        result = await self.synthesize_findings_raw(alert, evidence, handlers)
+
+        return Finding(
+            investigation_id="",  # Set by orchestrator
+            status="completed" if result.root_cause else "inconclusive",
+            root_cause=result.root_cause,
+            confidence=result.confidence,
+            evidence=evidence,
+            recommendations=result.recommendations,
+            duration_seconds=0.0,  # Set by orchestrator
+        )
+
+    async def synthesize_findings_raw(
+        self,
+        alert: AnomalyAlert,
+        evidence: list[Evidence],
+        handlers: StreamHandlers | None = None,
+    ) -> SynthesisResponse:
+        """Synthesize all evidence into a root cause finding (raw response).
+
+        Args:
+            alert: The original anomaly alert.
+            evidence: All collected evidence.
+            handlers: Optional streaming handlers for real-time updates.
+
+        Returns:
+            Raw SynthesisResponse with all fields from LLM.
+
+        Raises:
+            LLMError: If synthesis fails.
+        """
         prompt = synthesis.build_user(alert=alert, evidence=evidence)
         system = synthesis.build_system()
 
         try:
-            result = await self._synthesis_agent.ask(
+            result: SynthesisResponse = await self._synthesis_agent.ask(
                 prompt,
                 dynamic_instructions=system,
                 handlers=handlers,
             )
-
-            return Finding(
-                investigation_id="",  # Set by orchestrator
-                status="completed" if result.root_cause else "inconclusive",
-                root_cause=result.root_cause,
-                confidence=result.confidence,
-                evidence=evidence,
-                recommendations=result.recommendations,
-                duration_seconds=0.0,  # Set by orchestrator
-            )
+            return result
 
         except Exception as e:
             raise LLMError(

@@ -80,10 +80,25 @@ def build_user(hypothesis: Hypothesis, alert: AnomalyAlert | None = None) -> str
     if alert:
         date_hint = f"\n\nIMPORTANT: Focus your query on the anomaly date: {alert.anomaly_date}"
 
+    # Use the suggested query if available - it was crafted during hypothesis generation
+    suggested_query_section = ""
+    if hypothesis.suggested_query:
+        suggested_query_section = f"""
+
+SUGGESTED QUERY (use this as your starting point, refine if needed):
+```sql
+{hypothesis.suggested_query}
+```
+
+Use this query directly if it looks correct for the schema. Only modify it if:
+- Table/column names need adjustment for the actual schema
+- The date filter needs updating
+- There's a syntax issue"""
+
     return f"""Generate a SQL query to test this hypothesis:
 
 Hypothesis: {hypothesis.title}
 Category: {hypothesis.category.value}
-Reasoning: {hypothesis.reasoning}
+Reasoning: {hypothesis.reasoning}{suggested_query_section}
 
 Generate a query that would confirm or refute this hypothesis.{date_hint}"""

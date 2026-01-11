@@ -6,6 +6,10 @@ including entities, value objects, and the step abstraction.
 
 from .entities import Branch, Investigation, InvestigationContext, Snapshot
 from .orchestrator import InvestigationOrchestrator, TickResult
+from .pattern_extraction import (
+    PatternExtractionService,
+    PatternRepositoryProtocol,
+)
 from .registry import StepRegistry
 from .repository import ExecutionLock, InvestigationRepository
 from .values import (
@@ -36,4 +40,7 @@ __all__ = [
     # Orchestrator
     "InvestigationOrchestrator",
     "TickResult",
+    # Pattern Learning
+    "PatternExtractionService",
+    "PatternRepositoryProtocol",
 ]

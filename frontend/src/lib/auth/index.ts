@@ -28,6 +28,11 @@ export { JwtAuthProvider, RequireJwtAuth, useJwtAuth } from './jwt-context'
 // Demo role toggle
 export { DemoRoleToggle } from './demo-role-toggle'
 
+// User impersonation (for multi-user demo testing)
+export { ImpersonationProvider, useImpersonation, DEMO_USERS } from './impersonation-context'
+export type { DemoUser } from './impersonation-context'
+export { ImpersonateUserToggle } from './impersonate-user-toggle'
+
 // Role utilities
 export { useRole } from './use-role'
 export { RoleGuard, ExactRoleGuard } from './role-guard'

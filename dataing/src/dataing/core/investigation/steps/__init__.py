@@ -4,6 +4,7 @@ Steps are pure functions that transform context.
 The orchestrator handles persistence, locking, and flow control.
 """
 
+from .execute_query import ExecuteQueryStep
 from .gather_context import ContextBundle, GatherContextStep
 from .generate_hypotheses import GenerateHypothesesStep
 from .generate_query import GenerateQueryStep
@@ -18,4 +19,5 @@ __all__ = [
     "ContextBundle",
     "GenerateHypothesesStep",
     "GenerateQueryStep",
+    "ExecuteQueryStep",
 ]

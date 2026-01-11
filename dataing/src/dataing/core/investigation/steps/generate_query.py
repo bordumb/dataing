@@ -105,8 +105,11 @@ class GenerateQueryStep(Step[dict[str, Any], str]):
                 output=None,
             )
 
+        # Update context with the generated query
+        updated_context = context.model_copy(update={"current_query": query})
+
         return StepResult(
-            context=context,
+            context=updated_context,
             signal=ExecutionSignal.CONTINUE,
             output=query,
             next_step=StepType.EXECUTE_QUERY,

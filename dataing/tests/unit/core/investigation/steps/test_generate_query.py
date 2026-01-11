@@ -160,6 +160,25 @@ class TestGenerateQueryStep:
         assert result.context.schema_info == sample_context.schema_info
 
     @pytest.mark.asyncio
+    async def test_execute_sets_current_query_in_context(
+        self,
+        sample_context: InvestigationContext,
+        sample_hypothesis: dict[str, Any],
+        mock_llm: AsyncMock,
+    ) -> None:
+        """Execute sets current_query in the updated context."""
+        step = GenerateQueryStep(llm=mock_llm)
+        input_data = {"hypothesis": sample_hypothesis}
+
+        result = await step.execute(sample_context, input_data)
+
+        # Context should have current_query set
+        assert result.context.current_query == result.output
+        assert result.context.current_query == (
+            "SELECT COUNT(*) FROM events WHERE user_id IS NULL"
+        )
+
+    @pytest.mark.asyncio
     async def test_execute_handles_llm_error(
         self,
         sample_context: InvestigationContext,

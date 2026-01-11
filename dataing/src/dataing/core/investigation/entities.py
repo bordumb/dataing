@@ -39,6 +39,9 @@ class InvestigationContext(BaseModel):
     hypotheses: list[dict[str, Any]] = Field(default_factory=list)
     evidence: list[dict[str, Any]] = Field(default_factory=list)
 
+    # Current query being executed
+    current_query: str | None = None
+
     # Synthesis
     current_synthesis: dict[str, Any] | None = None
     counter_analysis: dict[str, Any] | None = None

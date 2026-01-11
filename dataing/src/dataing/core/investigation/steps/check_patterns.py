@@ -8,47 +8,15 @@ from __future__ import annotations
 
 import logging
 import re
-from typing import Any, Protocol
+from typing import Any
 
 from dataing.core.investigation.entities import InvestigationContext
+from dataing.core.investigation.pattern_extraction import PatternRepositoryProtocol
 from dataing.core.investigation.values import ExecutionSignal, StepType
 
 from .protocol import Step, StepResult
 
 logger = logging.getLogger(__name__)
-
-
-class PatternRepositoryProtocol(Protocol):
-    """Protocol for pattern repository used by CheckPatternsStep.
-
-    This defines the interface for querying historical root cause patterns.
-    """
-
-    async def find_matching_patterns(
-        self,
-        *,
-        dataset_id: str,
-        anomaly_type: str | None = None,
-        metric_name: str | None = None,
-        min_confidence: float = 0.8,
-    ) -> list[dict[str, Any]]:
-        """Find patterns that match the given criteria.
-
-        Args:
-            dataset_id: The dataset identifier to search patterns for.
-            anomaly_type: Optional anomaly type to filter by.
-            metric_name: Optional metric name to filter by.
-            min_confidence: Minimum confidence threshold (default 0.8).
-
-        Returns:
-            List of pattern dicts with:
-            - id: str
-            - name: str
-            - description: str
-            - typical_root_cause: str
-            - confidence: float
-        """
-        ...
 
 
 class CheckPatternsStep(Step[None, list[dict[str, Any]]]):

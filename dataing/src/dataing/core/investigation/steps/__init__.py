@@ -4,7 +4,9 @@ Steps are pure functions that transform context.
 The orchestrator handles persistence, locking, and flow control.
 """
 
-from .check_patterns import CheckPatternsStep, PatternRepositoryProtocol
+from dataing.core.investigation.pattern_extraction import PatternRepositoryProtocol
+
+from .check_patterns import CheckPatternsStep
 from .classify_intent import ClassifyIntentStep, RefinementIntent
 from .execute_query import ExecuteQueryStep
 from .gather_context import ContextBundle, GatherContextStep

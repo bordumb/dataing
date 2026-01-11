@@ -10,6 +10,7 @@ from .generate_hypotheses import GenerateHypothesesStep
 from .generate_query import GenerateQueryStep
 from .interpret_evidence import InterpretEvidenceStep
 from .protocol import BranchRequest, BranchSpec, Step, StepResult
+from .synthesize import SynthesizeStep
 
 __all__ = [
     "Step",
@@ -22,4 +23,5 @@ __all__ = [
     "GenerateQueryStep",
     "ExecuteQueryStep",
     "InterpretEvidenceStep",
+    "SynthesizeStep",
 ]

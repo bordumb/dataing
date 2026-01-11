@@ -1,0 +1,22 @@
+{
+  "assignee": "bordumbb@gmail.com",
+  "claim_note": "",
+  "claimed_at": "2026-01-11T23:52:33.474441Z",
+  "created_at": "2026-01-11T23:16:42.027147Z",
+  "depends_on": [
+    "fn-1.1"
+  ],
+  "epic": "fn-1",
+  "evidence": {
+    "eslint": "passed",
+    "polling_5s": true,
+    "query_keys_added": true,
+    "ui_redesigned": true
+  },
+  "id": "fn-1.2",
+  "priority": null,
+  "spec_path": ".flow/tasks/fn-1.2.md",
+  "status": "done",
+  "title": "Connect frontend to usage API",
+  "updated_at": "2026-01-11T23:53:56.608624Z"
+}

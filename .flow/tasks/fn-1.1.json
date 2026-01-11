@@ -1,0 +1,19 @@
+{
+  "assignee": "bordumbb@gmail.com",
+  "claim_note": "",
+  "claimed_at": "2026-01-11T23:48:57.582826Z",
+  "created_at": "2026-01-11T23:16:33.923780Z",
+  "depends_on": [],
+  "epic": "fn-1",
+  "evidence": {
+    "curl_test": "returns JSON with llm_tokens, llm_cost, query_executions, investigations, total_cost",
+    "mypy": "passed",
+    "ruff": "passed"
+  },
+  "id": "fn-1.1",
+  "priority": null,
+  "spec_path": ".flow/tasks/fn-1.1.md",
+  "status": "done",
+  "title": "Create backend usage API route",
+  "updated_at": "2026-01-11T23:52:22.019043Z"
+}

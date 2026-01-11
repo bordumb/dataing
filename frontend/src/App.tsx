@@ -31,6 +31,7 @@ import { SSOCallbackPage } from '@/features/auth/sso-callback-page'
 import { JwtAuthProvider, RequireJwtAuth } from '@/lib/auth/jwt-context'
 import { DemoRoleToggle } from '@/lib/auth/demo-role-toggle'
 import { DemoRoleProvider, useDemoRoleContext } from '@/lib/auth/demo-role-context'
+import { ImpersonationProvider, ImpersonateUserToggle } from '@/lib/auth'
 
 /**
  * CRITICAL: DO NOT REMOVE THE ENTITLEMENTS IMPORTS OR DEMO TOGGLE
@@ -58,7 +59,10 @@ function AppLayout({ children }: { children: React.ReactNode }) {
             <Separator orientation="vertical" className="mr-2 h-4" />
             <span className="text-sm text-muted-foreground">Dataing</span>
           </div>
-          <ModeToggle />
+          <div className="flex items-center gap-2">
+            <ImpersonateUserToggle />
+            <ModeToggle />
+          </div>
         </header>
         <main className="flex-1 p-6">{children}</main>
       </SidebarInset>
@@ -211,9 +215,11 @@ function App() {
   return (
     <ErrorBoundary>
       <JwtAuthProvider>
-        <DemoRoleProvider>
-          <AppWithEntitlements />
-        </DemoRoleProvider>
+        <ImpersonationProvider>
+          <DemoRoleProvider>
+            <AppWithEntitlements />
+          </DemoRoleProvider>
+        </ImpersonationProvider>
       </JwtAuthProvider>
     </ErrorBoundary>
   )

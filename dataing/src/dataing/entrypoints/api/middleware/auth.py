@@ -40,8 +40,35 @@ async def verify_api_key(
     """Verify API key or JWT and return context.
 
     This dependency validates authentication and returns tenant/user context.
-    Accepts either X-API-Key header or Bearer token (JWT).
+    Accepts either X-API-Key header, Bearer token (JWT), or token query parameter.
+    Query parameter is needed for SSE since EventSource doesn't support headers.
     """
+    # Check for token in query params (needed for SSE EventSource)
+    token_param = request.query_params.get("token")
+    if token_param and not bearer:
+        # Treat query param as JWT token
+        try:
+            payload = decode_token(token_param)
+            scopes = ["read", "write"]
+            if payload.role in ("admin", "owner"):
+                scopes.append("admin")
+            context = ApiKeyContext(
+                key_id=UUID("00000000-0000-0000-0000-000000000000"),
+                tenant_id=UUID(payload.org_id),
+                tenant_slug="",
+                tenant_name="",
+                user_id=UUID(payload.sub),
+                scopes=scopes,
+            )
+            request.state.auth_context = context
+            logger.debug(
+                f"jwt_verified_via_query: user_id={payload.sub}, org_id={payload.org_id}"
+            )
+            return context
+        except TokenError as e:
+            logger.warning(f"jwt_query_param_validation_failed: {e}")
+            # Fall through to try other methods
+
     # Try JWT first if Bearer token is provided
     if bearer:
         try:

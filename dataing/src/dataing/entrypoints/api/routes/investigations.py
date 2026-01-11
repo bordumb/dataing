@@ -1,380 +1,506 @@
-"""API routes for the investigation service."""
+"""API routes for the unified investigation system (v2).
+
+This module provides endpoints for the new unified investigation system
+with branch support and real-time updates via SSE streaming.
+"""
 
 from __future__ import annotations
 
 import asyncio
-import uuid
+import json
+import logging
 from collections.abc import AsyncIterator
-from datetime import UTC, datetime
-from typing import TYPE_CHECKING, Annotated, Any, cast
+from typing import Annotated, Any
+from uuid import UUID
 
-if TYPE_CHECKING:
-    from dataing.adapters.datasource.sql.base import SQLAdapter
-
-import structlog
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request
-from fastapi.responses import StreamingResponse
+from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
+from sse_starlette.sse import EventSourceResponse
 
-from dataing.adapters.audit import audited
 from dataing.adapters.db.app_db import AppDatabase
 from dataing.core.domain_types import AnomalyAlert, MetricSpec
-from dataing.core.entitlements.features import Feature
-from dataing.core.orchestrator import InvestigationOrchestrator
-from dataing.core.rbac import PermissionService
-from dataing.core.state import InvestigationState
-from dataing.entrypoints.api.deps import (
-    get_app_db,
-    get_context_engine_for_tenant,
-    get_default_tenant_adapter,
-    get_investigations,
-    get_orchestrator,
-    get_tenant_lineage_adapter,
-)
+from dataing.core.investigation.service import InvestigationService
 from dataing.entrypoints.api.middleware.auth import ApiKeyContext, verify_api_key
-from dataing.entrypoints.api.middleware.entitlements import require_under_limit
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/investigations", tags=["investigations"])
 
-logger = structlog.get_logger()
-
 # Annotated types for dependency injection
 AuthDep = Annotated[ApiKeyContext, Depends(verify_api_key)]
-OrchestratorDep = Annotated[InvestigationOrchestrator, Depends(get_orchestrator)]
-InvestigationsDep = Annotated[dict[str, dict[str, Any]], Depends(get_investigations)]
+
+
+class StartInvestigationRequest(BaseModel):
+    """Request body for starting an investigation."""
+
+    alert: dict[str, Any]  # AnomalyAlert data
+
+
+class StartInvestigationResponse(BaseModel):
+    """Response for starting an investigation."""
+
+    investigation_id: UUID
+    main_branch_id: UUID
+
+
+class StepHistoryItemResponse(BaseModel):
+    """A step in the branch history."""
+
+    step: str
+    completed: bool
+    timestamp: str | None = None
+
+
+class MatchedPatternResponse(BaseModel):
+    """A pattern that was matched during investigation."""
+
+    pattern_id: str
+    pattern_name: str
+    confidence: float
+    description: str | None = None
+
+
+class BranchStateResponse(BaseModel):
+    """State of a branch for API responses."""
+
+    branch_id: UUID
+    status: str
+    current_step: str
+    synthesis: dict[str, Any] | None = None
+    evidence: list[dict[str, Any]] = []
+    step_history: list[StepHistoryItemResponse] = []
+    matched_patterns: list[MatchedPatternResponse] = []
+    can_merge: bool = False
+    parent_branch_id: UUID | None = None
+
+
+class InvestigationStateResponse(BaseModel):
+    """Full investigation state for API responses."""
+
+    investigation_id: UUID
+    status: str
+    main_branch: BranchStateResponse
+    user_branch: BranchStateResponse | None = None
+
+
+class InvestigationListItem(BaseModel):
+    """Investigation list item for API responses."""
+
+    investigation_id: UUID
+    status: str
+    created_at: str
+    dataset_id: str
+
+
+class SendMessageRequest(BaseModel):
+    """Request body for sending a message."""
+
+    message: str
+
+
+class SendMessageResponse(BaseModel):
+    """Response for sending a message."""
+
+    branch_id: UUID
+
+
+def get_investigation_service(request: Request) -> InvestigationService:
+    """Get the investigation service from app state.
+
+    Args:
+        request: The current request.
+
+    Returns:
+        The configured InvestigationService.
+
+    Raises:
+        HTTPException: If service is not configured.
+    """
+    service: InvestigationService | None = getattr(
+        request.app.state, "investigation_service", None
+    )
+    if service is None:
+        raise HTTPException(
+            status_code=503,
+            detail="Investigation service not configured",
+        )
+    return service
+
+
+InvestigationServiceDep = Annotated[
+    InvestigationService, Depends(get_investigation_service)
+]
+
+
+def get_app_db(request: Request) -> AppDatabase:
+    """Get the app database from app state."""
+    app_db: AppDatabase = request.app.state.app_db
+    return app_db
+
+
 AppDbDep = Annotated[AppDatabase, Depends(get_app_db)]
 
 
-class MetricSpecRequest(BaseModel):
-    """Structured metric specification from upstream anomaly detector."""
-
-    metric_type: str  # "column", "sql_expression", "dbt_metric", "description"
-    expression: str  # The metric definition
-    display_name: str  # Human-readable name
-    columns_referenced: list[str] = []  # Columns involved
-    source_url: str | None = None  # Link to metric definition
-
-
-class CreateInvestigationRequest(BaseModel):
-    """Request body for creating an investigation.
-
-    This API performs ROOT CAUSE ANALYSIS, not anomaly detection.
-    The upstream anomaly detector must provide structured metric_spec.
-    """
-
-    dataset_id: str
-    metric_spec: MetricSpecRequest  # Structured metric specification
-    anomaly_type: str  # null_rate, row_count, freshness, custom
-    expected_value: float
-    actual_value: float
-    deviation_pct: float
-    anomaly_date: str
-    severity: str = "medium"
-    source_system: str | None = None  # monte_carlo, great_expectations, dbt
-    source_alert_id: str | None = None
-    source_url: str | None = None
-    metadata: dict[str, str | int | float | bool] | None = None
-
-
-class InvestigationResponse(BaseModel):
-    """Response for investigation creation."""
-
-    investigation_id: str
-    status: str
-    created_at: datetime
-
-
-class InvestigationStatusResponse(BaseModel):
-    """Response for investigation status."""
-
-    investigation_id: str
-    status: str
-    events: list[dict[str, Any]]
-    finding: dict[str, Any] | None = None
-    error: str | None = None
-
-
-@router.post("/", response_model=InvestigationResponse)
-@audited(action="investigation.create", resource_type="investigation")
-@require_under_limit(Feature.MAX_INVESTIGATIONS_PER_MONTH)
-async def create_investigation(
-    request: Request,
-    body: CreateInvestigationRequest,
-    background_tasks: BackgroundTasks,
+@router.get("", response_model=list[InvestigationListItem])
+async def list_investigations(
     auth: AuthDep,
-    orchestrator: OrchestratorDep,
-    investigations: InvestigationsDep,
-) -> InvestigationResponse:
-    """Start a new investigation.
+    db: AppDbDep,
+) -> list[InvestigationListItem]:
+    """List all investigations for the tenant.
 
-    This endpoint starts an investigation in the background
-    and returns immediately with the investigation ID.
+    Args:
+        auth: Authentication context from API key/JWT.
+        db: Application database.
 
-    The investigation will query the tenant's actual data source
-    (e.g., DuckDB with parquet files) instead of just metadata.
+    Returns:
+        List of investigations.
     """
-    investigation_id = str(uuid.uuid4())
+    try:
+        results = await db.fetch_all(
+            """
+            SELECT id, alert, created_at, status
+            FROM investigations
+            WHERE tenant_id = $1
+            ORDER BY created_at DESC
+            LIMIT 100
+            """,
+            auth.tenant_id,
+        )
+    except Exception as e:
+        logger.error(f"Failed to list investigations: {e}")
+        return []
 
-    # Convert request to domain types
+    items = []
+    for row in results:
+        alert_data = row["alert"]
+        if isinstance(alert_data, str):
+            alert_data = json.loads(alert_data)
+
+        items.append(InvestigationListItem(
+            investigation_id=row["id"],
+            status=row.get("status", "active"),
+            created_at=row["created_at"].isoformat(),
+            dataset_id=alert_data.get("dataset_id", "unknown"),
+        ))
+
+    return items
+
+
+@router.post("", response_model=StartInvestigationResponse)
+async def start_investigation(
+    http_request: Request,
+    request: StartInvestigationRequest,
+    auth: AuthDep,
+    service: InvestigationServiceDep,
+) -> StartInvestigationResponse:
+    """Start a new investigation for an alert.
+
+    Creates a new investigation with a main branch positioned at
+    GATHER_CONTEXT step.
+
+    Args:
+        http_request: The HTTP request for accessing app state.
+        request: The investigation request containing alert data.
+        auth: Authentication context from API key/JWT.
+        service: Investigation service dependency.
+
+    Returns:
+        StartInvestigationResponse with investigation and branch IDs.
+    """
+    from dataing.entrypoints.api.deps import get_tenant_adapter
+
+    # Parse alert from request
+    alert_data = request.alert
+    metric_spec_data = alert_data.get("metric_spec", {})
+
     metric_spec = MetricSpec(
-        metric_type=body.metric_spec.metric_type,
-        expression=body.metric_spec.expression,
-        display_name=body.metric_spec.display_name,
-        columns_referenced=body.metric_spec.columns_referenced,
-        source_url=body.metric_spec.source_url,
+        metric_type=metric_spec_data.get("metric_type", "column"),
+        expression=metric_spec_data.get("expression", ""),
+        display_name=metric_spec_data.get("display_name", ""),
+        columns_referenced=metric_spec_data.get("columns_referenced", []),
+        source_url=metric_spec_data.get("source_url"),
     )
 
     alert = AnomalyAlert(
-        dataset_id=body.dataset_id,
+        dataset_id=alert_data["dataset_id"],
         metric_spec=metric_spec,
-        anomaly_type=body.anomaly_type,
-        expected_value=body.expected_value,
-        actual_value=body.actual_value,
-        deviation_pct=body.deviation_pct,
-        anomaly_date=body.anomaly_date,
-        severity=body.severity,
-        source_system=body.source_system,
-        source_alert_id=body.source_alert_id,
-        source_url=body.source_url,
-        metadata=body.metadata,
+        anomaly_type=alert_data["anomaly_type"],
+        expected_value=alert_data["expected_value"],
+        actual_value=alert_data["actual_value"],
+        deviation_pct=alert_data["deviation_pct"],
+        anomaly_date=alert_data["anomaly_date"],
+        severity=alert_data.get("severity", "medium"),
+        source_system=alert_data.get("source_system"),
+        source_alert_id=alert_data.get("source_alert_id"),
+        source_url=alert_data.get("source_url"),
+        metadata=alert_data.get("metadata"),
     )
 
-    state = InvestigationState(
-        id=investigation_id,
+    # Get data adapter for this tenant
+    try:
+        data_adapter = await get_tenant_adapter(http_request, auth.tenant_id)
+    except ValueError as e:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Could not get data adapter: {e}",
+        ) from e
+    except RuntimeError as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Data adapter error: {e}",
+        ) from e
+
+    investigation_id, main_branch_id = await service.start_investigation(
         tenant_id=auth.tenant_id,
         alert=alert,
+        data_adapter=data_adapter,
+        user_id=auth.user_id,
     )
 
-    # Store initial state
-    investigations[investigation_id] = {
-        "state": state,
-        "finding": None,
-        "status": "started",
-        "created_at": datetime.now(UTC),
-        "tenant_id": str(auth.tenant_id),
-    }
-
-    # Run investigation in background with tenant's data source
-    async def run_investigation() -> None:
-        try:
-            # Resolve tenant's data source adapter using AdapterRegistry
-            data_adapter = await get_default_tenant_adapter(request, auth.tenant_id)
-
-            # Get tenant's lineage adapter if configured
-            lineage_adapter = await get_tenant_lineage_adapter(request, auth.tenant_id)
-
-            # Create context engine with tenant's lineage adapter
-            context_engine = get_context_engine_for_tenant(request, lineage_adapter)
-
-            # Update orchestrator with tenant-specific context engine
-            orchestrator.context_engine = context_engine
-
-            # Run investigation against tenant's actual data
-            # Cast to SQLAdapter since investigations require SQL capabilities
-            sql_adapter = cast("SQLAdapter", data_adapter)
-            finding = await orchestrator.run_investigation(state, sql_adapter)
-            investigations[investigation_id]["finding"] = finding.model_dump()
-            investigations[investigation_id]["status"] = "completed"
-        except Exception as e:
-            import traceback
-
-            logger.error("investigation_failed", error=str(e), traceback=traceback.format_exc())
-            investigations[investigation_id]["status"] = "failed"
-            investigations[investigation_id]["error"] = str(e)
-
-    background_tasks.add_task(run_investigation)
-
-    return InvestigationResponse(
+    return StartInvestigationResponse(
         investigation_id=investigation_id,
-        status="started",
-        created_at=datetime.now(UTC),
+        main_branch_id=main_branch_id,
     )
 
 
-@router.get("/{investigation_id}")
+@router.get("/{investigation_id}", response_model=InvestigationStateResponse)
 async def get_investigation(
-    investigation_id: str,
+    investigation_id: UUID,
     auth: AuthDep,
-    app_db: AppDbDep,
-    investigations: InvestigationsDep,
-) -> InvestigationStatusResponse:
-    """Get investigation status and results."""
-    if investigation_id not in investigations:
-        raise HTTPException(status_code=404, detail="Investigation not found")
+    service: InvestigationServiceDep,
+) -> InvestigationStateResponse:
+    """Get investigation state including user branch if exists.
 
-    inv = investigations[investigation_id]
+    Returns the current state of the investigation with the main branch
+    and optionally the user's branch if one exists.
 
-    # Check tenant access
-    if inv.get("tenant_id") and inv["tenant_id"] != str(auth.tenant_id):
-        raise HTTPException(status_code=404, detail="Investigation not found")
+    Args:
+        investigation_id: UUID of the investigation.
+        auth: Authentication context from API key/JWT.
+        service: Investigation service dependency.
 
-    # Check RBAC permissions if user_id is available and investigation is persisted
-    # Note: In-memory investigations (not yet persisted) rely on tenant check above
-    if auth.user_id:
-        try:
-            inv_uuid = uuid.UUID(investigation_id)
-            async with app_db.acquire() as conn:
-                # Check if investigation exists in DB before RBAC check
-                exists = await conn.fetchval(
-                    "SELECT EXISTS(SELECT 1 FROM investigations WHERE id = $1)",
-                    inv_uuid,
-                )
-                if exists:
-                    permission_service = PermissionService(conn)
-                    has_access = await permission_service.can_access_investigation(
-                        auth.user_id, inv_uuid
-                    )
-                    if not has_access:
-                        raise HTTPException(
-                            status_code=403,
-                            detail="You don't have access to this investigation",
-                        )
-                # If not in DB, rely on tenant check above (in-memory investigation)
-        except ValueError:
-            # Invalid UUID, fall back to tenant check only
-            pass
+    Returns:
+        InvestigationStateResponse with main and optional user branch.
 
-    state: InvestigationState = inv["state"]
+    Raises:
+        HTTPException: If investigation not found.
+    """
+    if auth.user_id is None:
+        raise HTTPException(
+            status_code=400,
+            detail="User authentication required for investigation state",
+        )
 
-    return InvestigationStatusResponse(
-        investigation_id=state.id,
-        status=inv["status"],
-        events=[
-            {
-                "type": e.type,
-                "timestamp": e.timestamp.isoformat(),
-                "data": e.data,
-            }
-            for e in state.events
+    try:
+        state = await service.get_state(
+            investigation_id=investigation_id,
+            user_id=auth.user_id,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e)) from e
+
+    # Convert service state to API response
+    main_branch = BranchStateResponse(
+        branch_id=state.main_branch.branch_id,
+        status=state.main_branch.status,
+        current_step=state.main_branch.current_step,
+        synthesis=state.main_branch.synthesis,
+        evidence=list(state.main_branch.evidence),
+        step_history=[
+            StepHistoryItemResponse(step=s.step, completed=s.completed, timestamp=s.timestamp)
+            for s in state.main_branch.step_history
         ],
-        finding=inv.get("finding"),
-        error=inv.get("error"),
-    )
-
-
-@router.get("/{investigation_id}/events")
-async def stream_events(
-    investigation_id: str,
-    auth: AuthDep,
-    app_db: AppDbDep,
-    investigations: InvestigationsDep,
-) -> StreamingResponse:
-    """SSE stream of investigation events.
-
-    Returns a Server-Sent Events stream that pushes
-    new events as they occur during the investigation.
-    """
-    if investigation_id not in investigations:
-        raise HTTPException(status_code=404, detail="Investigation not found")
-
-    inv = investigations[investigation_id]
-
-    # Check tenant access
-    if inv.get("tenant_id") and inv["tenant_id"] != str(auth.tenant_id):
-        raise HTTPException(status_code=404, detail="Investigation not found")
-
-    # Check RBAC permissions if user_id is available and investigation is persisted
-    if auth.user_id:
-        try:
-            inv_uuid = uuid.UUID(investigation_id)
-            async with app_db.acquire() as conn:
-                exists = await conn.fetchval(
-                    "SELECT EXISTS(SELECT 1 FROM investigations WHERE id = $1)",
-                    inv_uuid,
-                )
-                if exists:
-                    permission_service = PermissionService(conn)
-                    has_access = await permission_service.can_access_investigation(
-                        auth.user_id, inv_uuid
-                    )
-                    if not has_access:
-                        raise HTTPException(
-                            status_code=403,
-                            detail="You don't have access to this investigation",
-                        )
-        except ValueError:
-            pass
-
-    async def event_generator() -> AsyncIterator[str]:
-        """Generate SSE events."""
-        last_event_count = 0
-
-        while True:
-            inv = investigations.get(investigation_id)
-            if not inv:
-                break
-
-            state: InvestigationState = inv["state"]
-            current_events = state.events
-
-            # Send new events
-            if len(current_events) > last_event_count:
-                for event in current_events[last_event_count:]:
-                    event_data = {
-                        "type": event.type,
-                        "timestamp": event.timestamp.isoformat(),
-                        "data": event.data,
-                    }
-                    yield f"data: {event_data}\n\n"
-                last_event_count = len(current_events)
-
-            # Check if investigation is complete
-            if inv["status"] in ("completed", "failed"):
-                yield f'data: {{"type": "investigation_ended", "status": "{inv["status"]}"}}\n\n'
-                break
-
-            await asyncio.sleep(0.5)
-
-    return StreamingResponse(
-        event_generator(),
-        media_type="text/event-stream",
-    )
-
-
-@router.get("")
-async def list_investigations(
-    auth: AuthDep,
-    app_db: AppDbDep,
-    investigations: InvestigationsDep,
-) -> list[dict[str, Any]]:
-    """List all investigations for the current tenant.
-
-    Results are filtered by RBAC permissions when user_id is available.
-    Admins and owners see all investigations; members see only those
-    they have access to via direct grants, tags, teams, or datasources.
-    """
-    tenant_id = str(auth.tenant_id)
-
-    # First filter by tenant
-    tenant_investigations = [
-        (inv_id, inv)
-        for inv_id, inv in investigations.items()
-        if not inv.get("tenant_id") or inv["tenant_id"] == tenant_id
-    ]
-
-    # If user_id is available, apply RBAC filtering
-    if auth.user_id:
-        async with app_db.acquire() as conn:
-            permission_service = PermissionService(conn)
-            accessible_ids = await permission_service.get_accessible_investigation_ids(
-                auth.user_id, auth.tenant_id
+        matched_patterns=[
+            MatchedPatternResponse(
+                pattern_id=p.pattern_id,
+                pattern_name=p.pattern_name,
+                confidence=p.confidence,
+                description=p.description,
             )
+            for p in state.main_branch.matched_patterns
+        ],
+        can_merge=state.main_branch.can_merge,
+        parent_branch_id=state.main_branch.parent_branch_id,
+    )
 
-            # None means admin/owner - show all
-            if accessible_ids is not None:
-                accessible_set = {str(id_) for id_ in accessible_ids}
-                tenant_investigations = [
-                    (inv_id, inv)
-                    for inv_id, inv in tenant_investigations
-                    if inv_id in accessible_set
-                ]
+    user_branch = None
+    if state.user_branch:
+        user_branch = BranchStateResponse(
+            branch_id=state.user_branch.branch_id,
+            status=state.user_branch.status,
+            current_step=state.user_branch.current_step,
+            synthesis=state.user_branch.synthesis,
+            evidence=list(state.user_branch.evidence),
+            step_history=[
+                StepHistoryItemResponse(step=s.step, completed=s.completed, timestamp=s.timestamp)
+                for s in state.user_branch.step_history
+            ],
+            matched_patterns=[
+                MatchedPatternResponse(
+                    pattern_id=p.pattern_id,
+                    pattern_name=p.pattern_name,
+                    confidence=p.confidence,
+                    description=p.description,
+                )
+                for p in state.user_branch.matched_patterns
+            ],
+            can_merge=state.user_branch.can_merge,
+            parent_branch_id=state.user_branch.parent_branch_id,
+        )
 
-    return [
-        {
-            "investigation_id": inv_id,
-            "status": inv["status"],
-            "created_at": inv["created_at"].isoformat(),
-            "dataset_id": inv["state"].alert.dataset_id,
-        }
-        for inv_id, inv in tenant_investigations
-    ]
+    return InvestigationStateResponse(
+        investigation_id=state.investigation_id,
+        status=state.status,
+        main_branch=main_branch,
+        user_branch=user_branch,
+    )
+
+
+@router.post("/{investigation_id}/messages", response_model=SendMessageResponse)
+async def send_message(
+    investigation_id: UUID,
+    request: SendMessageRequest,
+    auth: AuthDep,
+    service: InvestigationServiceDep,
+) -> SendMessageResponse:
+    """Send a message to the user's branch (creates branch if needed).
+
+    Gets or creates a user branch and adds the message. Resumes the
+    branch if it was suspended.
+
+    Args:
+        investigation_id: UUID of the investigation.
+        request: The message request.
+        auth: Authentication context from API key/JWT.
+        service: Investigation service dependency.
+
+    Returns:
+        SendMessageResponse with the branch ID.
+
+    Raises:
+        HTTPException: If user authentication required.
+    """
+    if auth.user_id is None:
+        raise HTTPException(
+            status_code=400,
+            detail="User authentication required to send messages",
+        )
+
+    try:
+        branch_id = await service.send_message(
+            investigation_id=investigation_id,
+            user_id=auth.user_id,
+            message=request.message,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e)) from e
+
+    return SendMessageResponse(branch_id=branch_id)
+
+
+@router.get("/{investigation_id}/stream")
+async def stream_updates(
+    investigation_id: UUID,
+    auth: AuthDep,
+    service: InvestigationServiceDep,
+) -> EventSourceResponse:
+    """Stream real-time updates via SSE.
+
+    Returns a Server-Sent Events stream that pushes investigation
+    updates as they occur.
+
+    Args:
+        investigation_id: UUID of the investigation.
+        auth: Authentication context from API key/JWT.
+        service: Investigation service dependency.
+
+    Returns:
+        EventSourceResponse with SSE stream.
+    """
+    if auth.user_id is None:
+        raise HTTPException(
+            status_code=400,
+            detail="User authentication required for streaming",
+        )
+
+    # Capture user_id for closure (mypy type narrowing)
+    user_id = auth.user_id
+
+    async def event_generator() -> AsyncIterator[dict[str, Any]]:
+        """Generate SSE events for investigation updates."""
+        last_step = None
+        last_status = None
+        poll_count = 0
+        max_polls = 600  # 5 minutes at 0.5s intervals
+
+        try:
+            while poll_count < max_polls:
+                try:
+                    state = await service.get_state(
+                        investigation_id=investigation_id,
+                        user_id=user_id,
+                    )
+
+                    # Check for changes
+                    current_step = state.main_branch.current_step
+                    current_status = state.status
+
+                    if current_step != last_step:
+                        yield {
+                            "event": "step_changed",
+                            "data": json.dumps({
+                                "step": current_step,
+                                "branch_id": str(state.main_branch.branch_id),
+                            }),
+                        }
+                        last_step = current_step
+
+                    if current_status != last_status:
+                        yield {
+                            "event": "status_changed",
+                            "data": json.dumps({
+                                "status": current_status,
+                                "investigation_id": str(state.investigation_id),
+                            }),
+                        }
+                        last_status = current_status
+
+                    # Check for completion
+                    if current_status in ("completed", "failed"):
+                        # Send final state
+                        yield {
+                            "event": "investigation_ended",
+                            "data": json.dumps({
+                                "status": current_status,
+                                "synthesis": state.main_branch.synthesis,
+                            }),
+                        }
+                        break
+
+                except ValueError:
+                    # Investigation not found
+                    yield {
+                        "event": "error",
+                        "data": json.dumps({
+                            "error": "Investigation not found",
+                        }),
+                    }
+                    break
+
+                await asyncio.sleep(0.5)
+                poll_count += 1
+
+            # Timeout
+            if poll_count >= max_polls:
+                yield {
+                    "event": "timeout",
+                    "data": json.dumps({
+                        "message": "Stream timeout, please reconnect",
+                    }),
+                }
+
+        except asyncio.CancelledError:
+            # Client disconnected
+            logger.info(f"SSE stream cancelled for investigation {investigation_id}")
+
+    return EventSourceResponse(event_generator())

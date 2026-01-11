@@ -19,6 +19,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from dataing.models.api_key import ApiKey
 from dataing.models.data_source import DataSource, DataSourceType
 from dataing.models.tenant import Tenant
+from dataing.models.user import User
 
 logger = logging.getLogger(__name__)
 
@@ -26,6 +27,11 @@ logger = logging.getLogger(__name__)
 DEMO_TENANT_ID = UUID("00000000-0000-0000-0000-000000000001")
 DEMO_API_KEY_ID = UUID("00000000-0000-0000-0000-000000000002")
 DEMO_DATASOURCE_ID = UUID("00000000-0000-0000-0000-000000000003")
+
+# Demo User IDs
+DEMO_USER_BOB_ID = UUID("00000000-0000-0000-0000-000000000010")
+DEMO_USER_ALICE_ID = UUID("00000000-0000-0000-0000-000000000011")
+DEMO_USER_KIMITAKA_ID = UUID("00000000-0000-0000-0000-000000000012")
 
 # Demo API key (for testing) - pragma: allowlist secret
 DEMO_API_KEY_VALUE = "dd_demo_12345"  # pragma: allowlist secret
@@ -117,12 +123,50 @@ async def seed_demo_data(session: AsyncSession) -> None:
     )
     session.add(data_source)
 
+    # Create demo users
+    # Bob - member: can create investigations, test regular user flow
+    bob = User(
+        id=DEMO_USER_BOB_ID,
+        tenant_id=DEMO_TENANT_ID,
+        email="bob@demo.dataing.io",
+        name="Bob",
+        role="member",
+        is_active=True,
+    )
+    session.add(bob)
+
+    # Alice - member: second user for testing multi-user investigation branches
+    alice = User(
+        id=DEMO_USER_ALICE_ID,
+        tenant_id=DEMO_TENANT_ID,
+        email="alice@demo.dataing.io",
+        name="Alice",
+        role="member",
+        is_active=True,
+    )
+    session.add(alice)
+
+    # Kimitaka - admin: can impersonate other users, manage settings
+    kimitaka = User(
+        id=DEMO_USER_KIMITAKA_ID,
+        tenant_id=DEMO_TENANT_ID,
+        email="kimitaka@demo.dataing.io",
+        name="Kimitaka",
+        role="admin",
+        is_active=True,
+    )
+    session.add(kimitaka)
+
     await session.commit()
 
     logger.info("Demo data seeded successfully")
     logger.info(f"  Tenant: {tenant.name} (id: {tenant.id})")
     logger.info(f"  API Key: {DEMO_API_KEY_VALUE}")
     logger.info(f"  Data Source: {data_source.name} (path: {fixture_path})")
+    logger.info("  Demo Users:")
+    logger.info(f"    - {kimitaka.name} ({kimitaka.email}) - role: {kimitaka.role}")
+    logger.info(f"    - {bob.name} ({bob.email}) - role: {bob.role}")
+    logger.info(f"    - {alice.name} ({alice.email}) - role: {alice.role}")
 
 
 async def verify_demo_fixtures() -> bool:

@@ -20,14 +20,16 @@ from dataing.adapters.auth.recovery_email import EmailPasswordRecoveryAdapter
 from dataing.adapters.context import ContextEngine
 from dataing.adapters.datasource import BaseAdapter, get_registry
 from dataing.adapters.db.app_db import AppDatabase
+from dataing.adapters.db.investigation_repository import PostgresInvestigationRepository
 from dataing.adapters.entitlements import DatabaseEntitlementsAdapter
+from dataing.adapters.investigation.pattern_adapter import InMemoryPatternRepository
 from dataing.adapters.investigation_feedback import InvestigationFeedbackAdapter
 from dataing.adapters.lineage import BaseLineageAdapter, LineageAdapter, get_lineage_registry
-from dataing.agents import AgentClient
 from dataing.adapters.notifications.email import EmailConfig, EmailNotifier
+from dataing.agents import AgentClient
 from dataing.core.auth.recovery import PasswordRecoveryAdapter
-from dataing.core.orchestrator import InvestigationOrchestrator, OrchestratorConfig
-from dataing.safety.circuit_breaker import CircuitBreaker, CircuitBreakerConfig
+from dataing.core.investigation.collaboration import CollaborationService
+from dataing.core.investigation.service import InvestigationService
 
 if TYPE_CHECKING:
     from fastapi import FastAPI
@@ -103,26 +105,20 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     # Create context engine
     context_engine = ContextEngine()
 
-    circuit_breaker = CircuitBreaker(
-        CircuitBreakerConfig(
-            max_total_queries=settings.max_total_queries,
-            max_queries_per_hypothesis=settings.max_queries_per_hypothesis,
-            max_retries_per_hypothesis=settings.max_retries_per_hypothesis,
-        )
-    )
-
-    # Note: Orchestrator now receives adapters per-request instead of at startup
-    # The db parameter is now optional and will be resolved per-tenant
-    orchestrator = InvestigationOrchestrator(
-        db=None,  # Will be set per-request based on tenant's data source
-        llm=llm,
-        context_engine=context_engine,
-        circuit_breaker=circuit_breaker,
-        config=OrchestratorConfig(),
-    )
-
     # Initialize investigation feedback adapter
     feedback_adapter = InvestigationFeedbackAdapter(db=app_db)
+
+    # Initialize unified investigation service (v2 API)
+    investigation_repository = PostgresInvestigationRepository(db=app_db)
+    collaboration_service = CollaborationService(repository=investigation_repository)
+    pattern_repository = InMemoryPatternRepository()
+    investigation_service = InvestigationService(
+        repository=investigation_repository,
+        collaboration=collaboration_service,
+        agent_client=llm,
+        context_engine=context_engine,
+        pattern_repository=pattern_repository,
+    )
 
     # Initialize email notifier (optional, needed for email recovery)
     email_notifier: EmailNotifier | None = None
@@ -191,9 +187,8 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     app.state.app_db = app_db
     app.state.llm = llm
     app.state.context_engine = context_engine
-    app.state.circuit_breaker = circuit_breaker
-    app.state.orchestrator = orchestrator
     app.state.feedback_adapter = feedback_adapter
+    app.state.investigation_service = investigation_service  # Unified investigation service (v2)
     app.state.email_notifier = email_notifier
     app.state.recovery_adapter = recovery_adapter
     app.state.frontend_url = settings.frontend_url
@@ -327,19 +322,6 @@ async def _seed_demo_data(app_db: AppDatabase) -> None:
     logger.info("Demo data seeded successfully")
     logger.info(f"  API Key: {DEMO_API_KEY_VALUE}")
     logger.info(f"  Data Source: E-Commerce Demo (path: {fixture_path})")
-
-
-def get_orchestrator(request: Request) -> InvestigationOrchestrator:
-    """Get the orchestrator from app state.
-
-    Args:
-        request: The current request.
-
-    Returns:
-        The configured InvestigationOrchestrator.
-    """
-    orchestrator: InvestigationOrchestrator = request.app.state.orchestrator
-    return orchestrator
 
 
 def get_investigations(request: Request) -> dict[str, dict[str, Any]]:

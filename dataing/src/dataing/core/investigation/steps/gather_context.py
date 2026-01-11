@@ -125,9 +125,7 @@ class GatherContextStep(Step[None, ContextBundle]):
             return StepResult(
                 context=context,
                 signal=ExecutionSignal.FAIL,
-                output=ContextBundle(
-                    schema_info={"error": f"Context gathering failed: {e}"}
-                ),
+                output=ContextBundle(schema_info={"error": f"Context gathering failed: {e}"}),
             )
 
         # Fail fast on empty schema

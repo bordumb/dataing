@@ -95,7 +95,7 @@ class InterpretEvidenceStep(Step[dict[str, Any], dict[str, Any]]):
             return StepResult(
                 context=context,
                 signal=ExecutionSignal.FAIL,
-                output=None,
+                output={"error": "No hypothesis in input data"},
             )
 
         # Validate context has current_query_result
@@ -103,7 +103,7 @@ class InterpretEvidenceStep(Step[dict[str, Any], dict[str, Any]]):
             return StepResult(
                 context=context,
                 signal=ExecutionSignal.FAIL,
-                output=None,
+                output={"error": "No query result available to interpret"},
             )
 
         hypothesis: dict[str, Any] = input_data["hypothesis"]
@@ -115,11 +115,11 @@ class InterpretEvidenceStep(Step[dict[str, Any], dict[str, Any]]):
                 query_result=context.current_query_result,
                 alert_summary=context.alert_summary,
             )
-        except Exception:
+        except Exception as e:
             return StepResult(
                 context=context,
                 signal=ExecutionSignal.FAIL,
-                output=None,
+                output={"error": f"Evidence interpretation failed: {e}"},
             )
 
         # Update context by appending evidence to the list

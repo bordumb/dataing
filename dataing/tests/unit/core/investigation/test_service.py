@@ -159,9 +159,29 @@ def mock_repository(
 
 
 @pytest.fixture
-def mock_orchestrator() -> AsyncMock:
-    """Create mock orchestrator."""
+def mock_agent_client() -> AsyncMock:
+    """Create mock agent client."""
     return AsyncMock()
+
+
+@pytest.fixture
+def mock_context_engine() -> AsyncMock:
+    """Create mock context engine."""
+    return AsyncMock()
+
+
+@pytest.fixture
+def mock_pattern_repository() -> AsyncMock:
+    """Create mock pattern repository."""
+    return AsyncMock()
+
+
+@pytest.fixture
+def mock_data_adapter() -> AsyncMock:
+    """Create mock data adapter."""
+    adapter = AsyncMock()
+    adapter.execute_query = AsyncMock(return_value={"columns": [], "rows": [], "row_count": 0})
+    return adapter
 
 
 @pytest.fixture
@@ -177,7 +197,10 @@ class TestInvestigationServiceStartInvestigation:
     async def test_creates_investigation(
         self,
         mock_repository: AsyncMock,
-        mock_orchestrator: AsyncMock,
+        mock_agent_client: AsyncMock,
+        mock_context_engine: AsyncMock,
+        mock_pattern_repository: AsyncMock,
+        mock_data_adapter: AsyncMock,
         mock_collaboration: AsyncMock,
         tenant_id: UUID,
         user_id: UUID,
@@ -186,13 +209,16 @@ class TestInvestigationServiceStartInvestigation:
         """Creates a new investigation record."""
         service = InvestigationService(
             repository=mock_repository,
-            orchestrator=mock_orchestrator,
             collaboration=mock_collaboration,
+            agent_client=mock_agent_client,
+            context_engine=mock_context_engine,
+            pattern_repository=mock_pattern_repository,
         )
 
         await service.start_investigation(
             tenant_id=tenant_id,
             alert=sample_alert,
+            data_adapter=mock_data_adapter,
             user_id=user_id,
         )
 
@@ -205,7 +231,10 @@ class TestInvestigationServiceStartInvestigation:
     async def test_creates_main_branch(
         self,
         mock_repository: AsyncMock,
-        mock_orchestrator: AsyncMock,
+        mock_agent_client: AsyncMock,
+        mock_context_engine: AsyncMock,
+        mock_pattern_repository: AsyncMock,
+        mock_data_adapter: AsyncMock,
         mock_collaboration: AsyncMock,
         tenant_id: UUID,
         user_id: UUID,
@@ -215,13 +244,16 @@ class TestInvestigationServiceStartInvestigation:
         """Creates main branch for investigation."""
         service = InvestigationService(
             repository=mock_repository,
-            orchestrator=mock_orchestrator,
             collaboration=mock_collaboration,
+            agent_client=mock_agent_client,
+            context_engine=mock_context_engine,
+            pattern_repository=mock_pattern_repository,
         )
 
         await service.start_investigation(
             tenant_id=tenant_id,
             alert=sample_alert,
+            data_adapter=mock_data_adapter,
             user_id=user_id,
         )
 
@@ -235,7 +267,10 @@ class TestInvestigationServiceStartInvestigation:
     async def test_sets_main_branch_on_investigation(
         self,
         mock_repository: AsyncMock,
-        mock_orchestrator: AsyncMock,
+        mock_agent_client: AsyncMock,
+        mock_context_engine: AsyncMock,
+        mock_pattern_repository: AsyncMock,
+        mock_data_adapter: AsyncMock,
         mock_collaboration: AsyncMock,
         tenant_id: UUID,
         user_id: UUID,
@@ -246,13 +281,16 @@ class TestInvestigationServiceStartInvestigation:
         """Sets main branch ID on investigation."""
         service = InvestigationService(
             repository=mock_repository,
-            orchestrator=mock_orchestrator,
             collaboration=mock_collaboration,
+            agent_client=mock_agent_client,
+            context_engine=mock_context_engine,
+            pattern_repository=mock_pattern_repository,
         )
 
         await service.start_investigation(
             tenant_id=tenant_id,
             alert=sample_alert,
+            data_adapter=mock_data_adapter,
             user_id=user_id,
         )
 
@@ -264,7 +302,10 @@ class TestInvestigationServiceStartInvestigation:
     async def test_creates_initial_snapshot(
         self,
         mock_repository: AsyncMock,
-        mock_orchestrator: AsyncMock,
+        mock_agent_client: AsyncMock,
+        mock_context_engine: AsyncMock,
+        mock_pattern_repository: AsyncMock,
+        mock_data_adapter: AsyncMock,
         mock_collaboration: AsyncMock,
         tenant_id: UUID,
         user_id: UUID,
@@ -275,13 +316,16 @@ class TestInvestigationServiceStartInvestigation:
         """Creates initial snapshot at GATHER_CONTEXT step."""
         service = InvestigationService(
             repository=mock_repository,
-            orchestrator=mock_orchestrator,
             collaboration=mock_collaboration,
+            agent_client=mock_agent_client,
+            context_engine=mock_context_engine,
+            pattern_repository=mock_pattern_repository,
         )
 
         await service.start_investigation(
             tenant_id=tenant_id,
             alert=sample_alert,
+            data_adapter=mock_data_adapter,
             user_id=user_id,
         )
 
@@ -297,7 +341,10 @@ class TestInvestigationServiceStartInvestigation:
     async def test_updates_branch_head(
         self,
         mock_repository: AsyncMock,
-        mock_orchestrator: AsyncMock,
+        mock_agent_client: AsyncMock,
+        mock_context_engine: AsyncMock,
+        mock_pattern_repository: AsyncMock,
+        mock_data_adapter: AsyncMock,
         mock_collaboration: AsyncMock,
         tenant_id: UUID,
         user_id: UUID,
@@ -308,13 +355,16 @@ class TestInvestigationServiceStartInvestigation:
         """Updates branch head to point to initial snapshot."""
         service = InvestigationService(
             repository=mock_repository,
-            orchestrator=mock_orchestrator,
             collaboration=mock_collaboration,
+            agent_client=mock_agent_client,
+            context_engine=mock_context_engine,
+            pattern_repository=mock_pattern_repository,
         )
 
         await service.start_investigation(
             tenant_id=tenant_id,
             alert=sample_alert,
+            data_adapter=mock_data_adapter,
             user_id=user_id,
         )
 
@@ -326,7 +376,10 @@ class TestInvestigationServiceStartInvestigation:
     async def test_returns_investigation_and_branch_ids(
         self,
         mock_repository: AsyncMock,
-        mock_orchestrator: AsyncMock,
+        mock_agent_client: AsyncMock,
+        mock_context_engine: AsyncMock,
+        mock_pattern_repository: AsyncMock,
+        mock_data_adapter: AsyncMock,
         mock_collaboration: AsyncMock,
         tenant_id: UUID,
         user_id: UUID,
@@ -337,13 +390,16 @@ class TestInvestigationServiceStartInvestigation:
         """Returns investigation ID and main branch ID."""
         service = InvestigationService(
             repository=mock_repository,
-            orchestrator=mock_orchestrator,
             collaboration=mock_collaboration,
+            agent_client=mock_agent_client,
+            context_engine=mock_context_engine,
+            pattern_repository=mock_pattern_repository,
         )
 
         investigation_id, branch_id = await service.start_investigation(
             tenant_id=tenant_id,
             alert=sample_alert,
+            data_adapter=mock_data_adapter,
             user_id=user_id,
         )
 
@@ -354,7 +410,10 @@ class TestInvestigationServiceStartInvestigation:
     async def test_works_without_user_id(
         self,
         mock_repository: AsyncMock,
-        mock_orchestrator: AsyncMock,
+        mock_agent_client: AsyncMock,
+        mock_context_engine: AsyncMock,
+        mock_pattern_repository: AsyncMock,
+        mock_data_adapter: AsyncMock,
         mock_collaboration: AsyncMock,
         tenant_id: UUID,
         sample_alert: AnomalyAlert,
@@ -362,13 +421,16 @@ class TestInvestigationServiceStartInvestigation:
         """Allows starting investigation without user ID (API key auth)."""
         service = InvestigationService(
             repository=mock_repository,
-            orchestrator=mock_orchestrator,
             collaboration=mock_collaboration,
+            agent_client=mock_agent_client,
+            context_engine=mock_context_engine,
+            pattern_repository=mock_pattern_repository,
         )
 
         investigation_id, branch_id = await service.start_investigation(
             tenant_id=tenant_id,
             alert=sample_alert,
+            data_adapter=mock_data_adapter,
             user_id=None,
         )
 
@@ -385,7 +447,10 @@ class TestInvestigationServiceGetState:
     async def test_returns_investigation_state(
         self,
         mock_repository: AsyncMock,
-        mock_orchestrator: AsyncMock,
+        mock_agent_client: AsyncMock,
+        mock_context_engine: AsyncMock,
+        mock_pattern_repository: AsyncMock,
+        mock_data_adapter: AsyncMock,
         mock_collaboration: AsyncMock,
         investigation_id: UUID,
         user_id: UUID,
@@ -401,8 +466,10 @@ class TestInvestigationServiceGetState:
 
         service = InvestigationService(
             repository=mock_repository,
-            orchestrator=mock_orchestrator,
             collaboration=mock_collaboration,
+            agent_client=mock_agent_client,
+            context_engine=mock_context_engine,
+            pattern_repository=mock_pattern_repository,
         )
 
         state = await service.get_state(
@@ -418,7 +485,10 @@ class TestInvestigationServiceGetState:
     async def test_includes_user_branch_if_exists(
         self,
         mock_repository: AsyncMock,
-        mock_orchestrator: AsyncMock,
+        mock_agent_client: AsyncMock,
+        mock_context_engine: AsyncMock,
+        mock_pattern_repository: AsyncMock,
+        mock_data_adapter: AsyncMock,
         mock_collaboration: AsyncMock,
         investigation_id: UUID,
         user_id: UUID,
@@ -438,8 +508,10 @@ class TestInvestigationServiceGetState:
 
         service = InvestigationService(
             repository=mock_repository,
-            orchestrator=mock_orchestrator,
             collaboration=mock_collaboration,
+            agent_client=mock_agent_client,
+            context_engine=mock_context_engine,
+            pattern_repository=mock_pattern_repository,
         )
 
         state = await service.get_state(
@@ -454,7 +526,10 @@ class TestInvestigationServiceGetState:
     async def test_raises_when_investigation_not_found(
         self,
         mock_repository: AsyncMock,
-        mock_orchestrator: AsyncMock,
+        mock_agent_client: AsyncMock,
+        mock_context_engine: AsyncMock,
+        mock_pattern_repository: AsyncMock,
+        mock_data_adapter: AsyncMock,
         mock_collaboration: AsyncMock,
         user_id: UUID,
     ) -> None:
@@ -463,8 +538,10 @@ class TestInvestigationServiceGetState:
 
         service = InvestigationService(
             repository=mock_repository,
-            orchestrator=mock_orchestrator,
             collaboration=mock_collaboration,
+            agent_client=mock_agent_client,
+            context_engine=mock_context_engine,
+            pattern_repository=mock_pattern_repository,
         )
 
         with pytest.raises(ValueError, match="Investigation not found"):
@@ -481,7 +558,10 @@ class TestInvestigationServiceSendMessage:
     async def test_gets_or_creates_user_branch(
         self,
         mock_repository: AsyncMock,
-        mock_orchestrator: AsyncMock,
+        mock_agent_client: AsyncMock,
+        mock_context_engine: AsyncMock,
+        mock_pattern_repository: AsyncMock,
+        mock_data_adapter: AsyncMock,
         mock_collaboration: AsyncMock,
         investigation_id: UUID,
         user_id: UUID,
@@ -492,8 +572,10 @@ class TestInvestigationServiceSendMessage:
 
         service = InvestigationService(
             repository=mock_repository,
-            orchestrator=mock_orchestrator,
             collaboration=mock_collaboration,
+            agent_client=mock_agent_client,
+            context_engine=mock_context_engine,
+            pattern_repository=mock_pattern_repository,
         )
 
         await service.send_message(
@@ -510,7 +592,10 @@ class TestInvestigationServiceSendMessage:
     async def test_adds_message_to_branch(
         self,
         mock_repository: AsyncMock,
-        mock_orchestrator: AsyncMock,
+        mock_agent_client: AsyncMock,
+        mock_context_engine: AsyncMock,
+        mock_pattern_repository: AsyncMock,
+        mock_data_adapter: AsyncMock,
         mock_collaboration: AsyncMock,
         investigation_id: UUID,
         user_id: UUID,
@@ -522,8 +607,10 @@ class TestInvestigationServiceSendMessage:
 
         service = InvestigationService(
             repository=mock_repository,
-            orchestrator=mock_orchestrator,
             collaboration=mock_collaboration,
+            agent_client=mock_agent_client,
+            context_engine=mock_context_engine,
+            pattern_repository=mock_pattern_repository,
         )
 
         await service.send_message(
@@ -540,7 +627,10 @@ class TestInvestigationServiceSendMessage:
     async def test_resumes_suspended_branch(
         self,
         mock_repository: AsyncMock,
-        mock_orchestrator: AsyncMock,
+        mock_agent_client: AsyncMock,
+        mock_context_engine: AsyncMock,
+        mock_pattern_repository: AsyncMock,
+        mock_data_adapter: AsyncMock,
         mock_collaboration: AsyncMock,
         investigation_id: UUID,
         user_id: UUID,
@@ -552,8 +642,10 @@ class TestInvestigationServiceSendMessage:
 
         service = InvestigationService(
             repository=mock_repository,
-            orchestrator=mock_orchestrator,
             collaboration=mock_collaboration,
+            agent_client=mock_agent_client,
+            context_engine=mock_context_engine,
+            pattern_repository=mock_pattern_repository,
         )
 
         await service.send_message(
@@ -568,7 +660,10 @@ class TestInvestigationServiceSendMessage:
     async def test_does_not_resume_active_branch(
         self,
         mock_repository: AsyncMock,
-        mock_orchestrator: AsyncMock,
+        mock_agent_client: AsyncMock,
+        mock_context_engine: AsyncMock,
+        mock_pattern_repository: AsyncMock,
+        mock_data_adapter: AsyncMock,
         mock_collaboration: AsyncMock,
         investigation_id: UUID,
         user_id: UUID,
@@ -586,8 +681,10 @@ class TestInvestigationServiceSendMessage:
 
         service = InvestigationService(
             repository=mock_repository,
-            orchestrator=mock_orchestrator,
             collaboration=mock_collaboration,
+            agent_client=mock_agent_client,
+            context_engine=mock_context_engine,
+            pattern_repository=mock_pattern_repository,
         )
 
         await service.send_message(
@@ -602,7 +699,10 @@ class TestInvestigationServiceSendMessage:
     async def test_returns_branch_id(
         self,
         mock_repository: AsyncMock,
-        mock_orchestrator: AsyncMock,
+        mock_agent_client: AsyncMock,
+        mock_context_engine: AsyncMock,
+        mock_pattern_repository: AsyncMock,
+        mock_data_adapter: AsyncMock,
         mock_collaboration: AsyncMock,
         investigation_id: UUID,
         user_id: UUID,
@@ -613,8 +713,10 @@ class TestInvestigationServiceSendMessage:
 
         service = InvestigationService(
             repository=mock_repository,
-            orchestrator=mock_orchestrator,
             collaboration=mock_collaboration,
+            agent_client=mock_agent_client,
+            context_engine=mock_context_engine,
+            pattern_repository=mock_pattern_repository,
         )
 
         branch_id = await service.send_message(

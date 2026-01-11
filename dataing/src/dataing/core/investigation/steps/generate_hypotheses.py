@@ -22,6 +22,7 @@ class LLMProtocol(Protocol):
         self,
         *,
         alert_summary: str,
+        alert: dict[str, Any] | None,
         schema_info: dict[str, Any] | None,
         lineage_info: dict[str, Any] | None,
         num_hypotheses: int,
@@ -30,7 +31,8 @@ class LLMProtocol(Protocol):
         """Generate hypotheses about potential root causes.
 
         Args:
-            alert_summary: Summary of the anomaly alert.
+            alert_summary: Summary of the anomaly alert (for display).
+            alert: Full alert data with date, column, values (for LLM prompts).
             schema_info: Database schema information.
             lineage_info: Data lineage information.
             num_hypotheses: Maximum number of hypotheses to generate.
@@ -97,6 +99,7 @@ class GenerateHypothesesStep(Step[None, list[Hypothesis]]):
         # Generate hypotheses
         hypotheses = await self.llm.generate_hypotheses(
             alert_summary=context.alert_summary,
+            alert=context.alert,
             schema_info=context.schema_info,
             lineage_info=context.lineage_info,
             num_hypotheses=self.max_hypotheses,
@@ -118,6 +121,7 @@ class GenerateHypothesesStep(Step[None, list[Hypothesis]]):
         # Update context with hypotheses
         new_context = InvestigationContext(
             alert_summary=context.alert_summary,
+            alert=context.alert,
             schema_info=context.schema_info,
             lineage_info=context.lineage_info,
             recent_changes=context.recent_changes,

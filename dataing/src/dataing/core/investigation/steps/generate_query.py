@@ -23,13 +23,15 @@ class LLMProtocol(Protocol):
         hypothesis: dict[str, Any],
         schema_info: dict[str, Any],
         alert_summary: str,
+        alert: dict[str, Any] | None,
     ) -> str:
         """Generate a SQL query to test the hypothesis.
 
         Args:
             hypothesis: Hypothesis to test.
             schema_info: Database schema information.
-            alert_summary: Summary of the anomaly alert.
+            alert_summary: Summary of the anomaly alert (for display).
+            alert: Full alert data with date, column, values (for LLM prompts).
 
         Returns:
             SQL query string.
@@ -97,12 +99,13 @@ class GenerateQueryStep(Step[dict[str, Any], str]):
                 hypothesis=hypothesis,
                 schema_info=context.schema_info,  # type: ignore[arg-type]
                 alert_summary=context.alert_summary,
+                alert=context.alert,
             )
-        except Exception:
+        except Exception as e:
             return StepResult(
                 context=context,
                 signal=ExecutionSignal.FAIL,
-                output=None,
+                output={"error": f"Query generation failed: {e}"},
             )
 
         # Update context with the generated query

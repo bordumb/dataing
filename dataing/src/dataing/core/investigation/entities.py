@@ -26,8 +26,11 @@ class InvestigationContext(BaseModel):
 
     model_config = ConfigDict(frozen=True)
 
-    # Summary of the triggering alert
+    # Summary of the triggering alert (for display/logging)
     alert_summary: str
+
+    # Full alert data (for LLM prompts - includes date, column, values)
+    alert: dict[str, Any] | None = None
 
     # Gathered context
     schema_info: dict[str, Any] | None = None

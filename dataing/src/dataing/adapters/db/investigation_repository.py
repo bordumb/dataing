@@ -465,6 +465,27 @@ class PostgresInvestigationRepository:
         ready: int = result["ready"]
         return total > 0 and total == ready
 
+    async def get_merge_step(
+        self,
+        parent_branch_id: UUID,
+    ) -> StepType | None:
+        """Get the merge step for a parent branch.
+
+        Returns the step to transition to when all children complete.
+        """
+        result = await self.db.fetch_one(
+            """
+            SELECT merge_step
+            FROM branch_merge_points
+            WHERE parent_branch_id = $1
+            LIMIT 1
+            """,
+            parent_branch_id,
+        )
+        if result is None:
+            return None
+        return StepType(result["merge_step"])
+
     # =========================================================================
     # Private Helper Methods
     # =========================================================================

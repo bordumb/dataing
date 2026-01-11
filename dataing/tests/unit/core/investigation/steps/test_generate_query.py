@@ -77,6 +77,7 @@ class TestGenerateQueryStep:
             hypothesis=sample_hypothesis,
             schema_info=sample_context.schema_info,
             alert_summary=sample_context.alert_summary,
+            alert=sample_context.alert,
         )
         # Verify output is the generated query
         assert result.output == "SELECT COUNT(*) FROM events WHERE user_id IS NULL"

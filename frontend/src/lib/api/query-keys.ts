@@ -6,10 +6,11 @@
  */
 
 export const queryKeys = {
-  // Investigations
+  // Investigations (unified with branches)
   investigations: {
-    all: ['/api/v1/investigations/'] as const,
+    all: ['/api/v1/investigations'] as const,
     detail: (id: string) => [`/api/v1/investigations/${id}`] as const,
+    stream: (id: string) => [`/api/v1/investigations/${id}/stream`] as const,
     events: (id: string) => [`/api/v1/investigations/${id}/events`] as const,
   },
 

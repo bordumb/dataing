@@ -197,3 +197,10 @@ class InvestigationRepository(Protocol):
     ) -> bool:
         """Check if all children are ready to merge."""
         ...
+
+    async def get_merge_step(
+        self,
+        parent_branch_id: UUID,
+    ) -> StepType | None:
+        """Get the merge step for a parent branch."""
+        ...

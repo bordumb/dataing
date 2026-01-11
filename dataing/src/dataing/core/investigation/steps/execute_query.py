@@ -78,7 +78,7 @@ class ExecuteQueryStep(Step[dict[str, Any], dict[str, Any]]):
             return StepResult(
                 context=context,
                 signal=ExecutionSignal.FAIL,
-                output=None,
+                output={"error": "No query available to execute"},
             )
 
         # Execute query via database adapter
@@ -86,11 +86,11 @@ class ExecuteQueryStep(Step[dict[str, Any], dict[str, Any]]):
             query_result: dict[str, Any] = await self.database.execute_query(
                 context.current_query
             )
-        except Exception:
+        except Exception as e:
             return StepResult(
                 context=context,
                 signal=ExecutionSignal.FAIL,
-                output=None,
+                output={"error": f"Query execution failed: {e}"},
             )
 
         # Update context with query result and incremented query count

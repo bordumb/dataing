@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
-import { useCreateInvestigation } from '@/lib/api/investigations'
+import { useStartInvestigation } from '@/lib/api/investigations'
 import { useDataSources, useDataSourceSchema, SchemaTable } from '@/lib/api/datasources'
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
@@ -34,7 +34,7 @@ interface FormData {
 
 export function NewInvestigation() {
   const navigate = useNavigate()
-  const createInvestigation = useCreateInvestigation()
+  const startInvestigation = useStartInvestigation()
 
   const [selectedTable, setSelectedTable] = useState<SchemaTable | null>(null)
   const [datasets, setDatasets] = useState<Dataset[]>([
@@ -80,7 +80,7 @@ export function NewInvestigation() {
         formData.display_name.trim() ||
         `${formData.anomaly_type} on ${formData.column_name || primaryDataset.identifier}`
 
-      const result = await createInvestigation.mutateAsync({
+      const result = await startInvestigation.mutateAsync({
         dataset_id: primaryDataset.identifier,
         metric_spec: {
           metric_type: 'column',
@@ -134,7 +134,7 @@ export function NewInvestigation() {
 
   const primaryDataset = datasets[0]
   const hasEmptyDataset = datasets.some((ds) => !ds.identifier.trim())
-  const isSubmitDisabled = createInvestigation.isPending || hasEmptyDataset || !anomalyDate.start
+  const isSubmitDisabled = startInvestigation.isPending || hasEmptyDataset || !anomalyDate.start
 
   if (isLoadingDataSources) {
     return (
@@ -201,7 +201,7 @@ export function NewInvestigation() {
                           onIdentifierChange={(val) => updateDataset(dataset.id, { identifier: val })}
                           onRemove={() => removeDataset(dataset.id)}
                           canRemove={datasets.length > 1}
-                          disabled={createInvestigation.isPending}
+                          disabled={startInvestigation.isPending}
                           autoFocus={index === datasets.length - 1 && !dataset.identifier}
                           dataSources={dataSources || []}
                           onTableSelect={setSelectedTable}
@@ -213,7 +213,7 @@ export function NewInvestigation() {
                     type="button"
                     variant="outline"
                     onClick={addDataset}
-                    disabled={createInvestigation.isPending || !dataSources?.length}
+                    disabled={startInvestigation.isPending || !dataSources?.length}
                     className="w-full border-dashed"
                   >
                     <Plus className="mr-2 h-4 w-4" />
@@ -347,11 +347,11 @@ export function NewInvestigation() {
                   </p>
                 </div>
 
-                {createInvestigation.error && (
+                {startInvestigation.error && (
                   <div className="rounded-md bg-destructive/10 p-3 text-sm text-destructive">
                     <p className="font-medium">Error:</p>
                     {(() => {
-                      const err = createInvestigation.error as { detail?: Array<{ loc: string[]; msg: string }> }
+                      const err = startInvestigation.error as { detail?: Array<{ loc: string[]; msg: string }> }
                       if (err.detail && Array.isArray(err.detail)) {
                         return (
                           <ul className="mt-1 list-disc pl-4">
@@ -363,19 +363,19 @@ export function NewInvestigation() {
                           </ul>
                         )
                       }
-                      return <p>{String(createInvestigation.error)}</p>
+                      return <p>{String(startInvestigation.error)}</p>
                     })()}
                   </div>
                 )}
 
                 <div className="flex justify-end gap-3 border-t border-border pt-4">
                   <Link to="/investigations">
-                    <Button variant="secondary" disabled={createInvestigation.isPending}>
+                    <Button variant="secondary" disabled={startInvestigation.isPending}>
                       Cancel
                     </Button>
                   </Link>
                   <Button type="submit" disabled={isSubmitDisabled}>
-                    {createInvestigation.isPending ? (
+                    {startInvestigation.isPending ? (
                       <>
                         <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                         Starting Investigation...

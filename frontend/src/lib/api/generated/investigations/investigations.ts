@@ -16,107 +16,215 @@ import type {
   UseQueryResult,
 } from "@tanstack/react-query";
 import type {
-  CreateInvestigationRequest,
   HTTPValidationError,
-  InvestigationResponse,
-  InvestigationStatusResponse,
-  ListInvestigationsApiV1InvestigationsGet200Item,
+  InvestigationListItem,
+  InvestigationStateResponse,
+  SendMessageRequest,
+  SendMessageResponse,
+  StartInvestigationRequest,
+  StartInvestigationResponse,
 } from "../../model";
 import { customInstance } from "../../client";
 
 /**
- * Start a new investigation.
+ * List all investigations for the tenant.
 
-This endpoint starts an investigation in the background
-and returns immediately with the investigation ID.
+Args:
+    auth: Authentication context from API key/JWT.
+    db: Application database.
 
-The investigation will query the tenant's actual data source
-(e.g., DuckDB with parquet files) instead of just metadata.
- * @summary Create Investigation
+Returns:
+    List of investigations.
+ * @summary List Investigations
  */
-export const createInvestigationApiV1InvestigationsPost = (
-  createInvestigationRequest: CreateInvestigationRequest,
+export const listInvestigationsApiV1InvestigationsGet = (
+  signal?: AbortSignal,
 ) => {
-  return customInstance<InvestigationResponse>({
-    url: `/api/v1/investigations/`,
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    data: createInvestigationRequest,
+  return customInstance<InvestigationListItem[]>({
+    url: `/api/v1/investigations`,
+    method: "GET",
+    signal,
   });
 };
 
-export const getCreateInvestigationApiV1InvestigationsPostMutationOptions = <
+export const getListInvestigationsApiV1InvestigationsGetQueryKey = () => {
+  return [`/api/v1/investigations`] as const;
+};
+
+export const getListInvestigationsApiV1InvestigationsGetQueryOptions = <
+  TData = Awaited<ReturnType<typeof listInvestigationsApiV1InvestigationsGet>>,
+  TError = unknown,
+>(options?: {
+  query?: Partial<
+    UseQueryOptions<
+      Awaited<ReturnType<typeof listInvestigationsApiV1InvestigationsGet>>,
+      TError,
+      TData
+    >
+  >;
+}) => {
+  const { query: queryOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ??
+    getListInvestigationsApiV1InvestigationsGetQueryKey();
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof listInvestigationsApiV1InvestigationsGet>>
+  > = ({ signal }) => listInvestigationsApiV1InvestigationsGet(signal);
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof listInvestigationsApiV1InvestigationsGet>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type ListInvestigationsApiV1InvestigationsGetQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listInvestigationsApiV1InvestigationsGet>>
+>;
+export type ListInvestigationsApiV1InvestigationsGetQueryError = unknown;
+
+/**
+ * @summary List Investigations
+ */
+export const useListInvestigationsApiV1InvestigationsGet = <
+  TData = Awaited<ReturnType<typeof listInvestigationsApiV1InvestigationsGet>>,
+  TError = unknown,
+>(options?: {
+  query?: Partial<
+    UseQueryOptions<
+      Awaited<ReturnType<typeof listInvestigationsApiV1InvestigationsGet>>,
+      TError,
+      TData
+    >
+  >;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } => {
+  const queryOptions =
+    getListInvestigationsApiV1InvestigationsGetQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  query.queryKey = queryOptions.queryKey;
+
+  return query;
+};
+
+/**
+ * Start a new investigation for an alert.
+
+Creates a new investigation with a main branch positioned at
+GATHER_CONTEXT step.
+
+Args:
+    http_request: The HTTP request for accessing app state.
+    request: The investigation request containing alert data.
+    auth: Authentication context from API key/JWT.
+    service: Investigation service dependency.
+
+Returns:
+    StartInvestigationResponse with investigation and branch IDs.
+ * @summary Start Investigation
+ */
+export const startInvestigationApiV1InvestigationsPost = (
+  startInvestigationRequest: StartInvestigationRequest,
+) => {
+  return customInstance<StartInvestigationResponse>({
+    url: `/api/v1/investigations`,
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    data: startInvestigationRequest,
+  });
+};
+
+export const getStartInvestigationApiV1InvestigationsPostMutationOptions = <
   TError = HTTPValidationError,
   TContext = unknown,
 >(options?: {
   mutation?: UseMutationOptions<
-    Awaited<ReturnType<typeof createInvestigationApiV1InvestigationsPost>>,
+    Awaited<ReturnType<typeof startInvestigationApiV1InvestigationsPost>>,
     TError,
-    { data: CreateInvestigationRequest },
+    { data: StartInvestigationRequest },
     TContext
   >;
 }): UseMutationOptions<
-  Awaited<ReturnType<typeof createInvestigationApiV1InvestigationsPost>>,
+  Awaited<ReturnType<typeof startInvestigationApiV1InvestigationsPost>>,
   TError,
-  { data: CreateInvestigationRequest },
+  { data: StartInvestigationRequest },
   TContext
 > => {
   const { mutation: mutationOptions } = options ?? {};
 
   const mutationFn: MutationFunction<
-    Awaited<ReturnType<typeof createInvestigationApiV1InvestigationsPost>>,
-    { data: CreateInvestigationRequest }
+    Awaited<ReturnType<typeof startInvestigationApiV1InvestigationsPost>>,
+    { data: StartInvestigationRequest }
   > = (props) => {
     const { data } = props ?? {};
 
-    return createInvestigationApiV1InvestigationsPost(data);
+    return startInvestigationApiV1InvestigationsPost(data);
   };
 
   return { mutationFn, ...mutationOptions };
 };
 
-export type CreateInvestigationApiV1InvestigationsPostMutationResult =
+export type StartInvestigationApiV1InvestigationsPostMutationResult =
   NonNullable<
-    Awaited<ReturnType<typeof createInvestigationApiV1InvestigationsPost>>
+    Awaited<ReturnType<typeof startInvestigationApiV1InvestigationsPost>>
   >;
-export type CreateInvestigationApiV1InvestigationsPostMutationBody =
-  CreateInvestigationRequest;
-export type CreateInvestigationApiV1InvestigationsPostMutationError =
+export type StartInvestigationApiV1InvestigationsPostMutationBody =
+  StartInvestigationRequest;
+export type StartInvestigationApiV1InvestigationsPostMutationError =
   HTTPValidationError;
 
 /**
- * @summary Create Investigation
+ * @summary Start Investigation
  */
-export const useCreateInvestigationApiV1InvestigationsPost = <
+export const useStartInvestigationApiV1InvestigationsPost = <
   TError = HTTPValidationError,
   TContext = unknown,
 >(options?: {
   mutation?: UseMutationOptions<
-    Awaited<ReturnType<typeof createInvestigationApiV1InvestigationsPost>>,
+    Awaited<ReturnType<typeof startInvestigationApiV1InvestigationsPost>>,
     TError,
-    { data: CreateInvestigationRequest },
+    { data: StartInvestigationRequest },
     TContext
   >;
 }): UseMutationResult<
-  Awaited<ReturnType<typeof createInvestigationApiV1InvestigationsPost>>,
+  Awaited<ReturnType<typeof startInvestigationApiV1InvestigationsPost>>,
   TError,
-  { data: CreateInvestigationRequest },
+  { data: StartInvestigationRequest },
   TContext
 > => {
   const mutationOptions =
-    getCreateInvestigationApiV1InvestigationsPostMutationOptions(options);
+    getStartInvestigationApiV1InvestigationsPostMutationOptions(options);
 
   return useMutation(mutationOptions);
 };
 /**
- * Get investigation status and results.
+ * Get investigation state including user branch if exists.
+
+Returns the current state of the investigation with the main branch
+and optionally the user's branch if one exists.
+
+Args:
+    investigation_id: UUID of the investigation.
+    auth: Authentication context from API key/JWT.
+    service: Investigation service dependency.
+
+Returns:
+    InvestigationStateResponse with main and optional user branch.
+
+Raises:
+    HTTPException: If investigation not found.
  * @summary Get Investigation
  */
 export const getInvestigationApiV1InvestigationsInvestigationIdGet = (
   investigationId: string,
   signal?: AbortSignal,
 ) => {
-  return customInstance<InvestigationStatusResponse>({
+  return customInstance<InvestigationStateResponse>({
     url: `/api/v1/investigations/${investigationId}`,
     method: "GET",
     signal,
@@ -231,32 +339,161 @@ export const useGetInvestigationApiV1InvestigationsInvestigationIdGet = <
 };
 
 /**
- * SSE stream of investigation events.
+ * Send a message to the user's branch (creates branch if needed).
 
-Returns a Server-Sent Events stream that pushes
-new events as they occur during the investigation.
- * @summary Stream Events
+Gets or creates a user branch and adds the message. Resumes the
+branch if it was suspended.
+
+Args:
+    investigation_id: UUID of the investigation.
+    request: The message request.
+    auth: Authentication context from API key/JWT.
+    service: Investigation service dependency.
+
+Returns:
+    SendMessageResponse with the branch ID.
+
+Raises:
+    HTTPException: If user authentication required.
+ * @summary Send Message
  */
-export const streamEventsApiV1InvestigationsInvestigationIdEventsGet = (
+export const sendMessageApiV1InvestigationsInvestigationIdMessagesPost = (
+  investigationId: string,
+  sendMessageRequest: SendMessageRequest,
+) => {
+  return customInstance<SendMessageResponse>({
+    url: `/api/v1/investigations/${investigationId}/messages`,
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    data: sendMessageRequest,
+  });
+};
+
+export const getSendMessageApiV1InvestigationsInvestigationIdMessagesPostMutationOptions =
+  <TError = HTTPValidationError, TContext = unknown>(options?: {
+    mutation?: UseMutationOptions<
+      Awaited<
+        ReturnType<
+          typeof sendMessageApiV1InvestigationsInvestigationIdMessagesPost
+        >
+      >,
+      TError,
+      { investigationId: string; data: SendMessageRequest },
+      TContext
+    >;
+  }): UseMutationOptions<
+    Awaited<
+      ReturnType<
+        typeof sendMessageApiV1InvestigationsInvestigationIdMessagesPost
+      >
+    >,
+    TError,
+    { investigationId: string; data: SendMessageRequest },
+    TContext
+  > => {
+    const { mutation: mutationOptions } = options ?? {};
+
+    const mutationFn: MutationFunction<
+      Awaited<
+        ReturnType<
+          typeof sendMessageApiV1InvestigationsInvestigationIdMessagesPost
+        >
+      >,
+      { investigationId: string; data: SendMessageRequest }
+    > = (props) => {
+      const { investigationId, data } = props ?? {};
+
+      return sendMessageApiV1InvestigationsInvestigationIdMessagesPost(
+        investigationId,
+        data,
+      );
+    };
+
+    return { mutationFn, ...mutationOptions };
+  };
+
+export type SendMessageApiV1InvestigationsInvestigationIdMessagesPostMutationResult =
+  NonNullable<
+    Awaited<
+      ReturnType<
+        typeof sendMessageApiV1InvestigationsInvestigationIdMessagesPost
+      >
+    >
+  >;
+export type SendMessageApiV1InvestigationsInvestigationIdMessagesPostMutationBody =
+  SendMessageRequest;
+export type SendMessageApiV1InvestigationsInvestigationIdMessagesPostMutationError =
+  HTTPValidationError;
+
+/**
+ * @summary Send Message
+ */
+export const useSendMessageApiV1InvestigationsInvestigationIdMessagesPost = <
+  TError = HTTPValidationError,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<
+      ReturnType<
+        typeof sendMessageApiV1InvestigationsInvestigationIdMessagesPost
+      >
+    >,
+    TError,
+    { investigationId: string; data: SendMessageRequest },
+    TContext
+  >;
+}): UseMutationResult<
+  Awaited<
+    ReturnType<typeof sendMessageApiV1InvestigationsInvestigationIdMessagesPost>
+  >,
+  TError,
+  { investigationId: string; data: SendMessageRequest },
+  TContext
+> => {
+  const mutationOptions =
+    getSendMessageApiV1InvestigationsInvestigationIdMessagesPostMutationOptions(
+      options,
+    );
+
+  return useMutation(mutationOptions);
+};
+/**
+ * Stream real-time updates via SSE.
+
+Returns a Server-Sent Events stream that pushes investigation
+updates as they occur.
+
+Args:
+    investigation_id: UUID of the investigation.
+    auth: Authentication context from API key/JWT.
+    service: Investigation service dependency.
+
+Returns:
+    EventSourceResponse with SSE stream.
+ * @summary Stream Updates
+ */
+export const streamUpdatesApiV1InvestigationsInvestigationIdStreamGet = (
   investigationId: string,
   signal?: AbortSignal,
 ) => {
   return customInstance<unknown>({
-    url: `/api/v1/investigations/${investigationId}/events`,
+    url: `/api/v1/investigations/${investigationId}/stream`,
     method: "GET",
     signal,
   });
 };
 
-export const getStreamEventsApiV1InvestigationsInvestigationIdEventsGetQueryKey =
+export const getStreamUpdatesApiV1InvestigationsInvestigationIdStreamGetQueryKey =
   (investigationId: string) => {
-    return [`/api/v1/investigations/${investigationId}/events`] as const;
+    return [`/api/v1/investigations/${investigationId}/stream`] as const;
   };
 
-export const getStreamEventsApiV1InvestigationsInvestigationIdEventsGetQueryOptions =
+export const getStreamUpdatesApiV1InvestigationsInvestigationIdStreamGetQueryOptions =
   <
     TData = Awaited<
-      ReturnType<typeof streamEventsApiV1InvestigationsInvestigationIdEventsGet>
+      ReturnType<
+        typeof streamUpdatesApiV1InvestigationsInvestigationIdStreamGet
+      >
     >,
     TError = HTTPValidationError,
   >(
@@ -266,7 +503,7 @@ export const getStreamEventsApiV1InvestigationsInvestigationIdEventsGetQueryOpti
         UseQueryOptions<
           Awaited<
             ReturnType<
-              typeof streamEventsApiV1InvestigationsInvestigationIdEventsGet
+              typeof streamUpdatesApiV1InvestigationsInvestigationIdStreamGet
             >
           >,
           TError,
@@ -279,18 +516,18 @@ export const getStreamEventsApiV1InvestigationsInvestigationIdEventsGetQueryOpti
 
     const queryKey =
       queryOptions?.queryKey ??
-      getStreamEventsApiV1InvestigationsInvestigationIdEventsGetQueryKey(
+      getStreamUpdatesApiV1InvestigationsInvestigationIdStreamGetQueryKey(
         investigationId,
       );
 
     const queryFn: QueryFunction<
       Awaited<
         ReturnType<
-          typeof streamEventsApiV1InvestigationsInvestigationIdEventsGet
+          typeof streamUpdatesApiV1InvestigationsInvestigationIdStreamGet
         >
       >
     > = ({ signal }) =>
-      streamEventsApiV1InvestigationsInvestigationIdEventsGet(
+      streamUpdatesApiV1InvestigationsInvestigationIdStreamGet(
         investigationId,
         signal,
       );
@@ -303,7 +540,7 @@ export const getStreamEventsApiV1InvestigationsInvestigationIdEventsGetQueryOpti
     } as UseQueryOptions<
       Awaited<
         ReturnType<
-          typeof streamEventsApiV1InvestigationsInvestigationIdEventsGet
+          typeof streamUpdatesApiV1InvestigationsInvestigationIdStreamGet
         >
       >,
       TError,
@@ -311,21 +548,23 @@ export const getStreamEventsApiV1InvestigationsInvestigationIdEventsGetQueryOpti
     > & { queryKey: QueryKey };
   };
 
-export type StreamEventsApiV1InvestigationsInvestigationIdEventsGetQueryResult =
+export type StreamUpdatesApiV1InvestigationsInvestigationIdStreamGetQueryResult =
   NonNullable<
     Awaited<
-      ReturnType<typeof streamEventsApiV1InvestigationsInvestigationIdEventsGet>
+      ReturnType<
+        typeof streamUpdatesApiV1InvestigationsInvestigationIdStreamGet
+      >
     >
   >;
-export type StreamEventsApiV1InvestigationsInvestigationIdEventsGetQueryError =
+export type StreamUpdatesApiV1InvestigationsInvestigationIdStreamGetQueryError =
   HTTPValidationError;
 
 /**
- * @summary Stream Events
+ * @summary Stream Updates
  */
-export const useStreamEventsApiV1InvestigationsInvestigationIdEventsGet = <
+export const useStreamUpdatesApiV1InvestigationsInvestigationIdStreamGet = <
   TData = Awaited<
-    ReturnType<typeof streamEventsApiV1InvestigationsInvestigationIdEventsGet>
+    ReturnType<typeof streamUpdatesApiV1InvestigationsInvestigationIdStreamGet>
   >,
   TError = HTTPValidationError,
 >(
@@ -335,7 +574,7 @@ export const useStreamEventsApiV1InvestigationsInvestigationIdEventsGet = <
       UseQueryOptions<
         Awaited<
           ReturnType<
-            typeof streamEventsApiV1InvestigationsInvestigationIdEventsGet
+            typeof streamUpdatesApiV1InvestigationsInvestigationIdStreamGet
           >
         >,
         TError,
@@ -345,93 +584,10 @@ export const useStreamEventsApiV1InvestigationsInvestigationIdEventsGet = <
   },
 ): UseQueryResult<TData, TError> & { queryKey: QueryKey } => {
   const queryOptions =
-    getStreamEventsApiV1InvestigationsInvestigationIdEventsGetQueryOptions(
+    getStreamUpdatesApiV1InvestigationsInvestigationIdStreamGetQueryOptions(
       investigationId,
       options,
     );
-
-  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
-    queryKey: QueryKey;
-  };
-
-  query.queryKey = queryOptions.queryKey;
-
-  return query;
-};
-
-/**
- * List all investigations for the current tenant.
-
-Results are filtered by RBAC permissions when user_id is available.
-Admins and owners see all investigations; members see only those
-they have access to via direct grants, tags, teams, or datasources.
- * @summary List Investigations
- */
-export const listInvestigationsApiV1InvestigationsGet = (
-  signal?: AbortSignal,
-) => {
-  return customInstance<ListInvestigationsApiV1InvestigationsGet200Item[]>({
-    url: `/api/v1/investigations`,
-    method: "GET",
-    signal,
-  });
-};
-
-export const getListInvestigationsApiV1InvestigationsGetQueryKey = () => {
-  return [`/api/v1/investigations`] as const;
-};
-
-export const getListInvestigationsApiV1InvestigationsGetQueryOptions = <
-  TData = Awaited<ReturnType<typeof listInvestigationsApiV1InvestigationsGet>>,
-  TError = unknown,
->(options?: {
-  query?: Partial<
-    UseQueryOptions<
-      Awaited<ReturnType<typeof listInvestigationsApiV1InvestigationsGet>>,
-      TError,
-      TData
-    >
-  >;
-}) => {
-  const { query: queryOptions } = options ?? {};
-
-  const queryKey =
-    queryOptions?.queryKey ??
-    getListInvestigationsApiV1InvestigationsGetQueryKey();
-
-  const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof listInvestigationsApiV1InvestigationsGet>>
-  > = ({ signal }) => listInvestigationsApiV1InvestigationsGet(signal);
-
-  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
-    Awaited<ReturnType<typeof listInvestigationsApiV1InvestigationsGet>>,
-    TError,
-    TData
-  > & { queryKey: QueryKey };
-};
-
-export type ListInvestigationsApiV1InvestigationsGetQueryResult = NonNullable<
-  Awaited<ReturnType<typeof listInvestigationsApiV1InvestigationsGet>>
->;
-export type ListInvestigationsApiV1InvestigationsGetQueryError = unknown;
-
-/**
- * @summary List Investigations
- */
-export const useListInvestigationsApiV1InvestigationsGet = <
-  TData = Awaited<ReturnType<typeof listInvestigationsApiV1InvestigationsGet>>,
-  TError = unknown,
->(options?: {
-  query?: Partial<
-    UseQueryOptions<
-      Awaited<ReturnType<typeof listInvestigationsApiV1InvestigationsGet>>,
-      TError,
-      TData
-    >
-  >;
-}): UseQueryResult<TData, TError> & { queryKey: QueryKey } => {
-  const queryOptions =
-    getListInvestigationsApiV1InvestigationsGetQueryOptions(options);
 
   const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
     queryKey: QueryKey;

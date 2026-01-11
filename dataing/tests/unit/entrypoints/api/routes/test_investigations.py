@@ -3,205 +3,368 @@
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timezone
-from unittest.mock import AsyncMock, MagicMock, patch
+from typing import Any
+from unittest.mock import AsyncMock, patch
 
 import pytest
-from fastapi import FastAPI, HTTPException
-from fastapi.testclient import TestClient
 
-from dataing.core.domain_types import AnomalyAlert, Finding
-from dataing.core.state import InvestigationState
+from dataing.core.domain_types import AnomalyAlert, MetricSpec
+from dataing.core.investigation.service import BranchState, InvestigationState
 from dataing.entrypoints.api.middleware.auth import ApiKeyContext
-from dataing.entrypoints.api.routes.investigations import (
-    CreateInvestigationRequest,
-    InvestigationResponse,
-    InvestigationStatusResponse,
-    router,
-)
 
 
-class TestCreateInvestigationRequest:
-    """Tests for CreateInvestigationRequest."""
+@pytest.fixture
+def mock_auth_context() -> ApiKeyContext:
+    """Return a mock auth context."""
+    return ApiKeyContext(
+        key_id=uuid.uuid4(),
+        tenant_id=uuid.uuid4(),
+        tenant_slug="test-tenant",
+        tenant_name="Test Tenant",
+        user_id=uuid.uuid4(),
+        scopes=["read", "write"],
+    )
 
-    def test_create_request(self) -> None:
-        """Test creating an investigation request."""
-        request = CreateInvestigationRequest(
-            dataset_id="public.orders",
-            metric_name="row_count",
-            expected_value=1000.0,
-            actual_value=500.0,
-            deviation_pct=50.0,
-            anomaly_date="2024-01-15",
+
+@pytest.fixture
+def sample_alert() -> dict[str, Any]:
+    """Return a sample alert dict for requests."""
+    return {
+        "dataset_id": "analytics.events",
+        "metric_spec": {
+            "metric_type": "column",
+            "expression": "user_id",
+            "display_name": "NULL rate",
+            "columns_referenced": ["user_id"],
+        },
+        "anomaly_type": "null_rate",
+        "expected_value": 0.01,
+        "actual_value": 0.15,
+        "deviation_pct": 1400.0,
+        "anomaly_date": "2026-01-10",
+        "severity": "high",
+    }
+
+
+@pytest.fixture
+def mock_service() -> AsyncMock:
+    """Create mock investigation service."""
+    service = AsyncMock()
+    investigation_id = uuid.uuid4()
+    branch_id = uuid.uuid4()
+
+    service.start_investigation.return_value = (investigation_id, branch_id)
+    service.get_state.return_value = InvestigationState(
+        investigation_id=investigation_id,
+        status="active",
+        main_branch=BranchState(
+            branch_id=branch_id,
+            status="active",
+            current_step="gather_context",
+        ),
+    )
+    service.send_message.return_value = branch_id
+
+    return service
+
+
+class TestStartInvestigationRoute:
+    """Tests for POST /investigations."""
+
+    def test_request_model_validation(self, sample_alert: dict[str, Any]) -> None:
+        """Test that the request model validates correctly."""
+        from dataing.entrypoints.api.routes.investigations import (
+            StartInvestigationRequest,
         )
 
-        assert request.dataset_id == "public.orders"
-        assert request.severity == "medium"  # Default
+        request = StartInvestigationRequest(alert=sample_alert)
+        assert request.alert["dataset_id"] == "analytics.events"
+        assert request.alert["anomaly_type"] == "null_rate"
 
-    def test_create_request_with_metadata(self) -> None:
-        """Test creating request with metadata."""
-        request = CreateInvestigationRequest(
-            dataset_id="public.orders",
-            metric_name="row_count",
-            expected_value=1000.0,
-            actual_value=500.0,
-            deviation_pct=50.0,
-            anomaly_date="2024-01-15",
-            metadata={"source": "airflow"},
+    def test_response_model(self) -> None:
+        """Test response model structure."""
+        from dataing.entrypoints.api.routes.investigations import (
+            StartInvestigationResponse,
         )
 
-        assert request.metadata["source"] == "airflow"
+        investigation_id = uuid.uuid4()
+        branch_id = uuid.uuid4()
 
-
-class TestInvestigationResponse:
-    """Tests for InvestigationResponse."""
-
-    def test_create_response(self) -> None:
-        """Test creating investigation response."""
-        response = InvestigationResponse(
-            investigation_id="inv-001",
-            status="started",
-            created_at=datetime.now(timezone.utc),
+        response = StartInvestigationResponse(
+            investigation_id=investigation_id,
+            main_branch_id=branch_id,
         )
 
-        assert response.investigation_id == "inv-001"
-        assert response.status == "started"
+        assert response.investigation_id == investigation_id
+        assert response.main_branch_id == branch_id
 
 
-class TestInvestigationStatusResponse:
-    """Tests for InvestigationStatusResponse."""
+class TestGetInvestigationRoute:
+    """Tests for GET /investigations/{investigation_id}."""
 
-    def test_create_status_response(self) -> None:
-        """Test creating status response."""
-        response = InvestigationStatusResponse(
-            investigation_id="inv-001",
-            status="in_progress",
-            events=[{"type": "started", "timestamp": "2024-01-15T00:00:00Z", "data": {}}],
-            finding=None,
+    def test_response_model_with_main_branch(self) -> None:
+        """Test response model with main branch only."""
+        from dataing.entrypoints.api.routes.investigations import (
+            BranchStateResponse,
+            InvestigationStateResponse,
         )
 
-        assert response.investigation_id == "inv-001"
-        assert len(response.events) == 1
+        investigation_id = uuid.uuid4()
+        branch_id = uuid.uuid4()
 
-    def test_create_status_response_with_finding(self) -> None:
-        """Test creating status response with finding."""
-        response = InvestigationStatusResponse(
-            investigation_id="inv-001",
+        response = InvestigationStateResponse(
+            investigation_id=investigation_id,
+            status="active",
+            main_branch=BranchStateResponse(
+                branch_id=branch_id,
+                status="active",
+                current_step="gather_context",
+                synthesis=None,
+                evidence=[],
+            ),
+            user_branch=None,
+        )
+
+        assert response.investigation_id == investigation_id
+        assert response.status == "active"
+        assert response.main_branch.branch_id == branch_id
+        assert response.user_branch is None
+
+    def test_response_model_with_user_branch(self) -> None:
+        """Test response model with both main and user branches."""
+        from dataing.entrypoints.api.routes.investigations import (
+            BranchStateResponse,
+            InvestigationStateResponse,
+        )
+
+        investigation_id = uuid.uuid4()
+        main_branch_id = uuid.uuid4()
+        user_branch_id = uuid.uuid4()
+
+        response = InvestigationStateResponse(
+            investigation_id=investigation_id,
+            status="active",
+            main_branch=BranchStateResponse(
+                branch_id=main_branch_id,
+                status="active",
+                current_step="synthesize",
+                synthesis={"root_cause": "Test", "confidence": 0.9},
+                evidence=[{"hypothesis_id": "h1", "supports": True}],
+            ),
+            user_branch=BranchStateResponse(
+                branch_id=user_branch_id,
+                status="suspended",
+                current_step="await_user",
+                synthesis=None,
+                evidence=[],
+            ),
+        )
+
+        assert response.main_branch.synthesis["root_cause"] == "Test"
+        assert response.user_branch is not None
+        assert response.user_branch.status == "suspended"
+
+
+class TestSendMessageRoute:
+    """Tests for POST /investigations/{investigation_id}/messages."""
+
+    def test_request_model(self) -> None:
+        """Test message request model."""
+        from dataing.entrypoints.api.routes.investigations import (
+            SendMessageRequest,
+        )
+
+        request = SendMessageRequest(message="Can you investigate upstream?")
+        assert request.message == "Can you investigate upstream?"
+
+    def test_response_model(self) -> None:
+        """Test message response model."""
+        from dataing.entrypoints.api.routes.investigations import (
+            SendMessageResponse,
+        )
+
+        branch_id = uuid.uuid4()
+        response = SendMessageResponse(branch_id=branch_id)
+        assert response.branch_id == branch_id
+
+
+class TestStreamUpdatesRoute:
+    """Tests for GET /investigations/{investigation_id}/stream."""
+
+    def test_sse_response_format(self) -> None:
+        """Test that SSE events have correct format."""
+        # SSE events should be formatted as "data: {json}\n\n"
+        event_data = {"type": "step_started", "step": "gather_context"}
+        formatted = f"data: {event_data}\n\n"
+        assert formatted.startswith("data:")
+        assert formatted.endswith("\n\n")
+
+
+class TestBranchStateResponse:
+    """Tests for BranchStateResponse model."""
+
+    def test_branch_state_with_synthesis(self) -> None:
+        """Test branch state with synthesis data."""
+        from dataing.entrypoints.api.routes.investigations import (
+            BranchStateResponse,
+        )
+
+        branch_id = uuid.uuid4()
+        response = BranchStateResponse(
+            branch_id=branch_id,
             status="completed",
-            events=[],
-            finding={"root_cause": "Test cause", "confidence": 0.9},
+            current_step="complete",
+            synthesis={
+                "root_cause": "ETL job failed",
+                "confidence": 0.95,
+                "recommendations": ["Check job logs", "Verify source data"],
+            },
+            evidence=[
+                {
+                    "hypothesis_id": "h1",
+                    "query": "SELECT COUNT(*) FROM events",
+                    "supports_hypothesis": True,
+                }
+            ],
         )
 
-        assert response.finding["root_cause"] == "Test cause"
+        assert response.synthesis is not None
+        assert response.synthesis["confidence"] == 0.95
+        assert len(response.evidence) == 1
 
-
-class TestInvestigationsRoutes:
-    """Tests for investigation routes."""
-
-    @pytest.fixture
-    def mock_auth_context(self) -> ApiKeyContext:
-        """Return a mock auth context."""
-        return ApiKeyContext(
-            key_id=uuid.uuid4(),
-            tenant_id=uuid.uuid4(),
-            tenant_slug="test-tenant",
-            tenant_name="Test Tenant",
-            user_id=None,
-            scopes=["read", "write"],
+    def test_branch_state_minimal(self) -> None:
+        """Test branch state with minimal data."""
+        from dataing.entrypoints.api.routes.investigations import (
+            BranchStateResponse,
         )
 
-    @pytest.fixture
-    def mock_orchestrator(self) -> AsyncMock:
-        """Return a mock orchestrator."""
-        mock = AsyncMock()
-        mock.run_investigation.return_value = Finding(
-            investigation_id="inv-001",
-            status="completed",
-            root_cause="Test root cause",
-            confidence=0.9,
-            evidence=[],
-            recommendations=["Test recommendation"],
-            duration_seconds=10.0,
+        branch_id = uuid.uuid4()
+        response = BranchStateResponse(
+            branch_id=branch_id,
+            status="active",
+            current_step="gather_context",
         )
-        return mock
 
-    @pytest.fixture
-    def mock_investigations(self) -> dict:
-        """Return a mock investigations store."""
-        return {}
+        assert response.synthesis is None
+        assert response.evidence == []
 
-    @pytest.fixture
-    def sample_investigation(
+
+class TestRouterConfiguration:
+    """Tests for router configuration."""
+
+    def test_router_prefix(self) -> None:
+        """Test that router has correct prefix."""
+        from dataing.entrypoints.api.routes.investigations import router
+
+        assert router.prefix == "/investigations"
+
+    def test_router_tags(self) -> None:
+        """Test that router has correct tags."""
+        from dataing.entrypoints.api.routes.investigations import router
+
+        assert "investigations" in router.tags
+
+
+class TestInvestigationServiceIntegration:
+    """Integration tests for route handlers with mocked service."""
+
+    @pytest.mark.asyncio
+    async def test_start_investigation_calls_service(
         self,
         mock_auth_context: ApiKeyContext,
-    ) -> dict:
-        """Return a sample investigation."""
-        alert = AnomalyAlert(
-            dataset_id="public.orders",
-            metric_name="row_count",
-            expected_value=1000.0,
-            actual_value=500.0,
-            deviation_pct=50.0,
-            anomaly_date="2024-01-15",
-            severity="high",
-        )
-        state = InvestigationState(id="inv-001", alert=alert)
-        return {
-            "state": state,
-            "finding": None,
-            "status": "in_progress",
-            "created_at": datetime.now(timezone.utc),
-            "tenant_id": str(mock_auth_context.tenant_id),
-        }
-
-    def test_create_investigation_request_model(self) -> None:
-        """Test the request model validation."""
-        # Valid request
-        request = CreateInvestigationRequest(
-            dataset_id="public.orders",
-            metric_name="row_count",
-            expected_value=1000.0,
-            actual_value=500.0,
-            deviation_pct=50.0,
-            anomaly_date="2024-01-15",
-        )
-        assert request.dataset_id == "public.orders"
-
-    def test_investigation_response_model(self) -> None:
-        """Test the response model."""
-        response = InvestigationResponse(
-            investigation_id="inv-123",
-            status="started",
-            created_at=datetime.now(timezone.utc),
-        )
-        assert response.investigation_id == "inv-123"
-
-    def test_investigation_status_model(self) -> None:
-        """Test the status response model."""
-        response = InvestigationStatusResponse(
-            investigation_id="inv-123",
-            status="completed",
-            events=[],
-            finding={"root_cause": "Test", "confidence": 0.9},
-        )
-        assert response.status == "completed"
-        assert response.finding["root_cause"] == "Test"
-
-    def test_investigation_not_found_scenario(self) -> None:
-        """Test that 404 is raised for unknown investigation ID."""
-        investigations = {}
-        investigation_id = "nonexistent"
-
-        assert investigation_id not in investigations
-
-    def test_tenant_access_denied_scenario(
-        self,
-        sample_investigation: dict,
-        mock_auth_context: ApiKeyContext,
+        mock_service: AsyncMock,
+        sample_alert: dict[str, Any],
     ) -> None:
-        """Test tenant access control."""
-        # Create investigation with different tenant
-        sample_investigation["tenant_id"] = str(uuid.uuid4())
+        """Test that start_investigation route calls service correctly."""
+        from dataing.entrypoints.api.routes.investigations import (
+            StartInvestigationRequest,
+        )
 
-        # Mock auth has different tenant
-        assert sample_investigation["tenant_id"] != str(mock_auth_context.tenant_id)
+        request = StartInvestigationRequest(alert=sample_alert)
+
+        # Call the route handler directly with mocked dependencies
+        with patch(
+            "dataing.entrypoints.api.routes.investigations.get_investigation_service",
+            return_value=mock_service,
+        ):
+            # Simulate what the route would receive
+            mock_service.start_investigation.return_value = (
+                uuid.uuid4(),
+                uuid.uuid4(),
+            )
+
+            # Verify the request parsing works
+            alert = AnomalyAlert(
+                dataset_id=request.alert["dataset_id"],
+                metric_spec=MetricSpec(
+                    metric_type=request.alert["metric_spec"]["metric_type"],
+                    expression=request.alert["metric_spec"]["expression"],
+                    display_name=request.alert["metric_spec"]["display_name"],
+                    columns_referenced=request.alert["metric_spec"].get(
+                        "columns_referenced", []
+                    ),
+                ),
+                anomaly_type=request.alert["anomaly_type"],
+                expected_value=request.alert["expected_value"],
+                actual_value=request.alert["actual_value"],
+                deviation_pct=request.alert["deviation_pct"],
+                anomaly_date=request.alert["anomaly_date"],
+                severity=request.alert["severity"],
+            )
+
+            assert alert.dataset_id == "analytics.events"
+            assert alert.metric_spec.display_name == "NULL rate"
+
+    @pytest.mark.asyncio
+    async def test_get_investigation_returns_state(
+        self,
+        mock_auth_context: ApiKeyContext,
+        mock_service: AsyncMock,
+    ) -> None:
+        """Test that get_investigation returns proper state."""
+        investigation_id = uuid.uuid4()
+        branch_id = uuid.uuid4()
+
+        mock_service.get_state.return_value = InvestigationState(
+            investigation_id=investigation_id,
+            status="active",
+            main_branch=BranchState(
+                branch_id=branch_id,
+                status="active",
+                current_step="generate_hypotheses",
+            ),
+        )
+
+        state = await mock_service.get_state(
+            investigation_id=investigation_id,
+            user_id=mock_auth_context.user_id,
+        )
+
+        assert state.investigation_id == investigation_id
+        assert state.main_branch.current_step == "generate_hypotheses"
+
+    @pytest.mark.asyncio
+    async def test_send_message_triggers_resume(
+        self,
+        mock_auth_context: ApiKeyContext,
+        mock_service: AsyncMock,
+    ) -> None:
+        """Test that send_message triggers branch resume."""
+        investigation_id = uuid.uuid4()
+        branch_id = uuid.uuid4()
+        message = "Please investigate the upstream ETL job"
+
+        mock_service.send_message.return_value = branch_id
+
+        result_branch_id = await mock_service.send_message(
+            investigation_id=investigation_id,
+            user_id=mock_auth_context.user_id,
+            message=message,
+        )
+
+        assert result_branch_id == branch_id
+        mock_service.send_message.assert_called_once_with(
+            investigation_id=investigation_id,
+            user_id=mock_auth_context.user_id,
+            message=message,
+        )

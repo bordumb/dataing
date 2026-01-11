@@ -327,19 +327,51 @@
         }
       }
     },
-    "/api/v1/investigations/": {
+    "/api/v1/investigations": {
+      "get": {
+        "tags": [
+          "investigations"
+        ],
+        "summary": "List Investigations",
+        "description": "List all investigations for the tenant.\n\nArgs:\n    auth: Authentication context from API key/JWT.\n    db: Application database.\n\nReturns:\n    List of investigations.",
+        "operationId": "list_investigations_api_v1_investigations_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/InvestigationListItem"
+                  },
+                  "type": "array",
+                  "title": "Response List Investigations Api V1 Investigations Get"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "APIKeyHeader": []
+          },
+          {
+            "HTTPBearer": []
+          }
+        ]
+      },
       "post": {
         "tags": [
           "investigations"
         ],
-        "summary": "Create Investigation",
-        "description": "Start a new investigation.\n\nThis endpoint starts an investigation in the background\nand returns immediately with the investigation ID.\n\nThe investigation will query the tenant's actual data source\n(e.g., DuckDB with parquet files) instead of just metadata.",
-        "operationId": "create_investigation_api_v1_investigations__post",
+        "summary": "Start Investigation",
+        "description": "Start a new investigation for an alert.\n\nCreates a new investigation with a main branch positioned at\nGATHER_CONTEXT step.\n\nArgs:\n    http_request: The HTTP request for accessing app state.\n    request: The investigation request containing alert data.\n    auth: Authentication context from API key/JWT.\n    service: Investigation service dependency.\n\nReturns:\n    StartInvestigationResponse with investigation and branch IDs.",
+        "operationId": "start_investigation_api_v1_investigations_post",
         "requestBody": {
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/CreateInvestigationRequest"
+                "$ref": "#/components/schemas/StartInvestigationRequest"
               }
             }
           },
@@ -351,7 +383,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/InvestigationResponse"
+                  "$ref": "#/components/schemas/StartInvestigationResponse"
                 }
               }
             }
@@ -383,7 +415,7 @@
           "investigations"
         ],
         "summary": "Get Investigation",
-        "description": "Get investigation status and results.",
+        "description": "Get investigation state including user branch if exists.\n\nReturns the current state of the investigation with the main branch\nand optionally the user's branch if one exists.\n\nArgs:\n    investigation_id: UUID of the investigation.\n    auth: Authentication context from API key/JWT.\n    service: Investigation service dependency.\n\nReturns:\n    InvestigationStateResponse with main and optional user branch.\n\nRaises:\n    HTTPException: If investigation not found.",
         "operationId": "get_investigation_api_v1_investigations__investigation_id__get",
         "security": [
           {
@@ -400,6 +432,7 @@
             "required": true,
             "schema": {
               "type": "string",
+              "format": "uuid",
               "title": "Investigation Id"
             }
           }
@@ -410,7 +443,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/InvestigationStatusResponse"
+                  "$ref": "#/components/schemas/InvestigationStateResponse"
                 }
               }
             }
@@ -428,14 +461,14 @@
         }
       }
     },
-    "/api/v1/investigations/{investigation_id}/events": {
-      "get": {
+    "/api/v1/investigations/{investigation_id}/messages": {
+      "post": {
         "tags": [
           "investigations"
         ],
-        "summary": "Stream Events",
-        "description": "SSE stream of investigation events.\n\nReturns a Server-Sent Events stream that pushes\nnew events as they occur during the investigation.",
-        "operationId": "stream_events_api_v1_investigations__investigation_id__events_get",
+        "summary": "Send Message",
+        "description": "Send a message to the user's branch (creates branch if needed).\n\nGets or creates a user branch and adds the message. Resumes the\nbranch if it was suspended.\n\nArgs:\n    investigation_id: UUID of the investigation.\n    request: The message request.\n    auth: Authentication context from API key/JWT.\n    service: Investigation service dependency.\n\nReturns:\n    SendMessageResponse with the branch ID.\n\nRaises:\n    HTTPException: If user authentication required.",
+        "operationId": "send_message_api_v1_investigations__investigation_id__messages_post",
         "security": [
           {
             "APIKeyHeader": []
@@ -451,6 +484,69 @@
             "required": true,
             "schema": {
               "type": "string",
+              "format": "uuid",
+              "title": "Investigation Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SendMessageRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SendMessageResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/investigations/{investigation_id}/stream": {
+      "get": {
+        "tags": [
+          "investigations"
+        ],
+        "summary": "Stream Updates",
+        "description": "Stream real-time updates via SSE.\n\nReturns a Server-Sent Events stream that pushes investigation\nupdates as they occur.\n\nArgs:\n    investigation_id: UUID of the investigation.\n    auth: Authentication context from API key/JWT.\n    service: Investigation service dependency.\n\nReturns:\n    EventSourceResponse with SSE stream.",
+        "operationId": "stream_updates_api_v1_investigations__investigation_id__stream_get",
+        "security": [
+          {
+            "APIKeyHeader": []
+          },
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "investigation_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
               "title": "Investigation Id"
             }
           }
@@ -475,41 +571,6 @@
             }
           }
         }
-      }
-    },
-    "/api/v1/investigations": {
-      "get": {
-        "tags": [
-          "investigations"
-        ],
-        "summary": "List Investigations",
-        "description": "List all investigations for the current tenant.\n\nResults are filtered by RBAC permissions when user_id is available.\nAdmins and owners see all investigations; members see only those\nthey have access to via direct grants, tags, teams, or datasources.",
-        "operationId": "list_investigations_api_v1_investigations_get",
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "items": {
-                    "additionalProperties": true,
-                    "type": "object"
-                  },
-                  "type": "array",
-                  "title": "Response List Investigations Api V1 Investigations Get"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "APIKeyHeader": []
-          },
-          {
-            "HTTPBearer": []
-          }
-        ]
       }
     },
     "/api/v1/datasources/types": {
@@ -6276,6 +6337,85 @@
         "title": "ApproveRequest",
         "description": "Request to approve an investigation."
       },
+      "BranchStateResponse": {
+        "properties": {
+          "branch_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Branch Id"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "current_step": {
+            "type": "string",
+            "title": "Current Step"
+          },
+          "synthesis": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Synthesis"
+          },
+          "evidence": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Evidence",
+            "default": []
+          },
+          "step_history": {
+            "items": {
+              "$ref": "#/components/schemas/StepHistoryItemResponse"
+            },
+            "type": "array",
+            "title": "Step History",
+            "default": []
+          },
+          "matched_patterns": {
+            "items": {
+              "$ref": "#/components/schemas/MatchedPatternResponse"
+            },
+            "type": "array",
+            "title": "Matched Patterns",
+            "default": []
+          },
+          "can_merge": {
+            "type": "boolean",
+            "title": "Can Merge",
+            "default": false
+          },
+          "parent_branch_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parent Branch Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "branch_id",
+          "status",
+          "current_step"
+        ],
+        "title": "BranchStateResponse",
+        "description": "State of a branch for API responses."
+      },
       "ColumnLineageListResponse": {
         "properties": {
           "lineage": {
@@ -6398,114 +6538,6 @@
         ],
         "title": "CreateDataSourceRequest",
         "description": "Request to create a new data source."
-      },
-      "CreateInvestigationRequest": {
-        "properties": {
-          "dataset_id": {
-            "type": "string",
-            "title": "Dataset Id"
-          },
-          "metric_spec": {
-            "$ref": "#/components/schemas/MetricSpecRequest"
-          },
-          "anomaly_type": {
-            "type": "string",
-            "title": "Anomaly Type"
-          },
-          "expected_value": {
-            "type": "number",
-            "title": "Expected Value"
-          },
-          "actual_value": {
-            "type": "number",
-            "title": "Actual Value"
-          },
-          "deviation_pct": {
-            "type": "number",
-            "title": "Deviation Pct"
-          },
-          "anomaly_date": {
-            "type": "string",
-            "title": "Anomaly Date"
-          },
-          "severity": {
-            "type": "string",
-            "title": "Severity",
-            "default": "medium"
-          },
-          "source_system": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Source System"
-          },
-          "source_alert_id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Source Alert Id"
-          },
-          "source_url": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Source Url"
-          },
-          "metadata": {
-            "anyOf": [
-              {
-                "additionalProperties": {
-                  "anyOf": [
-                    {
-                      "type": "string"
-                    },
-                    {
-                      "type": "integer"
-                    },
-                    {
-                      "type": "number"
-                    },
-                    {
-                      "type": "boolean"
-                    }
-                  ]
-                },
-                "type": "object"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Metadata"
-          }
-        },
-        "type": "object",
-        "required": [
-          "dataset_id",
-          "metric_spec",
-          "anomaly_type",
-          "expected_value",
-          "actual_value",
-          "deviation_pct",
-          "anomaly_date"
-        ],
-        "title": "CreateInvestigationRequest",
-        "description": "Request body for creating an investigation.\n\nThis API performs ROOT CAUSE ANALYSIS, not anomaly detection.\nThe upstream anomaly detector must provide structured metric_spec."
       },
       "CreateUserRequest": {
         "properties": {
@@ -7224,10 +7256,11 @@
         "type": "object",
         "title": "HTTPValidationError"
       },
-      "InvestigationResponse": {
+      "InvestigationListItem": {
         "properties": {
           "investigation_id": {
             "type": "string",
+            "format": "uuid",
             "title": "Investigation Id"
           },
           "status": {
@@ -7236,69 +7269,56 @@
           },
           "created_at": {
             "type": "string",
-            "format": "date-time",
             "title": "Created At"
+          },
+          "dataset_id": {
+            "type": "string",
+            "title": "Dataset Id"
           }
         },
         "type": "object",
         "required": [
           "investigation_id",
           "status",
-          "created_at"
+          "created_at",
+          "dataset_id"
         ],
-        "title": "InvestigationResponse",
-        "description": "Response for investigation creation."
+        "title": "InvestigationListItem",
+        "description": "Investigation list item for API responses."
       },
-      "InvestigationStatusResponse": {
+      "InvestigationStateResponse": {
         "properties": {
           "investigation_id": {
             "type": "string",
+            "format": "uuid",
             "title": "Investigation Id"
           },
           "status": {
             "type": "string",
             "title": "Status"
           },
-          "events": {
-            "items": {
-              "additionalProperties": true,
-              "type": "object"
-            },
-            "type": "array",
-            "title": "Events"
+          "main_branch": {
+            "$ref": "#/components/schemas/BranchStateResponse"
           },
-          "finding": {
+          "user_branch": {
             "anyOf": [
               {
-                "additionalProperties": true,
-                "type": "object"
+                "$ref": "#/components/schemas/BranchStateResponse"
               },
               {
                 "type": "null"
               }
-            ],
-            "title": "Finding"
-          },
-          "error": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Error"
+            ]
           }
         },
         "type": "object",
         "required": [
           "investigation_id",
           "status",
-          "events"
+          "main_branch"
         ],
-        "title": "InvestigationStatusResponse",
-        "description": "Response for investigation status."
+        "title": "InvestigationStateResponse",
+        "description": "Full investigation state for API responses."
       },
       "InvestigationSummary": {
         "properties": {
@@ -7826,29 +7846,21 @@
         "title": "LoginRequest",
         "description": "Login request body."
       },
-      "MetricSpecRequest": {
+      "MatchedPatternResponse": {
         "properties": {
-          "metric_type": {
+          "pattern_id": {
             "type": "string",
-            "title": "Metric Type"
+            "title": "Pattern Id"
           },
-          "expression": {
+          "pattern_name": {
             "type": "string",
-            "title": "Expression"
+            "title": "Pattern Name"
           },
-          "display_name": {
-            "type": "string",
-            "title": "Display Name"
+          "confidence": {
+            "type": "number",
+            "title": "Confidence"
           },
-          "columns_referenced": {
-            "items": {
-              "type": "string"
-            },
-            "type": "array",
-            "title": "Columns Referenced",
-            "default": []
-          },
-          "source_url": {
+          "description": {
             "anyOf": [
               {
                 "type": "string"
@@ -7857,17 +7869,17 @@
                 "type": "null"
               }
             ],
-            "title": "Source Url"
+            "title": "Description"
           }
         },
         "type": "object",
         "required": [
-          "metric_type",
-          "expression",
-          "display_name"
+          "pattern_id",
+          "pattern_name",
+          "confidence"
         ],
-        "title": "MetricSpecRequest",
-        "description": "Structured metric specification from upstream anomaly detector."
+        "title": "MatchedPatternResponse",
+        "description": "A pattern that was matched during investigation."
       },
       "ModifyRequest": {
         "properties": {
@@ -8620,6 +8632,35 @@
         "title": "SearchResultsResponse",
         "description": "Response for dataset search."
       },
+      "SendMessageRequest": {
+        "properties": {
+          "message": {
+            "type": "string",
+            "title": "Message"
+          }
+        },
+        "type": "object",
+        "required": [
+          "message"
+        ],
+        "title": "SendMessageRequest",
+        "description": "Request body for sending a message."
+      },
+      "SendMessageResponse": {
+        "properties": {
+          "branch_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Branch Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "branch_id"
+        ],
+        "title": "SendMessageResponse",
+        "description": "Response for sending a message."
+      },
       "SourceTypeResponse": {
         "properties": {
           "type": {
@@ -8683,6 +8724,42 @@
         "title": "SourceTypesResponse",
         "description": "Response for listing source types."
       },
+      "StartInvestigationRequest": {
+        "properties": {
+          "alert": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Alert"
+          }
+        },
+        "type": "object",
+        "required": [
+          "alert"
+        ],
+        "title": "StartInvestigationRequest",
+        "description": "Request body for starting an investigation."
+      },
+      "StartInvestigationResponse": {
+        "properties": {
+          "investigation_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Investigation Id"
+          },
+          "main_branch_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Main Branch Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "investigation_id",
+          "main_branch_id"
+        ],
+        "title": "StartInvestigationResponse",
+        "description": "Response for starting an investigation."
+      },
       "StatsRequest": {
         "properties": {
           "table": {
@@ -8738,6 +8815,36 @@
         ],
         "title": "StatsResponse",
         "description": "Response for column statistics."
+      },
+      "StepHistoryItemResponse": {
+        "properties": {
+          "step": {
+            "type": "string",
+            "title": "Step"
+          },
+          "completed": {
+            "type": "boolean",
+            "title": "Completed"
+          },
+          "timestamp": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Timestamp"
+          }
+        },
+        "type": "object",
+        "required": [
+          "step",
+          "completed"
+        ],
+        "title": "StepHistoryItemResponse",
+        "description": "A step in the branch history."
       },
       "SyncResponse": {
         "properties": {

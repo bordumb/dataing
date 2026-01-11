@@ -861,8 +861,9 @@ class TestOrchestratorBranching:
 
         await orchestrator.tick(sample_branch.id)
 
-        # Should update branch head for each child branch
-        assert mock_branch_repository.update_branch_head.call_count == 2
+        # Should update branch head: once for parent (with updated context) + once per child
+        # Parent head is updated to preserve context (e.g., hypotheses) before creating children
+        assert mock_branch_repository.update_branch_head.call_count == 3
 
     @pytest.mark.asyncio
     async def test_tick_branch_uses_default_child_start_step(

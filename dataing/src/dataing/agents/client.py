@@ -141,6 +141,7 @@ class AgentClient:
         schema: SchemaResponse,
         previous_error: str | None = None,
         handlers: StreamHandlers | None = None,
+        alert: AnomalyAlert | None = None,
     ) -> str:
         """Generate SQL query to test a hypothesis.
 
@@ -149,6 +150,7 @@ class AgentClient:
             schema: Available database schema.
             previous_error: Error from previous attempt (for reflexion).
             handlers: Optional streaming handlers for real-time updates.
+            alert: The anomaly alert being investigated (for date/context).
 
         Returns:
             Validated SQL query string.
@@ -160,8 +162,8 @@ class AgentClient:
             prompt = reflexion.build_user(hypothesis=hypothesis, previous_error=previous_error)
             system = reflexion.build_system(schema=schema)
         else:
-            prompt = query.build_user(hypothesis=hypothesis)
-            system = query.build_system(schema=schema)
+            prompt = query.build_user(hypothesis=hypothesis, alert=alert)
+            system = query.build_system(schema=schema, alert=alert)
 
         try:
             result = await self._query_agent.ask(

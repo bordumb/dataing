@@ -4,6 +4,7 @@ Steps are pure functions that transform context.
 The orchestrator handles persistence, locking, and flow control.
 """
 
+from .check_patterns import CheckPatternsStep, PatternRepositoryProtocol
 from .execute_query import ExecuteQueryStep
 from .gather_context import ContextBundle, GatherContextStep
 from .generate_hypotheses import GenerateHypothesesStep
@@ -19,6 +20,8 @@ __all__ = [
     "BranchSpec",
     "GatherContextStep",
     "ContextBundle",
+    "CheckPatternsStep",
+    "PatternRepositoryProtocol",
     "GenerateHypothesesStep",
     "GenerateQueryStep",
     "ExecuteQueryStep",

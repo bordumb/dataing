@@ -42,6 +42,9 @@ class InvestigationContext(BaseModel):
     # Current query being executed
     current_query: str | None = None
 
+    # Current query result (set by ExecuteQueryStep, read by InterpretEvidenceStep)
+    current_query_result: dict[str, Any] | None = None
+
     # Synthesis
     current_synthesis: dict[str, Any] | None = None
     counter_analysis: dict[str, Any] | None = None

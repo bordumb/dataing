@@ -158,6 +158,20 @@ class TestExecuteQueryStep:
         assert result.context.current_query == sample_context.current_query
 
     @pytest.mark.asyncio
+    async def test_execute_sets_current_query_result_in_context(
+        self,
+        sample_context: InvestigationContext,
+        mock_database: AsyncMock,
+        sample_query_result: dict[str, Any],
+    ) -> None:
+        """Execute sets current_query_result in context for InterpretEvidenceStep."""
+        step = ExecuteQueryStep(database=mock_database)
+
+        result = await step.execute(sample_context)
+
+        assert result.context.current_query_result == sample_query_result
+
+    @pytest.mark.asyncio
     async def test_execute_handles_db_error(
         self,
         sample_context: InvestigationContext,

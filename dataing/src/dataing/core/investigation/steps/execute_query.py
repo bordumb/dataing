@@ -93,9 +93,12 @@ class ExecuteQueryStep(Step[dict[str, Any], dict[str, Any]]):
                 output=None,
             )
 
-        # Update context with incremented query count
+        # Update context with query result and incremented query count
         updated_context = context.model_copy(
-            update={"total_queries_executed": context.total_queries_executed + 1}
+            update={
+                "current_query_result": query_result,
+                "total_queries_executed": context.total_queries_executed + 1,
+            }
         )
 
         return StepResult(

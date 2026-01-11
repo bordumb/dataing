@@ -8,6 +8,7 @@ from .execute_query import ExecuteQueryStep
 from .gather_context import ContextBundle, GatherContextStep
 from .generate_hypotheses import GenerateHypothesesStep
 from .generate_query import GenerateQueryStep
+from .interpret_evidence import InterpretEvidenceStep
 from .protocol import BranchRequest, BranchSpec, Step, StepResult
 
 __all__ = [
@@ -20,4 +21,5 @@ __all__ = [
     "GenerateHypothesesStep",
     "GenerateQueryStep",
     "ExecuteQueryStep",
+    "InterpretEvidenceStep",
 ]

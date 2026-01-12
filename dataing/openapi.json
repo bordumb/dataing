@@ -4203,6 +4203,64 @@
         ]
       }
     },
+    "/api/v1/notifications/stream": {
+      "get": {
+        "tags": [
+          "notifications"
+        ],
+        "summary": "Notification Stream",
+        "description": "Stream real-time notifications via Server-Sent Events.\n\nBrowser EventSource can't send headers, so JWT is accepted via query param.\nThe auth middleware already handles `?token=` for SSE endpoints.\n\nEvents:\n- `notification`: New notification (includes cursor for resume)\n- `heartbeat`: Keep-alive every 30 seconds\n\nExample:\n    GET /notifications/stream?token=<jwt>&after=<notification_id>\n\nReturns:\n    EventSourceResponse with SSE stream.",
+        "operationId": "notification_stream_api_v1_notifications_stream_get",
+        "security": [
+          {
+            "APIKeyHeader": []
+          },
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "after",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Resume from notification ID (for reconnect)",
+              "title": "After"
+            },
+            "description": "Resume from notification ID (for reconnect)"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/investigation-feedback/": {
       "post": {
         "tags": [

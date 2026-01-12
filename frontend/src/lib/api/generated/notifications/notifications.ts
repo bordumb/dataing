@@ -20,6 +20,7 @@ import type {
   ListNotificationsApiV1NotificationsGetParams,
   MarkAllReadResponse,
   NotificationListResponse,
+  NotificationStreamApiV1NotificationsStreamGetParams,
   UnreadCountResponse,
 } from "../../model";
 import { customInstance } from "../../client";
@@ -387,6 +388,122 @@ export const useGetUnreadCountApiV1NotificationsUnreadCountGet = <
 }): UseQueryResult<TData, TError> & { queryKey: QueryKey } => {
   const queryOptions =
     getGetUnreadCountApiV1NotificationsUnreadCountGetQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  query.queryKey = queryOptions.queryKey;
+
+  return query;
+};
+
+/**
+ * Stream real-time notifications via Server-Sent Events.
+
+Browser EventSource can't send headers, so JWT is accepted via query param.
+The auth middleware already handles `?token=` for SSE endpoints.
+
+Events:
+- `notification`: New notification (includes cursor for resume)
+- `heartbeat`: Keep-alive every 30 seconds
+
+Example:
+    GET /notifications/stream?token=<jwt>&after=<notification_id>
+
+Returns:
+    EventSourceResponse with SSE stream.
+ * @summary Notification Stream
+ */
+export const notificationStreamApiV1NotificationsStreamGet = (
+  params?: NotificationStreamApiV1NotificationsStreamGetParams,
+  signal?: AbortSignal,
+) => {
+  return customInstance<unknown>({
+    url: `/api/v1/notifications/stream`,
+    method: "GET",
+    params,
+    signal,
+  });
+};
+
+export const getNotificationStreamApiV1NotificationsStreamGetQueryKey = (
+  params?: NotificationStreamApiV1NotificationsStreamGetParams,
+) => {
+  return [`/api/v1/notifications/stream`, ...(params ? [params] : [])] as const;
+};
+
+export const getNotificationStreamApiV1NotificationsStreamGetQueryOptions = <
+  TData = Awaited<
+    ReturnType<typeof notificationStreamApiV1NotificationsStreamGet>
+  >,
+  TError = HTTPValidationError,
+>(
+  params?: NotificationStreamApiV1NotificationsStreamGetParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<
+          ReturnType<typeof notificationStreamApiV1NotificationsStreamGet>
+        >,
+        TError,
+        TData
+      >
+    >;
+  },
+) => {
+  const { query: queryOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ??
+    getNotificationStreamApiV1NotificationsStreamGetQueryKey(params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof notificationStreamApiV1NotificationsStreamGet>>
+  > = ({ signal }) =>
+    notificationStreamApiV1NotificationsStreamGet(params, signal);
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof notificationStreamApiV1NotificationsStreamGet>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type NotificationStreamApiV1NotificationsStreamGetQueryResult =
+  NonNullable<
+    Awaited<ReturnType<typeof notificationStreamApiV1NotificationsStreamGet>>
+  >;
+export type NotificationStreamApiV1NotificationsStreamGetQueryError =
+  HTTPValidationError;
+
+/**
+ * @summary Notification Stream
+ */
+export const useNotificationStreamApiV1NotificationsStreamGet = <
+  TData = Awaited<
+    ReturnType<typeof notificationStreamApiV1NotificationsStreamGet>
+  >,
+  TError = HTTPValidationError,
+>(
+  params?: NotificationStreamApiV1NotificationsStreamGetParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<
+          ReturnType<typeof notificationStreamApiV1NotificationsStreamGet>
+        >,
+        TError,
+        TData
+      >
+    >;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } => {
+  const queryOptions =
+    getNotificationStreamApiV1NotificationsStreamGetQueryOptions(
+      params,
+      options,
+    );
 
   const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
     queryKey: QueryKey;

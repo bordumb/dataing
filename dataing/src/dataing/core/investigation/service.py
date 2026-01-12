@@ -151,6 +151,14 @@ class InvestigationService:
             created_by=user_id,
         )
 
+        # Record investigation start for usage tracking
+        if self._usage_tracker:
+            await self._usage_tracker.record_investigation(
+                tenant_id=tenant_id,
+                investigation_id=investigation.id,
+                status="started",
+            )
+
         # Create main branch
         main_branch = await self.repository.create_branch(
             investigation_id=investigation.id,

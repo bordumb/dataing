@@ -6,6 +6,7 @@ Provides tools for investigating git history to determine:
 - Who are the experts for a file based on commit frequency
 """
 
+from ._adapter import GitHunterAdapter
 from ._exceptions import (
     BinaryFileError,
     FileNotFoundInRepoError,
@@ -20,6 +21,8 @@ from ._protocols import GitHunterProtocol
 from ._types import AuthorProfile, BlameResult, FileExpert, PRDiscussion
 
 __all__ = [
+    # Adapter
+    "GitHunterAdapter",
     # Types
     "AuthorProfile",
     "BlameResult",

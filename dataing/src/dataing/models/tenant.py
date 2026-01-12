@@ -12,6 +12,7 @@ if TYPE_CHECKING:
     from dataing.models.api_key import ApiKey
     from dataing.models.data_source import DataSource
     from dataing.models.investigation import Investigation
+    from dataing.models.notification import Notification
     from dataing.models.user import User
     from dataing.models.webhook import Webhook
 
@@ -40,4 +41,7 @@ class Tenant(BaseModel):
     )
     webhooks: Mapped[list["Webhook"]] = relationship(
         "Webhook", back_populates="tenant", cascade="all, delete-orphan"
+    )
+    notifications: Mapped[list["Notification"]] = relationship(
+        "Notification", back_populates="tenant", cascade="all, delete-orphan"
     )

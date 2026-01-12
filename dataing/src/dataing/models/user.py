@@ -11,6 +11,7 @@ from dataing.models.base import BaseModel
 if TYPE_CHECKING:
     from dataing.models.api_key import ApiKey
     from dataing.models.investigation import Investigation
+    from dataing.models.notification import NotificationRead
     from dataing.models.tenant import Tenant
 
 
@@ -32,6 +33,9 @@ class User(BaseModel):
     )
     investigations: Mapped[list["Investigation"]] = relationship(
         "Investigation", back_populates="created_by_user"
+    )
+    notification_reads: Mapped[list["NotificationRead"]] = relationship(
+        "NotificationRead", back_populates="user", cascade="all, delete-orphan"
     )
 
     __table_args__ = (

@@ -20,6 +20,7 @@ from dataing.entrypoints.api.routes.knowledge_comments import (
     router as knowledge_comments_router,
 )
 from dataing.entrypoints.api.routes.lineage import router as lineage_router
+from dataing.entrypoints.api.routes.notifications import router as notifications_router
 from dataing.entrypoints.api.routes.permissions import (
     investigation_permissions_router,
 )
@@ -51,6 +52,7 @@ api_router.include_router(users_router)
 api_router.include_router(dashboard_router)
 api_router.include_router(usage_router)
 api_router.include_router(lineage_router)
+api_router.include_router(notifications_router)
 api_router.include_router(investigation_feedback_router)
 api_router.include_router(schema_comments_router)
 api_router.include_router(knowledge_comments_router)

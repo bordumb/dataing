@@ -30,6 +30,7 @@ from dataing.agents import AgentClient
 from dataing.core.auth.recovery import PasswordRecoveryAdapter
 from dataing.core.investigation.collaboration import CollaborationService
 from dataing.core.investigation.service import InvestigationService
+from dataing.services.usage import UsageTracker
 
 if TYPE_CHECKING:
     from fastapi import FastAPI
@@ -108,6 +109,9 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     # Initialize investigation feedback adapter
     feedback_adapter = InvestigationFeedbackAdapter(db=app_db)
 
+    # Initialize usage tracker
+    usage_tracker = UsageTracker(db=app_db)
+
     # Initialize unified investigation service (v2 API)
     investigation_repository = PostgresInvestigationRepository(db=app_db)
     collaboration_service = CollaborationService(repository=investigation_repository)
@@ -118,6 +122,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         agent_client=llm,
         context_engine=context_engine,
         pattern_repository=pattern_repository,
+        usage_tracker=usage_tracker,
     )
 
     # Initialize email notifier (optional, needed for email recovery)
@@ -188,6 +193,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     app.state.llm = llm
     app.state.context_engine = context_engine
     app.state.feedback_adapter = feedback_adapter
+    app.state.usage_tracker = usage_tracker
     app.state.investigation_service = investigation_service  # Unified investigation service (v2)
     app.state.email_notifier = email_notifier
     app.state.recovery_adapter = recovery_adapter
@@ -606,3 +612,16 @@ def get_entitlements_adapter(request: Request) -> DatabaseEntitlementsAdapter:
     """
     adapter: DatabaseEntitlementsAdapter = request.app.state.entitlements_adapter
     return adapter
+
+
+def get_usage_tracker(request: Request) -> UsageTracker:
+    """Get usage tracker from app state.
+
+    Args:
+        request: The current request.
+
+    Returns:
+        The configured UsageTracker for tracking usage metrics.
+    """
+    tracker: UsageTracker = request.app.state.usage_tracker
+    return tracker

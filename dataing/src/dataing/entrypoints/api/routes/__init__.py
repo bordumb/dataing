@@ -34,6 +34,7 @@ from dataing.entrypoints.api.routes.tags import (
     router as tags_router,
 )
 from dataing.entrypoints.api.routes.teams import router as teams_router
+from dataing.entrypoints.api.routes.usage import router as usage_router
 from dataing.entrypoints.api.routes.users import router as users_router
 
 # Create main API router
@@ -48,6 +49,7 @@ api_router.include_router(datasets_router)
 api_router.include_router(approvals_router)
 api_router.include_router(users_router)
 api_router.include_router(dashboard_router)
+api_router.include_router(usage_router)
 api_router.include_router(lineage_router)
 api_router.include_router(investigation_feedback_router)
 api_router.include_router(schema_comments_router)

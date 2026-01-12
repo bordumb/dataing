@@ -13,6 +13,7 @@ from uuid import UUID
 
 if TYPE_CHECKING:
     from dataing.adapters.datasource.base import BaseAdapter
+    from dataing.services.usage import UsageTracker
 
 
 def _serialize_value(value: Any) -> Any:
@@ -63,13 +64,25 @@ class DatabaseAdapter:
     Works with any adapter that has execute_query method (SQLAdapter, etc.).
     """
 
-    def __init__(self, data_adapter: BaseAdapter) -> None:
+    def __init__(
+        self,
+        data_adapter: BaseAdapter,
+        usage_tracker: UsageTracker | None = None,
+        tenant_id: UUID | None = None,
+        investigation_id: UUID | None = None,
+    ) -> None:
         """Initialize the adapter.
 
         Args:
             data_adapter: The underlying data source adapter (must support SQL).
+            usage_tracker: Optional usage tracker for recording query executions.
+            tenant_id: Tenant ID for usage tracking.
+            investigation_id: Investigation ID for usage tracking.
         """
         self._adapter = data_adapter
+        self._usage_tracker = usage_tracker
+        self._tenant_id = tenant_id
+        self._investigation_id = investigation_id
 
     async def execute_query(self, sql: str) -> dict[str, Any]:
         """Execute SQL query and return results.
@@ -91,6 +104,16 @@ class DatabaseAdapter:
 
         # SQLAdapter.execute_query returns QueryResult
         result = await self._adapter.execute_query(sql)
+
+        # Record usage if tracker is available
+        if self._usage_tracker and self._tenant_id:
+            data_source_type = getattr(self._adapter, "source_type", "unknown")
+            await self._usage_tracker.record_query_execution(
+                tenant_id=self._tenant_id,
+                data_source_type=str(data_source_type),
+                rows_scanned=result.row_count,
+                investigation_id=self._investigation_id,
+            )
 
         # Serialize rows to ensure all values are JSON-compatible
         serialized_rows = _serialize_rows(result.rows)

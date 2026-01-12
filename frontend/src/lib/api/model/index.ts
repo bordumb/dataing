@@ -318,6 +318,7 @@ export * from "./updateUserRequestIsActive";
 export * from "./updateUserRequestName";
 export * from "./updateUserRequestRole";
 export * from "./upstreamResponse";
+export * from "./usageMetricsResponse";
 export * from "./userListResponse";
 export * from "./userResponse";
 export * from "./userResponseName";

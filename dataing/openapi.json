@@ -2904,6 +2904,36 @@
         ]
       }
     },
+    "/api/v1/usage/metrics": {
+      "get": {
+        "tags": [
+          "usage"
+        ],
+        "summary": "Get Usage Metrics",
+        "description": "Get current usage metrics for tenant.",
+        "operationId": "get_usage_metrics_api_v1_usage_metrics_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UsageMetricsResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "APIKeyHeader": []
+          },
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
     "/api/v1/lineage/providers": {
       "get": {
         "tags": [
@@ -9285,6 +9315,40 @@
         ],
         "title": "UpstreamResponse",
         "description": "Response for upstream datasets."
+      },
+      "UsageMetricsResponse": {
+        "properties": {
+          "llm_tokens": {
+            "type": "integer",
+            "title": "Llm Tokens"
+          },
+          "llm_cost": {
+            "type": "number",
+            "title": "Llm Cost"
+          },
+          "query_executions": {
+            "type": "integer",
+            "title": "Query Executions"
+          },
+          "investigations": {
+            "type": "integer",
+            "title": "Investigations"
+          },
+          "total_cost": {
+            "type": "number",
+            "title": "Total Cost"
+          }
+        },
+        "type": "object",
+        "required": [
+          "llm_tokens",
+          "llm_cost",
+          "query_executions",
+          "investigations",
+          "total_cost"
+        ],
+        "title": "UsageMetricsResponse",
+        "description": "Usage metrics response."
       },
       "UserListResponse": {
         "properties": {

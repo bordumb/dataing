@@ -51,6 +51,11 @@ export const queryKeys = {
     recent: ['/api/v1/dashboard/recent'] as const,
   },
 
+  // Usage
+  usage: {
+    metrics: ['/api/v1/usage/metrics'] as const,
+  },
+
   // Settings
   settings: {
     tenant: ['/api/v1/settings/tenant'] as const,

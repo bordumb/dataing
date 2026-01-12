@@ -8,6 +8,7 @@ since some steps require investigation-specific dependencies.
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
+from uuid import UUID
 
 from dataing.adapters.investigation.context_adapter import ContextEngineAdapter
 from dataing.adapters.investigation.database_adapter import DatabaseAdapter
@@ -35,6 +36,7 @@ if TYPE_CHECKING:
     from dataing.adapters.datasource.base import BaseAdapter
     from dataing.agents.client import AgentClient
     from dataing.core.domain_types import AnomalyAlert
+    from dataing.services.usage import UsageTracker
 
 
 def create_step_registry(
@@ -44,6 +46,10 @@ def create_step_registry(
     alert: AnomalyAlert,
     data_adapter: BaseAdapter,
     pattern_repository: InMemoryPatternRepository | None = None,
+    usage_tracker: UsageTracker | None = None,
+    tenant_id: UUID | None = None,
+    investigation_id: UUID | None = None,
+    model: str = "claude-sonnet-4-20250514",
 ) -> StepRegistry:
     """Create a step registry with real production dependencies.
 
@@ -57,6 +63,10 @@ def create_step_registry(
         alert: The anomaly alert being investigated.
         data_adapter: Connected adapter for the data source.
         pattern_repository: Optional pattern repository (creates in-memory if None).
+        usage_tracker: Optional usage tracker for recording usage metrics.
+        tenant_id: Tenant ID for usage tracking.
+        investigation_id: Investigation ID for usage tracking.
+        model: Model name for usage tracking.
 
     Returns:
         StepRegistry with configured step instances.
@@ -65,13 +75,42 @@ def create_step_registry(
     if pattern_repository is None:
         pattern_repository = InMemoryPatternRepository()
 
-    # Create adapters
+    # Create adapters with usage tracking
     context_adapter = ContextEngineAdapter(context_engine, alert, data_adapter)
-    database_adapter = DatabaseAdapter(data_adapter)
-    hypothesis_llm = HypothesisLLMAdapter(agent_client)
-    interpret_llm = InterpretEvidenceLLMAdapter(agent_client)
-    synthesis_llm = SynthesisLLMAdapter(agent_client)
-    query_llm = QueryLLMAdapter(agent_client)
+    database_adapter = DatabaseAdapter(
+        data_adapter,
+        usage_tracker=usage_tracker,
+        tenant_id=tenant_id,
+        investigation_id=investigation_id,
+    )
+    hypothesis_llm = HypothesisLLMAdapter(
+        agent_client,
+        usage_tracker=usage_tracker,
+        tenant_id=tenant_id,
+        investigation_id=investigation_id,
+        model=model,
+    )
+    interpret_llm = InterpretEvidenceLLMAdapter(
+        agent_client,
+        usage_tracker=usage_tracker,
+        tenant_id=tenant_id,
+        investigation_id=investigation_id,
+        model=model,
+    )
+    synthesis_llm = SynthesisLLMAdapter(
+        agent_client,
+        usage_tracker=usage_tracker,
+        tenant_id=tenant_id,
+        investigation_id=investigation_id,
+        model=model,
+    )
+    query_llm = QueryLLMAdapter(
+        agent_client,
+        usage_tracker=usage_tracker,
+        tenant_id=tenant_id,
+        investigation_id=investigation_id,
+        model=model,
+    )
 
     # Build registry with all steps
     registry = StepRegistry()

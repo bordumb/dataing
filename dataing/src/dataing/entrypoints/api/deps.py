@@ -122,6 +122,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         agent_client=llm,
         context_engine=context_engine,
         pattern_repository=pattern_repository,
+        usage_tracker=usage_tracker,
     )
 
     # Initialize email notifier (optional, needed for email recovery)

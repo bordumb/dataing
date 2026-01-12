@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from datetime import datetime
 from typing import TYPE_CHECKING, Any
+from uuid import UUID
 
 from dataing.adapters.datasource.types import (
     Catalog,
@@ -28,6 +29,7 @@ from dataing.core.domain_types import (
 
 if TYPE_CHECKING:
     from dataing.agents.client import AgentClient
+    from dataing.services.usage import UsageTracker
 
 
 def _create_minimal_alert(alert_summary: str) -> AnomalyAlert:
@@ -136,13 +138,28 @@ class HypothesisLLMAdapter:
     Implements the LLMProtocol expected by GenerateHypothesesStep.
     """
 
-    def __init__(self, agent_client: AgentClient) -> None:
+    def __init__(
+        self,
+        agent_client: AgentClient,
+        usage_tracker: UsageTracker | None = None,
+        tenant_id: UUID | None = None,
+        investigation_id: UUID | None = None,
+        model: str = "claude-sonnet-4-20250514",
+    ) -> None:
         """Initialize the adapter.
 
         Args:
             agent_client: The underlying AgentClient.
+            usage_tracker: Optional usage tracker for recording LLM usage.
+            tenant_id: Tenant ID for usage tracking.
+            investigation_id: Investigation ID for usage tracking.
+            model: Model name for usage tracking.
         """
         self._client = agent_client
+        self._usage_tracker = usage_tracker
+        self._tenant_id = tenant_id
+        self._investigation_id = investigation_id
+        self._model = model
 
     async def generate_hypotheses(
         self,
@@ -181,11 +198,26 @@ class HypothesisLLMAdapter:
             lineage=None,  # TODO: Convert lineage_info to LineageContext if needed
         )
 
-        return await self._client.generate_hypotheses(
+        result: list[Hypothesis] = await self._client.generate_hypotheses(
             alert=anomaly_alert,
             context=context,
             num_hypotheses=num_hypotheses,
         )
+
+        # Record usage (estimate tokens based on prompt + response)
+        if self._usage_tracker and self._tenant_id:
+            # Rough estimate: 4 chars per token
+            input_tokens = len(str(alert_summary) + str(schema_info)) // 4
+            output_tokens = sum(len(h.title) + len(h.reasoning) for h in result) // 4
+            await self._usage_tracker.record_llm_usage(
+                tenant_id=self._tenant_id,
+                model=self._model,
+                input_tokens=input_tokens,
+                output_tokens=output_tokens,
+                investigation_id=self._investigation_id,
+            )
+
+        return result
 
 
 class SynthesisLLMAdapter:
@@ -194,13 +226,28 @@ class SynthesisLLMAdapter:
     Implements the LLMProtocol expected by SynthesizeStep.
     """
 
-    def __init__(self, agent_client: AgentClient) -> None:
+    def __init__(
+        self,
+        agent_client: AgentClient,
+        usage_tracker: UsageTracker | None = None,
+        tenant_id: UUID | None = None,
+        investigation_id: UUID | None = None,
+        model: str = "claude-sonnet-4-20250514",
+    ) -> None:
         """Initialize the adapter.
 
         Args:
             agent_client: The underlying AgentClient.
+            usage_tracker: Optional usage tracker for recording LLM usage.
+            tenant_id: Tenant ID for usage tracking.
+            investigation_id: Investigation ID for usage tracking.
+            model: Model name for usage tracking.
         """
         self._client = agent_client
+        self._usage_tracker = usage_tracker
+        self._tenant_id = tenant_id
+        self._investigation_id = investigation_id
+        self._model = model
 
     async def synthesize_findings(
         self,
@@ -241,6 +288,18 @@ class SynthesisLLMAdapter:
             evidence=evidence_objects,
         )
 
+        # Record usage
+        if self._usage_tracker and self._tenant_id:
+            input_tokens = len(str(evidence) + alert_summary) // 4
+            output_tokens = len(str(synthesis_response.root_cause)) // 4
+            await self._usage_tracker.record_llm_usage(
+                tenant_id=self._tenant_id,
+                model=self._model,
+                input_tokens=input_tokens,
+                output_tokens=output_tokens,
+                investigation_id=self._investigation_id,
+            )
+
         return {
             "root_cause": synthesis_response.root_cause,
             "confidence": synthesis_response.confidence,
@@ -258,13 +317,28 @@ class QueryLLMAdapter:
     Implements the LLMProtocol expected by GenerateQueryStep.
     """
 
-    def __init__(self, agent_client: AgentClient) -> None:
+    def __init__(
+        self,
+        agent_client: AgentClient,
+        usage_tracker: UsageTracker | None = None,
+        tenant_id: UUID | None = None,
+        investigation_id: UUID | None = None,
+        model: str = "claude-sonnet-4-20250514",
+    ) -> None:
         """Initialize the adapter.
 
         Args:
             agent_client: The underlying AgentClient.
+            usage_tracker: Optional usage tracker for recording LLM usage.
+            tenant_id: Tenant ID for usage tracking.
+            investigation_id: Investigation ID for usage tracking.
+            model: Model name for usage tracking.
         """
         self._client = agent_client
+        self._usage_tracker = usage_tracker
+        self._tenant_id = tenant_id
+        self._investigation_id = investigation_id
+        self._model = model
 
     async def generate_query(
         self,
@@ -298,6 +372,19 @@ class QueryLLMAdapter:
             schema=schema,
             alert=anomaly_alert,
         )
+
+        # Record usage
+        if self._usage_tracker and self._tenant_id:
+            input_tokens = len(str(hypothesis) + str(schema_info)) // 4
+            output_tokens = len(generated_query) // 4
+            await self._usage_tracker.record_llm_usage(
+                tenant_id=self._tenant_id,
+                model=self._model,
+                input_tokens=input_tokens,
+                output_tokens=output_tokens,
+                investigation_id=self._investigation_id,
+            )
+
         return generated_query
 
 
@@ -307,13 +394,28 @@ class InterpretEvidenceLLMAdapter:
     Implements the LLMProtocol expected by InterpretEvidenceStep.
     """
 
-    def __init__(self, agent_client: AgentClient) -> None:
+    def __init__(
+        self,
+        agent_client: AgentClient,
+        usage_tracker: UsageTracker | None = None,
+        tenant_id: UUID | None = None,
+        investigation_id: UUID | None = None,
+        model: str = "claude-sonnet-4-20250514",
+    ) -> None:
         """Initialize the adapter.
 
         Args:
             agent_client: The underlying AgentClient.
+            usage_tracker: Optional usage tracker for recording LLM usage.
+            tenant_id: Tenant ID for usage tracking.
+            investigation_id: Investigation ID for usage tracking.
+            model: Model name for usage tracking.
         """
         self._client = agent_client
+        self._usage_tracker = usage_tracker
+        self._tenant_id = tenant_id
+        self._investigation_id = investigation_id
+        self._model = model
 
     async def interpret_evidence(
         self,
@@ -345,6 +447,18 @@ class InterpretEvidenceLLMAdapter:
             sql=sql,
             results=results,
         )
+
+        # Record usage
+        if self._usage_tracker and self._tenant_id:
+            input_tokens = len(str(hypothesis) + str(query_result)) // 4
+            output_tokens = len(evidence_obj.interpretation) // 4
+            await self._usage_tracker.record_llm_usage(
+                tenant_id=self._tenant_id,
+                model=self._model,
+                input_tokens=input_tokens,
+                output_tokens=output_tokens,
+                investigation_id=self._investigation_id,
+            )
 
         return {
             "hypothesis_id": evidence_obj.hypothesis_id,

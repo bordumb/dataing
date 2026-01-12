@@ -22,6 +22,7 @@ if TYPE_CHECKING:
     from dataing.core.investigation.collaboration import CollaborationService
     from dataing.core.investigation.orchestrator import InvestigationOrchestrator
     from dataing.core.investigation.repository import InvestigationRepository
+    from dataing.services.usage import UsageTracker
 
 from dataing.core.investigation.entities import InvestigationContext
 from dataing.core.investigation.values import (
@@ -99,6 +100,7 @@ class InvestigationService:
         agent_client: AgentClient,
         context_engine: ContextEngine,
         pattern_repository: InMemoryPatternRepository | None = None,
+        usage_tracker: UsageTracker | None = None,
     ) -> None:
         """Initialize the investigation service.
 
@@ -108,12 +110,14 @@ class InvestigationService:
             agent_client: LLM client for AI operations.
             context_engine: Engine for gathering context from data sources.
             pattern_repository: Optional pattern repository for historical patterns.
+            usage_tracker: Optional usage tracker for recording usage metrics.
         """
         self.repository = repository
         self.collaboration = collaboration
         self._agent_client = agent_client
         self._context_engine = context_engine
         self._pattern_repository = pattern_repository
+        self._usage_tracker = usage_tracker
 
     async def start_investigation(
         self,
@@ -191,6 +195,9 @@ class InvestigationService:
             alert=alert,
             data_adapter=data_adapter,
             pattern_repository=self._pattern_repository,
+            usage_tracker=self._usage_tracker,
+            tenant_id=tenant_id,
+            investigation_id=investigation.id,
         )
 
         # Create orchestrator for this investigation
@@ -367,7 +374,8 @@ class InvestigationService:
         if branch.status == BranchStatus.SUSPENDED:
             await self.collaboration.resume_branch(branch.id)
 
-        return branch.id
+        branch_id: UUID = branch.id
+        return branch_id
 
     def _create_branch_state(
         self,

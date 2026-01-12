@@ -442,9 +442,100 @@ class GitHunterAdapter:
 
         Returns:
             List of FileExpert sorted by commit count (descending).
+
+        Raises:
+            RepoNotFoundError: If repo_path is not a git repository.
+            FileNotFoundInRepoError: If file doesn't exist in repo.
         """
-        # TODO: Implement in fn-3.4
-        return []
+        # Build git log command
+        # Format: email|name|hash|timestamp
+        args = [
+            "log",
+            "--format=%aE|%aN|%H|%at",
+            "--follow",
+            "--no-merges",
+        ]
+
+        # Add time window if specified
+        if window_days and window_days > 0:
+            args.append(f"--since={window_days} days ago")
+
+        args.extend(["--", file_path])
+
+        stdout, stderr, code = await self._run_git(repo_path, *args)
+
+        if code != 0:
+            stderr_lower = stderr.lower()
+            if "fatal: not a git repository" in stderr_lower:
+                raise RepoNotFoundError(str(repo_path))
+            # Empty output for non-existent files is handled below
+            return []
+
+        # Parse output and group by author email (case-insensitive)
+        author_stats: dict[str, dict[str, str | int | datetime]] = {}
+
+        for line in stdout.strip().split("\n"):
+            if not line or "|" not in line:
+                continue
+
+            parts = line.split("|")
+            if len(parts) < 4:
+                continue
+
+            email = parts[0].lower()  # Case-insensitive grouping
+            name = parts[1]
+            # commit_hash = parts[2]  # Not needed for stats
+            try:
+                timestamp = int(parts[3])
+                commit_date = datetime.fromtimestamp(timestamp, tz=UTC)
+            except (ValueError, OSError):
+                commit_date = datetime.now(tz=UTC)
+
+            if email not in author_stats:
+                author_stats[email] = {
+                    "name": name,
+                    "email": email,
+                    "commit_count": 0,
+                    "last_commit_date": commit_date,
+                }
+
+            current_count = author_stats[email]["commit_count"]
+            if isinstance(current_count, int):
+                author_stats[email]["commit_count"] = current_count + 1
+
+            # Track most recent commit
+            current_last = author_stats[email]["last_commit_date"]
+            if isinstance(current_last, datetime) and commit_date > current_last:
+                author_stats[email]["last_commit_date"] = commit_date
+
+        # Sort by commit count descending and take top N
+        sorted_authors = sorted(
+            author_stats.values(),
+            key=lambda x: x["commit_count"] if isinstance(x["commit_count"], int) else 0,
+            reverse=True,
+        )[:limit]
+
+        # Build FileExpert results
+        experts: list[FileExpert] = []
+        for stats in sorted_authors:
+            author = AuthorProfile(
+                git_email=str(stats["email"]),
+                git_name=str(stats["name"]),
+            )
+            commit_count = stats["commit_count"]
+            last_date = stats["last_commit_date"]
+            last_commit = (
+                last_date if isinstance(last_date, datetime) else datetime.now(tz=UTC)
+            )
+            experts.append(
+                FileExpert(
+                    author=author,
+                    commit_count=commit_count if isinstance(commit_count, int) else 0,
+                    last_commit_date=last_commit,
+                )
+            )
+
+        return experts
 
     async def close(self) -> None:
         """Close HTTP client and cleanup resources."""

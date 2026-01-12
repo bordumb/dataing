@@ -175,9 +175,38 @@ Add provider under auth:
 - [ ] No console errors when auth is not present
 
 ## Done summary
-TBD
+## Summary
 
+Implemented NotificationProvider context and sidebar badge for real-time notification count display.
+
+### Changes Made
+
+1. **NotificationProvider** (`frontend/src/lib/notifications/context.tsx`):
+   - Global context providing `unreadCount` and `isConnected` state
+   - SSE subscription for real-time notification events
+   - Initial unread count fetch on mount
+   - 30-second polling fallback
+   - Exponential backoff reconnection (max 30s)
+   - Reconnects on org change
+   - Event deduplication via lastEventId
+
+2. **Query Keys** (`frontend/src/lib/api/query-keys.ts`):
+   - Added `notifications.all`, `notifications.list`, `notifications.unreadCount`
+
+3. **App.tsx**:
+   - Wrapped app with NotificationProvider under JwtAuthProvider
+
+4. **Sidebar** (`frontend/src/components/layout/app-sidebar.tsx`):
+   - Added red badge next to Notifications menu item
+   - Shows unread count (or "99+" for counts > 99)
+   - Hidden when count is 0
+
+### Verification
+
+- ESLint: passed
+- TypeScript: passed
+- Pre-commit hooks: passed
 ## Evidence
-- Commits:
-- Tests:
+- Commits: 35d30958705cc24800b42b94deede06573770480
+- Tests: eslint_passed, typescript_passed
 - PRs:

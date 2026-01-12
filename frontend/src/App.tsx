@@ -33,6 +33,9 @@ import { DemoRoleToggle } from '@/lib/auth/demo-role-toggle'
 import { DemoRoleProvider, useDemoRoleContext } from '@/lib/auth/demo-role-context'
 import { ImpersonationProvider, ImpersonateUserToggle } from '@/lib/auth'
 
+// Notifications
+import { NotificationProvider } from '@/lib/notifications'
+
 /**
  * CRITICAL: DO NOT REMOVE THE ENTITLEMENTS IMPORTS OR DEMO TOGGLE
  *
@@ -215,11 +218,13 @@ function App() {
   return (
     <ErrorBoundary>
       <JwtAuthProvider>
-        <ImpersonationProvider>
-          <DemoRoleProvider>
-            <AppWithEntitlements />
-          </DemoRoleProvider>
-        </ImpersonationProvider>
+        <NotificationProvider>
+          <ImpersonationProvider>
+            <DemoRoleProvider>
+              <AppWithEntitlements />
+            </DemoRoleProvider>
+          </ImpersonationProvider>
+        </NotificationProvider>
       </JwtAuthProvider>
     </ErrorBoundary>
   )

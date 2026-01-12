@@ -11,7 +11,6 @@
     "commits": [
       "5891a0c20332aa28a1a5169376b479b580740269"
     ],
-    "_comment": "pragma: allowlist secret",
     "prs": [],
     "tests": [
       "ruff_passed",

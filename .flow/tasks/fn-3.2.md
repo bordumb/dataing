@@ -40,9 +40,21 @@ Implement `blame_line()` using async subprocess for git CLI.
 - [ ] Sets `is_boundary=True` for shallow clone boundary commits
 - [ ] Uses `shell=False` and `--` separator for security
 ## Done summary
-TBD
+## Summary
 
+Implemented blame_line() in GitHunterAdapter
+
+### Implementation
+- Uses `asyncio.create_subprocess_exec` with 30s timeout
+- Parses git blame --porcelain output
+- Handles errors: RepoNotFoundError, FileNotFoundInRepoError, LineOutOfRangeError, BinaryFileError
+- Detects shallow clone boundary commits (is_boundary=True)
+
+### Verification
+- Smoke test: successfully blamed pyproject.toml line 1
+- mypy --strict: passed
+- ruff check: passed
 ## Evidence
-- Commits:
-- Tests:
+- Commits: 5548d523
+- Tests: mypy_passed, ruff_passed, smoke_test_passed
 - PRs:

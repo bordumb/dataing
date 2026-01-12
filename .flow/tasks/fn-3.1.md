@@ -60,20 +60,20 @@ class PRDiscussion:
 - [ ] mypy passes with strict mode
 - [ ] ruff passes (D102, D107 docstrings)
 ## Done summary
-- Created types.py with AuthorProfile, BlameResult, FileExpert, PRDiscussion frozen dataclasses
-- Created protocols.py with GitHunterProtocol (runtime_checkable) taking repo_path: Path as first arg
-- Created exceptions.py with full hierarchy including RateLimitedError (stores retry_after_seconds, reset_at)
-- Created __init__.py exporting all types, protocol, and exceptions
+## Summary
 
-Why:
-- Task fn-3.1 specified creating foundational types and protocol for Git Hunter adapter
-- Following hexagonal architecture pattern from existing lineage adapter
+Created types and protocol definitions for Git Hunter in bond/src/bond/tools/githunter/
 
-Verification:
-- mypy --strict passes (8 source files)
-- ruff check passes
-- 21 unit tests pass (test_types.py, test_exceptions.py, test_protocols.py)
+### Files Created
+- `_types.py` - AuthorProfile, BlameResult, FileExpert, PRDiscussion frozen dataclasses
+- `_protocols.py` - GitHunterProtocol with runtime_checkable decorator
+- `_exceptions.py` - Exception hierarchy with RateLimitedError storing retry details
+- `__init__.py` - Public exports
+
+### Verification
+- mypy --strict: passed (4 source files)
+- ruff check: passed
 ## Evidence
-- Commits: 826341260af22454ddcbf2c31b9a005ed43b9395
-- Tests: pytest tests/unit/adapters/githunter/ -v
+- Commits: 904ff4ce
+- Tests: mypy_passed, ruff_passed
 - PRs:

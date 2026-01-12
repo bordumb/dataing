@@ -40,9 +40,23 @@ Implement `get_expert_for_file()` to determine code ownership based on commit fr
 - [ ] Returns empty list for file with no commits (untracked/new)
 - [ ] Uses async subprocess like blame_line
 ## Done summary
-TBD
+## Summary
 
+Implemented get_expert_for_file() in GitHunterAdapter
+
+### Implementation
+- Uses `git log --format='%aE|%aN|%H|%at' --follow --no-merges`
+- Groups commits by author email (case-insensitive)
+- Sorts by commit count descending, returns top N
+- Supports window_days parameter (0 = all history)
+- Returns empty list for untracked/non-existent files
+
+### Verification
+- Smoke test: Found 1 expert (bordumb) with 10 commits for pyproject.toml
+- Non-existent file returns empty list
+- mypy --strict: passed
+- ruff check: passed
 ## Evidence
-- Commits:
-- Tests:
+- Commits: e9efa015
+- Tests: mypy_passed, ruff_passed, smoke_test_passed
 - PRs:

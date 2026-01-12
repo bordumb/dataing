@@ -49,9 +49,22 @@ Add GitHub API integration for PR lookup and author enrichment.
 - [ ] GITHUB_TOKEN never appears in logs
 - [ ] Graceful degradation: if no token, skip enrichment (don't fail)
 ## Done summary
-TBD
+## Summary
 
+Implemented GitHub API integration in GitHunterAdapter
+
+### Implementation
+- `find_pr_discussion()` - retrieves PR via `/repos/{owner}/{repo}/commits/{sha}/pulls` endpoint
+- `enrich_author()` - looks up GitHub username/avatar via `/search/users` endpoint
+- `_get_github_repo()` - parses SSH/HTTPS remote URLs with regex
+- `_check_rate_limit()` - handles rate limiting with RateLimitedError
+- Graceful degradation when GITHUB_TOKEN not set (returns None)
+
+### Verification
+- Smoke test: all methods execute without error
+- mypy --strict: passed
+- ruff check: passed
 ## Evidence
-- Commits:
-- Tests:
+- Commits: 0f45a98f
+- Tests: mypy_passed, ruff_passed, smoke_test_passed
 - PRs:

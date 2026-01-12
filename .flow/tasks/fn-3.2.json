@@ -7,10 +7,21 @@
     "fn-3.1"
   ],
   "epic": "fn-3",
+  "evidence": {
+    "commits": [
+      "5548d523"
+    ],
+    "prs": [],
+    "tests": [
+      "mypy_passed",
+      "ruff_passed",
+      "smoke_test_passed"
+    ]
+  },
   "id": "fn-3.2",
   "priority": null,
   "spec_path": ".flow/tasks/fn-3.2.md",
-  "status": "in_progress",
+  "status": "done",
   "title": "blame_line implementation with git CLI",
-  "updated_at": "2026-01-12T22:41:36.106159Z"
+  "updated_at": "2026-01-12T22:43:09.685179Z"
 }

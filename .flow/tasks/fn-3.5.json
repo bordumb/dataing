@@ -1,0 +1,17 @@
+{
+  "assignee": null,
+  "claim_note": "",
+  "claimed_at": null,
+  "created_at": "2026-01-12T21:15:00.353768Z",
+  "depends_on": [
+    "fn-3.4",
+    "fn-3.3"
+  ],
+  "epic": "fn-3",
+  "id": "fn-3.5",
+  "priority": null,
+  "spec_path": ".flow/tasks/fn-3.5.md",
+  "status": "todo",
+  "title": "Unit tests for all GitHunter methods",
+  "updated_at": "2026-01-12T21:45:42.262407Z"
+}

@@ -33,8 +33,10 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
+import { Badge } from '@/components/ui/Badge'
 import { useJwtAuth } from '@/lib/auth/jwt-context'
 import { useDemoRoleContext } from '@/lib/auth/demo-role-context'
+import { useNotifications } from '@/lib/notifications'
 // IMPORTANT: OrgSelector is critical for multi-tenant support - DO NOT REMOVE
 import { OrgSelector } from '@/lib/auth/org-selector'
 
@@ -71,6 +73,7 @@ export function AppSidebar() {
   const { state } = useSidebar()
   const { logout, org } = useJwtAuth()
   const { canAccessAdmin } = useDemoRoleContext()
+  const { unreadCount } = useNotifications()
 
   // Build settings nav items based on role
   // Admin link only visible to admin/owner roles
@@ -154,6 +157,11 @@ export function AppSidebar() {
                     <Link to={item.url}>
                       <item.icon className="size-4" />
                       <span>{item.title}</span>
+                      {item.title === 'Notifications' && unreadCount > 0 && (
+                        <Badge variant="destructive" className="ml-auto h-5 min-w-[1.25rem] px-1 text-xs">
+                          {unreadCount > 99 ? '99+' : unreadCount}
+                        </Badge>
+                      )}
                     </Link>
                   </SidebarMenuButton>
                 </SidebarMenuItem>

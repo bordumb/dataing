@@ -1,118 +1,67 @@
-import { Bell, Check, AlertTriangle, Info, CheckCircle, XCircle } from 'lucide-react'
+/**
+ * Notifications page displaying real-time notifications with mark-as-read functionality.
+ */
+
+import { Bell, Check } from 'lucide-react'
 import { PageHeader } from '@/components/shared/page-header'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
-import { Badge } from '@/components/ui/Badge'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Skeleton } from '@/components/ui/skeleton'
+import { NotificationCard } from './components/notification-card'
+import { useNotificationsList, useUnreadCount } from './hooks/use-notifications-list'
+import { useMarkAsRead, useMarkAllAsRead } from './hooks/use-mark-read'
 
-// Mock notifications data - in production this would come from API
-const MOCK_NOTIFICATIONS = [
-  {
-    id: '1',
-    type: 'success' as const,
-    title: 'Investigation Complete',
-    message: 'Investigation "NULL spike in user_id" completed with root cause identified.',
-    timestamp: '2 hours ago',
-    read: false,
-    link: '/investigations/1',
-  },
-  {
-    id: '2',
-    type: 'warning' as const,
-    title: 'Approval Required',
-    message: 'Human-in-the-loop approval needed for "Volume drop in EU events".',
-    timestamp: '4 hours ago',
-    read: false,
-    link: '/investigations/2',
-  },
-  {
-    id: '3',
-    type: 'error' as const,
-    title: 'Investigation Failed',
-    message: 'Investigation "Schema drift in prices" failed: Unable to connect to data source.',
-    timestamp: '1 day ago',
-    read: true,
-    link: '/investigations/3',
-  },
-  {
-    id: '4',
-    type: 'info' as const,
-    title: 'New Data Source Connected',
-    message: 'PostgreSQL data source "analytics_db" was successfully connected.',
-    timestamp: '2 days ago',
-    read: true,
-    link: '/datasources',
-  },
-  {
-    id: '5',
-    type: 'success' as const,
-    title: 'Weekly Digest',
-    message: 'Your weekly investigation summary is ready. 12 investigations completed, 2 pending.',
-    timestamp: '3 days ago',
-    read: true,
-  },
-]
-
-const typeIcons = {
-  success: CheckCircle,
-  warning: AlertTriangle,
-  error: XCircle,
-  info: Info,
-}
-
-const typeColors = {
-  success: 'text-green-500',
-  warning: 'text-yellow-500',
-  error: 'text-red-500',
-  info: 'text-blue-500',
-}
-
-interface Notification {
-  id: string
-  type: 'success' | 'warning' | 'error' | 'info'
-  title: string
-  message: string
-  timestamp: string
-  read: boolean
-  link?: string
-}
-
-function NotificationItem({ notification }: { notification: Notification }) {
-  const Icon = typeIcons[notification.type]
-  const colorClass = typeColors[notification.type]
-
+function NotificationSkeleton() {
   return (
-    <div
-      className={`flex items-start gap-4 p-4 rounded-lg border ${
-        notification.read ? 'bg-background' : 'bg-muted/50'
-      }`}
-    >
-      <Icon className={`size-5 mt-0.5 ${colorClass}`} />
-      <div className="flex-1 space-y-1">
-        <div className="flex items-center gap-2">
-          <span className="font-medium">{notification.title}</span>
-          {!notification.read && (
-            <Badge variant="default" className="text-xs">
-              New
-            </Badge>
-          )}
+    <div className="p-4 border rounded-lg space-y-3">
+      <div className="flex items-start gap-3">
+        <Skeleton className="size-5 rounded-full" />
+        <div className="flex-1 space-y-2">
+          <Skeleton className="h-4 w-1/3" />
+          <Skeleton className="h-3 w-2/3" />
+          <Skeleton className="h-3 w-1/4" />
         </div>
-        <p className="text-sm text-muted-foreground">{notification.message}</p>
-        <span className="text-xs text-muted-foreground">{notification.timestamp}</span>
       </div>
-      {notification.link && (
-        <Button variant="ghost" size="sm" asChild>
-          <a href={notification.link}>View</a>
-        </Button>
-      )}
     </div>
   )
 }
 
 export function NotificationsPage() {
-  const unreadCount = MOCK_NOTIFICATIONS.filter((n) => !n.read).length
-  const allNotifications = MOCK_NOTIFICATIONS
-  const unreadNotifications = MOCK_NOTIFICATIONS.filter((n) => !n.read)
+  const { data, isLoading, error } = useNotificationsList()
+  const { data: unreadData } = useUnreadCount()
+  const markAsRead = useMarkAsRead()
+  const markAllAsRead = useMarkAllAsRead()
+
+  const allNotifications = data?.items ?? []
+  const unreadNotifications = allNotifications.filter((n) => !n.read_at)
+  const unreadCount = unreadData?.count ?? unreadNotifications.length
+
+  const handleMarkAsRead = (id: string) => {
+    markAsRead.mutate(id)
+  }
+
+  const handleMarkAllAsRead = () => {
+    markAllAsRead.mutate()
+  }
+
+  if (error) {
+    return (
+      <div className="space-y-6">
+        <PageHeader
+          title="Notifications"
+          description="Stay updated on investigation progress and system alerts."
+        />
+        <Card>
+          <CardContent className="py-8">
+            <p className="text-sm text-muted-foreground text-center">
+              Failed to load notifications. Please try again.
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-6">
@@ -129,9 +78,14 @@ export function NotificationsPage() {
           </span>
         </div>
         {unreadCount > 0 && (
-          <Button variant="outline" size="sm">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleMarkAllAsRead}
+            disabled={markAllAsRead.isPending}
+          >
             <Check className="size-4 mr-2" />
-            Mark all as read
+            {markAllAsRead.isPending ? 'Marking...' : 'Mark all as read'}
           </Button>
         )}
       </div>
@@ -148,9 +102,19 @@ export function NotificationsPage() {
             </TabsList>
 
             <TabsContent value="all" className="space-y-3">
-              {allNotifications.length > 0 ? (
+              {isLoading ? (
+                <>
+                  <NotificationSkeleton />
+                  <NotificationSkeleton />
+                  <NotificationSkeleton />
+                </>
+              ) : allNotifications.length > 0 ? (
                 allNotifications.map((notification) => (
-                  <NotificationItem key={notification.id} notification={notification} />
+                  <NotificationCard
+                    key={notification.id}
+                    notification={notification}
+                    onMarkRead={handleMarkAsRead}
+                  />
                 ))
               ) : (
                 <p className="text-sm text-muted-foreground text-center py-8">
@@ -160,9 +124,18 @@ export function NotificationsPage() {
             </TabsContent>
 
             <TabsContent value="unread" className="space-y-3">
-              {unreadNotifications.length > 0 ? (
+              {isLoading ? (
+                <>
+                  <NotificationSkeleton />
+                  <NotificationSkeleton />
+                </>
+              ) : unreadNotifications.length > 0 ? (
                 unreadNotifications.map((notification) => (
-                  <NotificationItem key={notification.id} notification={notification} />
+                  <NotificationCard
+                    key={notification.id}
+                    notification={notification}
+                    onMarkRead={handleMarkAsRead}
+                  />
                 ))
               ) : (
                 <p className="text-sm text-muted-foreground text-center py-8">

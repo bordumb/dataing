@@ -96,6 +96,14 @@ export const queryKeys = {
     all: (datasetId: string) => [`/api/v1/datasets/${datasetId}/knowledge-comments`] as const,
     list: (datasetId: string) => [`/api/v1/datasets/${datasetId}/knowledge-comments`] as const,
   },
+
+  // Notifications
+  notifications: {
+    all: ['notifications'] as const,
+    list: (filters?: { unread_only?: boolean; cursor?: string }) =>
+      ['notifications', 'list', filters] as const,
+    unreadCount: ['notifications', 'unreadCount'] as const,
+  },
 } as const
 
 // Type helper for getting query key types

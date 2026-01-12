@@ -203,6 +203,7 @@ demo: demo-fixtures
     PGPASSWORD=dataing psql -h localhost -U dataing -d dataing_demo -f dataing/migrations/011_rl_training_signals.sql 2>&1 | grep -v "^NOTICE:" || true
     PGPASSWORD=dataing psql -h localhost -U dataing -d dataing_demo -f dataing/migrations/012_agent_memories.sql 2>&1 | grep -v "^NOTICE:" || true
     PGPASSWORD=dataing psql -h localhost -U dataing -d dataing_demo -f dataing/migrations/013_unified_investigation.sql 2>&1 | grep -v "^NOTICE:" || true
+    PGPASSWORD=dataing psql -h localhost -U dataing -d dataing_demo -f dataing/migrations/014_notifications.sql 2>&1 | grep -v "^NOTICE:" || true
 
     trap 'kill 0' EXIT
 

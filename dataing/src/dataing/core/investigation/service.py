@@ -16,6 +16,7 @@ from pydantic import BaseModel, ConfigDict
 if TYPE_CHECKING:
     from dataing.adapters.context.engine import ContextEngine
     from dataing.adapters.datasource.base import BaseAdapter
+    from dataing.adapters.db.app_db import AppDatabase
     from dataing.adapters.investigation.pattern_adapter import InMemoryPatternRepository
     from dataing.agents.client import AgentClient
     from dataing.core.domain_types import AnomalyAlert
@@ -101,6 +102,7 @@ class InvestigationService:
         context_engine: ContextEngine,
         pattern_repository: InMemoryPatternRepository | None = None,
         usage_tracker: UsageTracker | None = None,
+        app_db: AppDatabase | None = None,
     ) -> None:
         """Initialize the investigation service.
 
@@ -111,6 +113,7 @@ class InvestigationService:
             context_engine: Engine for gathering context from data sources.
             pattern_repository: Optional pattern repository for historical patterns.
             usage_tracker: Optional usage tracker for recording usage metrics.
+            app_db: Optional app database for creating notifications.
         """
         self.repository = repository
         self.collaboration = collaboration
@@ -118,6 +121,7 @@ class InvestigationService:
         self._context_engine = context_engine
         self._pattern_repository = pattern_repository
         self._usage_tracker = usage_tracker
+        self._app_db = app_db
 
     async def start_investigation(
         self,
@@ -249,10 +253,14 @@ class InvestigationService:
 
                 if result.signal == ExecutionSignal.COMPLETE:
                     logger.info(f"Investigation branch {branch_id} completed")
+                    await self._create_completion_notification(branch_id, "completed")
                     break
                 elif result.signal == ExecutionSignal.FAIL:
                     logger.warning(
                         f"Investigation branch {branch_id} failed: {result.error}"
+                    )
+                    await self._create_completion_notification(
+                        branch_id, "failed", result.error
                     )
                     break
                 elif result.signal == ExecutionSignal.AWAIT_USER:
@@ -287,6 +295,79 @@ class InvestigationService:
             logger.warning(
                 f"Investigation branch {branch_id} reached max iterations ({max_iterations})"
             )
+
+    async def _create_completion_notification(
+        self,
+        branch_id: UUID,
+        status: str,
+        error_message: str | None = None,
+    ) -> None:
+        """Create notification when investigation completes or fails.
+
+        Only creates notifications for main branch completion (not child branches).
+
+        Args:
+            branch_id: ID of the branch that completed/failed.
+            status: "completed" or "failed".
+            error_message: Optional error message for failures.
+        """
+        if not self._app_db:
+            return  # No app_db configured, skip notifications
+
+        try:
+            # Get branch to check if it's the main branch
+            branch = await self.repository.get_branch(branch_id)
+            if branch is None or branch.branch_type != BranchType.MAIN:
+                return  # Only notify for main branch completion
+
+            # Get investigation for tenant_id and alert info
+            investigation = await self.repository.get_investigation(
+                branch.investigation_id
+            )
+            if investigation is None:
+                return
+
+            # Extract alert summary for notification title
+            alert_info = investigation.alert or {}
+            dataset_id = alert_info.get("dataset_id", "Unknown dataset")
+            metric_name = alert_info.get("metric_name", "")
+            alert_summary = f"{dataset_id}"
+            if metric_name:
+                alert_summary += f" - {metric_name}"
+
+            if status == "completed":
+                await self._app_db.create_notification(
+                    tenant_id=investigation.tenant_id,
+                    type="investigation_completed",
+                    title=f"Investigation completed: {alert_summary[:50]}",
+                    body="The investigation has finished analyzing the data anomaly.",
+                    resource_kind="investigation",
+                    resource_id=investigation.id,
+                    severity="success",
+                )
+            else:  # failed
+                error_body = (
+                    f"Investigation failed: {error_message[:200]}"
+                    if error_message
+                    else "Investigation failed without error details."
+                )
+                await self._app_db.create_notification(
+                    tenant_id=investigation.tenant_id,
+                    type="investigation_failed",
+                    title=f"Investigation failed: {alert_summary[:50]}",
+                    body=error_body,
+                    resource_kind="investigation",
+                    resource_id=investigation.id,
+                    severity="error",
+                )
+
+            logger.info(
+                f"Created {status} notification for investigation {investigation.id}"
+            )
+
+        except Exception as e:
+            # Don't fail the investigation if notification creation fails
+            logger.error(f"Failed to create notification for branch {branch_id}: {e}")
 
     async def get_state(
         self,

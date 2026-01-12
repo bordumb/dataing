@@ -1357,3 +1357,312 @@ class AppDatabase:
             WHERE id = $2
         """
         await self.execute(query, comment_type, comment_id)
+
+    # Notification operations
+    async def create_notification(
+        self,
+        tenant_id: UUID,
+        type: str,
+        title: str,
+        body: str | None = None,
+        resource_kind: str | None = None,
+        resource_id: UUID | None = None,
+        severity: str = "info",
+    ) -> dict[str, Any]:
+        """Create a new notification.
+
+        Args:
+            tenant_id: The tenant ID.
+            type: Notification type (e.g., 'investigation_completed').
+            title: Notification title.
+            body: Optional notification body.
+            resource_kind: Optional resource type (e.g., 'investigation').
+            resource_id: Optional resource ID for linking.
+            severity: Notification severity ('info', 'success', 'warning', 'error').
+
+        Returns:
+            The created notification as a dict.
+        """
+        result = await self.execute_returning(
+            """INSERT INTO notifications
+               (tenant_id, type, title, body, resource_kind, resource_id, severity)
+               VALUES ($1, $2, $3, $4, $5, $6, $7)
+               RETURNING *""",
+            tenant_id,
+            type,
+            title,
+            body,
+            resource_kind,
+            resource_id,
+            severity,
+        )
+        if result is None:
+            raise RuntimeError("Failed to create notification")
+        return result
+
+    async def list_notifications(
+        self,
+        tenant_id: UUID,
+        user_id: UUID,
+        limit: int = 50,
+        cursor: str | None = None,
+        unread_only: bool = False,
+    ) -> tuple[list[dict[str, Any]], str | None, bool]:
+        """List notifications with cursor pagination.
+
+        Uses cursor-based pagination with base64(created_at|id) format.
+        Returns notifications with read_at populated from the user's read state.
+
+        Args:
+            tenant_id: The tenant ID.
+            user_id: The user ID (for read state).
+            limit: Maximum notifications to return (max 100).
+            cursor: Pagination cursor (base64 encoded created_at|id).
+            unread_only: If True, only return unread notifications.
+
+        Returns:
+            Tuple of (notifications, next_cursor, has_more).
+        """
+        import base64
+        from datetime import datetime
+
+        # Cap limit at 100
+        limit = min(limit, 100)
+
+        # Parse cursor if provided
+        cursor_created_at: datetime | None = None
+        cursor_id: UUID | None = None
+        if cursor:
+            try:
+                decoded = base64.b64decode(cursor).decode()
+                parts = decoded.split("|")
+                cursor_created_at = datetime.fromisoformat(parts[0])
+                cursor_id = UUID(parts[1])
+            except (ValueError, IndexError):
+                pass  # Invalid cursor, start from beginning
+
+        # Build query
+        base_query = """
+            SELECT n.id, n.tenant_id, n.type, n.title, n.body,
+                   n.resource_kind, n.resource_id, n.severity, n.created_at,
+                   nr.read_at
+            FROM notifications n
+            LEFT JOIN notification_reads nr
+                ON n.id = nr.notification_id AND nr.user_id = $2
+            WHERE n.tenant_id = $1
+        """
+        args: list[Any] = [tenant_id, user_id]
+        idx = 3
+
+        # Add cursor filter
+        if cursor_created_at and cursor_id:
+            base_query += f"""
+                AND (n.created_at, n.id) < (${idx}, ${idx + 1})
+            """
+            args.extend([cursor_created_at, cursor_id])
+            idx += 2
+
+        # Add unread filter
+        if unread_only:
+            base_query += " AND nr.read_at IS NULL"
+
+        # Order and limit (fetch one extra to check has_more)
+        base_query += f"""
+            ORDER BY n.created_at DESC, n.id DESC
+            LIMIT ${idx}
+        """
+        args.append(limit + 1)
+
+        rows = await self.fetch_all(base_query, *args)
+
+        # Check if there are more results
+        has_more = len(rows) > limit
+        if has_more:
+            rows = rows[:limit]
+
+        # Build next cursor from last row
+        next_cursor: str | None = None
+        if has_more and rows:
+            last = rows[-1]
+            cursor_str = f"{last['created_at'].isoformat()}|{last['id']}"
+            next_cursor = base64.b64encode(cursor_str.encode()).decode()
+
+        return rows, next_cursor, has_more
+
+    async def get_notification(
+        self,
+        notification_id: UUID,
+        tenant_id: UUID,
+    ) -> dict[str, Any] | None:
+        """Get a notification by ID.
+
+        Args:
+            notification_id: The notification ID.
+            tenant_id: The tenant ID.
+
+        Returns:
+            The notification or None if not found.
+        """
+        return await self.fetch_one(
+            "SELECT * FROM notifications WHERE id = $1 AND tenant_id = $2",
+            notification_id,
+            tenant_id,
+        )
+
+    async def mark_notification_read(
+        self,
+        notification_id: UUID,
+        user_id: UUID,
+        tenant_id: UUID,
+    ) -> bool:
+        """Mark a notification as read for a user.
+
+        Idempotent - if already read, does nothing.
+
+        Args:
+            notification_id: The notification ID.
+            user_id: The user ID.
+            tenant_id: The tenant ID.
+
+        Returns:
+            True if notification exists and was marked read, False if not found.
+        """
+        # First verify notification exists and belongs to tenant
+        notification = await self.get_notification(notification_id, tenant_id)
+        if not notification:
+            return False
+
+        # Insert read record (idempotent via ON CONFLICT DO NOTHING)
+        await self.execute(
+            """INSERT INTO notification_reads (notification_id, user_id, read_at)
+               VALUES ($1, $2, NOW())
+               ON CONFLICT (notification_id, user_id) DO NOTHING""",
+            notification_id,
+            user_id,
+        )
+        return True
+
+    async def mark_all_notifications_read(
+        self,
+        tenant_id: UUID,
+        user_id: UUID,
+    ) -> tuple[int, str | None]:
+        """Mark all notifications as read for a user.
+
+        Returns cursor pointing to newest marked notification for resumability.
+
+        Args:
+            tenant_id: The tenant ID.
+            user_id: The user ID.
+
+        Returns:
+            Tuple of (count marked, cursor of newest notification).
+        """
+        import base64
+
+        # Get all unread notification IDs for tenant (ordered by created_at DESC)
+        unread_query = """
+            SELECT n.id, n.created_at
+            FROM notifications n
+            LEFT JOIN notification_reads nr
+                ON n.id = nr.notification_id AND nr.user_id = $2
+            WHERE n.tenant_id = $1 AND nr.read_at IS NULL
+            ORDER BY n.created_at DESC, n.id DESC
+        """
+        unread = await self.fetch_all(unread_query, tenant_id, user_id)
+
+        if not unread:
+            return 0, None
+
+        # Batch insert read records
+        insert_query = """
+            INSERT INTO notification_reads (notification_id, user_id, read_at)
+            SELECT id, $2, NOW()
+            FROM notifications n
+            WHERE n.tenant_id = $1
+            AND NOT EXISTS (
+                SELECT 1 FROM notification_reads nr
+                WHERE nr.notification_id = n.id AND nr.user_id = $2
+            )
+        """
+        await self.execute(insert_query, tenant_id, user_id)
+
+        # Build cursor from newest notification
+        newest = unread[0]
+        cursor_str = f"{newest['created_at'].isoformat()}|{newest['id']}"
+        cursor = base64.b64encode(cursor_str.encode()).decode()
+
+        return len(unread), cursor
+
+    async def get_unread_notification_count(
+        self,
+        tenant_id: UUID,
+        user_id: UUID,
+    ) -> int:
+        """Get count of unread notifications for a user.
+
+        Args:
+            tenant_id: The tenant ID.
+            user_id: The user ID.
+
+        Returns:
+            Number of unread notifications.
+        """
+        result = await self.fetch_one(
+            """SELECT COUNT(*)::int as count
+               FROM notifications n
+               LEFT JOIN notification_reads nr
+                   ON n.id = nr.notification_id AND nr.user_id = $2
+               WHERE n.tenant_id = $1 AND nr.read_at IS NULL""",
+            tenant_id,
+            user_id,
+        )
+        return result["count"] if result else 0
+
+    async def get_new_notifications(
+        self,
+        tenant_id: UUID,
+        since_id: UUID | None = None,
+        limit: int = 50,
+    ) -> list[dict[str, Any]]:
+        """Get new notifications since a given notification ID.
+
+        Used by SSE endpoint to poll for new notifications.
+        Returns notifications created after the given ID, ordered by created_at ASC
+        so clients can process them in chronological order.
+
+        Args:
+            tenant_id: The tenant ID.
+            since_id: Optional notification ID to get notifications after.
+            limit: Maximum notifications to return.
+
+        Returns:
+            List of notification dictionaries.
+        """
+        if since_id:
+            # Get notifications created after the reference notification
+            query = """
+                SELECT n.id, n.tenant_id, n.type, n.title, n.body,
+                       n.resource_kind, n.resource_id, n.severity, n.created_at
+                FROM notifications n
+                WHERE n.tenant_id = $1
+                AND (n.created_at, n.id) > (
+                    SELECT created_at, id FROM notifications WHERE id = $2
+                )
+                ORDER BY n.created_at ASC, n.id ASC
+                LIMIT $3
+            """
+            return await self.fetch_all(query, tenant_id, since_id, limit)
+        else:
+            # No cursor - get most recent notifications
+            query = """
+                SELECT n.id, n.tenant_id, n.type, n.title, n.body,
+                       n.resource_kind, n.resource_id, n.severity, n.created_at
+                FROM notifications n
+                WHERE n.tenant_id = $1
+                ORDER BY n.created_at DESC, n.id DESC
+                LIMIT $2
+            """
+            # Return in chronological order (oldest first)
+            rows = await self.fetch_all(query, tenant_id, limit)
+            return list(reversed(rows))

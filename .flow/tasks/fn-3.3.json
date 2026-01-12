@@ -1,0 +1,27 @@
+{
+  "assignee": "bordumbb@gmail.com",
+  "claim_note": "",
+  "claimed_at": "2026-01-12T22:43:22.862846Z",
+  "created_at": "2026-01-12T21:14:59.996612Z",
+  "depends_on": [
+    "fn-3.1"
+  ],
+  "epic": "fn-3",
+  "evidence": {
+    "commits": [
+      "0f45a98f"
+    ],
+    "prs": [],
+    "tests": [
+      "mypy_passed",
+      "ruff_passed",
+      "smoke_test_passed"
+    ]
+  },
+  "id": "fn-3.3",
+  "priority": null,
+  "spec_path": ".flow/tasks/fn-3.3.md",
+  "status": "done",
+  "title": "GitHub API integration for PR lookup and author enrichment",
+  "updated_at": "2026-01-12T22:46:05.515175Z"
+}

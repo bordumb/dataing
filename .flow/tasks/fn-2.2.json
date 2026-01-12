@@ -1,16 +1,28 @@
 {
-  "assignee": null,
+  "assignee": "bordumbb@gmail.com",
   "claim_note": "",
-  "claimed_at": null,
+  "claimed_at": "2026-01-12T10:59:03.082275Z",
   "created_at": "2026-01-12T01:43:45.982017Z",
   "depends_on": [
     "fn-2.1"
   ],
   "epic": "fn-2",
+  "evidence": {
+    "commits": [
+      "5891a0c20332aa28a1a5169376b479b580740269"
+    ],
+    "_comment": "pragma: allowlist secret",
+    "prs": [],
+    "tests": [
+      "ruff_passed",
+      "mypy_passed",
+      "imports_verified"
+    ]
+  },
   "id": "fn-2.2",
   "priority": null,
   "spec_path": ".flow/tasks/fn-2.2.md",
-  "status": "todo",
+  "status": "done",
   "title": "Backend: SSE endpoint for real-time notifications",
-  "updated_at": "2026-01-12T01:54:59.079074Z"
+  "updated_at": "2026-01-12T11:08:15.299274Z"
 }

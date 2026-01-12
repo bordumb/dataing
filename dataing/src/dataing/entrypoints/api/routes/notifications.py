@@ -2,16 +2,23 @@
 
 from __future__ import annotations
 
-from datetime import datetime
-from typing import Annotated
+import asyncio
+import json
+import logging
+from collections.abc import AsyncIterator
+from datetime import UTC, datetime
+from typing import Annotated, Any
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from pydantic import BaseModel, Field
+from sse_starlette.sse import EventSourceResponse
 
 from dataing.adapters.db.app_db import AppDatabase
 from dataing.entrypoints.api.deps import get_app_db
 from dataing.entrypoints.api.middleware.auth import ApiKeyContext, verify_api_key
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/notifications", tags=["notifications"])
 
@@ -161,3 +168,117 @@ async def get_unread_count(
     )
 
     return UnreadCountResponse(count=count)
+
+
+@router.get("/stream")
+async def notification_stream(
+    request: Request,
+    auth: AuthDep,
+    app_db: AppDbDep,
+    after: str | None = Query(
+        default=None,
+        description="Resume from notification ID (for reconnect)",
+    ),
+) -> EventSourceResponse:
+    """Stream real-time notifications via Server-Sent Events.
+
+    Browser EventSource can't send headers, so JWT is accepted via query param.
+    The auth middleware already handles `?token=` for SSE endpoints.
+
+    Events:
+    - `notification`: New notification (includes cursor for resume)
+    - `heartbeat`: Keep-alive every 30 seconds
+
+    Example:
+        GET /notifications/stream?token=<jwt>&after=<notification_id>
+
+    Returns:
+        EventSourceResponse with SSE stream.
+    """
+    user_id = _require_user_id(auth)
+    tenant_id = auth.tenant_id
+
+    # Parse after parameter if provided
+    last_id: UUID | None = None
+    if after:
+        try:
+            last_id = UUID(after)
+        except ValueError:
+            pass  # Invalid UUID, start from beginning
+
+    async def event_generator() -> AsyncIterator[dict[str, Any]]:
+        """Generate SSE events for notification updates."""
+        nonlocal last_id
+        last_heartbeat = datetime.now(UTC)
+        poll_count = 0
+        max_polls = 3600  # 30 minutes at 0.5s intervals
+
+        try:
+            while poll_count < max_polls:
+                # Check if client disconnected
+                if await request.is_disconnected():
+                    logger.info("SSE client disconnected")
+                    break
+
+                # Send heartbeat every 30 seconds
+                now = datetime.now(UTC)
+                if (now - last_heartbeat).total_seconds() >= 30:
+                    yield {
+                        "event": "heartbeat",
+                        "data": json.dumps({"ts": now.isoformat()}),
+                    }
+                    last_heartbeat = now
+
+                # Poll for new notifications
+                try:
+                    notifications = await app_db.get_new_notifications(
+                        tenant_id=tenant_id,
+                        since_id=last_id,
+                        limit=50,
+                    )
+
+                    for n in notifications:
+                        notification_data = {
+                            "id": str(n["id"]),
+                            "type": n["type"],
+                            "title": n["title"],
+                            "body": n.get("body"),
+                            "resource_kind": n.get("resource_kind"),
+                            "resource_id": str(n["resource_id"]) if n.get("resource_id") else None,
+                            "severity": n["severity"],
+                            "created_at": n["created_at"].isoformat(),
+                        }
+                        yield {
+                            "event": "notification",
+                            "id": str(n["id"]),  # For client-side Last-Event-ID
+                            "data": json.dumps(notification_data),
+                        }
+                        last_id = n["id"]
+
+                except Exception as e:
+                    logger.error(f"Error polling notifications: {e}")
+                    yield {
+                        "event": "error",
+                        "data": json.dumps({"error": "Failed to fetch notifications"}),
+                    }
+
+                await asyncio.sleep(0.5)
+                poll_count += 1
+
+            # Stream timeout
+            if poll_count >= max_polls:
+                yield {
+                    "event": "timeout",
+                    "data": json.dumps({"message": "Stream timeout, please reconnect"}),
+                }
+
+        except asyncio.CancelledError:
+            logger.info(f"SSE stream cancelled for user {user_id}")
+
+    return EventSourceResponse(
+        event_generator(),
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+        },
+    )

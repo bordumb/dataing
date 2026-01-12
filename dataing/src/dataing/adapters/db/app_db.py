@@ -1618,3 +1618,51 @@ class AppDatabase:
             user_id,
         )
         return result["count"] if result else 0
+
+    async def get_new_notifications(
+        self,
+        tenant_id: UUID,
+        since_id: UUID | None = None,
+        limit: int = 50,
+    ) -> list[dict[str, Any]]:
+        """Get new notifications since a given notification ID.
+
+        Used by SSE endpoint to poll for new notifications.
+        Returns notifications created after the given ID, ordered by created_at ASC
+        so clients can process them in chronological order.
+
+        Args:
+            tenant_id: The tenant ID.
+            since_id: Optional notification ID to get notifications after.
+            limit: Maximum notifications to return.
+
+        Returns:
+            List of notification dictionaries.
+        """
+        if since_id:
+            # Get notifications created after the reference notification
+            query = """
+                SELECT n.id, n.tenant_id, n.type, n.title, n.body,
+                       n.resource_kind, n.resource_id, n.severity, n.created_at
+                FROM notifications n
+                WHERE n.tenant_id = $1
+                AND (n.created_at, n.id) > (
+                    SELECT created_at, id FROM notifications WHERE id = $2
+                )
+                ORDER BY n.created_at ASC, n.id ASC
+                LIMIT $3
+            """
+            return await self.fetch_all(query, tenant_id, since_id, limit)
+        else:
+            # No cursor - get most recent notifications
+            query = """
+                SELECT n.id, n.tenant_id, n.type, n.title, n.body,
+                       n.resource_kind, n.resource_id, n.severity, n.created_at
+                FROM notifications n
+                WHERE n.tenant_id = $1
+                ORDER BY n.created_at DESC, n.id DESC
+                LIMIT $2
+            """
+            # Return in chronological order (oldest first)
+            rows = await self.fetch_all(query, tenant_id, limit)
+            return list(reversed(rows))

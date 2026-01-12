@@ -127,9 +127,38 @@ if self._notification_service:
 - [ ] Token query param auth works for browser EventSource
 
 ## Done summary
-TBD
+## Summary
 
+Implemented SSE endpoint for real-time notification streaming and wired notification creation into investigation completion/failure.
+
+### Changes Made
+
+1. **SSE Endpoint** (`src/dataing/entrypoints/api/routes/notifications.py`):
+   - `GET /notifications/stream` - Server-Sent Events endpoint
+   - Heartbeat every 30 seconds to keep connection alive
+   - Event IDs for client-side resume via `Last-Event-ID`
+   - Query param `?after=<id>` for resuming from specific notification
+   - 30-minute timeout with reconnect message
+   - Graceful disconnect handling
+
+2. **Database** (`src/dataing/adapters/db/app_db.py`):
+   - `get_new_notifications(tenant_id, since_id, limit)` for SSE polling
+
+3. **Notification Creation** (`src/dataing/core/investigation/service.py`):
+   - `_create_completion_notification()` helper method
+   - Creates "investigation_completed" notification on main branch completion
+   - Creates "investigation_failed" notification on main branch failure
+   - Non-blocking: notification failures logged but don't affect investigation
+
+4. **Wiring** (`src/dataing/entrypoints/api/deps.py`):
+   - Pass `app_db` to InvestigationService for notification creation
+
+### Verification
+
+- Ruff linting: passed
+- Mypy type checking: passed
+- Imports verified working
 ## Evidence
-- Commits:
-- Tests:
+- Commits: 5891a0c20332aa28a1a5169376b479b580740269
+- Tests: ruff_passed, mypy_passed, imports_verified
 - PRs:

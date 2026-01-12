@@ -7,6 +7,7 @@
 
 import * as React from 'react'
 import { useQueryClient } from '@tanstack/react-query'
+import { toast } from 'sonner'
 import { useJwtAuth } from '@/lib/auth/jwt-context'
 import { queryKeys } from '@/lib/api/query-keys'
 
@@ -116,6 +117,17 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
             setUnreadCount((prev) => prev + 1)
             // Invalidate notification queries so lists refresh
             queryClient.invalidateQueries({ queryKey: queryKeys.notifications.all })
+            // Show toast for new notification
+            const severity = notification.severity as 'info' | 'success' | 'warning' | 'error'
+            if (severity === 'error') {
+              toast.error(notification.title, { description: notification.body })
+            } else if (severity === 'warning') {
+              toast.warning(notification.title, { description: notification.body })
+            } else if (severity === 'success') {
+              toast.success(notification.title, { description: notification.body })
+            } else {
+              toast.info(notification.title, { description: notification.body })
+            }
           }
         } catch (error) {
           console.error('Failed to parse notification:', error)

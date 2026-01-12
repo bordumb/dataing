@@ -1,16 +1,24 @@
 {
-  "assignee": null,
+  "assignee": "bordumbb@gmail.com",
   "claim_note": "",
-  "claimed_at": null,
+  "claimed_at": "2026-01-12T11:14:06.374026Z",
   "created_at": "2026-01-12T01:43:49.386907Z",
   "depends_on": [
     "fn-2.3"
   ],
   "epic": "fn-2",
+  "evidence": {
+    "commits": [],
+    "prs": [],
+    "tests": [
+      "eslint_passed",
+      "typescript_passed"
+    ]
+  },
   "id": "fn-2.4",
   "priority": null,
   "spec_path": ".flow/tasks/fn-2.4.md",
-  "status": "todo",
+  "status": "done",
   "title": "Frontend: Interactive cards + optimistic updates",
-  "updated_at": "2026-01-12T01:54:59.782080Z"
+  "updated_at": "2026-01-12T11:17:59.070739Z"
 }

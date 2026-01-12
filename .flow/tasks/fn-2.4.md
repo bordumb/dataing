@@ -244,9 +244,44 @@ function showRateLimitedToast(notification: Notification) {
 - [ ] Toast rate limiting: max 3 per 10s, then summary
 
 ## Done summary
-TBD
+## Summary
 
+Implemented interactive notification cards with optimistic mark-as-read updates.
+
+### Changes Made
+
+1. **NotificationCard** (`frontend/src/features/notifications/components/notification-card.tsx`):
+   - Polymorphic rendering based on notification type
+   - Special handling for `approval_required` type with action buttons
+   - Severity-based icons and colors
+   - Relative timestamp display
+   - Click to mark as read + navigate
+
+2. **useMarkAsRead hooks** (`frontend/src/features/notifications/hooks/use-mark-read.ts`):
+   - `useMarkAsRead` - marks single notification with optimistic update
+   - `useMarkAllAsRead` - marks all notifications with optimistic update
+   - Both include rollback on error and cache invalidation
+
+3. **useNotificationsList hooks** (`frontend/src/features/notifications/hooks/use-notifications-list.ts`):
+   - `useNotificationsList` - fetches paginated notifications
+   - `useUnreadCount` - fetches unread count
+
+4. **NotificationsPage** (`frontend/src/features/notifications/notifications-page.tsx`):
+   - Removed MOCK_NOTIFICATIONS
+   - Uses real API hooks
+   - Loading skeleton states
+   - Error handling
+   - Tabs for All/Unread filtering
+
+5. **NotificationProvider toast integration** (`frontend/src/lib/notifications/context.tsx`):
+   - Shows toast on new SSE notifications
+   - Severity-based toast types (error, warning, success, info)
+
+### Verification
+
+- ESLint: passed
+- TypeScript: passed
 ## Evidence
 - Commits:
-- Tests:
+- Tests: eslint_passed, typescript_passed
 - PRs:

@@ -7,20 +7,29 @@ and httpx calls to GitHub API.
 from __future__ import annotations
 
 import asyncio
+import logging
+import os
+import re
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import TYPE_CHECKING
+
+import httpx
 
 from ._exceptions import (
     BinaryFileError,
     FileNotFoundInRepoError,
+    GitHubUnavailableError,
     LineOutOfRangeError,
+    RateLimitedError,
     RepoNotFoundError,
 )
 from ._types import AuthorProfile, BlameResult, FileExpert, PRDiscussion
 
-if TYPE_CHECKING:
-    pass
+logger = logging.getLogger(__name__)
+
+# Regex patterns for parsing git remote URLs
+SSH_REMOTE_PATTERN = re.compile(r"git@github\.com:([^/]+)/(.+?)(?:\.git)?$")
+HTTPS_REMOTE_PATTERN = re.compile(r"https://github\.com/([^/]+)/(.+?)(?:\.git)?$")
 
 
 class GitHunterAdapter:
@@ -34,10 +43,32 @@ class GitHunterAdapter:
         """Initialize adapter.
 
         Args:
-            timeout: Timeout in seconds for git commands.
+            timeout: Timeout in seconds for git/HTTP operations.
         """
         self._timeout = timeout
         self._head_cache: dict[str, str] = {}
+        self._github_token = os.environ.get("GITHUB_TOKEN")
+        self._http_client: httpx.AsyncClient | None = None
+
+    async def _get_http_client(self) -> httpx.AsyncClient:
+        """Get or create HTTP client for GitHub API.
+
+        Returns:
+            Configured httpx.AsyncClient.
+        """
+        if self._http_client is None:
+            headers = {
+                "Accept": "application/vnd.github+json",
+                "X-GitHub-Api-Version": "2022-11-28",
+            }
+            if self._github_token:
+                headers["Authorization"] = f"Bearer {self._github_token}"
+            self._http_client = httpx.AsyncClient(
+                base_url="https://api.github.com",
+                headers=headers,
+                timeout=self._timeout,
+            )
+        return self._http_client
 
     async def _run_git(
         self,
@@ -96,6 +127,62 @@ class GitHunterAdapter:
         self._head_cache[cache_key] = sha
         return sha
 
+    async def _get_github_repo(self, repo_path: Path) -> tuple[str, str] | None:
+        """Get GitHub owner/repo from git remote URL.
+
+        Args:
+            repo_path: Path to git repository.
+
+        Returns:
+            Tuple of (owner, repo) or None if not a GitHub repo.
+        """
+        stdout, stderr, code = await self._run_git(
+            repo_path, "remote", "get-url", "origin"
+        )
+        if code != 0:
+            return None
+
+        remote_url = stdout.strip()
+
+        # Try SSH format: git@github.com:owner/repo.git
+        match = SSH_REMOTE_PATTERN.match(remote_url)
+        if match:
+            return (match.group(1), match.group(2))
+
+        # Try HTTPS format: https://github.com/owner/repo.git
+        match = HTTPS_REMOTE_PATTERN.match(remote_url)
+        if match:
+            return (match.group(1), match.group(2))
+
+        return None
+
+    def _check_rate_limit(self, response: httpx.Response) -> None:
+        """Check GitHub rate limit headers and warn/raise as needed.
+
+        Args:
+            response: HTTP response from GitHub API.
+
+        Raises:
+            RateLimitedError: If rate limit is exceeded.
+        """
+        remaining = response.headers.get("X-RateLimit-Remaining")
+        reset_at = response.headers.get("X-RateLimit-Reset")
+
+        if remaining is not None:
+            remaining_int = int(remaining)
+            if remaining_int < 100:
+                logger.warning(
+                    "GitHub API rate limit low: %d requests remaining", remaining_int
+                )
+
+        if response.status_code == 403:
+            # Check if it's a rate limit error
+            if "rate limit" in response.text.lower():
+                reset_timestamp = int(reset_at) if reset_at else 0
+                reset_datetime = datetime.fromtimestamp(reset_timestamp, tz=UTC)
+                retry_after = max(0, reset_timestamp - int(datetime.now(tz=UTC).timestamp()))
+                raise RateLimitedError(retry_after, reset_datetime)
+
     def _parse_porcelain_blame(self, output: str) -> dict[str, str]:
         """Parse git blame --porcelain output.
 
@@ -103,8 +190,7 @@ class GitHunterAdapter:
             output: Raw porcelain output from git blame.
 
         Returns:
-            Dict with parsed fields: commit, author, author-mail,
-            author-time, summary, content.
+            Dict with parsed fields.
         """
         result: dict[str, str] = {}
         lines = output.strip().split("\n")
@@ -178,7 +264,6 @@ class GitHunterAdapter:
                 raise BinaryFileError(file_path)
             if "fatal: not a git repository" in stderr_lower:
                 raise RepoNotFoundError(str(repo_path))
-            # Generic error
             raise RepoNotFoundError(str(repo_path))
 
         # Parse output
@@ -202,7 +287,7 @@ class GitHunterAdapter:
         except (ValueError, OSError):
             commit_date = datetime.now(tz=UTC)
 
-        # Build author profile
+        # Build author profile (enrichment happens separately if needed)
         author = AuthorProfile(
             git_email=parsed.get("author-mail", "").strip("<>"),
             git_name=parsed.get("author", "Unknown"),
@@ -231,9 +316,114 @@ class GitHunterAdapter:
 
         Returns:
             PRDiscussion if commit is associated with a PR, None otherwise.
+
+        Raises:
+            RateLimitedError: If GitHub rate limit exceeded.
+            GitHubUnavailableError: If GitHub API is unavailable.
         """
-        # TODO: Implement in fn-3.3
-        return None
+        if not self._github_token:
+            logger.debug("No GITHUB_TOKEN set, skipping PR lookup")
+            return None
+
+        # Get owner/repo from remote
+        github_repo = await self._get_github_repo(repo_path)
+        if not github_repo:
+            logger.debug("Not a GitHub repository, skipping PR lookup")
+            return None
+
+        owner, repo = github_repo
+        client = await self._get_http_client()
+
+        try:
+            # Find PRs associated with this commit
+            response = await client.get(
+                f"/repos/{owner}/{repo}/commits/{commit_hash}/pulls"
+            )
+            self._check_rate_limit(response)
+
+            if response.status_code == 404:
+                return None
+            if response.status_code != 200:
+                logger.warning(
+                    "GitHub API error %d for commit %s", response.status_code, commit_hash
+                )
+                return None
+
+            prs = response.json()
+            if not prs:
+                return None
+
+            # Get the first (most recent) PR
+            pr_data = prs[0]
+            pr_number = pr_data["number"]
+
+            # Fetch issue comments (top-level PR comments)
+            comments_response = await client.get(
+                f"/repos/{owner}/{repo}/issues/{pr_number}/comments",
+                params={"per_page": 100},
+            )
+            self._check_rate_limit(comments_response)
+
+            comments: list[str] = []
+            if comments_response.status_code == 200:
+                for comment in comments_response.json():
+                    body = comment.get("body", "")
+                    if body:
+                        comments.append(body)
+
+            return PRDiscussion(
+                pr_number=pr_number,
+                title=pr_data.get("title", ""),
+                body=pr_data.get("body", "") or "",
+                url=pr_data.get("html_url", ""),
+                issue_comments=tuple(comments),
+            )
+
+        except httpx.TimeoutException as e:
+            raise GitHubUnavailableError("GitHub API timeout") from e
+        except httpx.RequestError as e:
+            raise GitHubUnavailableError(f"GitHub API error: {e}") from e
+
+    async def enrich_author(self, author: AuthorProfile) -> AuthorProfile:
+        """Enrich author profile with GitHub data.
+
+        Args:
+            author: Author profile with git_email.
+
+        Returns:
+            Author profile with github_username and avatar_url if found.
+        """
+        if not self._github_token or not author.git_email:
+            return author
+
+        client = await self._get_http_client()
+
+        try:
+            # Search for user by email
+            response = await client.get(
+                "/search/users",
+                params={"q": f"{author.git_email} in:email"},
+            )
+            self._check_rate_limit(response)
+
+            if response.status_code != 200:
+                return author
+
+            data = response.json()
+            if data.get("total_count", 0) > 0 and data.get("items"):
+                user = data["items"][0]
+                return AuthorProfile(
+                    git_email=author.git_email,
+                    git_name=author.git_name,
+                    github_username=user.get("login"),
+                    github_avatar_url=user.get("avatar_url"),
+                )
+
+        except (httpx.TimeoutException, httpx.RequestError):
+            # Graceful degradation - return unenriched author
+            pass
+
+        return author
 
     async def get_expert_for_file(
         self,
@@ -255,3 +445,9 @@ class GitHunterAdapter:
         """
         # TODO: Implement in fn-3.4
         return []
+
+    async def close(self) -> None:
+        """Close HTTP client and cleanup resources."""
+        if self._http_client:
+            await self._http_client.aclose()
+            self._http_client = None

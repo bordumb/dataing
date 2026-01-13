@@ -1,0 +1,115 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import Header from '../components/Header.astro';
+import Footer from '../components/Footer.astro';
+import Icons from '../components/Icons.astro';
+
+const docLinks = [
+  {
+    title: 'Getting Started',
+    description: 'Installation, configuration, and your first investigation',
+    href: 'https://docs.dataing.io/getting-started',
+    icon: 'terminal'
+  },
+  {
+    title: 'Architecture',
+    description: 'Understanding the maestro workflow engine and bond agent runtime',
+    href: 'https://docs.dataing.io/architecture',
+    icon: 'git-branch'
+  },
+  {
+    title: 'Data Sources',
+    description: 'Connect SQL databases, document stores, and enterprise systems',
+    href: 'https://docs.dataing.io/datasources',
+    icon: 'database'
+  },
+  {
+    title: 'Lineage Providers',
+    description: 'Integrate with OpenLineage, dbt, Dagster, Airflow, DataHub',
+    href: 'https://docs.dataing.io/lineage',
+    icon: 'git-branch'
+  },
+  {
+    title: 'API Reference',
+    description: 'REST API endpoints for programmatic access',
+    href: 'https://docs.dataing.io/api',
+    icon: 'zap'
+  },
+  {
+    title: 'Enterprise Edition',
+    description: 'SSO, SCIM, audit logging, and advanced datasource adapters',
+    href: 'https://docs.dataing.io/enterprise',
+    icon: 'shield'
+  }
+];
+---
+
+<BaseLayout title="Documentation - Dataing">
+  <Header currentPage="docs" />
+
+  <main>
+    <section class="docs">
+      <div class="container">
+        <div class="section-header">
+          <h1 class="section-title">Documentation</h1>
+          <p class="section-subtitle">Everything you need to get started with Dataing</p>
+        </div>
+
+        <div class="docs-grid">
+          {docLinks.map((doc, index) => (
+            <a
+              href={doc.href}
+              target="_blank"
+              rel="noopener noreferrer"
+              class="doc-card"
+              style={`animation-delay: ${index * 50}ms`}
+            >
+              <div class="doc-icon">
+                <Icons name={doc.icon} />
+              </div>
+              <div class="doc-content">
+                <h3>{doc.title}</h3>
+                <p>{doc.description}</p>
+              </div>
+              <Icons name="external-link" class="doc-arrow" />
+            </a>
+          ))}
+        </div>
+
+        <div class="docs-cta">
+          <p>Can't find what you're looking for?</p>
+          <a
+            href="https://github.com/bordumb/dataing/discussions"
+            target="_blank"
+            rel="noopener noreferrer"
+            class="btn-secondary"
+          >
+            Ask the community
+            <Icons name="external-link" class="icon-sm" />
+          </a>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <Footer />
+</BaseLayout>
+
+<style>
+  .icon-sm {
+    width: 1rem;
+    height: 1rem;
+  }
+
+  .doc-arrow {
+    width: 16px;
+    height: 16px;
+    color: var(--landing-text-muted);
+    opacity: 0;
+    transition: opacity 0.2s ease;
+  }
+
+  .doc-card:hover .doc-arrow {
+    opacity: 1;
+  }
+</style>

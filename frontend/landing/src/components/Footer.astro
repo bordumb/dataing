@@ -1,0 +1,27 @@
+---
+import Icons from './Icons.astro';
+---
+
+<footer>
+  <div class="container">
+    <div class="footer-content">
+      <div class="footer-brand">
+        <a href="/" class="logo">
+          <div class="logo-icon">
+            <Icons name="database" />
+          </div>
+          <span class="logo-text">dataing</span>
+        </a>
+        <p class="footer-tagline">Autonomous data quality investigation</p>
+      </div>
+      <div class="footer-links">
+        <a href="https://github.com/bordumb/dataing" target="_blank" rel="noopener noreferrer">GitHub</a>
+        <a href="/docs">Documentation</a>
+        <a href="/pricing">Pricing</a>
+      </div>
+    </div>
+    <div class="footer-bottom">
+      <p>&copy; {new Date().getFullYear()} Dataing. Open-core software.</p>
+    </div>
+  </div>
+</footer>

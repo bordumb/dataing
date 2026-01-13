@@ -10,8 +10,10 @@ default:
 setup:
     @echo "Setting up dataing (CE)..."
     uv sync
-    @echo "Setting up frontend..."
-    cd frontend && pnpm install
+    @echo "Setting up frontend app..."
+    cd frontend/app && pnpm install
+    @echo "Setting up landing site..."
+    cd frontend/landing && pnpm install
     @echo "Installing pre-commit hooks..."
     uv tool install pre-commit || pip install pre-commit
     pre-commit install
@@ -32,7 +34,7 @@ dev:
     set -euo pipefail
     trap 'kill 0' EXIT
     (uv run fastapi dev dataing-ee/src/dataing_ee/entrypoints/api/app.py --host 0.0.0.0 --port 8000) &
-    (cd frontend && pnpm dev --port 3000) &
+    (cd frontend/app && pnpm dev --port 3000) &
     wait
 
 # Run backend only (EE)
@@ -45,14 +47,26 @@ dev-backend-ce:
 
 # Run frontend only
 dev-frontend:
-    cd frontend && pnpm dev
+    cd frontend/app && pnpm dev
+
+# Run landing site only
+dev-landing:
+    cd frontend/landing && pnpm dev
+
+# Build landing site
+build-landing:
+    cd frontend/landing && pnpm build
+
+# Setup landing site dependencies
+setup-landing:
+    cd frontend/landing && pnpm install
 
 # Run all tests (CE + EE)
 test:
     @echo "Running dataing tests..."
     uv run pytest dataing/tests dataing-ee/tests
     @echo "Running frontend tests..."
-    cd frontend && pnpm test
+    cd frontend/app && pnpm test
 
 # Run CE tests only
 test-ce:
@@ -64,7 +78,7 @@ test-ee:
 
 # Run frontend tests only
 test-frontend:
-    cd frontend && pnpm test
+    cd frontend/app && pnpm test
 
 # Run linters (CE + EE)
 lint:
@@ -72,38 +86,41 @@ lint:
     uv run ruff check dataing/src dataing-ee/src
     uv run mypy dataing/src/dataing dataing-ee/src/dataing_ee
     @echo "Linting frontend..."
-    cd frontend && pnpm lint
+    cd frontend/app && pnpm lint
 
 # Format code
 format:
     uv run ruff format dataing/src dataing-ee/src
-    cd frontend && pnpm format
+    cd frontend/app && pnpm format
 
 # Generate OpenAPI client for frontend
 generate-client:
     @echo "Exporting OpenAPI schema from backend..."
     uv run python dataing/scripts/export_openapi.py
     @echo "Generating OpenAPI client..."
-    cd frontend && pnpm orval
+    cd frontend/app && pnpm orval
 
 # Build for production
 build:
     @echo "Building dataing..."
     uv build
-    @echo "Building frontend..."
-    cd frontend && pnpm build
+    @echo "Building landing site..."
+    cd frontend/landing && pnpm build
+    @echo "Building frontend app..."
+    cd frontend/app && pnpm build
 
 # Run type checking
 typecheck:
     uv run mypy dataing/src/dataing dataing-ee/src/dataing_ee
-    cd frontend && pnpm typecheck
+    cd frontend/app && pnpm typecheck
 
 # Clean build artifacts
 clean:
     rm -rf dist .pytest_cache .ruff_cache .mypy_cache
     rm -rf dataing/.pytest_cache dataing/.ruff_cache
     rm -rf dataing-ee/.pytest_cache dataing-ee/.ruff_cache
-    rm -rf frontend/dist frontend/node_modules/.cache
+    rm -rf frontend/app/dist frontend/app/node_modules/.cache
+    rm -rf frontend/landing/dist frontend/landing/node_modules/.cache
 
 # Start docker-compose stack
 docker-up:
@@ -152,16 +169,16 @@ demo: demo-fixtures
     uv sync --quiet
 
     # Ensure frontend dependencies are installed
-    if [ ! -d "frontend/node_modules" ]; then
+    if [ ! -d "frontend/app/node_modules" ]; then
         echo "Installing frontend dependencies..."
-        cd frontend && pnpm install
-        cd ..
+        cd frontend/app && pnpm install
+        cd ../..
     fi
 
     # Generate OpenAPI client for frontend
     echo "Generating OpenAPI client..."
     uv run python dataing/scripts/export_openapi.py
-    cd frontend && pnpm orval
+    cd frontend/app && pnpm orval
     cd ..
     echo ""
 
@@ -259,7 +276,7 @@ demo: demo-fixtures
     ) &
 
     # Start frontend
-    (cd frontend && pnpm dev --port 3000) &
+    (cd frontend/app && pnpm dev --port 3000) &
     wait
 
 # Stop demo (kills all processes and removes containers/volumes)

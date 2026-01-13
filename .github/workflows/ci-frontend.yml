@@ -29,19 +29,19 @@ jobs:
         with:
           node-version: '20'
           cache: 'pnpm'
-          cache-dependency-path: frontend/pnpm-lock.yaml
+          cache-dependency-path: frontend/app/pnpm-lock.yaml
 
       - name: Install dependencies
-        run: cd frontend && pnpm install
+        run: cd frontend/app && pnpm install
 
       - name: Run lint
-        run: cd frontend && pnpm lint
+        run: cd frontend/app && pnpm lint
 
       - name: Run type check
-        run: cd frontend && pnpm typecheck
+        run: cd frontend/app && pnpm typecheck
 
       - name: Run tests
-        run: cd frontend && pnpm test
+        run: cd frontend/app && pnpm test
 
       - name: Build
-        run: cd frontend && pnpm build
+        run: cd frontend/app && pnpm build

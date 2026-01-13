@@ -1,0 +1,25 @@
+{
+  "assignee": "bordumbb@gmail.com",
+  "claim_note": "",
+  "claimed_at": "2026-01-13T20:36:13.675548Z",
+  "created_at": "2026-01-13T20:16:26.924564Z",
+  "depends_on": [],
+  "epic": "fn-6",
+  "evidence": {
+    "files_modified": [
+      "dataing-ee/src/dataing_ee/adapters/sso/oidc_provider.py",
+      "dataing-ee/src/dataing_ee/adapters/sso/__init__.py",
+      "dataing-ee/tests/unit/adapters/sso/test_oidc_provider.py"
+    ],
+    "tests": [
+      "dataing-ee/tests/unit/adapters/sso/test_oidc_provider.py::TestVerifyIdToken (6 tests)",
+      "dataing-ee/tests/unit/adapters/sso/test_oidc_provider.py::TestJWKSCaching (2 tests)"
+    ]
+  },
+  "id": "fn-6.1",
+  "priority": null,
+  "spec_path": ".flow/tasks/fn-6.1.md",
+  "status": "done",
+  "title": "Add ID Token JWT Signature Verification",
+  "updated_at": "2026-01-13T20:40:11.627001Z"
+}

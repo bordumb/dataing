@@ -5,7 +5,14 @@ from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
 from uuid import UUID
 
-from dataing_ee.core.sso import DomainClaim, SSOConfig, SSOIdentity, SSOProviderType
+from dataing_ee.core.sso import (
+    DomainClaim,
+    SSOConfig,
+    SSOIdentity,
+    SSOProviderType,
+    decrypt_secret,
+    encrypt_secret,
+)
 
 if TYPE_CHECKING:
     from asyncpg import Connection
@@ -78,8 +85,8 @@ class SSORepository:
         Returns:
             Created SSO configuration.
         """
-        # Note: In production, encrypt oidc_client_secret before storing
-        encrypted_secret = oidc_client_secret.encode() if oidc_client_secret else None
+        # Encrypt client secret before storing
+        encrypted_secret = encrypt_secret(oidc_client_secret) if oidc_client_secret else None
 
         row = await self._conn.fetchrow(
             """
@@ -188,6 +195,48 @@ class SSORepository:
         """
         result: str = await self._conn.execute("DELETE FROM sso_configs WHERE org_id = $1", org_id)
         return result == "DELETE 1"
+
+    async def get_decrypted_client_secret(self, org_id: UUID) -> str | None:
+        """Get decrypted OIDC client secret for an organization.
+
+        This method should only be called when making API calls to the IdP.
+        The secret is never exposed in the SSOConfig domain object.
+
+        Args:
+            org_id: Organization ID.
+
+        Returns:
+            Decrypted client secret, or None if not configured.
+        """
+        row = await self._conn.fetchrow(
+            "SELECT oidc_client_secret_encrypted FROM sso_configs WHERE org_id = $1",
+            org_id,
+        )
+        if not row or not row["oidc_client_secret_encrypted"]:
+            return None
+        return decrypt_secret(row["oidc_client_secret_encrypted"])
+
+    async def update_client_secret(self, org_id: UUID, client_secret: str) -> bool:
+        """Update OIDC client secret for an organization.
+
+        Args:
+            org_id: Organization ID.
+            client_secret: New client secret (will be encrypted).
+
+        Returns:
+            True if updated, False if config not found.
+        """
+        encrypted_secret = encrypt_secret(client_secret)
+        result: str = await self._conn.execute(
+            """
+            UPDATE sso_configs
+            SET oidc_client_secret_encrypted = $1, updated_at = NOW()
+            WHERE org_id = $2
+            """,
+            encrypted_secret,
+            org_id,
+        )
+        return result == "UPDATE 1"
 
     # Domain claim methods
 

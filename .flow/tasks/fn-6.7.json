@@ -1,0 +1,33 @@
+{
+  "assignee": "bordumbb@gmail.com",
+  "claim_note": "",
+  "claimed_at": "2026-01-13T21:03:15.464302Z",
+  "created_at": "2026-01-13T20:16:27.949404Z",
+  "depends_on": [
+    "fn-6.3"
+  ],
+  "epic": "fn-6",
+  "evidence": {
+    "files_created": [
+      "dataing-ee/tests/unit/entrypoints/api/routes/test_settings_sso.py"
+    ],
+    "files_modified": [
+      "dataing-ee/src/dataing_ee/entrypoints/api/routes/settings.py"
+    ],
+    "routes_added": [
+      "GET /settings/sso/config",
+      "POST /settings/sso/config",
+      "DELETE /settings/sso/config",
+      "POST /settings/sso/test"
+    ],
+    "tests": [
+      "dataing-ee/tests/unit/entrypoints/api/routes/test_settings_sso.py (9 tests)"
+    ]
+  },
+  "id": "fn-6.7",
+  "priority": null,
+  "spec_path": ".flow/tasks/fn-6.7.md",
+  "status": "done",
+  "title": "Add SSO Admin Configuration Routes",
+  "updated_at": "2026-01-13T21:06:41.290072Z"
+}

@@ -7,11 +7,14 @@ handling signals to determine the next action.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Generic, TypeVar
+from typing import TYPE_CHECKING, Any, Generic, TypeVar
 
 from maestro.result import BranchRequest, StepResult
 from maestro.signals import Signal
 from maestro.step import Step
+
+if TYPE_CHECKING:
+    from maestro.handlers import SignalHandler
 
 ContextT = TypeVar("ContextT")
 
@@ -88,6 +91,26 @@ class Workflow(Generic[ContextT]):
         self._steps: dict[str, Step[ContextT, Any, Any]] = {}
         self._step_order: list[str] = []
         self._fail_on_cannot_execute = fail_on_cannot_execute
+        self._signal_handler: SignalHandler[ContextT] | None = None
+
+    def set_signal_handler(self, handler: SignalHandler[ContextT]) -> None:
+        """Set a custom signal handler.
+
+        The signal handler processes signals returned by steps
+        to determine how the workflow should proceed.
+
+        Args:
+            handler: The signal handler to use.
+        """
+        self._signal_handler = handler
+
+    def get_signal_handler(self) -> SignalHandler[ContextT] | None:
+        """Get the current signal handler.
+
+        Returns:
+            The current signal handler, or None if not set.
+        """
+        return self._signal_handler
 
     def add_step(self, step: Step[ContextT, Any, Any]) -> None:
         """Register a step with the workflow.

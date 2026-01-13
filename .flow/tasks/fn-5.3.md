@@ -49,9 +49,19 @@ Port signal handling logic to maestro as an extensible plugin system.
 - [ ] Unit test: BRANCH signal creates child contexts
 - [ ] Unit test: MERGE with custom strategy merges children
 ## Done summary
-TBD
+- Added SignalHandler ABC with pluggable signal handling
+- Created DefaultSignalHandler for CONTINUE, COMPLETE, FAIL
+- Created BranchingSignalHandler for BRANCH/MERGE with MergeStrategy
+- Added Workflow.set_signal_handler() for custom handlers
 
+Why:
+- Allows domain-specific signal handling without modifying core workflow
+- MergeStrategy protocol enables custom branch merging logic
+
+Verification:
+- 67 total tests passing (22 new handler tests)
+- mypy --strict passes
 ## Evidence
-- Commits:
-- Tests:
+- Commits: c48c334b624a22720d83c05ca4dd5e5b6cb3cdd7
+- Tests: cd maestro && uv run pytest tests/ -v
 - PRs:

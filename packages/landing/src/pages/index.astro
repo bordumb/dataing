@@ -100,105 +100,159 @@ const features = [
           <div class="data-flow">
             <svg viewBox="0 0 400 300" class="data-svg">
               <defs>
-                <filter id="glow">
-                  <feGaussianBlur stdDeviation="2" result="coloredBlur"/>
+                <!-- Premium glow filters -->
+                <filter id="glow-cyan" x="-50%" y="-50%" width="200%" height="200%">
+                  <feGaussianBlur stdDeviation="3" result="blur"/>
+                  <feFlood flood-color="#00d4aa" flood-opacity="0.6"/>
+                  <feComposite in2="blur" operator="in"/>
                   <feMerge>
-                    <feMergeNode in="coloredBlur"/>
+                    <feMergeNode/>
                     <feMergeNode in="SourceGraphic"/>
                   </feMerge>
                 </filter>
+                <filter id="glow-purple" x="-50%" y="-50%" width="200%" height="200%">
+                  <feGaussianBlur stdDeviation="3" result="blur"/>
+                  <feFlood flood-color="#a855f7" flood-opacity="0.5"/>
+                  <feComposite in2="blur" operator="in"/>
+                  <feMerge>
+                    <feMergeNode/>
+                    <feMergeNode in="SourceGraphic"/>
+                  </feMerge>
+                </filter>
+                <filter id="glow-amber" x="-50%" y="-50%" width="200%" height="200%">
+                  <feGaussianBlur stdDeviation="3" result="blur"/>
+                  <feFlood flood-color="#f59e0b" flood-opacity="0.5"/>
+                  <feComposite in2="blur" operator="in"/>
+                  <feMerge>
+                    <feMergeNode/>
+                    <feMergeNode in="SourceGraphic"/>
+                  </feMerge>
+                </filter>
+                <filter id="glow-output" x="-50%" y="-50%" width="200%" height="200%">
+                  <feGaussianBlur stdDeviation="2" result="blur"/>
+                  <feFlood flood-color="#00d4aa" flood-opacity="0.8"/>
+                  <feComposite in2="blur" operator="in"/>
+                  <feMerge>
+                    <feMergeNode/>
+                    <feMergeNode in="SourceGraphic"/>
+                  </feMerge>
+                </filter>
+                <!-- Gradients -->
+                <linearGradient id="grad-lineage" x1="0%" y1="0%" x2="100%" y2="100%">
+                  <stop offset="0%" stop-color="#06b6d4"/>
+                  <stop offset="100%" stop-color="#0891b2"/>
+                </linearGradient>
+                <linearGradient id="grad-code" x1="0%" y1="0%" x2="100%" y2="100%">
+                  <stop offset="0%" stop-color="#a855f7"/>
+                  <stop offset="100%" stop-color="#7c3aed"/>
+                </linearGradient>
+                <linearGradient id="grad-anomaly" x1="0%" y1="0%" x2="100%" y2="100%">
+                  <stop offset="0%" stop-color="#f59e0b"/>
+                  <stop offset="100%" stop-color="#d97706"/>
+                </linearGradient>
               </defs>
 
-              <!-- Data nodes -->
-              <g class="nodes">
-                <!-- Combined Lineage logos (Airflow + dbt + OpenLineage) -->
-                <g class="node node-1" transform="translate(60, 80)">
-                  <circle r="18" fill="rgba(116, 164, 188, 0.1)" stroke="rgba(116, 164, 188, 0.4)" stroke-width="1"/>
-                  <!-- Airflow (top) - simplified pinwheel -->
-                  <g transform="translate(-5, -14) scale(0.42)">
-                    <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z" fill="#017CEE"/>
-                  </g>
-                  <!-- dbt (bottom left) - bowtie icon -->
-                  <g transform="translate(-14, 2) scale(0.18)">
-                    <path d="M86.175 3.743c2.116 2.034 3.5 4.72 3.825 7.649 0 1.221-.326 2.035-1.058 3.581-.733 1.546-9.766 17.17-12.451 21.483-1.546 2.522-2.36 5.533-2.36 8.463s.814 5.94 2.36 8.463c2.685 4.313 11.718 19.937 12.451 21.483.732 1.546 1.058 2.279 1.058 3.5-.326 2.929-1.628 5.615-3.744 7.568-2.034 2.116-4.72 3.5-7.568 3.744-1.22 0-2.034-.326-3.5-1.058-1.464-.732-17.25-9.521-21.563-12.207-.325-.163-.65-.407-1.057-.57l-21.32-12.613c.488 4.069 2.278 7.975 5.208 10.823.57.57 1.139 1.058 1.79 1.546-.488.244-1.058.488-1.546.814-4.313 2.685-19.937 11.718-21.483 12.45-1.546.733-2.279 1.059-3.581 1.059-2.93-.326-5.615-1.628-7.568-3.744C2.034 84.222.651 81.537.326 78.608c.081-1.221.407-2.442 1.058-3.5.732-1.546 9.765-17.251 12.45-21.564 1.546-2.522 2.36-5.533 2.36-8.463s-.814-5.94-2.36-8.463C11.15 32.306 2.116 16.6 1.465 15.055c-.651-1.058-.977-2.279-1.058-3.5.325-2.93 1.627-5.615 3.743-7.649 2.034-2.116 4.72-3.418 7.649-3.743 1.22.081 2.441.407 3.58 1.058 1.303.57 12.777 7.242 18.88 10.823l1.384.813c.488.326.895.57 1.22.733l.651.407 21.727 12.857c-.488-4.882-3.011-9.358-6.917-12.369.488-.244 1.057-.488 1.546-.813 4.313-2.685 19.937-11.719 21.483-12.451 1.058-.651 2.279-.977 3.58-1.058 2.848.325 5.534 1.627 7.568 3.743zM46.139 50.778l4.638-4.639c.651-.651.651-1.627 0-2.278l-4.638-4.639c-.651-.651-1.628-.651-2.279 0l-4.638 4.639c-.651.651-.651 1.627 0 2.278l4.638 4.639c.57.57 1.628.57 2.279 0z" fill="#FF694A"/>
-                  </g>
-                  <!-- OpenLineage (bottom right) - arrow/chevron -->
-                  <g transform="translate(2, 4) scale(0.035)">
-                    <path d="M0,-67.969L-198.46,-67.969L-198.46,0L1.985,0L25.006,-33.985L0,-67.969Z" fill="#74a4bc"/>
+              <!-- Data source icons - uniform 24x24 viewbox, no outer circles -->
+              <g class="source-icons">
+
+                <!-- Lineage icon: Data pipeline/flow network -->
+                <g class="node node-1" transform="translate(60, 80)" filter="url(#glow-cyan)">
+                  <g transform="translate(-12, -12)">
+                    <!-- Three connected nodes representing pipeline -->
+                    <circle cx="4" cy="12" r="3" fill="url(#grad-lineage)"/>
+                    <circle cx="12" cy="4" r="3" fill="url(#grad-lineage)"/>
+                    <circle cx="12" cy="20" r="3" fill="url(#grad-lineage)"/>
+                    <circle cx="20" cy="12" r="3" fill="url(#grad-lineage)"/>
+                    <!-- Connecting lines -->
+                    <path d="M7 12 L17 12" stroke="url(#grad-lineage)" stroke-width="1.5" stroke-linecap="round"/>
+                    <path d="M12 7 L12 17" stroke="url(#grad-lineage)" stroke-width="1.5" stroke-linecap="round"/>
+                    <path d="M6.5 9.5 L9.5 6.5" stroke="url(#grad-lineage)" stroke-width="1.5" stroke-linecap="round"/>
+                    <path d="M6.5 14.5 L9.5 17.5" stroke="url(#grad-lineage)" stroke-width="1.5" stroke-linecap="round"/>
+                    <path d="M14.5 6.5 L17.5 9.5" stroke="url(#grad-lineage)" stroke-width="1.5" stroke-linecap="round"/>
+                    <path d="M14.5 17.5 L17.5 14.5" stroke="url(#grad-lineage)" stroke-width="1.5" stroke-linecap="round"/>
                   </g>
                 </g>
 
-                <!-- GitHub logo (code) -->
-                <g class="node node-2" transform="translate(60, 150)">
-                  <circle r="14" fill="rgba(110, 84, 148, 0.15)" stroke="rgba(110, 84, 148, 0.6)" stroke-width="1"/>
-                  <g transform="translate(-8, -8) scale(0.67)">
-                    <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z" fill="#6e5494"/>
+                <!-- Code icon: Git branch / code brackets -->
+                <g class="node node-2" transform="translate(60, 150)" filter="url(#glow-purple)">
+                  <g transform="translate(-12, -12)">
+                    <!-- Git branch visualization -->
+                    <circle cx="6" cy="6" r="2.5" fill="url(#grad-code)"/>
+                    <circle cx="6" cy="18" r="2.5" fill="url(#grad-code)"/>
+                    <circle cx="18" cy="12" r="2.5" fill="url(#grad-code)"/>
+                    <!-- Branch lines -->
+                    <path d="M6 8.5 L6 15.5" stroke="url(#grad-code)" stroke-width="1.5" stroke-linecap="round"/>
+                    <path d="M6 8.5 Q6 12 15.5 12" stroke="url(#grad-code)" stroke-width="1.5" stroke-linecap="round" fill="none"/>
                   </g>
                 </g>
 
-                <!-- Anomaly detection icon (chart with alert) -->
-                <g class="node node-3" transform="translate(60, 220)">
-                  <circle r="14" fill="rgba(239, 68, 68, 0.15)" stroke="rgba(239, 68, 68, 0.6)" stroke-width="1"/>
-                  <g transform="translate(-8, -8) scale(0.67)">
-                    <!-- Chart bars -->
-                    <rect x="3" y="14" width="3" height="6" rx="0.5" fill="#ef4444"/>
-                    <rect x="8" y="10" width="3" height="10" rx="0.5" fill="#ef4444"/>
-                    <rect x="13" y="4" width="3" height="16" rx="0.5" fill="#ef4444"/>
-                    <rect x="18" y="8" width="3" height="12" rx="0.5" fill="#ef4444"/>
-                    <!-- Alert indicator -->
-                    <circle cx="19" cy="4" r="3" fill="#fbbf24"/>
-                    <text x="19" y="6" text-anchor="middle" font-size="5" font-weight="bold" fill="#000">!</text>
+                <!-- Anomaly icon: Chart with spike -->
+                <g class="node node-3" transform="translate(60, 220)" filter="url(#glow-amber)">
+                  <g transform="translate(-12, -12)">
+                    <!-- Chart line with anomaly spike -->
+                    <path d="M2 18 L6 14 L10 16 L14 4 L18 10 L22 12"
+                          stroke="url(#grad-anomaly)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+                    <!-- Anomaly indicator dot -->
+                    <circle cx="14" cy="4" r="2.5" fill="#fbbf24"/>
+                    <!-- Pulse ring around anomaly -->
+                    <circle cx="14" cy="4" r="4" fill="none" stroke="#fbbf24" stroke-width="1" opacity="0.5">
+                      <animate attributeName="r" values="2.5;6;2.5" dur="2s" repeatCount="indefinite"/>
+                      <animate attributeName="opacity" values="0.6;0;0.6" dur="2s" repeatCount="indefinite"/>
+                    </circle>
                   </g>
                 </g>
+              </g>
 
-                <rect x="170" y="130" width="60" height="40" rx="4" class="processor"/>
+              <!-- LLM Processor -->
+              <g class="processor-group">
+                <rect x="170" y="130" width="60" height="40" rx="6" class="processor"/>
                 <text x="200" y="155" class="processor-text">LLM</text>
-                <circle cx="340" cy="100" r="6" class="node node-4"/>
-                <circle cx="340" cy="150" r="6" class="node node-5"/>
-                <circle cx="340" cy="200" r="6" class="node node-6"/>
               </g>
 
-              <!-- Flow lines -->
+              <!-- Output nodes - uniform small circles -->
+              <g class="output-nodes">
+                <circle cx="340" cy="100" r="5" fill="#00d4aa" filter="url(#glow-output)" class="node node-4"/>
+                <circle cx="340" cy="150" r="5" fill="#00d4aa" filter="url(#glow-output)" class="node node-5"/>
+                <circle cx="340" cy="200" r="5" fill="#00d4aa" filter="url(#glow-output)" class="node node-6"/>
+              </g>
+
+              <!-- Flow lines with gradient -->
               <g class="flow-lines">
-                <path d="M68 80 Q120 80 170 140" class="flow-line"/>
-                <path d="M68 150 L170 150" class="flow-line"/>
-                <path d="M68 220 Q120 220 170 160" class="flow-line"/>
-                <path d="M230 140 Q280 100 334 100" class="flow-line"/>
-                <path d="M230 150 L334 150" class="flow-line"/>
-                <path d="M230 160 Q280 200 334 200" class="flow-line"/>
+                <path d="M72 80 Q120 80 170 140" class="flow-line"/>
+                <path d="M72 150 L170 150" class="flow-line"/>
+                <path d="M72 220 Q120 220 170 160" class="flow-line"/>
+                <path d="M230 140 Q280 100 335 100" class="flow-line"/>
+                <path d="M230 150 L335 150" class="flow-line"/>
+                <path d="M230 160 Q280 200 335 200" class="flow-line"/>
               </g>
 
-              <!-- Animated packets -->
+              <!-- Animated data packets -->
               <g class="packets">
-                <circle r="3" class="packet">
-                  <animateMotion dur="2s" repeatCount="indefinite" path="M68 80 Q120 80 170 140"/>
+                <circle r="3" class="packet packet-1">
+                  <animateMotion dur="2.4s" repeatCount="indefinite" path="M72 80 Q120 80 170 140"/>
                 </circle>
-                <circle r="3" class="packet">
-                  <animateMotion dur="1.8s" repeatCount="indefinite" path="M68 150 L170 150"/>
+                <circle r="3" class="packet packet-2">
+                  <animateMotion dur="2s" repeatCount="indefinite" path="M72 150 L170 150"/>
                 </circle>
-                <circle r="3" class="packet">
-                  <animateMotion dur="2.2s" repeatCount="indefinite" path="M68 220 Q120 220 170 160"/>
+                <circle r="3" class="packet packet-3">
+                  <animateMotion dur="2.6s" repeatCount="indefinite" path="M72 220 Q120 220 170 160"/>
                 </circle>
-                <circle r="3" class="packet">
-                  <animateMotion dur="1.5s" repeatCount="indefinite" begin="0.5s" path="M230 140 Q280 100 334 100"/>
+                <circle r="3" class="packet packet-4">
+                  <animateMotion dur="1.8s" repeatCount="indefinite" begin="0.6s" path="M230 140 Q280 100 335 100"/>
                 </circle>
-                <circle r="3" class="packet">
-                  <animateMotion dur="1.3s" repeatCount="indefinite" begin="0.3s" path="M230 150 L334 150"/>
+                <circle r="3" class="packet packet-5">
+                  <animateMotion dur="1.5s" repeatCount="indefinite" begin="0.4s" path="M230 150 L335 150"/>
                 </circle>
-                <circle r="3" class="packet">
-                  <animateMotion dur="1.7s" repeatCount="indefinite" begin="0.7s" path="M230 160 Q280 200 334 200"/>
+                <circle r="3" class="packet packet-6">
+                  <animateMotion dur="2s" repeatCount="indefinite" begin="0.8s" path="M230 160 Q280 200 335 200"/>
                 </circle>
               </g>
 
               <!-- Labels -->
               <g class="labels">
-                <text x="60" y="45" class="label">Data Sources</text>
-                <text x="15" y="78" class="label-small">Airflow</text>
-                <text x="15" y="86" class="label-small">dbt + OL</text>
-                <text x="20" y="150" class="label-small">Code</text>
-                <text x="20" y="220" class="label-small">Anomalies</text>
-                <text x="200" y="195" class="label">Analysis</text>
-                <text x="340" y="250" class="label">Insights</text>
+                <text x="60" y="42" class="label">Data Sources</text>
+                <text x="200" y="190" class="label">Analysis</text>
+                <text x="340" y="245" class="label">Insights</text>
               </g>
             </svg>
           </div>

@@ -35,9 +35,18 @@ Make InvestigationContext compatible with maestro's generic context requirements
 - [ ] No circular imports between dataing and maestro
 - [ ] `mypy` passes with maestro types used in dataing
 ## Done summary
-TBD
+- Created InvestigationStep and InvestigationResult type aliases
+- Added maestro-flow as workspace dependency with path source
+- Updated mypy configuration to include maestro
 
+Why:
+- InvestigationContext already satisfies maestro requirements (frozen Pydantic model)
+- Type aliases provide convenient typing for dataing steps
+
+Verification:
+- mypy passes on types.py
+- Import test confirms model_copy and model_dump work correctly
 ## Evidence
-- Commits:
-- Tests:
+- Commits: a968e0cef2e53920b1fd02e3e0822f5e9b52f395
+- Tests: python -c 'from dataing.core.investigation.types import *'
 - PRs:

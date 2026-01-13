@@ -11,7 +11,7 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, Generic, Protocol, TypeVar, runtime_checkable
 
-from maestro.result import BranchRequest, StepResult
+from maestro.result import StepResult
 from maestro.signals import Signal
 
 if TYPE_CHECKING:
@@ -231,9 +231,9 @@ class DefaultSignalHandler(SignalHandler[ContextT]):
 
     async def handle_continue(
         self,
-        context: ContextT,
+        _context: ContextT,
         result: StepResult[ContextT, Any],
-        workflow: Workflow[ContextT],
+        _workflow: Workflow[ContextT],
     ) -> SignalResult[ContextT]:
         """Continue to next step.
 
@@ -248,9 +248,9 @@ class DefaultSignalHandler(SignalHandler[ContextT]):
 
     async def handle_complete(
         self,
-        context: ContextT,
+        _context: ContextT,
         result: StepResult[ContextT, Any],
-        workflow: Workflow[ContextT],
+        _workflow: Workflow[ContextT],
     ) -> SignalResult[ContextT]:
         """Complete the workflow."""
         return SignalResult(
@@ -260,9 +260,9 @@ class DefaultSignalHandler(SignalHandler[ContextT]):
 
     async def handle_fail(
         self,
-        context: ContextT,
+        _context: ContextT,
         result: StepResult[ContextT, Any],
-        workflow: Workflow[ContextT],
+        _workflow: Workflow[ContextT],
     ) -> SignalResult[ContextT]:
         """Fail the workflow."""
         return SignalResult(
@@ -273,9 +273,9 @@ class DefaultSignalHandler(SignalHandler[ContextT]):
 
     async def handle_branch(
         self,
-        context: ContextT,
-        result: StepResult[ContextT, Any],
-        workflow: Workflow[ContextT],
+        _context: ContextT,
+        _result: StepResult[ContextT, Any],
+        _workflow: Workflow[ContextT],
     ) -> SignalResult[ContextT]:
         """Handle BRANCH - not implemented in default handler."""
         raise NotImplementedError(
@@ -285,9 +285,9 @@ class DefaultSignalHandler(SignalHandler[ContextT]):
 
     async def handle_merge(
         self,
-        context: ContextT,
-        result: StepResult[ContextT, Any],
-        workflow: Workflow[ContextT],
+        _context: ContextT,
+        _result: StepResult[ContextT, Any],
+        _workflow: Workflow[ContextT],
     ) -> SignalResult[ContextT]:
         """Handle MERGE - not implemented in default handler."""
         raise NotImplementedError(
@@ -320,9 +320,9 @@ class BranchingSignalHandler(DefaultSignalHandler[ContextT]):
 
     async def handle_branch(
         self,
-        context: ContextT,
+        _context: ContextT,
         result: StepResult[ContextT, Any],
-        workflow: Workflow[ContextT],
+        _workflow: Workflow[ContextT],
     ) -> SignalResult[ContextT]:
         """Create child branch contexts from BranchRequest.
 
@@ -383,9 +383,9 @@ class BranchingSignalHandler(DefaultSignalHandler[ContextT]):
 
     async def handle_merge(
         self,
-        context: ContextT,
+        _context: ContextT,
         result: StepResult[ContextT, Any],
-        workflow: Workflow[ContextT],
+        _workflow: Workflow[ContextT],
     ) -> SignalResult[ContextT]:
         """Merge completed branch contexts.
 
@@ -393,9 +393,6 @@ class BranchingSignalHandler(DefaultSignalHandler[ContextT]):
         branch results back into a single context.
         """
         # Find pending branches that have this step as merge point
-        # This is a simplified implementation - real usage would
-        # need more sophisticated tracking
-        merge_key = workflow.get_step(result.next_step or "")
         step_name = result.next_step or "merge"
 
         if step_name not in self._pending_branches:

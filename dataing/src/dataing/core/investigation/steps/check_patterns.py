@@ -12,9 +12,9 @@ from typing import Any
 
 from dataing.core.investigation.entities import InvestigationContext
 from dataing.core.investigation.pattern_extraction import PatternRepositoryProtocol
-from dataing.core.investigation.values import ExecutionSignal, StepType
+from dataing.core.investigation.values import StepType
 
-from .protocol import Step, StepResult
+from .protocol import Signal, Step, StepResult
 
 logger = logging.getLogger(__name__)
 
@@ -58,7 +58,7 @@ class CheckPatternsStep(Step[None, list[dict[str, Any]]]):
         self,
         context: InvestigationContext,
         input_data: None = None,
-    ) -> StepResult[list[dict[str, Any]]]:
+    ) -> StepResult[InvestigationContext, list[dict[str, Any]]]:
         """Execute pattern matching against historical root causes.
 
         Args:
@@ -87,9 +87,9 @@ class CheckPatternsStep(Step[None, list[dict[str, Any]]]):
 
         return StepResult(
             context=new_context,
-            signal=ExecutionSignal.CONTINUE,
+            signal=Signal.CONTINUE,
             output=patterns,
-            next_step=StepType.GENERATE_HYPOTHESES,
+            next_step=StepType.GENERATE_HYPOTHESES.value,
         )
 
     def _extract_dataset(self, context: InvestigationContext) -> str:

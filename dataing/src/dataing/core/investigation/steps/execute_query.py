@@ -9,9 +9,9 @@ from __future__ import annotations
 from typing import Any, Protocol
 
 from dataing.core.investigation.entities import InvestigationContext
-from dataing.core.investigation.values import ExecutionSignal, StepType
+from dataing.core.investigation.values import StepType
 
-from .protocol import Step, StepResult
+from .protocol import Signal, Step, StepResult
 
 
 class DatabaseProtocol(Protocol):
@@ -63,7 +63,7 @@ class ExecuteQueryStep(Step[dict[str, Any], dict[str, Any]]):
         self,
         context: InvestigationContext,
         input_data: dict[str, Any] | None = None,
-    ) -> StepResult[dict[str, Any]]:
+    ) -> StepResult[InvestigationContext, dict[str, Any]]:
         """Execute SQL query via database adapter.
 
         Args:
@@ -77,7 +77,7 @@ class ExecuteQueryStep(Step[dict[str, Any], dict[str, Any]]):
         if context.current_query is None:
             return StepResult(
                 context=context,
-                signal=ExecutionSignal.FAIL,
+                signal=Signal.FAIL,
                 output={"error": "No query available to execute"},
             )
 
@@ -89,7 +89,7 @@ class ExecuteQueryStep(Step[dict[str, Any], dict[str, Any]]):
         except Exception as e:
             return StepResult(
                 context=context,
-                signal=ExecutionSignal.FAIL,
+                signal=Signal.FAIL,
                 output={"error": f"Query execution failed: {e}"},
             )
 
@@ -103,7 +103,7 @@ class ExecuteQueryStep(Step[dict[str, Any], dict[str, Any]]):
 
         return StepResult(
             context=updated_context,
-            signal=ExecutionSignal.CONTINUE,
+            signal=Signal.CONTINUE,
             output=query_result,
-            next_step=StepType.INTERPRET_EVIDENCE,
+            next_step=StepType.INTERPRET_EVIDENCE.value,
         )

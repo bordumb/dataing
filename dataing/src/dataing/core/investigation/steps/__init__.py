@@ -14,24 +14,25 @@ from .gather_context import ContextBundle, GatherContextStep
 from .generate_hypotheses import GenerateHypothesesStep
 from .generate_query import GenerateQueryStep
 from .interpret_evidence import InterpretEvidenceStep
-from .protocol import BranchRequest, BranchSpec, Step, StepResult
+from .protocol import BranchRequest, BranchSpec, Signal, Step, StepResult
 from .synthesize import SynthesizeStep
 
 __all__ = [
-    "Step",
-    "StepResult",
     "BranchRequest",
     "BranchSpec",
-    "GatherContextStep",
-    "ContextBundle",
     "CheckPatternsStep",
-    "PatternRepositoryProtocol",
     "ClassifyIntentStep",
-    "RefinementIntent",
+    "ContextBundle",
+    "CounterAnalyzeStep",
+    "ExecuteQueryStep",
+    "GatherContextStep",
     "GenerateHypothesesStep",
     "GenerateQueryStep",
-    "ExecuteQueryStep",
     "InterpretEvidenceStep",
+    "PatternRepositoryProtocol",
+    "RefinementIntent",
+    "Signal",
+    "Step",
+    "StepResult",
     "SynthesizeStep",
-    "CounterAnalyzeStep",
 ]

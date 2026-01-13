@@ -9,9 +9,9 @@ from __future__ import annotations
 from typing import Any, Protocol
 
 from dataing.core.investigation.entities import InvestigationContext
-from dataing.core.investigation.values import ExecutionSignal, StepType
+from dataing.core.investigation.values import StepType
 
-from .protocol import Step, StepResult
+from .protocol import Signal, Step, StepResult
 
 
 class SchemaLike(Protocol):
@@ -107,7 +107,7 @@ class GatherContextStep(Step[None, ContextBundle]):
         self,
         context: InvestigationContext,
         input_data: None = None,
-    ) -> StepResult[ContextBundle]:
+    ) -> StepResult[InvestigationContext, ContextBundle]:
         """Gather context from data source.
 
         Args:
@@ -124,7 +124,7 @@ class GatherContextStep(Step[None, ContextBundle]):
         except Exception as e:
             return StepResult(
                 context=context,
-                signal=ExecutionSignal.FAIL,
+                signal=Signal.FAIL,
                 output=ContextBundle(schema_info={"error": f"Context gathering failed: {e}"}),
             )
 
@@ -132,7 +132,7 @@ class GatherContextStep(Step[None, ContextBundle]):
         if gathered.schema.is_empty():
             return StepResult(
                 context=context,
-                signal=ExecutionSignal.FAIL,
+                signal=Signal.FAIL,
                 output=ContextBundle(
                     schema_info={"error": "Empty schema - check connectivity/permissions"}
                 ),
@@ -162,7 +162,7 @@ class GatherContextStep(Step[None, ContextBundle]):
 
         return StepResult(
             context=new_context,
-            signal=ExecutionSignal.CONTINUE,
+            signal=Signal.CONTINUE,
             output=ContextBundle(schema_info=schema_info, lineage_info=lineage_info),
-            next_step=StepType.CHECK_PATTERNS,
+            next_step=StepType.CHECK_PATTERNS.value,
         )

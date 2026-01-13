@@ -10,9 +10,9 @@ from __future__ import annotations
 from typing import Any
 
 from dataing.core.investigation.entities import InvestigationContext
-from dataing.core.investigation.values import ExecutionSignal, StepType
+from dataing.core.investigation.values import StepType
 
-from .protocol import Step, StepResult
+from .protocol import Signal, Step, StepResult
 
 
 class CounterAnalyzeStep(Step[None, dict[str, Any]]):
@@ -44,7 +44,7 @@ class CounterAnalyzeStep(Step[None, dict[str, Any]]):
         self,
         context: InvestigationContext,
         input_data: None = None,
-    ) -> StepResult[dict[str, Any]]:
+    ) -> StepResult[InvestigationContext, dict[str, Any]]:
         """Complete the investigation with the current synthesis.
 
         In the future, this could implement counter-analysis logic.
@@ -59,6 +59,6 @@ class CounterAnalyzeStep(Step[None, dict[str, Any]]):
         """
         return StepResult(
             context=context,
-            signal=ExecutionSignal.COMPLETE,
+            signal=Signal.COMPLETE,
             output=context.current_synthesis,
         )

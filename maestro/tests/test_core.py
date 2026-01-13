@@ -11,13 +11,14 @@ class TestSignal:
     """Tests for Signal enum."""
 
     def test_signal_values(self) -> None:
-        """Signal has exactly 5 core values."""
-        assert len(Signal) == 5
+        """Signal has exactly 6 core values."""
+        assert len(Signal) == 6
         assert Signal.CONTINUE == "continue"
         assert Signal.COMPLETE == "complete"
         assert Signal.FAIL == "fail"
         assert Signal.BRANCH == "branch"
         assert Signal.MERGE == "merge"
+        assert Signal.AWAIT_USER == "await_user"
 
     def test_signal_is_str_enum(self) -> None:
         """Signal values are strings."""
@@ -64,6 +65,14 @@ class TestBranchRequest:
             branches=branches, merge_step="merge", child_start_step="init"
         )
         assert request.child_start_step == "init"
+
+    def test_branch_request_with_branch_type(self) -> None:
+        """BranchRequest accepts optional branch_type."""
+        branches = [BranchSpec(name="a")]
+        request = BranchRequest(
+            branches=branches, merge_step="merge", branch_type="hypothesis"
+        )
+        assert request.branch_type == "hypothesis"
 
     def test_branch_request_is_frozen(self) -> None:
         """BranchRequest is immutable."""

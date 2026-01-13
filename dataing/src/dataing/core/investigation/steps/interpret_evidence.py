@@ -9,9 +9,9 @@ from __future__ import annotations
 from typing import Any, Protocol
 
 from dataing.core.investigation.entities import InvestigationContext
-from dataing.core.investigation.values import ExecutionSignal, StepType
+from dataing.core.investigation.values import StepType
 
-from .protocol import Step, StepResult
+from .protocol import Signal, Step, StepResult
 
 
 class LLMProtocol(Protocol):
@@ -80,7 +80,7 @@ class InterpretEvidenceStep(Step[dict[str, Any], dict[str, Any]]):
         self,
         context: InvestigationContext,
         input_data: dict[str, Any] | None = None,
-    ) -> StepResult[dict[str, Any]]:
+    ) -> StepResult[InvestigationContext, dict[str, Any]]:
         """Interpret query results via LLM.
 
         Args:
@@ -94,7 +94,7 @@ class InterpretEvidenceStep(Step[dict[str, Any], dict[str, Any]]):
         if input_data is None or "hypothesis" not in input_data:
             return StepResult(
                 context=context,
-                signal=ExecutionSignal.FAIL,
+                signal=Signal.FAIL,
                 output={"error": "No hypothesis in input data"},
             )
 
@@ -102,7 +102,7 @@ class InterpretEvidenceStep(Step[dict[str, Any], dict[str, Any]]):
         if context.current_query_result is None:
             return StepResult(
                 context=context,
-                signal=ExecutionSignal.FAIL,
+                signal=Signal.FAIL,
                 output={"error": "No query result available to interpret"},
             )
 
@@ -118,7 +118,7 @@ class InterpretEvidenceStep(Step[dict[str, Any], dict[str, Any]]):
         except Exception as e:
             return StepResult(
                 context=context,
-                signal=ExecutionSignal.FAIL,
+                signal=Signal.FAIL,
                 output={"error": f"Evidence interpretation failed: {e}"},
             )
 
@@ -128,6 +128,6 @@ class InterpretEvidenceStep(Step[dict[str, Any], dict[str, Any]]):
 
         return StepResult(
             context=updated_context,
-            signal=ExecutionSignal.COMPLETE,
+            signal=Signal.COMPLETE,
             output=evidence,
         )

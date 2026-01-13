@@ -10,9 +10,9 @@ from enum import Enum
 from typing import Any, Protocol
 
 from dataing.core.investigation.entities import InvestigationContext
-from dataing.core.investigation.values import ExecutionSignal, StepType
+from dataing.core.investigation.values import StepType
 
-from .protocol import Step, StepResult
+from .protocol import Signal, Step, StepResult
 
 
 class RefinementIntent(str, Enum):
@@ -64,14 +64,14 @@ class LLMProtocol(Protocol):
         ...
 
 
-# Mapping from intent to next step type
-_INTENT_TO_NEXT_STEP: dict[RefinementIntent, StepType] = {
-    RefinementIntent.MODIFY_QUERY: StepType.GENERATE_QUERY,
-    RefinementIntent.NEW_HYPOTHESIS: StepType.GENERATE_HYPOTHESES,
-    RefinementIntent.CLARIFY: StepType.AWAIT_USER,
-    RefinementIntent.REVISE_SYNTHESIS: StepType.SYNTHESIZE,
-    RefinementIntent.DRILL_DOWN: StepType.GENERATE_HYPOTHESES,
-    RefinementIntent.ACKNOWLEDGE: StepType.COMPLETE,
+# Mapping from intent to next step name
+_INTENT_TO_NEXT_STEP: dict[RefinementIntent, str] = {
+    RefinementIntent.MODIFY_QUERY: StepType.GENERATE_QUERY.value,
+    RefinementIntent.NEW_HYPOTHESIS: StepType.GENERATE_HYPOTHESES.value,
+    RefinementIntent.CLARIFY: StepType.AWAIT_USER.value,
+    RefinementIntent.REVISE_SYNTHESIS: StepType.SYNTHESIZE.value,
+    RefinementIntent.DRILL_DOWN: StepType.GENERATE_HYPOTHESES.value,
+    RefinementIntent.ACKNOWLEDGE: StepType.COMPLETE.value,
 }
 
 
@@ -113,7 +113,7 @@ class ClassifyIntentStep(Step[dict[str, Any] | None, RefinementIntent]):
         self,
         context: InvestigationContext,
         input_data: dict[str, Any] | None = None,
-    ) -> StepResult[RefinementIntent]:
+    ) -> StepResult[InvestigationContext, RefinementIntent]:
         """Classify user message intent and route to next step.
 
         Args:
@@ -141,7 +141,7 @@ class ClassifyIntentStep(Step[dict[str, Any] | None, RefinementIntent]):
         except Exception:
             return StepResult(
                 context=context,
-                signal=ExecutionSignal.FAIL,
+                signal=Signal.FAIL,
                 output=None,
             )
 
@@ -170,9 +170,9 @@ class ClassifyIntentStep(Step[dict[str, Any] | None, RefinementIntent]):
             updated_context = context.model_copy(update={"chat_history": new_chat_history})
             return StepResult(
                 context=updated_context,
-                signal=ExecutionSignal.AWAIT_USER,
+                signal=Signal.AWAIT_USER,
                 output=intent,
-                next_step=StepType.AWAIT_USER,
+                next_step=StepType.AWAIT_USER.value,
             )
 
         # Handle ACKNOWLEDGE intent - complete the branch
@@ -180,7 +180,7 @@ class ClassifyIntentStep(Step[dict[str, Any] | None, RefinementIntent]):
             updated_context = context.model_copy(update={"chat_history": new_chat_history})
             return StepResult(
                 context=updated_context,
-                signal=ExecutionSignal.COMPLETE,
+                signal=Signal.COMPLETE,
                 output=intent,
             )
 
@@ -190,7 +190,7 @@ class ClassifyIntentStep(Step[dict[str, Any] | None, RefinementIntent]):
 
         return StepResult(
             context=updated_context,
-            signal=ExecutionSignal.CONTINUE,
+            signal=Signal.CONTINUE,
             output=intent,
             next_step=next_step,
         )

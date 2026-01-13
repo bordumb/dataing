@@ -8,8 +8,13 @@ from __future__ import annotations
 
 from typing import Any
 
-from dataing.core.investigation.steps.protocol import Step
+from maestro import Step
+
+from dataing.core.investigation.entities import InvestigationContext
 from dataing.core.investigation.values import StepType
+
+# Type alias for investigation steps
+InvestigationStep = Step[InvestigationContext, Any, Any]
 
 
 class StepRegistry:
@@ -21,17 +26,18 @@ class StepRegistry:
 
     def __init__(self) -> None:
         """Initialize empty registry."""
-        self._steps: dict[StepType, Step[Any, Any]] = {}
+        self._steps: dict[StepType, InvestigationStep] = {}
 
-    def register(self, step: Step[Any, Any]) -> None:
+    def register(self, step: InvestigationStep) -> None:
         """Register a step implementation.
 
         Args:
-            step: Step instance to register. Uses step.step_type as key.
+            step: Step instance to register. Uses step.name as key.
         """
-        self._steps[step.step_type] = step
+        step_type = StepType(step.name)
+        self._steps[step_type] = step
 
-    def get(self, step_type: StepType) -> Step[Any, Any] | None:
+    def get(self, step_type: StepType) -> InvestigationStep | None:
         """Get step implementation for a step type.
 
         Args:

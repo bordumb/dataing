@@ -123,6 +123,8 @@ class SignalHandler(ABC, Generic[ContextT]):
             return await self.handle_branch(context, result, workflow)
         elif signal == Signal.MERGE:
             return await self.handle_merge(context, result, workflow)
+        elif signal == Signal.AWAIT_USER:
+            return await self.handle_await_user(context, result, workflow)
         else:
             raise SignalHandlerError(f"Unknown signal: {signal}")
 
@@ -221,11 +223,32 @@ class SignalHandler(ABC, Generic[ContextT]):
         """
         ...
 
+    @abstractmethod
+    async def handle_await_user(
+        self,
+        context: ContextT,
+        result: StepResult[ContextT, Any],
+        workflow: Workflow[ContextT],
+    ) -> SignalResult[ContextT]:
+        """Handle AWAIT_USER signal.
+
+        Pauses the workflow to wait for external user input.
+
+        Args:
+            context: Current workflow context.
+            result: The StepResult from step execution.
+            workflow: The workflow instance.
+
+        Returns:
+            SignalResult with should_continue=False (workflow pauses).
+        """
+        ...
+
 
 class DefaultSignalHandler(SignalHandler[ContextT]):
     """Default signal handler with basic implementations.
 
-    Handles CONTINUE, COMPLETE, and FAIL signals.
+    Handles CONTINUE, COMPLETE, FAIL, and AWAIT_USER signals.
     BRANCH and MERGE raise NotImplementedError.
     """
 
@@ -269,6 +292,19 @@ class DefaultSignalHandler(SignalHandler[ContextT]):
             context=result.context,
             should_continue=False,
             error="Workflow failed",
+        )
+
+    async def handle_await_user(
+        self,
+        _context: ContextT,
+        result: StepResult[ContextT, Any],
+        _workflow: Workflow[ContextT],
+    ) -> SignalResult[ContextT]:
+        """Pause workflow for user input."""
+        return SignalResult(
+            context=result.context,
+            should_continue=False,
+            next_step=result.next_step,
         )
 
     async def handle_branch(

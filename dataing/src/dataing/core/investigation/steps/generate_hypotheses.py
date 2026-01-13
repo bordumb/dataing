@@ -10,9 +10,9 @@ from typing import Any, Protocol
 
 from dataing.core.domain_types import Hypothesis
 from dataing.core.investigation.entities import InvestigationContext
-from dataing.core.investigation.values import BranchType, ExecutionSignal, StepType
+from dataing.core.investigation.values import BranchType, StepType
 
-from .protocol import BranchRequest, BranchSpec, Step, StepResult
+from .protocol import BranchRequest, BranchSpec, Signal, Step, StepResult
 
 
 class LLMProtocol(Protocol):
@@ -83,7 +83,7 @@ class GenerateHypothesesStep(Step[None, list[Hypothesis]]):
         self,
         context: InvestigationContext,
         input_data: None = None,
-    ) -> StepResult[list[Hypothesis]]:
+    ) -> StepResult[InvestigationContext, list[Hypothesis]]:
         """Generate hypotheses via LLM.
 
         Args:
@@ -139,12 +139,12 @@ class GenerateHypothesesStep(Step[None, list[Hypothesis]]):
 
         return StepResult(
             context=new_context,
-            signal=ExecutionSignal.BRANCH,
+            signal=Signal.BRANCH,
             output=hypotheses,
             branch_request=BranchRequest(
-                branch_type=BranchType.HYPOTHESIS,
                 branches=branch_specs,
-                merge_step=StepType.SYNTHESIZE,
-                child_start_step=StepType.GENERATE_QUERY,
+                merge_step=StepType.SYNTHESIZE.value,
+                child_start_step=StepType.GENERATE_QUERY.value,
+                branch_type=BranchType.HYPOTHESIS.value,
             ),
         )

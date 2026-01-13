@@ -40,11 +40,14 @@ class BranchRequest:
         merge_step: Name of the step that will merge branch results.
         child_start_step: Optional step name to start each child at.
             If None, children start at the workflow's default start step.
+        branch_type: Optional string categorizing the type of branch.
+            Domains can use this for tracking/routing (e.g., "hypothesis", "user").
     """
 
     branches: list[BranchSpec]
     merge_step: str
     child_start_step: str | None = None
+    branch_type: str | None = None
 
 
 @dataclass(frozen=True)

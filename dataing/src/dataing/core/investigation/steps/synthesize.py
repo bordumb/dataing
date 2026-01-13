@@ -10,9 +10,9 @@ from __future__ import annotations
 from typing import Any, Protocol
 
 from dataing.core.investigation.entities import InvestigationContext
-from dataing.core.investigation.values import ExecutionSignal, StepType
+from dataing.core.investigation.values import StepType
 
-from .protocol import Step, StepResult
+from .protocol import Signal, Step, StepResult
 
 
 class LLMProtocol(Protocol):
@@ -84,7 +84,7 @@ class SynthesizeStep(Step[None, dict[str, Any]]):
         self,
         context: InvestigationContext,
         input_data: None = None,
-    ) -> StepResult[dict[str, Any]]:
+    ) -> StepResult[InvestigationContext, dict[str, Any]]:
         """Synthesize evidence into root cause finding via LLM.
 
         Args:
@@ -106,7 +106,7 @@ class SynthesizeStep(Step[None, dict[str, Any]]):
         except Exception:
             return StepResult(
                 context=context,
-                signal=ExecutionSignal.FAIL,
+                signal=Signal.FAIL,
                 output=None,
             )
 
@@ -118,13 +118,13 @@ class SynthesizeStep(Step[None, dict[str, Any]]):
         if confidence >= self.confidence_threshold:
             return StepResult(
                 context=updated_context,
-                signal=ExecutionSignal.COMPLETE,
+                signal=Signal.COMPLETE,
                 output=synthesis,
             )
         else:
             return StepResult(
                 context=updated_context,
-                signal=ExecutionSignal.CONTINUE,
+                signal=Signal.CONTINUE,
                 output=synthesis,
-                next_step=StepType.COUNTER_ANALYZE,
+                next_step=StepType.COUNTER_ANALYZE.value,
             )

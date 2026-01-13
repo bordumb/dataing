@@ -17,6 +17,7 @@ class Signal(str, Enum):
     - FAIL: Workflow failed
     - BRANCH: Create child workflows for parallel execution
     - MERGE: Await convergence of child branches
+    - AWAIT_USER: Pause workflow and wait for external input
     """
 
     CONTINUE = "continue"
@@ -24,3 +25,4 @@ class Signal(str, Enum):
     FAIL = "fail"
     BRANCH = "branch"
     MERGE = "merge"
+    AWAIT_USER = "await_user"

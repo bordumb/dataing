@@ -1,16 +1,29 @@
 {
-  "assignee": null,
+  "assignee": "bordumbb@gmail.com",
   "claim_note": "",
-  "claimed_at": null,
+  "claimed_at": "2026-01-13T21:00:39.155628Z",
   "created_at": "2026-01-13T20:16:27.781711Z",
   "depends_on": [
     "fn-6.5"
   ],
   "epic": "fn-6",
+  "evidence": {
+    "files_modified": [
+      "dataing-ee/src/dataing_ee/entrypoints/api/routes/sso.py",
+      "dataing-ee/tests/unit/entrypoints/api/routes/test_sso.py"
+    ],
+    "new_tests": [
+      "test_callback_links_existing_user_with_verified_email",
+      "test_callback_rejects_link_when_email_not_verified"
+    ],
+    "tests": [
+      "dataing-ee/tests/unit/entrypoints/api/routes/test_sso.py (19 tests)"
+    ]
+  },
   "id": "fn-6.6",
   "priority": null,
   "spec_path": ".flow/tasks/fn-6.6.md",
-  "status": "todo",
+  "status": "done",
   "title": "Link Existing Users on SSO Login",
-  "updated_at": "2026-01-13T20:18:23.298357Z"
+  "updated_at": "2026-01-13T21:02:41.081313Z"
 }

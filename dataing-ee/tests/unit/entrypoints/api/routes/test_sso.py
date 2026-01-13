@@ -750,3 +750,205 @@ class TestCallbackEndpoint:
 
         assert response.status_code == 400
         assert "email" in response.json()["detail"].lower()
+
+    def test_callback_links_existing_user_with_verified_email(
+        self, client: TestClient, mock_state_repo: MagicMock, mock_sso_repo: MagicMock
+    ) -> None:
+        """Links existing user when email is verified by IdP."""
+        now = datetime.now(UTC)
+        org_id = uuid4()
+        config_id = uuid4()
+        user_id = uuid4()
+
+        mock_state_repo.validate_and_consume = AsyncMock(
+            return_value=SSOState(
+                state_id="valid-state",
+                nonce="test-nonce",
+                org_id=org_id,
+                redirect_uri=None,
+                created_at=now - timedelta(minutes=1),
+                expires_at=now + timedelta(minutes=9),
+                consumed_at=now,
+            )
+        )
+
+        mock_sso_repo.get_sso_config = AsyncMock(
+            return_value=SSOConfig(
+                id=config_id,
+                org_id=org_id,
+                provider_type=SSOProviderType.OIDC,
+                display_name="Okta",
+                is_enabled=True,
+                oidc_issuer_url="https://example.okta.com",
+                oidc_client_id="client-id",
+                saml_idp_metadata_url=None,
+                saml_idp_entity_id=None,
+                saml_certificate=None,
+                created_at=now,
+                updated_at=now,
+            )
+        )
+        mock_sso_repo.get_decrypted_client_secret = AsyncMock(
+            return_value="client-secret"
+        )
+        mock_sso_repo.get_sso_identity = AsyncMock(return_value=None)
+        mock_sso_repo.create_sso_identity = AsyncMock(
+            return_value=SSOIdentity(
+                id=uuid4(),
+                user_id=user_id,
+                sso_config_id=config_id,
+                idp_user_id="idp-user-123",
+                created_at=now,
+            )
+        )
+
+        with (
+            patch(
+                "dataing_ee.entrypoints.api.routes.sso.OIDCProvider"
+            ) as mock_provider_class,
+            patch(
+                "dataing_ee.entrypoints.api.routes.sso.PostgresAuthRepository"
+            ) as mock_auth_repo_class,
+        ):
+            mock_provider = MagicMock()
+            mock_provider.exchange_code = AsyncMock(
+                return_value=OIDCTokens(
+                    access_token="access-token",
+                    id_token="id-token",
+                    token_type="Bearer",
+                    expires_in=3600,
+                    refresh_token=None,
+                )
+            )
+            # Email is verified by IdP
+            mock_provider.verify_id_token = AsyncMock(
+                return_value={
+                    "sub": "idp-user-123",
+                    "email": "alice@example.com",
+                    "email_verified": True,
+                    "nonce": "test-nonce",
+                }
+            )
+            mock_provider_class.return_value = mock_provider
+
+            # Existing user found by email
+            mock_auth_repo = MagicMock()
+            mock_auth_repo.get_user_by_email = AsyncMock(
+                return_value=User(
+                    id=user_id,
+                    email="alice@example.com",
+                    name="Alice Smith",
+                    is_active=True,
+                    created_at=now - timedelta(days=30),
+                )
+            )
+            mock_auth_repo.get_user_org_membership = AsyncMock(
+                return_value=MagicMock(user_id=user_id, org_id=org_id, role=OrgRole.MEMBER)
+            )
+            mock_auth_repo.get_user_teams = AsyncMock(return_value=[])
+            mock_auth_repo_class.return_value = mock_auth_repo
+
+            response = client.get(
+                "/auth/sso/callback",
+                params={"code": "auth-code-123", "state": "valid-state"},
+            )
+
+        assert response.status_code == 200
+        # Should have linked existing user, not created new one
+        mock_auth_repo.create_user.assert_not_called()
+        # SSO identity should be created
+        mock_sso_repo.create_sso_identity.assert_called_once()
+
+    def test_callback_rejects_link_when_email_not_verified(
+        self, client: TestClient, mock_state_repo: MagicMock, mock_sso_repo: MagicMock
+    ) -> None:
+        """Rejects linking existing user when email is not verified by IdP."""
+        now = datetime.now(UTC)
+        org_id = uuid4()
+        config_id = uuid4()
+        user_id = uuid4()
+
+        mock_state_repo.validate_and_consume = AsyncMock(
+            return_value=SSOState(
+                state_id="valid-state",
+                nonce="test-nonce",
+                org_id=org_id,
+                redirect_uri=None,
+                created_at=now - timedelta(minutes=1),
+                expires_at=now + timedelta(minutes=9),
+                consumed_at=now,
+            )
+        )
+
+        mock_sso_repo.get_sso_config = AsyncMock(
+            return_value=SSOConfig(
+                id=config_id,
+                org_id=org_id,
+                provider_type=SSOProviderType.OIDC,
+                display_name="Okta",
+                is_enabled=True,
+                oidc_issuer_url="https://example.okta.com",
+                oidc_client_id="client-id",
+                saml_idp_metadata_url=None,
+                saml_idp_entity_id=None,
+                saml_certificate=None,
+                created_at=now,
+                updated_at=now,
+            )
+        )
+        mock_sso_repo.get_decrypted_client_secret = AsyncMock(
+            return_value="client-secret"
+        )
+        mock_sso_repo.get_sso_identity = AsyncMock(return_value=None)
+
+        with (
+            patch(
+                "dataing_ee.entrypoints.api.routes.sso.OIDCProvider"
+            ) as mock_provider_class,
+            patch(
+                "dataing_ee.entrypoints.api.routes.sso.PostgresAuthRepository"
+            ) as mock_auth_repo_class,
+        ):
+            mock_provider = MagicMock()
+            mock_provider.exchange_code = AsyncMock(
+                return_value=OIDCTokens(
+                    access_token="access-token",
+                    id_token="id-token",
+                    token_type="Bearer",
+                    expires_in=3600,
+                    refresh_token=None,
+                )
+            )
+            # Email is NOT verified by IdP
+            mock_provider.verify_id_token = AsyncMock(
+                return_value={
+                    "sub": "idp-user-123",
+                    "email": "alice@example.com",
+                    "email_verified": False,
+                    "nonce": "test-nonce",
+                }
+            )
+            mock_provider_class.return_value = mock_provider
+
+            # Existing user found by email
+            mock_auth_repo = MagicMock()
+            mock_auth_repo.get_user_by_email = AsyncMock(
+                return_value=User(
+                    id=user_id,
+                    email="alice@example.com",
+                    name="Alice Smith",
+                    is_active=True,
+                    created_at=now - timedelta(days=30),
+                )
+            )
+            mock_auth_repo_class.return_value = mock_auth_repo
+
+            response = client.get(
+                "/auth/sso/callback",
+                params={"code": "auth-code-123", "state": "valid-state"},
+            )
+
+        assert response.status_code == 400
+        assert "verified" in response.json()["detail"].lower()
+        # Should NOT have linked or created
+        mock_sso_repo.create_sso_identity.assert_not_called()

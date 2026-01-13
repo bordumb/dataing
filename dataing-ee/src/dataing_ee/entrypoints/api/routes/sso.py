@@ -322,11 +322,14 @@ async def sso_callback(
     # Extract user info from claims
     idp_user_id = claims["sub"]
     email = claims.get("email")
+    email_verified = claims.get("email_verified", False)
+
     if not email:
         # Try to get email from userinfo endpoint
         try:
             user_info = await provider.get_user_info(tokens.access_token)
             email = user_info.email
+            email_verified = user_info.email_verified
         except Exception as e:
             logger.error(f"Failed to get user info: {e}")
             raise HTTPException(
@@ -358,14 +361,34 @@ async def sso_callback(
             )
         logger.info(f"SSO login for existing user: {user.id}")
     else:
-        # No SSO identity - JIT provision user
+        # No SSO identity - JIT provision user or link existing
         # First check if user exists by email
-        user = await auth_repo.get_user_by_email(email)
+        existing_user = await auth_repo.get_user_by_email(email)
 
-        if user:
-            # User exists but no SSO identity - link them
-            # (fn-6.6 will handle the full linking flow with verification)
-            logger.info(f"Linking existing user {user.id} to SSO identity")
+        if existing_user:
+            # User exists but no SSO identity - link them if email is verified
+            if not email_verified:
+                # Security: Don't link accounts without verified email
+                logger.warning(
+                    f"SSO login blocked: unverified email {email} for existing user"
+                )
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=(
+                        "Cannot link SSO to existing account: email not verified by "
+                        "identity provider. Please verify your email with your IdP."
+                    ),
+                )
+            user = existing_user
+            logger.info(
+                "Linking existing user to SSO identity",
+                extra={
+                    "user_id": str(user.id),
+                    "email": email,
+                    "idp_user_id": idp_user_id,
+                    "org_id": str(sso_state.org_id),
+                },
+            )
         else:
             # Create new user (JIT provisioning)
             name = claims.get("name") or claims.get("given_name")

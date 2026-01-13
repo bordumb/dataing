@@ -35,9 +35,15 @@ Handle the case where a user already exists with password auth and logs in via S
 - [ ] Audit log entry for account linking
 - [ ] Unit tests for linking scenarios
 ## Done summary
-TBD
+Implemented secure account linking for existing users on SSO login:
 
+- Extract email_verified claim from ID token or userinfo endpoint
+- Only link existing users to SSO if email is verified by IdP
+- Block account linking with unverified email (security requirement)
+- Add structured logging with user_id, email, idp_user_id, org_id
+- JIT provisioning for new users continues without email verification check
+- Added 2 new tests for linking scenarios (verified and unverified email)
 ## Evidence
 - Commits:
-- Tests:
+- Tests: dataing-ee/tests/unit/entrypoints/api/routes/test_sso.py (19 tests)
 - PRs:

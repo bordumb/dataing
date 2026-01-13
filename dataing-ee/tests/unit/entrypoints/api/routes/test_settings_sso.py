@@ -1,7 +1,7 @@
 """Tests for SSO admin configuration routes."""
 
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from unittest.mock import AsyncMock, MagicMock, patch
 from uuid import UUID, uuid4
 
@@ -349,3 +349,277 @@ class TestSSOConfigTest:
         data = response.json()
         assert data["success"] is False
         assert "connect" in data["message"].lower()
+
+
+class TestDomainClaims:
+    """Tests for domain claim endpoints."""
+
+    def test_list_domains_empty(
+        self, client: TestClient, mock_sso_repo: MagicMock
+    ) -> None:
+        """Returns empty list when no domains claimed."""
+        mock_sso_repo.get_domain_claims_for_org = AsyncMock(return_value=[])
+
+        response = client.get("/settings/sso/domains")
+
+        assert response.status_code == 200
+        assert response.json() == []
+
+    def test_list_domains_with_claims(
+        self, client: TestClient, mock_sso_repo: MagicMock, tenant_id: UUID
+    ) -> None:
+        """Returns domain claims for organization."""
+        from dataing_ee.core.sso import DomainClaim
+
+        now = datetime.now(UTC)
+        claim_id = uuid4()
+
+        mock_sso_repo.get_domain_claims_for_org = AsyncMock(
+            return_value=[
+                DomainClaim(
+                    id=claim_id,
+                    org_id=tenant_id,
+                    domain="acme.com",
+                    is_verified=False,
+                    verification_token="abc123",
+                    verified_at=None,
+                    expires_at=now + timedelta(days=7),
+                    created_at=now,
+                )
+            ]
+        )
+
+        response = client.get("/settings/sso/domains")
+
+        assert response.status_code == 200
+        data = response.json()
+        assert len(data) == 1
+        assert data[0]["domain"] == "acme.com"
+        assert data[0]["is_verified"] is False
+        assert data[0]["verification_token"] == "abc123"
+        assert data[0]["dns_record"] == "_dataing.acme.com"
+
+    def test_claim_domain_success(
+        self, client: TestClient, mock_sso_repo: MagicMock, tenant_id: UUID
+    ) -> None:
+        """Successfully claims a new domain."""
+        from dataing_ee.core.sso import DomainClaim
+
+        now = datetime.now(UTC)
+        claim_id = uuid4()
+
+        mock_sso_repo.get_domain_claim = AsyncMock(return_value=None)
+        mock_sso_repo.create_domain_claim = AsyncMock(
+            return_value=DomainClaim(
+                id=claim_id,
+                org_id=tenant_id,
+                domain="acme.com",
+                is_verified=False,
+                verification_token="test-token",
+                verified_at=None,
+                expires_at=now + timedelta(days=7),
+                created_at=now,
+            )
+        )
+
+        response = client.post(
+            "/settings/sso/domains",
+            json={"domain": "acme.com"},
+        )
+
+        assert response.status_code == 201
+        data = response.json()
+        assert data["domain"] == "acme.com"
+        assert data["is_verified"] is False
+        assert data["dns_record"] == "_dataing.acme.com"
+
+    def test_claim_domain_already_verified_by_other(
+        self, client: TestClient, mock_sso_repo: MagicMock, tenant_id: UUID
+    ) -> None:
+        """Rejects claiming domain already verified by another org."""
+        from dataing_ee.core.sso import DomainClaim
+
+        now = datetime.now(UTC)
+        other_org_id = uuid4()
+
+        mock_sso_repo.get_domain_claim = AsyncMock(
+            return_value=DomainClaim(
+                id=uuid4(),
+                org_id=other_org_id,  # Different org
+                domain="acme.com",
+                is_verified=True,
+                verification_token=None,
+                verified_at=now,
+                expires_at=None,
+                created_at=now,
+            )
+        )
+
+        response = client.post(
+            "/settings/sso/domains",
+            json={"domain": "acme.com"},
+        )
+
+        assert response.status_code == 409
+        assert "already claimed" in response.json()["detail"].lower()
+
+    def test_delete_domain_success(
+        self, client: TestClient, mock_sso_repo: MagicMock, tenant_id: UUID
+    ) -> None:
+        """Successfully deletes a domain claim."""
+        from dataing_ee.core.sso import DomainClaim
+
+        now = datetime.now(UTC)
+        claim_id = uuid4()
+
+        mock_sso_repo.get_domain_claim = AsyncMock(
+            return_value=DomainClaim(
+                id=claim_id,
+                org_id=tenant_id,
+                domain="acme.com",
+                is_verified=False,
+                verification_token="token",
+                verified_at=None,
+                expires_at=now + timedelta(days=7),
+                created_at=now,
+            )
+        )
+        mock_sso_repo.delete_domain_claim = AsyncMock(return_value=True)
+
+        response = client.delete("/settings/sso/domains/acme.com")
+
+        assert response.status_code == 204
+
+    def test_delete_domain_not_found(
+        self, client: TestClient, mock_sso_repo: MagicMock
+    ) -> None:
+        """Returns 404 when domain claim not found."""
+        mock_sso_repo.get_domain_claim = AsyncMock(return_value=None)
+
+        response = client.delete("/settings/sso/domains/unknown.com")
+
+        assert response.status_code == 404
+
+    def test_delete_domain_wrong_org(
+        self, client: TestClient, mock_sso_repo: MagicMock
+    ) -> None:
+        """Returns 403 when domain belongs to another org."""
+        from dataing_ee.core.sso import DomainClaim
+
+        now = datetime.now(UTC)
+        other_org_id = uuid4()
+
+        mock_sso_repo.get_domain_claim = AsyncMock(
+            return_value=DomainClaim(
+                id=uuid4(),
+                org_id=other_org_id,
+                domain="acme.com",
+                is_verified=True,
+                verification_token=None,
+                verified_at=now,
+                expires_at=None,
+                created_at=now,
+            )
+        )
+
+        response = client.delete("/settings/sso/domains/acme.com")
+
+        assert response.status_code == 403
+
+    def test_verify_domain_success(
+        self, client: TestClient, mock_sso_repo: MagicMock, tenant_id: UUID
+    ) -> None:
+        """Successfully verifies a domain."""
+        from dataing_ee.core.sso import DomainClaim
+
+        now = datetime.now(UTC)
+        claim_id = uuid4()
+
+        mock_sso_repo.get_domain_claim = AsyncMock(
+            return_value=DomainClaim(
+                id=claim_id,
+                org_id=tenant_id,
+                domain="acme.com",
+                is_verified=False,
+                verification_token="token123",
+                verified_at=None,
+                expires_at=now + timedelta(days=7),
+                created_at=now,
+            )
+        )
+        mock_sso_repo.verify_domain_claim = AsyncMock(return_value=True)
+
+        with patch(
+            "dataing_ee.core.sso.dns_verification.verify_domain_dns"
+        ) as mock_verify:
+            mock_verify.return_value = True
+
+            response = client.post("/settings/sso/domains/acme.com/verify")
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["success"] is True
+        assert data["is_verified"] is True
+
+    def test_verify_domain_dns_failure(
+        self, client: TestClient, mock_sso_repo: MagicMock, tenant_id: UUID
+    ) -> None:
+        """Returns failure when DNS verification fails."""
+        from dataing_ee.core.sso import DomainClaim
+
+        now = datetime.now(UTC)
+        claim_id = uuid4()
+
+        mock_sso_repo.get_domain_claim = AsyncMock(
+            return_value=DomainClaim(
+                id=claim_id,
+                org_id=tenant_id,
+                domain="acme.com",
+                is_verified=False,
+                verification_token="token123",
+                verified_at=None,
+                expires_at=now + timedelta(days=7),
+                created_at=now,
+            )
+        )
+
+        with patch(
+            "dataing_ee.core.sso.dns_verification.verify_domain_dns"
+        ) as mock_verify:
+            mock_verify.return_value = False
+
+            response = client.post("/settings/sso/domains/acme.com/verify")
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["success"] is False
+        assert data["is_verified"] is False
+
+    def test_verify_domain_already_verified(
+        self, client: TestClient, mock_sso_repo: MagicMock, tenant_id: UUID
+    ) -> None:
+        """Returns success when domain is already verified."""
+        from dataing_ee.core.sso import DomainClaim
+
+        now = datetime.now(UTC)
+
+        mock_sso_repo.get_domain_claim = AsyncMock(
+            return_value=DomainClaim(
+                id=uuid4(),
+                org_id=tenant_id,
+                domain="acme.com",
+                is_verified=True,
+                verification_token=None,
+                verified_at=now,
+                expires_at=None,
+                created_at=now,
+            )
+        )
+
+        response = client.post("/settings/sso/domains/acme.com/verify")
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["success"] is True
+        assert data["is_verified"] is True
+        assert "already" in data["message"].lower()

@@ -1,16 +1,25 @@
 {
-  "assignee": null,
+  "assignee": "bordumbb@gmail.com",
   "claim_note": "",
-  "claimed_at": null,
+  "claimed_at": "2026-01-13T02:31:44.061914Z",
   "created_at": "2026-01-13T00:33:16.869551Z",
   "depends_on": [
     "fn-5.6"
   ],
   "epic": "fn-5",
+  "evidence": {
+    "commits": [],
+    "prs": [],
+    "tests": [
+      "uv run mypy bond/src/bond/maestro --strict",
+      "uv run pytest bond/tests/unit/maestro -v (8 passed)",
+      "uv run python -c 'from bond import BondStep'"
+    ]
+  },
   "id": "fn-5.7",
   "priority": null,
   "spec_path": ".flow/tasks/fn-5.7.md",
-  "status": "todo",
+  "status": "done",
   "title": "Create Bond-Maestro Bridge",
-  "updated_at": "2026-01-13T00:36:30.659515Z"
+  "updated_at": "2026-01-13T02:34:21.387086Z"
 }

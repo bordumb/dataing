@@ -64,9 +64,24 @@ Create the BondStep base class for AI-powered steps.
 - [ ] Unit test: Mock BondStep implementation executes correctly
 - [ ] No circular dependency between bond and maestro
 ## Done summary
-TBD
+- Created bond/src/bond/maestro/ module with BondStep base class
+- BondStep is ABC with abstract methods: create_agent(), build_prompt(), map_response()
+- execute() orchestrates agent call using template method pattern
+- BondStep satisfies maestro.Step protocol via name property and execute()
+- StreamHandlers can be passed to BondStep for real-time callbacks
+- Exported from bond package: `from bond import BondStep`
+- Added 8 unit tests verifying protocol compliance and execution
 
+Why:
+- BondStep provides clean bridge between BondAgent and maestro.Workflow
+- Template method pattern separates concerns (agent creation, prompting, response mapping)
+- Handles agent errors gracefully with FAIL signal
+
+Verification:
+- mypy passes on bond/src/bond/maestro --strict
+- 8 unit tests pass (test_bond_step.py)
+- Import test: `from bond import BondStep` works
 ## Evidence
 - Commits:
-- Tests:
+- Tests: uv run mypy bond/src/bond/maestro --strict, uv run pytest bond/tests/unit/maestro -v (8 passed), uv run python -c 'from bond import BondStep'
 - PRs:

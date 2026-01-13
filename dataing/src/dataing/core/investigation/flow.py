@@ -19,6 +19,12 @@ from maestro import (
     Workflow,
 )
 
+from dataing.adapters.investigation.llm_adapter import (
+    HypothesisLLMAdapter,
+    InterpretEvidenceLLMAdapter,
+    QueryLLMAdapter,
+    SynthesisLLMAdapter,
+)
 from dataing.core.investigation.entities import InvestigationContext
 from dataing.core.investigation.steps import (
     CheckPatternsStep,
@@ -33,15 +39,8 @@ from dataing.core.investigation.steps import (
 from dataing.core.investigation.values import StepType
 
 if TYPE_CHECKING:
+    from dataing.agents.client import AgentClient
     from dataing.core.investigation.steps.gather_context import ContextEngineProtocol
-    from dataing.core.investigation.steps.generate_hypotheses import (
-        LLMProtocol as HypothesisLLM,
-    )
-    from dataing.core.investigation.steps.generate_query import LLMProtocol as QueryLLM
-    from dataing.core.investigation.steps.interpret_evidence import (
-        LLMProtocol as EvidenceLLM,
-    )
-    from dataing.core.investigation.steps.synthesize import LLMProtocol as SynthesisLLM
     from dataing.core.investigation.steps.execute_query import DatabaseProtocol
     from dataing.core.investigation.pattern_extraction import PatternRepositoryProtocol
 
@@ -119,7 +118,7 @@ class InvestigationSignalHandler(BranchingSignalHandler[InvestigationContext]):
 def build_investigation_workflow(
     *,
     context_engine: ContextEngineProtocol,
-    llm: HypothesisLLM | QueryLLM | EvidenceLLM | SynthesisLLM,
+    llm: AgentClient,
     database: DatabaseProtocol,
     pattern_repository: PatternRepositoryProtocol,
     max_hypotheses: int = 5,
@@ -132,7 +131,7 @@ def build_investigation_workflow(
 
     Args:
         context_engine: Engine for gathering schema/lineage context.
-        llm: LLM client for hypothesis generation, queries, and synthesis.
+        llm: AgentClient for LLM operations (wrapped with adapters internally).
         database: Database adapter for query execution.
         pattern_repository: Repository for historical pattern matching.
         max_hypotheses: Maximum hypotheses to generate (default 5).
@@ -143,14 +142,20 @@ def build_investigation_workflow(
     """
     workflow: Workflow[InvestigationContext] = Workflow()
 
+    # Create LLM adapters that wrap AgentClient with step-compatible interfaces
+    hypothesis_llm = HypothesisLLMAdapter(llm)
+    query_llm = QueryLLMAdapter(llm)
+    evidence_llm = InterpretEvidenceLLMAdapter(llm)
+    synthesis_llm = SynthesisLLMAdapter(llm)
+
     # Add steps in logical order (actual routing controlled by signals)
-    workflow.add_step(GatherContextStep(context_engine))
+    workflow.add_step(GatherContextStep(context_engine, database))
     workflow.add_step(CheckPatternsStep(pattern_repository))
-    workflow.add_step(GenerateHypothesesStep(llm, max_hypotheses))
-    workflow.add_step(GenerateQueryStep(llm))
+    workflow.add_step(GenerateHypothesesStep(hypothesis_llm, max_hypotheses))
+    workflow.add_step(GenerateQueryStep(query_llm))
     workflow.add_step(ExecuteQueryStep(database))
-    workflow.add_step(InterpretEvidenceStep(llm))
-    workflow.add_step(SynthesizeStep(llm, confidence_threshold))
+    workflow.add_step(InterpretEvidenceStep(evidence_llm))
+    workflow.add_step(SynthesizeStep(synthesis_llm, confidence_threshold))
     workflow.add_step(CounterAnalyzeStep())
 
     # Configure signal handler for branching and merging

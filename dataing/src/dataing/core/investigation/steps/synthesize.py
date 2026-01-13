@@ -103,11 +103,11 @@ class SynthesizeStep(Step[None, dict[str, Any]]):
                 hypotheses=context.hypotheses,
                 alert_summary=context.alert_summary,
             )
-        except Exception:
+        except Exception as e:
             return StepResult(
                 context=context,
                 signal=Signal.FAIL,
-                output=None,
+                error=f"Synthesis failed: {e}",
             )
 
         # Update context with synthesis

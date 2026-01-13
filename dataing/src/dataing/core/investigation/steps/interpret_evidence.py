@@ -90,12 +90,18 @@ class InterpretEvidenceStep(Step[dict[str, Any], dict[str, Any]]):
         Returns:
             StepResult with COMPLETE signal and evidence dict.
         """
-        # Validate input_data contains hypothesis
-        if input_data is None or "hypothesis" not in input_data:
+        # Get hypothesis from input_data or context
+        hypothesis: dict[str, Any] | None = None
+        if input_data and "hypothesis" in input_data:
+            hypothesis = input_data["hypothesis"]
+        elif context.current_hypothesis is not None:
+            hypothesis = context.current_hypothesis
+
+        if hypothesis is None:
             return StepResult(
                 context=context,
                 signal=Signal.FAIL,
-                output={"error": "No hypothesis in input data"},
+                error="No hypothesis available for interpretation",
             )
 
         # Validate context has current_query_result
@@ -103,10 +109,8 @@ class InterpretEvidenceStep(Step[dict[str, Any], dict[str, Any]]):
             return StepResult(
                 context=context,
                 signal=Signal.FAIL,
-                output={"error": "No query result available to interpret"},
+                error="No query result available to interpret",
             )
-
-        hypothesis: dict[str, Any] = input_data["hypothesis"]
 
         # Interpret evidence via LLM
         try:
@@ -119,7 +123,7 @@ class InterpretEvidenceStep(Step[dict[str, Any], dict[str, Any]]):
             return StepResult(
                 context=context,
                 signal=Signal.FAIL,
-                output={"error": f"Evidence interpretation failed: {e}"},
+                error=f"Evidence interpretation failed: {e}",
             )
 
         # Update context by appending evidence to the list

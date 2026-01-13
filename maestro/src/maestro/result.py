@@ -66,6 +66,7 @@ class StepResult(Generic[ContextT, OutputT]):
         context: The (possibly updated) workflow context.
         signal: Control flow signal for the workflow engine.
         output: Optional step-specific output data.
+        error: Error message (when signal=FAIL).
         next_step: Explicit next step name (when signal=CONTINUE).
             If None, the workflow uses its default routing.
         branch_request: Branch specifications (required when signal=BRANCH).
@@ -74,6 +75,7 @@ class StepResult(Generic[ContextT, OutputT]):
     context: ContextT
     signal: Signal
     output: OutputT | None = None
+    error: str | None = None
     next_step: str | None = None
     branch_request: BranchRequest | None = None
 

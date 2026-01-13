@@ -138,11 +138,11 @@ class ClassifyIntentStep(Step[dict[str, Any] | None, RefinementIntent]):
                 message=user_message,
                 context=context.current_synthesis,
             )
-        except Exception:
+        except Exception as e:
             return StepResult(
                 context=context,
                 signal=Signal.FAIL,
-                output=None,
+                error=f"Intent classification failed: {e}",
             )
 
         # Add user message to chat_history

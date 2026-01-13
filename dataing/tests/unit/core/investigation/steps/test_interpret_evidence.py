@@ -7,7 +7,7 @@ import pytest
 
 from dataing.core.investigation.entities import InvestigationContext
 from dataing.core.investigation.steps.interpret_evidence import InterpretEvidenceStep
-from dataing.core.investigation.values import ExecutionSignal, StepType
+from maestro import Signal, StepType
 
 
 @pytest.fixture
@@ -128,7 +128,7 @@ class TestInterpretEvidenceStep:
 
         result = await step.execute(sample_context, input_data)
 
-        assert result.signal == ExecutionSignal.COMPLETE
+        assert result.signal == Signal.COMPLETE
 
     @pytest.mark.asyncio
     async def test_execute_adds_evidence_to_context(
@@ -225,7 +225,7 @@ class TestInterpretEvidenceStep:
         # No input_data (hypothesis missing)
         result = await step.execute(sample_context, None)
 
-        assert result.signal == ExecutionSignal.FAIL
+        assert result.signal == Signal.FAIL
         mock_llm.interpret_evidence.assert_not_called()
 
     @pytest.mark.asyncio
@@ -240,7 +240,7 @@ class TestInterpretEvidenceStep:
 
         result = await step.execute(sample_context, input_data)
 
-        assert result.signal == ExecutionSignal.FAIL
+        assert result.signal == Signal.FAIL
         mock_llm.interpret_evidence.assert_not_called()
 
     @pytest.mark.asyncio
@@ -261,7 +261,7 @@ class TestInterpretEvidenceStep:
 
         result = await step.execute(context_no_result, input_data)
 
-        assert result.signal == ExecutionSignal.FAIL
+        assert result.signal == Signal.FAIL
         mock_llm.interpret_evidence.assert_not_called()
 
     @pytest.mark.asyncio
@@ -278,4 +278,4 @@ class TestInterpretEvidenceStep:
 
         result = await step.execute(sample_context, input_data)
 
-        assert result.signal == ExecutionSignal.FAIL
+        assert result.signal == Signal.FAIL

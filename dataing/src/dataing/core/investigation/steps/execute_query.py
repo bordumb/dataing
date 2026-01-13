@@ -78,25 +78,28 @@ class ExecuteQueryStep(Step[dict[str, Any], dict[str, Any]]):
             return StepResult(
                 context=context,
                 signal=Signal.FAIL,
-                output={"error": "No query available to execute"},
+                error="No query available to execute",
             )
 
         # Execute query via database adapter
         try:
-            query_result: dict[str, Any] = await self.database.execute_query(
-                context.current_query
-            )
+            query_result = await self.database.execute_query(context.current_query)
+            # Convert QueryResult to dict if it's a Pydantic model
+            if hasattr(query_result, "model_dump"):
+                query_result_dict: dict[str, Any] = query_result.model_dump()
+            else:
+                query_result_dict = query_result
         except Exception as e:
             return StepResult(
                 context=context,
                 signal=Signal.FAIL,
-                output={"error": f"Query execution failed: {e}"},
+                error=f"Query execution failed: {e}",
             )
 
         # Update context with query result and incremented query count
         updated_context = context.model_copy(
             update={
-                "current_query_result": query_result,
+                "current_query_result": query_result_dict,
                 "total_queries_executed": context.total_queries_executed + 1,
             }
         )
@@ -104,6 +107,6 @@ class ExecuteQueryStep(Step[dict[str, Any], dict[str, Any]]):
         return StepResult(
             context=updated_context,
             signal=Signal.CONTINUE,
-            output=query_result,
+            output=query_result_dict,
             next_step=StepType.INTERPRET_EVIDENCE.value,
         )

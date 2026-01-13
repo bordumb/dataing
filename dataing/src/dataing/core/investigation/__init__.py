@@ -2,10 +2,14 @@
 
 This module contains the core domain model for the investigation system,
 including entities, value objects, and the step abstraction.
+
+Uses maestro.Workflow for workflow execution.
 """
 
+from maestro import Signal, Workflow
+
 from .entities import Branch, Investigation, InvestigationContext, Snapshot
-from .orchestrator import InvestigationOrchestrator, TickResult
+from .flow import build_investigation_workflow, run_investigation
 from .pattern_extraction import (
     PatternExtractionService,
     PatternRepositoryProtocol,
@@ -15,7 +19,6 @@ from .repository import ExecutionLock, InvestigationRepository
 from .values import (
     BranchStatus,
     BranchType,
-    ExecutionSignal,
     StepType,
     VersionId,
 )
@@ -31,15 +34,16 @@ __all__ = [
     "BranchType",
     "BranchStatus",
     "StepType",
-    "ExecutionSignal",
+    "Signal",
     # Repository
     "InvestigationRepository",
     "ExecutionLock",
     # Registry
     "StepRegistry",
-    # Orchestrator
-    "InvestigationOrchestrator",
-    "TickResult",
+    # Workflow (maestro)
+    "Workflow",
+    "build_investigation_workflow",
+    "run_investigation",
     # Pattern Learning
     "PatternExtractionService",
     "PatternRepositoryProtocol",

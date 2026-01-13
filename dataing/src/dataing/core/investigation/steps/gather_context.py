@@ -6,63 +6,37 @@ It's the first step in any investigation.
 
 from __future__ import annotations
 
-from typing import Any, Protocol
+from typing import TYPE_CHECKING, Any, Protocol
 
+from dataing.core.domain_types import AnomalyAlert
 from dataing.core.investigation.entities import InvestigationContext
 from dataing.core.investigation.values import StepType
 
 from .protocol import Signal, Step, StepResult
 
-
-class SchemaLike(Protocol):
-    """Protocol for schema objects."""
-
-    def is_empty(self) -> bool:
-        """Return True if schema has no tables."""
-        ...
-
-    def to_dict(self) -> dict[str, Any]:
-        """Return schema as dictionary."""
-        ...
-
-
-class LineageLike(Protocol):
-    """Protocol for lineage objects."""
-
-    def to_dict(self) -> dict[str, Any]:
-        """Return lineage as dictionary."""
-        ...
-
-
-class GatheredContext(Protocol):
-    """Protocol for gathered context from data source."""
-
-    @property
-    def schema(self) -> SchemaLike:
-        """Return schema object."""
-        ...
-
-    @property
-    def lineage(self) -> LineageLike | None:
-        """Return lineage object or None."""
-        ...
+if TYPE_CHECKING:
+    from dataing.adapters.datasource.base import BaseAdapter
 
 
 class ContextEngineProtocol(Protocol):
     """Protocol for context engine used by GatherContextStep.
 
-    This defines the interface that the new investigation system expects.
-    It differs from the legacy ContextEngine interface in core/interfaces.py.
+    This matches the real ContextEngine.gather() signature.
     """
 
-    async def gather(self, *, alert_summary: str) -> GatheredContext:
+    async def gather(
+        self,
+        alert: AnomalyAlert,
+        adapter: BaseAdapter,
+    ) -> Any:
         """Gather schema and lineage context.
 
         Args:
-            alert_summary: Summary of the alert to investigate.
+            alert: The anomaly alert being investigated.
+            adapter: Connected data source adapter.
 
         Returns:
-            GatheredContext with schema and optional lineage.
+            InvestigationContext with schema and optional lineage.
         """
         ...
 
@@ -95,13 +69,19 @@ class GatherContextStep(Step[None, ContextBundle]):
 
     step_type = StepType.GATHER_CONTEXT
 
-    def __init__(self, context_engine: ContextEngineProtocol) -> None:
+    def __init__(
+        self,
+        context_engine: ContextEngineProtocol,
+        adapter: BaseAdapter,
+    ) -> None:
         """Initialize the step.
 
         Args:
             context_engine: Engine for gathering context from data source.
+            adapter: Connected data source adapter.
         """
         self.context_engine = context_engine
+        self.adapter = adapter
 
     async def execute(
         self,
@@ -117,47 +97,80 @@ class GatherContextStep(Step[None, ContextBundle]):
         Returns:
             StepResult with updated context containing schema/lineage.
         """
-        try:
-            gathered = await self.context_engine.gather(
-                alert_summary=context.alert_summary,
+        # Convert alert dict back to AnomalyAlert
+        if context.alert is None:
+            return StepResult(
+                context=context,
+                signal=Signal.FAIL,
+                error="No alert data in context",
             )
+
+        try:
+            alert = AnomalyAlert.model_validate(context.alert)
         except Exception as e:
             return StepResult(
                 context=context,
                 signal=Signal.FAIL,
-                output=ContextBundle(schema_info={"error": f"Context gathering failed: {e}"}),
+                error=f"Invalid alert data: {e}",
             )
 
-        # Fail fast on empty schema
-        if gathered.schema.is_empty():
+        # Call context engine with alert and adapter
+        try:
+            gathered = await self.context_engine.gather(alert, self.adapter)
+        except Exception as e:
             return StepResult(
                 context=context,
                 signal=Signal.FAIL,
-                output=ContextBundle(
-                    schema_info={"error": "Empty schema - check connectivity/permissions"}
-                ),
+                error=f"Context gathering failed: {e}",
             )
 
-        # Build updated context
-        schema_info = gathered.schema.to_dict()
-        lineage_info = gathered.lineage.to_dict() if gathered.lineage else None
+        # The real ContextEngine returns domain_types.InvestigationContext
+        # with schema: SchemaResponse and lineage: LineageContext
+        # Convert to dict format for our workflow context
+
+        # Convert schema to dict
+        schema_info: dict[str, Any] = {}
+        if gathered.schema:
+            try:
+                # SchemaResponse has a model_dump method (Pydantic model)
+                schema_info = gathered.schema.model_dump(mode="json")
+            except AttributeError:
+                # Fallback for non-Pydantic schemas
+                schema_info = {"raw": str(gathered.schema)}
+
+        # Check for empty schema
+        if not schema_info or (
+            "catalogs" in schema_info
+            and not any(
+                schema.get("tables")
+                for catalog in schema_info.get("catalogs", [])
+                for schema in catalog.get("schemas", [])
+            )
+        ):
+            return StepResult(
+                context=context,
+                signal=Signal.FAIL,
+                error="Empty schema - check connectivity/permissions",
+            )
+
+        # Convert lineage to dict
+        lineage_info: dict[str, Any] | None = None
+        if gathered.lineage:
+            try:
+                lineage_info = {
+                    "target": gathered.lineage.target,
+                    "upstream": list(gathered.lineage.upstream),
+                    "downstream": list(gathered.lineage.downstream),
+                }
+            except AttributeError:
+                lineage_info = None
 
         # Create new context with gathered info
-        new_context = InvestigationContext(
-            alert_summary=context.alert_summary,
-            schema_info=schema_info,
-            lineage_info=lineage_info,
-            recent_changes=context.recent_changes,
-            matched_patterns=context.matched_patterns,
-            hypotheses=context.hypotheses,
-            evidence=context.evidence,
-            current_synthesis=context.current_synthesis,
-            counter_analysis=context.counter_analysis,
-            chat_history=context.chat_history,
-            pending_approval=context.pending_approval,
-            total_tokens_used=context.total_tokens_used,
-            total_queries_executed=context.total_queries_executed,
-            execution_time_ms=context.execution_time_ms,
+        new_context = context.model_copy(
+            update={
+                "schema_info": schema_info,
+                "lineage_info": lineage_info,
+            }
         )
 
         return StepResult(

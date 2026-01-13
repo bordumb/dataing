@@ -7,7 +7,9 @@ import pytest
 from dataing.core.domain_types import Hypothesis, HypothesisCategory
 from dataing.core.investigation.entities import InvestigationContext
 from dataing.core.investigation.steps.generate_hypotheses import GenerateHypothesesStep
-from dataing.core.investigation.values import BranchType, ExecutionSignal, StepType
+from maestro import Signal
+
+from dataing.core.investigation.values import BranchType, StepType
 
 
 @pytest.fixture
@@ -68,7 +70,7 @@ class TestGenerateHypothesesStep:
 
         result = await step.execute(sample_context)
 
-        assert result.signal == ExecutionSignal.BRANCH
+        assert result.signal == Signal.BRANCH
         assert result.branch_request is not None
         assert len(result.branch_request.branches) == 2
 
@@ -83,7 +85,7 @@ class TestGenerateHypothesesStep:
 
         result = await step.execute(sample_context)
 
-        assert result.signal == ExecutionSignal.BRANCH
+        assert result.signal == Signal.BRANCH
         assert result.branch_request is not None
         assert result.branch_request.branch_type == BranchType.HYPOTHESIS
         assert result.branch_request.merge_step == StepType.SYNTHESIZE

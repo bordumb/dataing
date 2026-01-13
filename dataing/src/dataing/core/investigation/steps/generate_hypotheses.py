@@ -137,6 +137,15 @@ class GenerateHypothesesStep(Step[None, list[Hypothesis]]):
             execution_time_ms=context.execution_time_ms,
         )
 
+        # Handle empty hypotheses case - skip to synthesis
+        if not hypotheses:
+            return StepResult(
+                context=new_context,
+                signal=Signal.CONTINUE,
+                output=hypotheses,
+                next_step=StepType.SYNTHESIZE.value,
+            )
+
         return StepResult(
             context=new_context,
             signal=Signal.BRANCH,

@@ -8,7 +8,7 @@ from dataing.core.investigation.entities import InvestigationContext
 from dataing.core.investigation.steps.protocol import BranchRequest, BranchSpec, StepResult
 from dataing.core.investigation.values import (
     BranchType,
-    ExecutionSignal,
+    Signal,
     StepType,
 )
 
@@ -26,10 +26,10 @@ class TestStepResult:
         """Can create a CONTINUE result."""
         result = StepResult(
             context=sample_context,
-            signal=ExecutionSignal.CONTINUE,
+            signal=Signal.CONTINUE,
             next_step=StepType.GENERATE_HYPOTHESES,
         )
-        assert result.signal == ExecutionSignal.CONTINUE
+        assert result.signal == Signal.CONTINUE
         assert result.next_step == StepType.GENERATE_HYPOTHESES
         assert result.output is None
         assert result.branch_request is None
@@ -39,10 +39,10 @@ class TestStepResult:
         output = {"root_cause": "ETL failure", "confidence": 0.9}
         result = StepResult(
             context=sample_context,
-            signal=ExecutionSignal.COMPLETE,
+            signal=Signal.COMPLETE,
             output=output,
         )
-        assert result.signal == ExecutionSignal.COMPLETE
+        assert result.signal == Signal.COMPLETE
         assert result.output == output
         assert result.next_step is None
 
@@ -58,10 +58,10 @@ class TestStepResult:
         )
         result = StepResult(
             context=sample_context,
-            signal=ExecutionSignal.BRANCH,
+            signal=Signal.BRANCH,
             branch_request=branch_request,
         )
-        assert result.signal == ExecutionSignal.BRANCH
+        assert result.signal == Signal.BRANCH
         assert result.branch_request is not None
         assert len(result.branch_request.branches) == 2
 
@@ -69,10 +69,10 @@ class TestStepResult:
         """StepResult is immutable."""
         result = StepResult(
             context=sample_context,
-            signal=ExecutionSignal.CONTINUE,
+            signal=Signal.CONTINUE,
         )
         with pytest.raises(FrozenInstanceError):
-            result.signal = ExecutionSignal.FAIL
+            result.signal = Signal.FAIL
 
 
 class TestBranchRequest:

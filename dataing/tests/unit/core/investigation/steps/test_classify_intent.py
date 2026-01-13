@@ -10,7 +10,7 @@ from dataing.core.investigation.steps.classify_intent import (
     ClassifyIntentStep,
     RefinementIntent,
 )
-from dataing.core.investigation.values import ExecutionSignal, StepType
+from maestro import Signal, StepType
 
 
 @pytest.fixture
@@ -134,7 +134,7 @@ class TestClassifyIntentStepRouting:
 
         result = await step.execute(sample_context, {"user_message": "Try a different query"})
 
-        assert result.signal == ExecutionSignal.CONTINUE
+        assert result.signal == Signal.CONTINUE
         assert result.next_step == StepType.GENERATE_QUERY
 
     @pytest.mark.asyncio
@@ -152,7 +152,7 @@ class TestClassifyIntentStepRouting:
             {"user_message": "What about network issues?"},
         )
 
-        assert result.signal == ExecutionSignal.CONTINUE
+        assert result.signal == Signal.CONTINUE
         assert result.next_step == StepType.GENERATE_HYPOTHESES
 
     @pytest.mark.asyncio
@@ -167,7 +167,7 @@ class TestClassifyIntentStepRouting:
 
         result = await step.execute(sample_context, {"user_message": "What does that mean?"})
 
-        assert result.signal == ExecutionSignal.AWAIT_USER
+        assert result.signal == Signal.AWAIT_USER
         assert result.next_step == StepType.AWAIT_USER
 
     @pytest.mark.asyncio
@@ -185,7 +185,7 @@ class TestClassifyIntentStepRouting:
             {"user_message": "Re-analyze with this new information"},
         )
 
-        assert result.signal == ExecutionSignal.CONTINUE
+        assert result.signal == Signal.CONTINUE
         assert result.next_step == StepType.SYNTHESIZE
 
     @pytest.mark.asyncio
@@ -200,7 +200,7 @@ class TestClassifyIntentStepRouting:
 
         result = await step.execute(sample_context, {"user_message": "Tell me more about ETL"})
 
-        assert result.signal == ExecutionSignal.CONTINUE
+        assert result.signal == Signal.CONTINUE
         assert result.next_step == StepType.GENERATE_HYPOTHESES
 
     @pytest.mark.asyncio
@@ -215,7 +215,7 @@ class TestClassifyIntentStepRouting:
 
         result = await step.execute(sample_context, {"user_message": "Thanks, that's helpful"})
 
-        assert result.signal == ExecutionSignal.COMPLETE
+        assert result.signal == Signal.COMPLETE
         assert result.output == RefinementIntent.ACKNOWLEDGE
 
 
@@ -280,7 +280,7 @@ class TestClassifyIntentStepErrorHandling:
 
         result = await step.execute(sample_context, {"user_message": "test"})
 
-        assert result.signal == ExecutionSignal.FAIL
+        assert result.signal == Signal.FAIL
 
     @pytest.mark.asyncio
     async def test_preserves_context_fields_on_success(

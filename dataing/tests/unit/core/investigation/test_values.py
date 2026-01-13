@@ -6,7 +6,7 @@ from pydantic import ValidationError
 from dataing.core.investigation.values import (
     BranchStatus,
     BranchType,
-    ExecutionSignal,
+    Signal,
     StepType,
     VersionId,
 )
@@ -98,11 +98,11 @@ class TestEnums:
         assert StepType.FAIL == "fail"
 
     def test_execution_signal_values(self) -> None:
-        """ExecutionSignal has expected values."""
-        assert ExecutionSignal.CONTINUE == "continue"
-        assert ExecutionSignal.REQUIRE_APPROVAL == "require_approval"
-        assert ExecutionSignal.AWAIT_USER == "await_user"
-        assert ExecutionSignal.BRANCH == "branch"
-        assert ExecutionSignal.MERGE == "merge"
-        assert ExecutionSignal.COMPLETE == "complete"
-        assert ExecutionSignal.FAIL == "fail"
+        """Signal has expected values."""
+        assert Signal.CONTINUE == "continue"
+        assert Signal.REQUIRE_APPROVAL == "require_approval"
+        assert Signal.AWAIT_USER == "await_user"
+        assert Signal.BRANCH == "branch"
+        assert Signal.MERGE == "merge"
+        assert Signal.COMPLETE == "complete"
+        assert Signal.FAIL == "fail"

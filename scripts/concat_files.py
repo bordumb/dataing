@@ -18,8 +18,8 @@ ROOT_DIR = Path(".")
 SEARCH_PREFIXES = [
     # "dataing",
     # "frontend",
-    "bond",
-    # "docs",
+    # "bond",
+    "maestro",
     # "docs/feedback",
 ]
 

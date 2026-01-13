@@ -207,6 +207,7 @@ class Workflow(Generic[ContextT]):
             next_step=next_step,
             branch_request=result.branch_request,
             output=result.output,
+            error=result.error,
         )
 
     async def run(
@@ -248,16 +249,121 @@ class Workflow(Generic[ContextT]):
                 )
 
             if tick_result.signal == Signal.BRANCH:
-                raise NotImplementedError(
-                    "BRANCH signal handling not implemented. "
-                    "Use fn-5.3 to add signal handlers."
+                # Require signal handler for BRANCH signal
+                if self._signal_handler is None:
+                    raise WorkflowError(
+                        message="BRANCH signal requires a signal handler. "
+                        "Use set_signal_handler() to configure one.",
+                        context=tick_result.context,
+                    )
+                # Delegate to signal handler to get branch contexts
+                branch_result = await self._signal_handler.handle_branch(
+                    context,
+                    StepResult(
+                        context=tick_result.context,
+                        signal=tick_result.signal,
+                        branch_request=tick_result.branch_request,
+                    ),
+                    self,
                 )
+                context = branch_result.context
+                if not branch_result.should_continue:
+                    return context
+
+                # Execute each branch context
+                if branch_result.branch_contexts:
+                    branch_request = tick_result.branch_request
+                    child_start_step = branch_result.next_step
+                    merge_step = branch_request.merge_step if branch_request else None
+
+                    for branch_ctx in branch_result.branch_contexts:
+                        # Execute child workflow from child_start_step
+                        # passing branch data as input
+                        child_context = branch_ctx.context
+                        child_step = child_start_step
+                        child_input = branch_ctx.data
+
+                        # Run child branch until MERGE, COMPLETE, or FAIL
+                        for _ in range(max_iterations):
+                            child_tick = await self.tick(
+                                child_context, child_step, child_input
+                            )
+
+                            if child_tick.signal == Signal.FAIL:
+                                raise WorkflowError(
+                                    message=child_tick.error or "Branch failed",
+                                    context=child_tick.context,
+                                )
+
+                            if child_tick.signal == Signal.COMPLETE:
+                                # Branch completed early
+                                child_context = child_tick.context
+                                break
+
+                            if child_tick.signal == Signal.MERGE:
+                                # Branch reached merge point
+                                child_context = child_tick.context
+                                break
+
+                            if child_tick.signal == Signal.CONTINUE:
+                                child_context = child_tick.context
+                                child_step = child_tick.next_step
+                                child_input = None
+                                if child_step is None or child_step == merge_step:
+                                    # Reached merge step or end
+                                    break
+
+                        # Register branch completion with handler
+                        from maestro.handlers import BranchContext as HandlerBranchContext
+
+                        if hasattr(self._signal_handler, "register_branch_completion"):
+                            self._signal_handler.register_branch_completion(
+                                merge_step or "",
+                                HandlerBranchContext(
+                                    name=branch_ctx.name,
+                                    context=child_context,
+                                    data=branch_ctx.data,
+                                ),
+                            )
+
+                    # After all branches complete, call handle_merge to get merged context
+                    if merge_step and hasattr(self._signal_handler, "handle_merge"):
+                        merge_result = await self._signal_handler.handle_merge(
+                            context,
+                            StepResult(
+                                context=context,
+                                signal=Signal.MERGE,
+                                next_step=merge_step,
+                            ),
+                            self,
+                        )
+                        context = merge_result.context
+                        current_step = merge_step
+                        current_input = None
+                        continue
+
+                current_step = branch_result.next_step or self._get_next_step(current_step)
+                if current_step is None:
+                    return context
+                continue
 
             if tick_result.signal == Signal.MERGE:
-                raise NotImplementedError(
-                    "MERGE signal handling not implemented. "
-                    "Use fn-5.3 to add signal handlers."
+                # Delegate to signal handler
+                merge_result = await self._signal_handler.handle_merge(
+                    context,
+                    StepResult(
+                        context=tick_result.context,
+                        signal=tick_result.signal,
+                    ),
+                    self,
                 )
+                context = merge_result.context
+                if not merge_result.should_continue:
+                    return context
+                current_step = merge_result.next_step or self._get_next_step(current_step)
+                if current_step is None:
+                    return context
+                continue
 
             if tick_result.signal == Signal.CONTINUE:
                 if tick_result.next_step is None:

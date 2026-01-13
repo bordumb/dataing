@@ -7,7 +7,7 @@ import pytest
 
 from dataing.core.investigation.entities import InvestigationContext
 from dataing.core.investigation.steps.synthesize import SynthesizeStep
-from dataing.core.investigation.values import ExecutionSignal, StepType
+from maestro import Signal, StepType
 
 
 @pytest.fixture
@@ -164,7 +164,7 @@ class TestSynthesizeStep:
 
         result = await step.execute(sample_context)
 
-        assert result.signal == ExecutionSignal.COMPLETE
+        assert result.signal == Signal.COMPLETE
 
     @pytest.mark.asyncio
     async def test_execute_returns_continue_on_low_confidence(
@@ -179,7 +179,7 @@ class TestSynthesizeStep:
 
         result = await step.execute(sample_context)
 
-        assert result.signal == ExecutionSignal.CONTINUE
+        assert result.signal == Signal.CONTINUE
         assert result.next_step == StepType.COUNTER_ANALYZE
 
     @pytest.mark.asyncio
@@ -222,7 +222,7 @@ class TestSynthesizeStep:
 
         result = await step.execute(sample_context)
 
-        assert result.signal == ExecutionSignal.FAIL
+        assert result.signal == Signal.FAIL
 
     @pytest.mark.asyncio
     async def test_execute_preserves_context_fields(
@@ -259,12 +259,12 @@ class TestSynthesizeStep:
         # With threshold 0.70, should be COMPLETE
         step_low_threshold = SynthesizeStep(llm=mock_llm, confidence_threshold=0.70)
         result_low = await step_low_threshold.execute(sample_context)
-        assert result_low.signal == ExecutionSignal.COMPLETE
+        assert result_low.signal == Signal.COMPLETE
 
         # With threshold 0.80, should be CONTINUE
         step_high_threshold = SynthesizeStep(llm=mock_llm, confidence_threshold=0.80)
         result_high = await step_high_threshold.execute(sample_context)
-        assert result_high.signal == ExecutionSignal.CONTINUE
+        assert result_high.signal == Signal.CONTINUE
         assert result_high.next_step == StepType.COUNTER_ANALYZE
 
     @pytest.mark.asyncio
@@ -285,5 +285,5 @@ class TestSynthesizeStep:
         result = await step.execute(sample_context)
 
         # Missing confidence should default to 0, triggering CONTINUE
-        assert result.signal == ExecutionSignal.CONTINUE
+        assert result.signal == Signal.CONTINUE
         assert result.next_step == StepType.COUNTER_ANALYZE

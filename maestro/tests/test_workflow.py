@@ -346,15 +346,15 @@ class TestWorkflowRun:
         assert "max iterations" in exc_info.value.message
 
     @pytest.mark.asyncio
-    async def test_run_branch_signal_raises_not_implemented(self) -> None:
-        """Run raises NotImplementedError on BRANCH signal."""
+    async def test_run_branch_signal_without_handler_raises(self) -> None:
+        """Run raises WorkflowError on BRANCH signal without signal handler."""
         workflow: Workflow[CounterContext] = Workflow()
         workflow.add_step(BranchingStep())
 
-        with pytest.raises(NotImplementedError) as exc_info:
+        with pytest.raises(WorkflowError) as exc_info:
             await workflow.run(CounterContext(count=0), "branch")
 
-        assert "BRANCH" in str(exc_info.value)
+        assert "signal handler" in exc_info.value.message
 
     @pytest.mark.asyncio
     async def test_run_explicit_routing(self) -> None:

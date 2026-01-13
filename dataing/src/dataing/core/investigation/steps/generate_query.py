@@ -88,7 +88,7 @@ class GenerateQueryStep(Step[dict[str, Any], str]):
             return StepResult(
                 context=context,
                 signal=Signal.FAIL,
-                output=None,
+                error="No hypothesis in input data for query generation",
             )
 
         hypothesis: dict[str, Any] = input_data["hypothesis"]
@@ -100,7 +100,7 @@ class GenerateQueryStep(Step[dict[str, Any], str]):
                 return StepResult(
                     context=context,
                     signal=Signal.FAIL,
-                    output=None,
+                    error="No schema info available for query generation",
                 )
             query = await self.llm.generate_query(
                 hypothesis=hypothesis,
@@ -108,15 +108,20 @@ class GenerateQueryStep(Step[dict[str, Any], str]):
                 alert_summary=context.alert_summary,
                 alert=context.alert,
             )
-        except Exception:
+        except Exception as e:
             return StepResult(
                 context=context,
                 signal=Signal.FAIL,
-                output=None,
+                error=f"Query generation failed: {e}",
             )
 
-        # Update context with the generated query
-        updated_context = context.model_copy(update={"current_query": query})
+        # Update context with the generated query and current hypothesis
+        updated_context = context.model_copy(
+            update={
+                "current_query": query,
+                "current_hypothesis": hypothesis,
+            }
+        )
 
         return StepResult(
             context=updated_context,

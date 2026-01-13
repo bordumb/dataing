@@ -7,7 +7,7 @@ import pytest
 
 from dataing.core.investigation.entities import InvestigationContext
 from dataing.core.investigation.steps.execute_query import ExecuteQueryStep
-from dataing.core.investigation.values import ExecutionSignal, StepType
+from maestro import Signal, StepType
 
 
 @pytest.fixture
@@ -113,7 +113,7 @@ class TestExecuteQueryStep:
 
         result = await step.execute(sample_context)
 
-        assert result.signal == ExecutionSignal.CONTINUE
+        assert result.signal == Signal.CONTINUE
 
     @pytest.mark.asyncio
     async def test_execute_sets_next_step_interpret_evidence(
@@ -183,7 +183,7 @@ class TestExecuteQueryStep:
 
         result = await step.execute(sample_context)
 
-        assert result.signal == ExecutionSignal.FAIL
+        assert result.signal == Signal.FAIL
 
     @pytest.mark.asyncio
     async def test_execute_fails_without_current_query(
@@ -199,5 +199,5 @@ class TestExecuteQueryStep:
 
         result = await step.execute(context_no_query)
 
-        assert result.signal == ExecutionSignal.FAIL
+        assert result.signal == Signal.FAIL
         mock_database.execute_query.assert_not_called()

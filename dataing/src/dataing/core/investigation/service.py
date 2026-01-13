@@ -2,12 +2,17 @@
 
 This module provides the InvestigationService that coordinates between
 the API layer, repository, orchestrator, and collaboration service.
+
+Supports two execution engines controlled by INVESTIGATION_ENGINE env var:
+- "v1" (default): Legacy tick-based orchestrator with persistence
+- "v2": New maestro-based workflow engine
 """
 
 from __future__ import annotations
 
 import asyncio
 import logging
+import os
 from typing import TYPE_CHECKING, Any
 from uuid import UUID
 
@@ -33,6 +38,9 @@ from dataing.core.investigation.values import (
     StepType,
     VersionId,
 )
+
+# Feature flag for investigation engine version
+INVESTIGATION_ENGINE = os.getenv("INVESTIGATION_ENGINE", "v1")
 
 logger = logging.getLogger(__name__)
 
@@ -200,29 +208,50 @@ class InvestigationService:
         # Update branch head
         await self.repository.update_branch_head(main_branch.id, snapshot.id)
 
-        # Create step registry with real dependencies for this investigation
-        step_registry = create_step_registry(
-            agent_client=self._agent_client,
-            context_engine=self._context_engine,
-            alert=alert,
-            data_adapter=data_adapter,
-            pattern_repository=self._pattern_repository,
-            usage_tracker=self._usage_tracker,
-            tenant_id=tenant_id,
-            investigation_id=investigation.id,
-        )
+        # Check which engine to use based on feature flag
+        if INVESTIGATION_ENGINE == "v2":
+            logger.info(f"Using maestro workflow engine for investigation {investigation.id}")
+            # Use new maestro-based workflow
+            asyncio.create_task(
+                self._run_investigation_v2(
+                    investigation_id=investigation.id,
+                    main_branch_id=main_branch.id,
+                    initial_context=initial_context,
+                    data_adapter=data_adapter,
+                ),
+                name=f"investigation-{investigation.id}",
+            )
+        else:
+            logger.info(
+                f"Using legacy orchestrator for investigation {investigation.id}"
+            )
+            # Use legacy tick-based orchestrator
+            from dataing.adapters.investigation.step_factory import create_step_registry
+            from dataing.core.investigation.orchestrator import InvestigationOrchestrator
 
-        # Create orchestrator for this investigation
-        orchestrator = InvestigationOrchestrator(
-            repository=self.repository,
-            registry=step_registry,
-        )
+            # Create step registry with real dependencies for this investigation
+            step_registry = create_step_registry(
+                agent_client=self._agent_client,
+                context_engine=self._context_engine,
+                alert=alert,
+                data_adapter=data_adapter,
+                pattern_repository=self._pattern_repository,
+                usage_tracker=self._usage_tracker,
+                tenant_id=tenant_id,
+                investigation_id=investigation.id,
+            )
 
-        # Start the orchestrator in the background
-        asyncio.create_task(
-            self._run_investigation(main_branch.id, orchestrator),
-            name=f"investigation-{investigation.id}",
-        )
+            # Create orchestrator for this investigation
+            orchestrator = InvestigationOrchestrator(
+                repository=self.repository,
+                registry=step_registry,
+            )
+
+            # Start the orchestrator in the background
+            asyncio.create_task(
+                self._run_investigation(main_branch.id, orchestrator),
+                name=f"investigation-{investigation.id}",
+            )
 
         return investigation.id, main_branch.id
 
@@ -294,6 +323,92 @@ class InvestigationService:
         else:
             logger.warning(
                 f"Investigation branch {branch_id} reached max iterations ({max_iterations})"
+            )
+
+    async def _run_investigation_v2(
+        self,
+        investigation_id: UUID,
+        main_branch_id: UUID,
+        initial_context: InvestigationContext,
+        data_adapter: BaseAdapter,
+    ) -> None:
+        """Run investigation using new maestro-based workflow.
+
+        Uses the simpler, in-memory workflow engine instead of
+        tick-based persistence.
+
+        Args:
+            investigation_id: ID of the investigation.
+            main_branch_id: ID of the main branch.
+            initial_context: Initial investigation context.
+            data_adapter: Connected data source adapter.
+        """
+        from dataing.core.investigation.flow import (
+            build_investigation_workflow,
+            run_investigation,
+        )
+        from maestro import WorkflowError
+
+        logger.info(f"Starting maestro workflow for investigation {investigation_id}")
+
+        try:
+            # Build workflow with dependencies
+            workflow = build_investigation_workflow(
+                context_engine=self._context_engine,
+                llm=self._agent_client,
+                database=data_adapter,
+                pattern_repository=self._pattern_repository,
+            )
+
+            # Run the workflow to completion
+            final_context = await run_investigation(
+                workflow=workflow,
+                initial_context=initial_context,
+            )
+
+            logger.info(
+                f"Maestro workflow completed for investigation {investigation_id}"
+            )
+
+            # Update investigation outcome
+            outcome = final_context.current_synthesis or {}
+            await self.repository.update_investigation_outcome(
+                investigation_id, outcome
+            )
+
+            # Create final snapshot for persistence
+            await self.repository.create_snapshot(
+                investigation_id=investigation_id,
+                branch_id=main_branch_id,
+                version=VersionId(major=1),
+                step=StepType.COMPLETE,
+                context=final_context,
+            )
+
+            # Mark branch as completed
+            await self.repository.update_branch_status(
+                main_branch_id, BranchStatus.COMPLETED
+            )
+
+            # Create completion notification
+            await self._create_completion_notification(main_branch_id, "completed")
+
+        except WorkflowError as e:
+            logger.error(f"Maestro workflow failed: {e}", exc_info=True)
+            await self.repository.update_branch_status(
+                main_branch_id, BranchStatus.ABANDONED
+            )
+            await self._create_completion_notification(
+                main_branch_id, "failed", str(e)
+            )
+
+        except Exception as e:
+            logger.error(f"Unexpected error in maestro workflow: {e}", exc_info=True)
+            await self.repository.update_branch_status(
+                main_branch_id, BranchStatus.ABANDONED
+            )
+            await self._create_completion_notification(
+                main_branch_id, "failed", f"Unexpected error: {e}"
             )
 
     async def _create_completion_notification(

@@ -52,9 +52,24 @@ Create the new workflow entry point using maestro.Workflow.
 - [ ] Full investigation integration test passes with new flow
 - [ ] Existing API contract unchanged
 ## Done summary
-TBD
+- Created flow.py with build_investigation_workflow() using maestro.Workflow
+- Created InvestigationMergeStrategy for merging evidence from child branches
+- Created InvestigationSignalHandler extending BranchingSignalHandler
+- Added run_investigation() convenience function for workflow execution
+- Updated InvestigationService with INVESTIGATION_ENGINE feature flag
+- Added _run_investigation_v2() method for maestro-based execution
 
+Why:
+- New flow.py provides cleaner workflow orchestration via maestro
+- InvestigationMergeStrategy handles hypothesis branch convergence
+- Feature flag allows gradual rollout (v1=legacy, v2=maestro)
+
+Verification:
+- mypy passes on flow.py and service.py (--strict)
+- All 68 maestro tests pass
+- Import test confirms flow module loads correctly
+- INVESTIGATION_ENGINE=v2 enables new path
 ## Evidence
 - Commits:
-- Tests:
+- Tests: uv run mypy dataing/src/dataing/core/investigation/flow.py --strict, uv run mypy dataing/src/dataing/core/investigation/service.py --strict, uv run pytest maestro/tests/ -v (68 passed), python -c 'from dataing.core.investigation.flow import *'
 - PRs:

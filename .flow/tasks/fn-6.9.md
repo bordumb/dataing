@@ -35,9 +35,24 @@ Add integration tests for the complete SSO flow from discovery to authenticated 
 - [ ] Tests use mocked IdP responses
 - [ ] All tests pass in CI
 ## Done summary
-TBD
+Added integration tests for the complete SSO flow:
 
+Test Coverage:
+- Discovery endpoint: 4 tests (unknown domain, unverified domain, verified domain, disabled SSO)
+- Callback endpoint: 8 tests (invalid state, consumed state, JIT provisioning, account linking, unverified email rejection, existing SSO identity reuse, invalid token, expired token)
+
+Total: 12 integration tests
+
+Features tested:
+- Discovery returns password for unknown/unverified domains
+- Discovery returns OIDC auth URL for verified domains with SSO configured
+- Callback rejects invalid or already-consumed state (CSRF protection)
+- Callback JIT provisions new users on first SSO login
+- Callback links existing users when email is verified by IdP
+- Callback rejects account linking when IdP email is unverified (security)
+- Callback reuses existing SSO identity for returning users
+- Callback rejects invalid or expired ID tokens
 ## Evidence
 - Commits:
-- Tests:
+- Tests: dataing-ee/tests/integration/sso/test_sso_flow.py (12 tests)
 - PRs:

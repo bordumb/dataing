@@ -45,9 +45,19 @@ Implement the Workflow engine that executes steps in a tick loop.
 - [ ] Unit test: 2-step workflow runs to completion
 - [ ] Unit test: Step returning FAIL stops workflow
 ## Done summary
-TBD
+- Added Workflow[ContextT] class with tick-based execution
+- Implemented run() loop handling CONTINUE, COMPLETE, FAIL signals
+- Added step registry with sequential and explicit routing
+- WorkflowError raised on failure with context preservation
 
+Why:
+- Decouples execution engine from domain-specific orchestrator
+- Generic type parameter allows any context type
+
+Verification:
+- 45 total tests passing (24 new workflow tests)
+- mypy --strict passes
 ## Evidence
-- Commits:
-- Tests:
+- Commits: 175c0fb1fe94b31a27eb0dacbb72d70f290914ae
+- Tests: cd maestro && uv run pytest tests/ -v
 - PRs:

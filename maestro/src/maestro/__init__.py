@@ -38,6 +38,7 @@ Example:
 from maestro.result import BranchRequest, BranchSpec, StepResult
 from maestro.signals import Signal
 from maestro.step import Step
+from maestro.workflow import TickResult, Workflow, WorkflowError
 
 __all__ = [
     "BranchRequest",
@@ -45,6 +46,9 @@ __all__ = [
     "Signal",
     "Step",
     "StepResult",
+    "TickResult",
+    "Workflow",
+    "WorkflowError",
 ]
 
 __version__ = "0.1.0"

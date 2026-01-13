@@ -1,0 +1,16 @@
+{
+  "assignee": null,
+  "claim_note": "",
+  "claimed_at": null,
+  "created_at": "2026-01-13T00:33:16.468225Z",
+  "depends_on": [
+    "fn-5.4"
+  ],
+  "epic": "fn-5",
+  "id": "fn-5.5",
+  "priority": null,
+  "spec_path": ".flow/tasks/fn-5.5.md",
+  "status": "todo",
+  "title": "Port Existing Steps to Maestro Protocol",
+  "updated_at": "2026-01-13T00:36:30.219528Z"
+}

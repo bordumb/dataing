@@ -1,0 +1,16 @@
+{
+  "assignee": null,
+  "claim_note": "",
+  "claimed_at": null,
+  "created_at": "2026-01-13T00:33:16.869551Z",
+  "depends_on": [
+    "fn-5.6"
+  ],
+  "epic": "fn-5",
+  "id": "fn-5.7",
+  "priority": null,
+  "spec_path": ".flow/tasks/fn-5.7.md",
+  "status": "todo",
+  "title": "Create Bond-Maestro Bridge",
+  "updated_at": "2026-01-13T00:36:30.659515Z"
+}

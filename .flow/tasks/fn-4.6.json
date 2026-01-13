@@ -1,0 +1,16 @@
+{
+  "assignee": null,
+  "claim_note": "",
+  "claimed_at": null,
+  "created_at": "2026-01-12T23:16:27.154759Z",
+  "depends_on": [
+    "fn-4.5"
+  ],
+  "epic": "fn-4",
+  "id": "fn-4.6",
+  "priority": null,
+  "spec_path": ".flow/tasks/fn-4.6.md",
+  "status": "todo",
+  "title": "Hierarchical branch synthesis in SynthesizeStep",
+  "updated_at": "2026-01-12T23:19:27.438056Z"
+}

@@ -1,17 +1,41 @@
 """Tests for SSO endpoints."""
 
+from datetime import UTC, datetime, timedelta
+from unittest.mock import AsyncMock, MagicMock
+from uuid import uuid4
+
 import pytest
-from dataing_ee.core.sso import SSOProviderType
-from dataing_ee.entrypoints.api.routes.sso import _extract_domain, generate_state, router
+from dataing_ee.adapters.sso import (
+    SSOStateRepository,
+    StateConsumedError,
+    StateExpiredError,
+    StateNotFoundError,
+)
+from dataing_ee.core.sso import SSOState
+from dataing_ee.entrypoints.api.routes.sso import (
+    _extract_domain,
+    get_sso_state_repository,
+    router,
+)
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 
 @pytest.fixture
-def app() -> FastAPI:
-    """Create test FastAPI app."""
+def mock_state_repo() -> MagicMock:
+    """Create mock state repository."""
+    return MagicMock(spec=SSOStateRepository)
+
+
+@pytest.fixture
+def app(mock_state_repo: MagicMock) -> FastAPI:
+    """Create test FastAPI app with mocked dependencies."""
     app = FastAPI()
     app.include_router(router)
+
+    # Override the state repository dependency
+    app.dependency_overrides[get_sso_state_repository] = lambda: mock_state_repo
+
     return app
 
 
@@ -35,22 +59,6 @@ class TestExtractDomain:
     def test_handles_subdomains(self) -> None:
         """Handles email with subdomain."""
         assert _extract_domain("alice@mail.acme.com") == "mail.acme.com"
-
-
-class TestGenerateState:
-    """Tests for generate_state helper."""
-
-    def test_generates_unique_states(self) -> None:
-        """Generates unique state strings."""
-        state1 = generate_state("org1", SSOProviderType.OIDC)
-        state2 = generate_state("org2", SSOProviderType.OIDC)
-        assert state1 != state2
-
-    def test_state_is_url_safe(self) -> None:
-        """State is URL-safe."""
-        state = generate_state("org1", SSOProviderType.SAML)
-        # URL-safe base64 only contains alphanumeric, -, and _
-        assert all(c.isalnum() or c in "-_" for c in state)
 
 
 class TestDiscoverEndpoint:
@@ -81,12 +89,76 @@ class TestDiscoverEndpoint:
 class TestCallbackEndpoint:
     """Tests for /callback endpoint."""
 
-    def test_rejects_invalid_state(self, client: TestClient) -> None:
-        """Rejects callback with invalid state."""
+    def test_rejects_not_found_state(
+        self, client: TestClient, mock_state_repo: MagicMock
+    ) -> None:
+        """Rejects callback with unknown state."""
+        mock_state_repo.validate_and_consume = AsyncMock(
+            side_effect=StateNotFoundError("SSO state not found")
+        )
+
         response = client.get(
             "/auth/sso/callback",
-            params={"code": "abc123", "state": "invalid-state"},
+            params={"code": "abc123", "state": "unknown-state"},
         )
 
         assert response.status_code == 400
-        assert "Invalid or expired state" in response.json()["detail"]
+        assert "Invalid state" in response.json()["detail"]
+
+    def test_rejects_expired_state(
+        self, client: TestClient, mock_state_repo: MagicMock
+    ) -> None:
+        """Rejects callback with expired state."""
+        mock_state_repo.validate_and_consume = AsyncMock(
+            side_effect=StateExpiredError("SSO state has expired")
+        )
+
+        response = client.get(
+            "/auth/sso/callback",
+            params={"code": "abc123", "state": "expired-state"},
+        )
+
+        assert response.status_code == 400
+        assert "expired" in response.json()["detail"]
+
+    def test_rejects_consumed_state(
+        self, client: TestClient, mock_state_repo: MagicMock
+    ) -> None:
+        """Rejects callback with already-used state (replay attack)."""
+        mock_state_repo.validate_and_consume = AsyncMock(
+            side_effect=StateConsumedError("SSO state has already been used")
+        )
+
+        response = client.get(
+            "/auth/sso/callback",
+            params={"code": "abc123", "state": "used-state"},
+        )
+
+        assert response.status_code == 400
+        assert "already been used" in response.json()["detail"]
+
+    def test_returns_not_implemented(
+        self, client: TestClient, mock_state_repo: MagicMock
+    ) -> None:
+        """Returns 501 when state is valid (feature not yet implemented)."""
+        now = datetime.now(UTC)
+        mock_state_repo.validate_and_consume = AsyncMock(
+            return_value=SSOState(
+                state_id="valid-state",
+                nonce="test-nonce",
+                org_id=uuid4(),
+                redirect_uri=None,
+                created_at=now - timedelta(minutes=1),
+                expires_at=now + timedelta(minutes=9),
+                consumed_at=now,
+            )
+        )
+
+        response = client.get(
+            "/auth/sso/callback",
+            params={"code": "abc123", "state": "valid-state"},
+        )
+
+        # Feature not yet implemented
+        assert response.status_code == 501
+        assert "not yet implemented" in response.json()["detail"]

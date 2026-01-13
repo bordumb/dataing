@@ -69,3 +69,28 @@ class SSODiscoveryResult:
     auth_url: str | None = None
     state: str | None = None
     display_name: str | None = None
+
+
+@dataclass
+class SSOState:
+    """SSO authentication state for CSRF protection."""
+
+    state_id: str
+    nonce: str
+    org_id: UUID
+    redirect_uri: str | None
+    created_at: datetime
+    expires_at: datetime
+    consumed_at: datetime | None = None
+
+    @property
+    def is_expired(self) -> bool:
+        """Check if state has expired."""
+        from datetime import UTC
+
+        return datetime.now(UTC) > self.expires_at
+
+    @property
+    def is_consumed(self) -> bool:
+        """Check if state has already been used."""
+        return self.consumed_at is not None

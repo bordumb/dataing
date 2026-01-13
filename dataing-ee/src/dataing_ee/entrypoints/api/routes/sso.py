@@ -1,11 +1,16 @@
 """SSO authentication endpoints."""
 
 import logging
-import secrets
 
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, EmailStr
 
+from dataing_ee.adapters.sso import (
+    SSOStateRepository,
+    StateConsumedError,
+    StateExpiredError,
+    StateNotFoundError,
+)
 from dataing_ee.core.sso import SSOProviderType
 
 logger = logging.getLogger(__name__)
@@ -43,8 +48,16 @@ class SSOTokenResponse(BaseModel):
     token_type: str = "bearer"
 
 
-# In-memory state store (replace with Redis in production)
-_sso_states: dict[str, dict[str, str]] = {}
+# Placeholder for dependency injection - will be implemented in fn-6.4/fn-6.5
+async def get_sso_state_repository() -> SSOStateRepository:
+    """Get SSO state repository.
+
+    This is a placeholder that will be replaced with proper
+    database connection injection in fn-6.4/fn-6.5.
+    """
+    # TODO: Wire database connection via dependency injection
+    msg = "SSO state repository not yet configured"
+    raise NotImplementedError(msg)
 
 
 def _extract_domain(email: str) -> str:
@@ -89,6 +102,7 @@ async def discover_sso_method(
 async def sso_callback(
     code: str,
     state: str,
+    state_repo: SSOStateRepository = Depends(get_sso_state_repository),
 ) -> SSOTokenResponse:
     """Handle SSO callback from IdP.
 
@@ -98,46 +112,44 @@ async def sso_callback(
     Args:
         code: Authorization code from IdP.
         state: State parameter for CSRF protection.
+        state_repo: SSO state repository for state validation.
 
     Returns:
         JWT access and refresh tokens.
+
+    Raises:
+        HTTPException: If state is invalid, expired, or already used.
     """
-    # Validate state
-    if state not in _sso_states:
+    # Validate and consume state (single-use for CSRF protection)
+    try:
+        sso_state = await state_repo.validate_and_consume(state)
+        logger.info(f"Processing SSO callback for org: {sso_state.org_id}")
+    except StateNotFoundError:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Invalid or expired state parameter",
-        )
+            detail="Invalid state parameter",
+        ) from None
+    except StateExpiredError:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="SSO session has expired. Please try again.",
+        ) from None
+    except StateConsumedError:
+        logger.warning(f"SSO state replay attempt detected: {state[:8]}...")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="This SSO session has already been used",
+        ) from None
 
-    state_data = _sso_states.pop(state)
-    logger.info(f"Processing SSO callback for org: {state_data.get('org_id')}")
-
-    # TODO: Implement token exchange
-    # 1. Get SSO config from state_data
+    # TODO: Implement token exchange (fn-6.5)
+    # 1. Get SSO config from sso_state.org_id
     # 2. Exchange code for tokens with IdP
-    # 3. Extract user info from ID token
-    # 4. JIT create or update user
-    # 5. Issue JWT tokens
+    # 3. Verify ID token with sso_state.nonce
+    # 4. Extract user info from ID token
+    # 5. JIT create or update user
+    # 6. Issue JWT tokens
 
     raise HTTPException(
         status_code=status.HTTP_501_NOT_IMPLEMENTED,
         detail="SSO callback not yet implemented",
     )
-
-
-def generate_state(org_id: str, provider_type: SSOProviderType) -> str:
-    """Generate and store state for SSO flow.
-
-    Args:
-        org_id: Organization ID.
-        provider_type: SSO provider type.
-
-    Returns:
-        Random state string.
-    """
-    state = secrets.token_urlsafe(32)
-    _sso_states[state] = {
-        "org_id": org_id,
-        "provider_type": provider_type.value,
-    }
-    return state

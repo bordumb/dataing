@@ -1,0 +1,19 @@
+{
+  "assignee": null,
+  "claim_note": "",
+  "claimed_at": null,
+  "created_at": "2026-01-13T20:16:27.610546Z",
+  "depends_on": [
+    "fn-6.1",
+    "fn-6.2",
+    "fn-6.3",
+    "fn-6.4"
+  ],
+  "epic": "fn-6",
+  "id": "fn-6.5",
+  "priority": null,
+  "spec_path": ".flow/tasks/fn-6.5.md",
+  "status": "todo",
+  "title": "Wire SSO Callback with JIT Provisioning",
+  "updated_at": "2026-01-13T20:18:22.901595Z"
+}

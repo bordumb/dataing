@@ -1,0 +1,30 @@
+{
+  "assignee": "bordumbb@gmail.com",
+  "claim_note": "",
+  "claimed_at": "2026-01-13T20:40:26.683178Z",
+  "created_at": "2026-01-13T20:16:27.096098Z",
+  "depends_on": [],
+  "epic": "fn-6",
+  "evidence": {
+    "files_modified": [
+      "dataing/migrations/015_sso_states.sql",
+      "dataing-ee/src/dataing_ee/adapters/sso/state_repository.py",
+      "dataing-ee/src/dataing_ee/adapters/sso/__init__.py",
+      "dataing-ee/src/dataing_ee/core/sso/types.py",
+      "dataing-ee/src/dataing_ee/core/sso/__init__.py",
+      "dataing-ee/src/dataing_ee/entrypoints/api/routes/sso.py",
+      "dataing-ee/tests/unit/adapters/sso/test_state_repository.py",
+      "dataing-ee/tests/unit/entrypoints/api/routes/test_sso.py"
+    ],
+    "tests": [
+      "dataing-ee/tests/unit/adapters/sso/test_state_repository.py (17 tests)",
+      "dataing-ee/tests/unit/entrypoints/api/routes/test_sso.py (9 tests)"
+    ]
+  },
+  "id": "fn-6.2",
+  "priority": null,
+  "spec_path": ".flow/tasks/fn-6.2.md",
+  "status": "done",
+  "title": "Implement Secure SSO State Management",
+  "updated_at": "2026-01-13T20:45:23.203914Z"
+}

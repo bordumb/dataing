@@ -52,9 +52,21 @@ class SSOConfigResponse(BaseModel):
 - [ ] Pydantic models for request/response
 - [ ] Unit tests for CRUD operations
 ## Done summary
-TBD
+Added SSO admin configuration routes for managing OIDC settings:
 
+Routes added:
+- GET /settings/sso/config - Get current SSO configuration
+- POST /settings/sso/config - Create or update SSO configuration
+- DELETE /settings/sso/config - Disable SSO (preserves config for re-enabling)
+- POST /settings/sso/test - Test OIDC discovery document validity
+
+Features:
+- All endpoints require admin scope
+- Client secret encrypted before storage using Fernet
+- Test endpoint validates IdP reachability and OIDC metadata
+- Create/update handles both new and existing configurations
+- Added 9 unit tests covering CRUD and test functionality
 ## Evidence
 - Commits:
-- Tests:
+- Tests: dataing-ee/tests/unit/entrypoints/api/routes/test_settings_sso.py (9 tests)
 - PRs:

@@ -3,17 +3,27 @@
 from __future__ import annotations
 
 import json
+import logging
 import secrets
-from typing import Annotated, Any
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
+from datetime import datetime
+from typing import Annotated, Any, Literal
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Response
+import httpx
+from asyncpg import Connection
+from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from pydantic import BaseModel, Field, HttpUrl
 
 from dataing.adapters.db.app_db import AppDatabase
 from dataing.entrypoints.api.deps import get_app_db
 from dataing.entrypoints.api.middleware.auth import ApiKeyContext, require_scope, verify_api_key
 from dataing_ee.adapters.audit import audited
+from dataing_ee.adapters.sso import SSORepository
+from dataing_ee.core.sso import SSOProviderType
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/settings", tags=["settings"])
 
@@ -376,3 +386,235 @@ async def revoke_api_key(
         raise HTTPException(status_code=404, detail="API key not found")
 
     return Response(status_code=204)
+
+
+# --- SSO Configuration Settings ---
+
+
+def get_app_db_from_request(request: Request) -> AppDatabase:
+    """Get AppDatabase from app state."""
+    return request.app.state.app_db
+
+
+@asynccontextmanager
+async def get_db_connection(app_db: AppDatabase) -> AsyncIterator[Connection]:
+    """Get database connection from pool."""
+    async with app_db.acquire() as conn:
+        yield conn
+
+
+async def get_sso_repository(request: Request) -> AsyncIterator[SSORepository]:
+    """Get SSO repository with database connection."""
+    app_db = get_app_db_from_request(request)
+    async with get_db_connection(app_db) as conn:
+        yield SSORepository(conn)
+
+
+SSORepoDep = Annotated[SSORepository, Depends(get_sso_repository)]
+
+
+class SSOConfigRequest(BaseModel):
+    """Request to create or update SSO configuration."""
+
+    provider_type: Literal["oidc"] = "oidc"
+    display_name: str | None = Field(
+        None, description="Display name for the SSO button (e.g., 'Sign in with Okta')"
+    )
+    oidc_issuer_url: str = Field(..., description="OIDC issuer URL (e.g., https://your-org.okta.com)")
+    oidc_client_id: str = Field(..., description="OIDC client ID")
+    oidc_client_secret: str = Field(..., description="OIDC client secret")
+
+
+class SSOConfigResponse(BaseModel):
+    """Response for SSO configuration (without secret)."""
+
+    id: str
+    provider_type: str
+    display_name: str | None
+    oidc_issuer_url: str
+    oidc_client_id: str
+    is_enabled: bool
+    created_at: datetime
+    updated_at: datetime
+
+
+class SSOTestRequest(BaseModel):
+    """Request to test SSO configuration."""
+
+    oidc_issuer_url: str = Field(..., description="OIDC issuer URL to test")
+
+
+class SSOTestResponse(BaseModel):
+    """Response for SSO test."""
+
+    success: bool
+    message: str
+    discovery_url: str | None = None
+
+
+@router.get("/sso/config", response_model=SSOConfigResponse | None)
+async def get_sso_config(
+    auth: AdminScopeDep,
+    sso_repo: SSORepoDep,
+) -> SSOConfigResponse | None:
+    """Get current SSO configuration for the organization.
+
+    Returns None if SSO is not configured.
+    """
+    config = await sso_repo.get_sso_config(auth.tenant_id)
+
+    if not config:
+        return None
+
+    return SSOConfigResponse(
+        id=str(config.id),
+        provider_type=config.provider_type.value,
+        display_name=config.display_name,
+        oidc_issuer_url=config.oidc_issuer_url or "",
+        oidc_client_id=config.oidc_client_id or "",
+        is_enabled=config.is_enabled,
+        created_at=config.created_at,
+        updated_at=config.updated_at,
+    )
+
+
+@router.post("/sso/config", response_model=SSOConfigResponse, status_code=201)
+@audited(action="sso.config.create", resource_type="sso_config")
+async def create_or_update_sso_config(
+    request: SSOConfigRequest,
+    auth: AdminScopeDep,
+    sso_repo: SSORepoDep,
+) -> SSOConfigResponse:
+    """Create or update SSO configuration for the organization.
+
+    If SSO is already configured, this updates the existing configuration.
+    The client secret is encrypted before storage.
+    """
+    # Check if config already exists
+    existing = await sso_repo.get_sso_config(auth.tenant_id)
+
+    if existing:
+        # Update existing config
+        # First update the main config
+        updated = await sso_repo.update_sso_config(
+            config_id=existing.id,
+            is_enabled=True,
+            display_name=request.display_name,
+        )
+
+        # Update client secret separately (it's encrypted)
+        await sso_repo.update_client_secret(auth.tenant_id, request.oidc_client_secret)
+
+        if not updated:
+            raise HTTPException(status_code=500, detail="Failed to update SSO configuration")
+
+        return SSOConfigResponse(
+            id=str(updated.id),
+            provider_type=updated.provider_type.value,
+            display_name=updated.display_name,
+            oidc_issuer_url=updated.oidc_issuer_url or "",
+            oidc_client_id=updated.oidc_client_id or "",
+            is_enabled=updated.is_enabled,
+            created_at=updated.created_at,
+            updated_at=updated.updated_at,
+        )
+
+    # Create new config
+    config = await sso_repo.create_sso_config(
+        org_id=auth.tenant_id,
+        provider_type=SSOProviderType.OIDC,
+        display_name=request.display_name,
+        oidc_issuer_url=request.oidc_issuer_url,
+        oidc_client_id=request.oidc_client_id,
+        oidc_client_secret=request.oidc_client_secret,
+    )
+
+    logger.info(f"SSO config created for org: {auth.tenant_id}")
+
+    return SSOConfigResponse(
+        id=str(config.id),
+        provider_type=config.provider_type.value,
+        display_name=config.display_name,
+        oidc_issuer_url=config.oidc_issuer_url or "",
+        oidc_client_id=config.oidc_client_id or "",
+        is_enabled=config.is_enabled,
+        created_at=config.created_at,
+        updated_at=config.updated_at,
+    )
+
+
+@router.delete("/sso/config", status_code=204, response_class=Response)
+@audited(action="sso.config.disable", resource_type="sso_config")
+async def disable_sso_config(
+    auth: AdminScopeDep,
+    sso_repo: SSORepoDep,
+) -> Response:
+    """Disable SSO configuration for the organization.
+
+    This doesn't delete the configuration, just disables it.
+    Existing SSO identities are preserved for re-enabling.
+    """
+    config = await sso_repo.get_sso_config(auth.tenant_id)
+
+    if not config:
+        raise HTTPException(status_code=404, detail="SSO configuration not found")
+
+    await sso_repo.update_sso_config(config.id, is_enabled=False)
+
+    logger.info(f"SSO config disabled for org: {auth.tenant_id}")
+
+    return Response(status_code=204)
+
+
+@router.post("/sso/test", response_model=SSOTestResponse)
+async def test_sso_config(
+    request: SSOTestRequest,
+    auth: AdminScopeDep,
+) -> SSOTestResponse:
+    """Test SSO configuration by validating the OIDC discovery document.
+
+    This endpoint checks if the IdP is reachable and returns valid OIDC metadata.
+    """
+    discovery_url = f"{request.oidc_issuer_url.rstrip('/')}/.well-known/openid-configuration"
+
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            response = await client.get(discovery_url)
+            response.raise_for_status()
+            data = response.json()
+
+        # Validate required OIDC endpoints
+        required_fields = ["authorization_endpoint", "token_endpoint", "jwks_uri"]
+        missing = [f for f in required_fields if f not in data]
+
+        if missing:
+            return SSOTestResponse(
+                success=False,
+                message=f"OIDC discovery missing required fields: {', '.join(missing)}",
+                discovery_url=discovery_url,
+            )
+
+        return SSOTestResponse(
+            success=True,
+            message="OIDC discovery document is valid and IdP is reachable",
+            discovery_url=discovery_url,
+        )
+
+    except httpx.ConnectError:
+        return SSOTestResponse(
+            success=False,
+            message=f"Could not connect to IdP at {request.oidc_issuer_url}",
+            discovery_url=discovery_url,
+        )
+    except httpx.HTTPStatusError as e:
+        return SSOTestResponse(
+            success=False,
+            message=f"IdP returned error: HTTP {e.response.status_code}",
+            discovery_url=discovery_url,
+        )
+    except Exception as e:
+        return SSOTestResponse(
+            success=False,
+            message=f"Failed to fetch OIDC discovery: {e}",
+            discovery_url=discovery_url,
+        )

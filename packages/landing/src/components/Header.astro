@@ -1,0 +1,50 @@
+---
+import Icons from './Icons.astro';
+
+interface Props {
+  currentPage?: 'install' | 'docs' | 'pricing';
+}
+
+const { currentPage = 'install' } = Astro.props;
+const appUrl = import.meta.env.PUBLIC_APP_URL || 'https://app.dataing.io';
+---
+
+<header>
+  <div class="container">
+    <nav>
+      <a href="/" class="logo">
+        <div class="logo-icon">
+          <Icons name="database" />
+        </div>
+        <span class="logo-text">dataing</span>
+      </a>
+
+      <div class="tabs">
+        <a href="/" class:list={['tab', { active: currentPage === 'install' }]}>Install</a>
+        <a href="/docs" class:list={['tab', { active: currentPage === 'docs' }]}>Docs</a>
+        <a href="/pricing" class:list={['tab', { active: currentPage === 'pricing' }]}>Pricing</a>
+      </div>
+
+      <div class="nav-actions">
+        <a
+          href="https://github.com/bordumb/dataing"
+          target="_blank"
+          rel="noopener noreferrer"
+          class="github-link"
+        >
+          <Icons name="github" />
+        </a>
+        <a href={`${appUrl}/login`} class="btn-secondary">Sign in</a>
+        <a href={`${appUrl}/login`} class="btn-primary">
+          Get Started
+          <Icons name="arrow-right" class="w-4 h-4" />
+        </a>
+      </div>
+    </nav>
+  </div>
+</header>
+
+<style>
+  .w-4 { width: 1rem; }
+  .h-4 { height: 1rem; }
+</style>

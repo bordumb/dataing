@@ -1,0 +1,126 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import Header from '../components/Header.astro';
+import Footer from '../components/Footer.astro';
+import Icons from '../components/Icons.astro';
+
+const appUrl = import.meta.env.PUBLIC_APP_URL || 'https://app.dataing.io';
+
+const plans = [
+  {
+    name: 'Community',
+    price: '$0',
+    period: 'forever',
+    description: 'Full-featured open source edition',
+    features: [
+      'Unlimited investigations',
+      'All anomaly detection types',
+      'SQL datasource adapters',
+      'OpenLineage integration',
+      'Webhook notifications',
+      'Community support'
+    ],
+    cta: {
+      text: 'Get Started',
+      href: 'https://github.com/bordumb/dataing',
+      variant: 'secondary'
+    }
+  },
+  {
+    name: 'Pro',
+    price: '$49',
+    period: '/user/month',
+    description: 'For growing data teams',
+    featured: true,
+    features: [
+      'Everything in Community',
+      'Priority investigation queue',
+      'Advanced datasource adapters',
+      'Slack & email notifications',
+      'Usage analytics dashboard',
+      'Email support'
+    ],
+    cta: {
+      text: 'Start Free Trial',
+      href: `${appUrl}/login`,
+      variant: 'primary'
+    }
+  },
+  {
+    name: 'Enterprise',
+    price: 'Custom',
+    period: '',
+    description: 'For large organizations',
+    features: [
+      'Everything in Pro',
+      'SSO / OIDC / SAML',
+      'SCIM provisioning',
+      'Audit logging',
+      'Salesforce, HubSpot, Stripe adapters',
+      'Dedicated support'
+    ],
+    cta: {
+      text: 'Contact Sales',
+      href: 'mailto:sales@dataing.io',
+      variant: 'secondary'
+    }
+  }
+];
+---
+
+<BaseLayout title="Pricing - Dataing">
+  <Header currentPage="pricing" />
+
+  <main>
+    <section class="pricing">
+      <div class="container">
+        <div class="section-header">
+          <h1 class="section-title">Simple, transparent pricing</h1>
+          <p class="section-subtitle">Start free with Community Edition. Upgrade for enterprise features.</p>
+        </div>
+
+        <div class="pricing-grid">
+          {plans.map((plan) => (
+            <div class:list={['pricing-card', { 'pricing-featured': plan.featured }]}>
+              {plan.featured && <div class="pricing-badge">Most Popular</div>}
+              <div class="pricing-header">
+                <h3>{plan.name}</h3>
+                <div class="pricing-price">
+                  <span class="price-amount">{plan.price}</span>
+                  {plan.period && <span class="price-period">{plan.period}</span>}
+                </div>
+                <p class="pricing-desc">{plan.description}</p>
+              </div>
+              <ul class="pricing-features">
+                {plan.features.map((feature) => (
+                  <li>
+                    <Icons name="check" />
+                    {feature}
+                  </li>
+                ))}
+              </ul>
+              <a
+                href={plan.cta.href}
+                target={plan.cta.href.startsWith('http') ? '_blank' : undefined}
+                rel={plan.cta.href.startsWith('http') ? 'noopener noreferrer' : undefined}
+                class:list={['btn-full', plan.cta.variant === 'primary' ? 'btn-primary' : 'btn-secondary']}
+              >
+                {plan.cta.text}
+                <Icons name="arrow-right" class="icon-sm" />
+              </a>
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <Footer />
+</BaseLayout>
+
+<style>
+  .icon-sm {
+    width: 1rem;
+    height: 1rem;
+  }
+</style>

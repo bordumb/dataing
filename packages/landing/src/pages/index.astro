@@ -1,0 +1,213 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import Header from '../components/Header.astro';
+import Footer from '../components/Footer.astro';
+import Icons from '../components/Icons.astro';
+
+const appUrl = import.meta.env.PUBLIC_APP_URL || 'https://app.dataing.io';
+
+const features = [
+  {
+    icon: 'search',
+    title: 'Anomaly Detection',
+    description: 'Automatically detect data quality issues like null spikes, volume drops, schema drift, and duplicates.'
+  },
+  {
+    icon: 'zap',
+    title: 'Hypothesis Generation',
+    description: 'LLMs generate multiple hypotheses about potential root causes based on context and patterns.'
+  },
+  {
+    icon: 'database',
+    title: 'Parallel SQL Testing',
+    description: 'Test hypotheses concurrently with safe, validated SQL queries against your data warehouse.'
+  },
+  {
+    icon: 'git-branch',
+    title: 'Lineage Integration',
+    description: 'Connect to OpenLineage, dbt, Dagster, Airflow, or DataHub for full data lineage context.'
+  },
+  {
+    icon: 'shield',
+    title: 'Enterprise Ready',
+    description: 'SSO/OIDC, SCIM, audit logging, and role-based access control for enterprise deployments.'
+  },
+  {
+    icon: 'terminal',
+    title: 'Open Core',
+    description: 'Community Edition is fully open source. Enterprise Edition adds advanced features.'
+  }
+];
+---
+
+<BaseLayout>
+  <Header currentPage="install" />
+
+  <main>
+    <!-- Hero -->
+    <section class="hero">
+      <div class="container">
+        <div class="hero-content">
+          <div class="badge">
+            <span class="badge-dot"></span>
+            Open Source
+          </div>
+          <h1 class="title">
+            <span class="title-accent">Autonomous</span> data quality<br/>investigation platform
+          </h1>
+          <p class="subtitle">
+            Detect anomalies. Generate hypotheses. Test with SQL. Synthesize root causes.<br/>
+            All powered by LLMs working in parallel.
+          </p>
+          <div class="cta-group">
+            <a href={`${appUrl}/login`} class="btn-primary btn-lg">
+              Start investigating
+              <Icons name="arrow-right" class="icon-sm" />
+            </a>
+            <a
+              href="https://github.com/bordumb/dataing"
+              target="_blank"
+              rel="noopener noreferrer"
+              class="btn-secondary btn-lg"
+            >
+              View on GitHub
+              <Icons name="external-link" class="icon-sm" />
+            </a>
+          </div>
+
+          <!-- Install command -->
+          <div class="install-box">
+            <div class="install-header">
+              <Icons name="terminal" />
+              <span>Quick install</span>
+            </div>
+            <div class="install-commands">
+              <code>
+                <span class="code-comment"># Clone and setup</span><br/>
+                git clone https://github.com/bordumb/dataing.git<br/>
+                cd dataing<br/>
+                just setup<br/>
+                <br/>
+                <span class="code-comment"># Run development stack</span><br/>
+                just dev
+              </code>
+            </div>
+          </div>
+        </div>
+
+        <!-- Animated visualization -->
+        <div class="hero-visual">
+          <div class="data-flow">
+            <svg viewBox="0 0 400 300" class="data-svg">
+              <defs>
+                <filter id="glow">
+                  <feGaussianBlur stdDeviation="2" result="coloredBlur"/>
+                  <feMerge>
+                    <feMergeNode in="coloredBlur"/>
+                    <feMergeNode in="SourceGraphic"/>
+                  </feMerge>
+                </filter>
+              </defs>
+
+              <!-- Data nodes -->
+              <g class="nodes">
+                <circle cx="60" cy="80" r="8" class="node node-1"/>
+                <circle cx="60" cy="150" r="8" class="node node-2"/>
+                <circle cx="60" cy="220" r="8" class="node node-3"/>
+                <rect x="170" y="130" width="60" height="40" rx="4" class="processor"/>
+                <text x="200" y="155" class="processor-text">LLM</text>
+                <circle cx="340" cy="100" r="6" class="node node-4"/>
+                <circle cx="340" cy="150" r="6" class="node node-5"/>
+                <circle cx="340" cy="200" r="6" class="node node-6"/>
+              </g>
+
+              <!-- Flow lines -->
+              <g class="flow-lines">
+                <path d="M68 80 Q120 80 170 140" class="flow-line"/>
+                <path d="M68 150 L170 150" class="flow-line"/>
+                <path d="M68 220 Q120 220 170 160" class="flow-line"/>
+                <path d="M230 140 Q280 100 334 100" class="flow-line"/>
+                <path d="M230 150 L334 150" class="flow-line"/>
+                <path d="M230 160 Q280 200 334 200" class="flow-line"/>
+              </g>
+
+              <!-- Animated packets -->
+              <g class="packets">
+                <circle r="3" class="packet">
+                  <animateMotion dur="2s" repeatCount="indefinite" path="M68 80 Q120 80 170 140"/>
+                </circle>
+                <circle r="3" class="packet">
+                  <animateMotion dur="1.8s" repeatCount="indefinite" path="M68 150 L170 150"/>
+                </circle>
+                <circle r="3" class="packet">
+                  <animateMotion dur="2.2s" repeatCount="indefinite" path="M68 220 Q120 220 170 160"/>
+                </circle>
+                <circle r="3" class="packet">
+                  <animateMotion dur="1.5s" repeatCount="indefinite" begin="0.5s" path="M230 140 Q280 100 334 100"/>
+                </circle>
+                <circle r="3" class="packet">
+                  <animateMotion dur="1.3s" repeatCount="indefinite" begin="0.3s" path="M230 150 L334 150"/>
+                </circle>
+                <circle r="3" class="packet">
+                  <animateMotion dur="1.7s" repeatCount="indefinite" begin="0.7s" path="M230 160 Q280 200 334 200"/>
+                </circle>
+              </g>
+
+              <!-- Labels -->
+              <g class="labels">
+                <text x="60" y="50" class="label">Data Sources</text>
+                <text x="200" y="195" class="label">Analysis</text>
+                <text x="340" y="250" class="label">Insights</text>
+              </g>
+            </svg>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Features -->
+    <section class="features">
+      <div class="container">
+        <div class="section-header">
+          <h2 class="section-title">How it works</h2>
+          <p class="section-subtitle">Dataing automates the tedious parts of data investigation</p>
+        </div>
+
+        <div class="features-grid">
+          {features.map((feature) => (
+            <div class="feature-card">
+              <div class="feature-icon">
+                <Icons name={feature.icon} />
+              </div>
+              <h3 class="feature-title">{feature.title}</h3>
+              <p class="feature-desc">{feature.description}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
+
+    <!-- CTA -->
+    <section class="cta-section">
+      <div class="container">
+        <div class="cta-box">
+          <h2>Ready to automate your data investigations?</h2>
+          <p>Get started in minutes with our quick setup guide.</p>
+          <a href={`${appUrl}/login`} class="btn-primary btn-lg">
+            Get Started Free
+            <Icons name="arrow-right" class="icon-sm" />
+          </a>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <Footer />
+</BaseLayout>
+
+<style>
+  .icon-sm {
+    width: 1rem;
+    height: 1rem;
+  }
+</style>

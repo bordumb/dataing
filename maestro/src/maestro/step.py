@@ -10,7 +10,7 @@ from typing import Generic, Protocol, TypeVar, runtime_checkable
 
 from maestro.result import StepResult
 
-ContextT = TypeVar("ContextT", contravariant=True)
+ContextT = TypeVar("ContextT")
 InputT = TypeVar("InputT", contravariant=True)
 OutputT = TypeVar("OutputT", covariant=True)
 
@@ -28,7 +28,7 @@ class Step(Protocol[ContextT, InputT, OutputT]):
     Any class with the right methods satisfies this protocol.
 
     Type Parameters:
-        ContextT: The workflow context type (contravariant).
+        ContextT: The workflow context type (invariant - used in both input and output).
         InputT: The step input type (contravariant).
         OutputT: The step output type (covariant).
 

@@ -5,12 +5,19 @@ behavior unless the request calls for it.
 
 ## Repository Map (Monorepo)
 
+- maestro/ - Generic workflow engine (zero deps, protocol-based steps)
+- bond/ - Agent runtime (PydanticAI wrapper, streaming, BondStep bridge to maestro)
 - dataing/ - Community Edition (CE) backend package, migrations, scripts
 - dataing-ee/ - Enterprise Edition (EE) extension package
-- bond/ - Agent runtime (PydanticAI wrapper, streaming, memory tools)
 - frontend/ - React + Vite + TypeScript + Tailwind + shadcn/ui
 - docs/ - MkDocs site and ADRs
 - demo/ - Demo fixtures, generator, docker-compose stack
+
+### Package Dependency Order
+
+```
+maestro (zero deps) → bond (maestro + pydantic-ai) → dataing (bond + maestro)
+```
 
 ## Development Commands
 
@@ -69,13 +76,39 @@ The repo is open-core:
 - EE lives in `dataing-ee/` and extends CE with enterprise-only features
 - `bond/` provides the agent runtime and memory tools used by the backend
 
+## Maestro Workflow Engine
+
+`maestro/src/maestro/` is a standalone generic workflow engine with zero dependencies:
+- `step.py` - `Step[ContextT, InputT, OutputT]` protocol for workflow steps
+- `result.py` - `StepResult`, `BranchRequest`, `BranchSpec` immutable result types
+- `signals.py` - `Signal` enum (CONTINUE, COMPLETE, FAIL, BRANCH, MERGE, AWAIT_USER)
+- `handlers.py` - `SignalHandler` ABC, `DefaultSignalHandler`, `BranchingSignalHandler`
+- `workflow.py` - `Workflow` executor with `tick()` and `run()` methods
+
+Key design: Protocol-based structural subtyping. Any class with `name`, `execute()`, and
+`can_execute()` methods satisfies `Step` without inheritance.
+
+## Bond Agent Runtime
+
+`bond/src/bond/` wraps PydanticAI for LLM interactions:
+- `agent.py` - `BondAgent` with streaming and structured output
+- `maestro/bond_step.py` - `BondStep` template method pattern bridging `BondAgent` + `maestro.Step`
+
+`BondStep` provides: `create_agent()`, `build_prompt()`, `map_response()` hooks with automatic
+`execute()` orchestration.
+
 ## Backend Architecture (CE)
 
 Core domain: `dataing/src/dataing/core/`
-- `investigation/` - Orchestrator, step pipeline, registry, repository
+- `investigation/` - Workflow steps, flow builder, registry, repository
+- `investigation/flow.py` - `build_investigation_workflow()` using maestro
+- `investigation/steps/protocol.py` - `DataingStep` ABC satisfying maestro.Step
 - `auth/`, `rbac/`, `entitlements/` - Identity and feature gating
 - `quality/` - LLM-as-judge quality validation
 - `state.py`, `domain_types.py`, `interfaces.py` - Event-sourced state + protocols
+
+Investigation workflow: Use `INVESTIGATION_ENGINE=v2` to enable maestro-based workflow (default
+is v1 legacy orchestrator).
 
 Adapters: `dataing/src/dataing/adapters/`
 - `datasource/` - SQL, document, filesystem adapters; API base types

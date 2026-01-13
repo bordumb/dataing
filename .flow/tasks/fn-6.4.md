@@ -39,9 +39,20 @@ POST /auth/sso/discover {"email": "user@acme.com"}
 - [ ] Auth URL includes all required OIDC parameters
 - [ ] Unit tests for discovery with/without SSO config
 ## Done summary
-TBD
+Wired SSO Discovery endpoint with database-backed domain lookup:
 
+- Added database connection dependency injection for SSO routes
+- Created get_sso_repository() and get_sso_state_repository() dependencies
+- Updated discover_sso_method to:
+  - Look up verified domain claims
+  - Get SSO config for the organization
+  - Decrypt client secret from database
+  - Generate OIDC auth URL using OIDCProvider
+  - Create and store state/nonce via SSOStateRepository
+- Returns OIDC auth URL for configured domains
+- Returns password method for unconfigured/unverified domains
+- Added 2 new tests for unverified domain and disabled SSO cases
 ## Evidence
 - Commits:
-- Tests:
+- Tests: dataing-ee/tests/unit/entrypoints/api/routes/test_sso.py (11 tests)
 - PRs:

@@ -11,9 +11,9 @@ setup:
     @echo "Setting up dataing (CE)..."
     uv sync
     @echo "Setting up frontend app..."
-    cd packages/app && pnpm install
+    cd frontend/app && pnpm install
     @echo "Setting up landing site..."
-    cd packages/landing && pnpm install
+    cd frontend/landing && pnpm install
     @echo "Installing pre-commit hooks..."
     uv tool install pre-commit || pip install pre-commit
     pre-commit install
@@ -34,7 +34,7 @@ dev:
     set -euo pipefail
     trap 'kill 0' EXIT
     (uv run fastapi dev dataing-ee/src/dataing_ee/entrypoints/api/app.py --host 0.0.0.0 --port 8000) &
-    (cd packages/app && pnpm dev --port 3000) &
+    (cd frontend/app && pnpm dev --port 3000) &
     wait
 
 # Run backend only (EE)
@@ -47,26 +47,26 @@ dev-backend-ce:
 
 # Run frontend only
 dev-frontend:
-    cd packages/app && pnpm dev
+    cd frontend/app && pnpm dev
 
 # Run landing site only
 dev-landing:
-    cd packages/landing && pnpm dev
+    cd frontend/landing && pnpm dev
 
 # Build landing site
 build-landing:
-    cd packages/landing && pnpm build
+    cd frontend/landing && pnpm build
 
 # Setup landing site dependencies
 setup-landing:
-    cd packages/landing && pnpm install
+    cd frontend/landing && pnpm install
 
 # Run all tests (CE + EE)
 test:
     @echo "Running dataing tests..."
     uv run pytest dataing/tests dataing-ee/tests
     @echo "Running frontend tests..."
-    cd packages/app && pnpm test
+    cd frontend/app && pnpm test
 
 # Run CE tests only
 test-ce:
@@ -78,7 +78,7 @@ test-ee:
 
 # Run frontend tests only
 test-frontend:
-    cd packages/app && pnpm test
+    cd frontend/app && pnpm test
 
 # Run linters (CE + EE)
 lint:
@@ -86,41 +86,41 @@ lint:
     uv run ruff check dataing/src dataing-ee/src
     uv run mypy dataing/src/dataing dataing-ee/src/dataing_ee
     @echo "Linting frontend..."
-    cd packages/app && pnpm lint
+    cd frontend/app && pnpm lint
 
 # Format code
 format:
     uv run ruff format dataing/src dataing-ee/src
-    cd packages/app && pnpm format
+    cd frontend/app && pnpm format
 
 # Generate OpenAPI client for frontend
 generate-client:
     @echo "Exporting OpenAPI schema from backend..."
     uv run python dataing/scripts/export_openapi.py
     @echo "Generating OpenAPI client..."
-    cd packages/app && pnpm orval
+    cd frontend/app && pnpm orval
 
 # Build for production
 build:
     @echo "Building dataing..."
     uv build
     @echo "Building landing site..."
-    cd packages/landing && pnpm build
+    cd frontend/landing && pnpm build
     @echo "Building frontend app..."
-    cd packages/app && pnpm build
+    cd frontend/app && pnpm build
 
 # Run type checking
 typecheck:
     uv run mypy dataing/src/dataing dataing-ee/src/dataing_ee
-    cd packages/app && pnpm typecheck
+    cd frontend/app && pnpm typecheck
 
 # Clean build artifacts
 clean:
     rm -rf dist .pytest_cache .ruff_cache .mypy_cache
     rm -rf dataing/.pytest_cache dataing/.ruff_cache
     rm -rf dataing-ee/.pytest_cache dataing-ee/.ruff_cache
-    rm -rf packages/app/dist packages/app/node_modules/.cache
-    rm -rf packages/landing/dist packages/landing/node_modules/.cache
+    rm -rf frontend/app/dist frontend/app/node_modules/.cache
+    rm -rf frontend/landing/dist frontend/landing/node_modules/.cache
 
 # Start docker-compose stack
 docker-up:
@@ -169,16 +169,16 @@ demo: demo-fixtures
     uv sync --quiet
 
     # Ensure frontend dependencies are installed
-    if [ ! -d "packages/app/node_modules" ]; then
+    if [ ! -d "frontend/app/node_modules" ]; then
         echo "Installing frontend dependencies..."
-        cd packages/app && pnpm install
+        cd frontend/app && pnpm install
         cd ../..
     fi
 
     # Generate OpenAPI client for frontend
     echo "Generating OpenAPI client..."
     uv run python dataing/scripts/export_openapi.py
-    cd packages/app && pnpm orval
+    cd frontend/app && pnpm orval
     cd ..
     echo ""
 
@@ -276,7 +276,7 @@ demo: demo-fixtures
     ) &
 
     # Start frontend
-    (cd packages/app && pnpm dev --port 3000) &
+    (cd frontend/app && pnpm dev --port 3000) &
     wait
 
 # Stop demo (kills all processes and removes containers/volumes)

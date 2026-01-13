@@ -397,42 +397,41 @@ nav {
   height: 100%;
 }
 
-/* Source icons container */
-.source-icons .node {
-  transition: transform 0.3s ease;
+/* Icon groups */
+.icon-group {
+  transition: transform 0.3s ease, opacity 0.3s ease;
 }
 
-.source-icons .node:hover {
-  transform: scale(1.1);
+.icon-group:hover {
+  transform: scale(1.05);
 }
 
-/* Staggered fade-in for nodes */
+/* Staggered fade-in for icon groups */
 .node-1 { animation: nodeAppear 0.8s ease-out 0.1s both; }
 .node-2 { animation: nodeAppear 0.8s ease-out 0.2s both; }
 .node-3 { animation: nodeAppear 0.8s ease-out 0.3s both; }
-.node-4 { animation: nodeAppear 0.6s ease-out 0.5s both; }
-.node-5 { animation: nodeAppear 0.6s ease-out 0.6s both; }
-.node-6 { animation: nodeAppear 0.6s ease-out 0.7s both; }
+.node-4 { animation: nodeAppear 0.8s ease-out 0.4s both; }
 
 @keyframes nodeAppear {
   from {
     opacity: 0;
-    transform: scale(0.5);
+    transform: translateX(-10px);
   }
   to {
     opacity: 1;
-    transform: scale(1);
+    transform: translateX(0);
   }
 }
 
 /* Output nodes pulsing */
-.output-nodes circle {
+.output-nodes .output-node {
   animation: outputPulse 3s ease-in-out infinite;
 }
 
-.node-4 { animation-delay: 0s; }
-.node-5 { animation-delay: 0.5s; }
-.node-6 { animation-delay: 1s; }
+.output-nodes .output-node:nth-child(1) { animation-delay: 0s; }
+.output-nodes .output-node:nth-child(2) { animation-delay: 0.3s; }
+.output-nodes .output-node:nth-child(3) { animation-delay: 0.6s; }
+.output-nodes .output-node:nth-child(4) { animation-delay: 0.9s; }
 
 @keyframes outputPulse {
   0%, 100% { opacity: 0.7; }
@@ -468,10 +467,12 @@ nav {
   filter: drop-shadow(0 0 8px var(--landing-accent));
 }
 
-/* Staggered packet colors for visual interest */
-.packet-1, .packet-4 { fill: #06b6d4; filter: drop-shadow(0 0 6px #06b6d4); }
-.packet-2, .packet-5 { fill: #a855f7; filter: drop-shadow(0 0 6px #a855f7); }
-.packet-3, .packet-6 { fill: #f59e0b; filter: drop-shadow(0 0 6px #f59e0b); }
+/* Color-coded packets matching their source rows */
+.packet-1 { fill: #06b6d4; filter: drop-shadow(0 0 6px #06b6d4); } /* Lineage - cyan */
+.packet-2 { fill: #f0f0f5; filter: drop-shadow(0 0 6px #f0f0f5); } /* Code - white */
+.packet-3 { fill: #f59e0b; filter: drop-shadow(0 0 6px #f59e0b); } /* Anomaly - amber */
+.packet-4 { fill: #3b82f6; filter: drop-shadow(0 0 6px #3b82f6); } /* Datasources - blue */
+.packet-5, .packet-6, .packet-7, .packet-8 { fill: #00d4aa; filter: drop-shadow(0 0 6px #00d4aa); } /* Output - accent */
 
 .label {
   fill: var(--landing-text-muted);

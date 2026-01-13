@@ -6,7 +6,7 @@ import pytest
 
 from dataing.core.investigation.entities import InvestigationContext
 from dataing.core.investigation.steps.check_patterns import CheckPatternsStep
-from dataing.core.investigation.values import ExecutionSignal, StepType
+from maestro import Signal, StepType
 
 
 @pytest.fixture
@@ -101,7 +101,7 @@ class TestCheckPatternsStep:
 
         result = await step.execute(sample_context)
 
-        assert result.signal == ExecutionSignal.CONTINUE
+        assert result.signal == Signal.CONTINUE
 
     @pytest.mark.asyncio
     async def test_execute_sets_next_step_generate_hypotheses(
@@ -142,7 +142,7 @@ class TestCheckPatternsStep:
 
         result = await step.execute(sample_context)
 
-        assert result.signal == ExecutionSignal.CONTINUE
+        assert result.signal == Signal.CONTINUE
         assert result.output == []
         assert result.context.matched_patterns == []
         assert result.next_step == StepType.GENERATE_HYPOTHESES
@@ -160,7 +160,7 @@ class TestCheckPatternsStep:
         result = await step.execute(sample_context)
 
         # Should still continue (patterns are optional enrichment)
-        assert result.signal == ExecutionSignal.CONTINUE
+        assert result.signal == Signal.CONTINUE
         assert result.context.matched_patterns == []
         assert result.next_step == StepType.GENERATE_HYPOTHESES
 

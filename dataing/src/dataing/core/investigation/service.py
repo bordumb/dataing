@@ -1,7 +1,9 @@
 """Investigation service for coordinating API operations.
 
 This module provides the InvestigationService that coordinates between
-the API layer, repository, orchestrator, and collaboration service.
+the API layer, repository, and collaboration service.
+
+Uses maestro.Workflow for investigation execution.
 """
 
 from __future__ import annotations
@@ -21,7 +23,6 @@ if TYPE_CHECKING:
     from dataing.agents.client import AgentClient
     from dataing.core.domain_types import AnomalyAlert
     from dataing.core.investigation.collaboration import CollaborationService
-    from dataing.core.investigation.orchestrator import InvestigationOrchestrator
     from dataing.core.investigation.repository import InvestigationRepository
     from dataing.services.usage import UsageTracker
 
@@ -29,7 +30,6 @@ from dataing.core.investigation.entities import InvestigationContext
 from dataing.core.investigation.values import (
     BranchStatus,
     BranchType,
-    ExecutionSignal,
     StepType,
     VersionId,
 )
@@ -68,7 +68,6 @@ class BranchState(BaseModel):
     current_step: str
     synthesis: dict[str, Any] | None = None
     evidence: list[dict[str, Any]] = []
-    # Phase 3: Additional data for visualization
     step_history: list[StepHistoryItem] = []
     matched_patterns: list[MatchedPattern] = []
     can_merge: bool = False
@@ -90,8 +89,7 @@ class InvestigationService:
     """Service for coordinating investigation operations.
 
     This service provides the business logic layer between the API
-    and the underlying domain services (repository, orchestrator,
-    collaboration).
+    and the underlying domain services (repository, collaboration).
     """
 
     def __init__(
@@ -132,9 +130,8 @@ class InvestigationService:
     ) -> tuple[UUID, UUID]:
         """Start a new investigation for an alert.
 
-        Creates the investigation, main branch, and initial snapshot
-        positioned at GATHER_CONTEXT step. Also creates an orchestrator
-        with real dependencies for this specific investigation.
+        Creates the investigation, main branch, and initial snapshot.
+        Then starts the maestro workflow in the background.
 
         Args:
             tenant_id: ID of the tenant starting the investigation.
@@ -145,9 +142,6 @@ class InvestigationService:
         Returns:
             Tuple of (investigation_id, main_branch_id).
         """
-        from dataing.adapters.investigation.step_factory import create_step_registry
-        from dataing.core.investigation.orchestrator import InvestigationOrchestrator
-
         # Create investigation
         investigation = await self.repository.create_investigation(
             tenant_id=tenant_id,
@@ -173,8 +167,7 @@ class InvestigationService:
         # Set main branch
         await self.repository.set_main_branch(investigation.id, main_branch.id)
 
-        # Create initial snapshot at GATHER_CONTEXT
-        # Build rich alert summary with all critical information for hypothesis generation
+        # Build rich alert summary with all critical information
         metric_name = alert.metric_spec.display_name
         columns = ", ".join(alert.metric_spec.columns_referenced) or "unknown column"
         alert_summary = (
@@ -185,8 +178,10 @@ class InvestigationService:
         )
         initial_context = InvestigationContext(
             alert_summary=alert_summary,
-            alert=alert.model_dump(mode="json"),  # Full alert for LLM prompts
+            alert=alert.model_dump(mode="json"),
         )
+
+        # Create initial snapshot at GATHER_CONTEXT
         snapshot = await self.repository.create_snapshot(
             investigation_id=investigation.id,
             branch_id=main_branch.id,
@@ -200,27 +195,15 @@ class InvestigationService:
         # Update branch head
         await self.repository.update_branch_head(main_branch.id, snapshot.id)
 
-        # Create step registry with real dependencies for this investigation
-        step_registry = create_step_registry(
-            agent_client=self._agent_client,
-            context_engine=self._context_engine,
-            alert=alert,
-            data_adapter=data_adapter,
-            pattern_repository=self._pattern_repository,
-            usage_tracker=self._usage_tracker,
-            tenant_id=tenant_id,
-            investigation_id=investigation.id,
-        )
-
-        # Create orchestrator for this investigation
-        orchestrator = InvestigationOrchestrator(
-            repository=self.repository,
-            registry=step_registry,
-        )
-
-        # Start the orchestrator in the background
+        # Start maestro workflow in the background
+        logger.info(f"Starting maestro workflow for investigation {investigation.id}")
         asyncio.create_task(
-            self._run_investigation(main_branch.id, orchestrator),
+            self._run_investigation(
+                investigation_id=investigation.id,
+                main_branch_id=main_branch.id,
+                initial_context=initial_context,
+                data_adapter=data_adapter,
+            ),
             name=f"investigation-{investigation.id}",
         )
 
@@ -228,72 +211,88 @@ class InvestigationService:
 
     async def _run_investigation(
         self,
-        branch_id: UUID,
-        orchestrator: InvestigationOrchestrator,
-        max_iterations: int = 50,
+        investigation_id: UUID,
+        main_branch_id: UUID,
+        initial_context: InvestigationContext,
+        data_adapter: BaseAdapter,
     ) -> None:
-        """Run the orchestrator tick loop for a branch.
-
-        This runs in the background after starting an investigation.
+        """Run investigation using maestro workflow.
 
         Args:
-            branch_id: ID of the branch to run.
-            orchestrator: The orchestrator with steps wired for this investigation.
-            max_iterations: Maximum number of iterations to prevent infinite loops.
+            investigation_id: ID of the investigation.
+            main_branch_id: ID of the main branch.
+            initial_context: Initial investigation context.
+            data_adapter: Connected data source adapter.
         """
-        logger.info(f"Starting investigation loop for branch {branch_id}")
+        from dataing.core.investigation.flow import (
+            build_investigation_workflow,
+            run_investigation,
+        )
+        from maestro import WorkflowError
 
-        for i in range(max_iterations):
-            try:
-                result = await orchestrator.tick(branch_id)
-                logger.info(
-                    f"Tick {i + 1}: signal={result.signal.value}, "
-                    f"snapshot={result.new_snapshot_id}"
-                )
+        logger.info(f"Starting maestro workflow for investigation {investigation_id}")
 
-                if result.signal == ExecutionSignal.COMPLETE:
-                    logger.info(f"Investigation branch {branch_id} completed")
-                    await self._create_completion_notification(branch_id, "completed")
-                    break
-                elif result.signal == ExecutionSignal.FAIL:
-                    logger.warning(
-                        f"Investigation branch {branch_id} failed: {result.error}"
-                    )
-                    await self._create_completion_notification(
-                        branch_id, "failed", result.error
-                    )
-                    break
-                elif result.signal == ExecutionSignal.AWAIT_USER:
-                    logger.info(f"Investigation branch {branch_id} awaiting user input")
-                    break
-                elif result.signal == ExecutionSignal.BRANCH:
-                    # Handle child branches
-                    if result.child_branch_ids:
-                        logger.info(
-                            f"Created {len(result.child_branch_ids)} child branches"
-                        )
-                        # Run child branches in parallel with the same orchestrator
-                        tasks = [
-                            self._run_investigation(child_id, orchestrator)
-                            for child_id in result.child_branch_ids
-                        ]
-                        await asyncio.gather(*tasks)
-                        # After children complete, the parent branch is resumed
-                        # Continue the loop to tick the parent at the merge step
-                        logger.info(f"Child branches completed, resuming parent {branch_id}")
-                        continue
-                    break
+        try:
+            # Build workflow with dependencies
+            workflow = build_investigation_workflow(
+                context_engine=self._context_engine,
+                llm=self._agent_client,
+                database=data_adapter,
+                pattern_repository=self._pattern_repository,
+            )
 
-                # Small delay between ticks
-                await asyncio.sleep(0.1)
+            # Run the workflow to completion
+            final_context = await run_investigation(
+                workflow=workflow,
+                initial_context=initial_context,
+            )
 
-            except Exception as e:
-                logger.error(f"Error in investigation loop: {e}", exc_info=True)
-                break
+            logger.info(
+                f"Maestro workflow completed for investigation {investigation_id}"
+            )
 
-        else:
-            logger.warning(
-                f"Investigation branch {branch_id} reached max iterations ({max_iterations})"
+            # Update investigation outcome
+            outcome = final_context.current_synthesis or {}
+            await self.repository.update_investigation_outcome(
+                investigation_id, outcome
+            )
+
+            # Create final snapshot for persistence
+            final_snapshot = await self.repository.create_snapshot(
+                investigation_id=investigation_id,
+                branch_id=main_branch_id,
+                version=VersionId(major=1),
+                step=StepType.COMPLETE,
+                context=final_context,
+            )
+
+            # Update branch head to point to final snapshot
+            await self.repository.update_branch_head(main_branch_id, final_snapshot.id)
+
+            # Mark branch as completed
+            await self.repository.update_branch_status(
+                main_branch_id, BranchStatus.COMPLETED
+            )
+
+            # Create completion notification
+            await self._create_completion_notification(main_branch_id, "completed")
+
+        except WorkflowError as e:
+            logger.error(f"Maestro workflow failed: {e}", exc_info=True)
+            await self.repository.update_branch_status(
+                main_branch_id, BranchStatus.ABANDONED
+            )
+            await self._create_completion_notification(
+                main_branch_id, "failed", str(e)
+            )
+
+        except Exception as e:
+            logger.error(f"Unexpected error in maestro workflow: {e}", exc_info=True)
+            await self.repository.update_branch_status(
+                main_branch_id, BranchStatus.ABANDONED
+            )
+            await self._create_completion_notification(
+                main_branch_id, "failed", f"Unexpected error: {e}"
             )
 
     async def _create_completion_notification(

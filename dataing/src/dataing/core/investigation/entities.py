@@ -42,6 +42,9 @@ class InvestigationContext(BaseModel):
     hypotheses: list[dict[str, Any]] = Field(default_factory=list)
     evidence: list[dict[str, Any]] = Field(default_factory=list)
 
+    # Current hypothesis being investigated (set by GenerateQueryStep in branches)
+    current_hypothesis: dict[str, Any] | None = None
+
     # Current query being executed
     current_query: str | None = None
 

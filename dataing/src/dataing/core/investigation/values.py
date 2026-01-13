@@ -86,15 +86,3 @@ class StepType(str, Enum):
     # Terminal
     COMPLETE = "complete"
     FAIL = "fail"
-
-
-class ExecutionSignal(str, Enum):
-    """Signals that control orchestrator flow."""
-
-    CONTINUE = "continue"
-    REQUIRE_APPROVAL = "require_approval"
-    AWAIT_USER = "await_user"
-    BRANCH = "branch"
-    MERGE = "merge"
-    COMPLETE = "complete"
-    FAIL = "fail"

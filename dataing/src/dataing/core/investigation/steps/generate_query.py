@@ -9,9 +9,9 @@ from __future__ import annotations
 from typing import Any, Protocol
 
 from dataing.core.investigation.entities import InvestigationContext
-from dataing.core.investigation.values import ExecutionSignal, StepType
+from dataing.core.investigation.values import StepType
 
-from .protocol import Step, StepResult
+from .protocol import Signal, Step, StepResult
 
 
 class LLMProtocol(Protocol):
@@ -73,7 +73,7 @@ class GenerateQueryStep(Step[dict[str, Any], str]):
         self,
         context: InvestigationContext,
         input_data: dict[str, Any] | None = None,
-    ) -> StepResult[str]:
+    ) -> StepResult[InvestigationContext, str]:
         """Generate SQL query via LLM.
 
         Args:
@@ -87,33 +87,45 @@ class GenerateQueryStep(Step[dict[str, Any], str]):
         if input_data is None or "hypothesis" not in input_data:
             return StepResult(
                 context=context,
-                signal=ExecutionSignal.FAIL,
-                output=None,
+                signal=Signal.FAIL,
+                error="No hypothesis in input data for query generation",
             )
 
         hypothesis: dict[str, Any] = input_data["hypothesis"]
 
         # Generate query via LLM
         try:
+            schema_info = context.schema_info
+            if schema_info is None:
+                return StepResult(
+                    context=context,
+                    signal=Signal.FAIL,
+                    error="No schema info available for query generation",
+                )
             query = await self.llm.generate_query(
                 hypothesis=hypothesis,
-                schema_info=context.schema_info,  # type: ignore[arg-type]
+                schema_info=schema_info,
                 alert_summary=context.alert_summary,
                 alert=context.alert,
             )
         except Exception as e:
             return StepResult(
                 context=context,
-                signal=ExecutionSignal.FAIL,
-                output={"error": f"Query generation failed: {e}"},
+                signal=Signal.FAIL,
+                error=f"Query generation failed: {e}",
             )
 
-        # Update context with the generated query
-        updated_context = context.model_copy(update={"current_query": query})
+        # Update context with the generated query and current hypothesis
+        updated_context = context.model_copy(
+            update={
+                "current_query": query,
+                "current_hypothesis": hypothesis,
+            }
+        )
 
         return StepResult(
             context=updated_context,
-            signal=ExecutionSignal.CONTINUE,
+            signal=Signal.CONTINUE,
             output=query,
-            next_step=StepType.EXECUTE_QUERY,
+            next_step=StepType.EXECUTE_QUERY.value,
         )

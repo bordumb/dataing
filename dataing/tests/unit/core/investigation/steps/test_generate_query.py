@@ -7,7 +7,7 @@ import pytest
 
 from dataing.core.investigation.entities import InvestigationContext
 from dataing.core.investigation.steps.generate_query import GenerateQueryStep
-from dataing.core.investigation.values import ExecutionSignal, StepType
+from maestro import Signal, StepType
 
 
 @pytest.fixture
@@ -95,7 +95,7 @@ class TestGenerateQueryStep:
 
         result = await step.execute(sample_context, input_data)
 
-        assert result.signal == ExecutionSignal.CONTINUE
+        assert result.signal == Signal.CONTINUE
 
     @pytest.mark.asyncio
     async def test_execute_sets_next_step_execute_query(
@@ -124,7 +124,7 @@ class TestGenerateQueryStep:
         # No input_data (hypothesis missing)
         result = await step.execute(sample_context, None)
 
-        assert result.signal == ExecutionSignal.FAIL
+        assert result.signal == Signal.FAIL
         # LLM should not be called
         mock_llm.generate_query.assert_not_called()
 
@@ -140,7 +140,7 @@ class TestGenerateQueryStep:
 
         result = await step.execute(sample_context, input_data)
 
-        assert result.signal == ExecutionSignal.FAIL
+        assert result.signal == Signal.FAIL
         mock_llm.generate_query.assert_not_called()
 
     @pytest.mark.asyncio
@@ -193,4 +193,4 @@ class TestGenerateQueryStep:
 
         result = await step.execute(sample_context, input_data)
 
-        assert result.signal == ExecutionSignal.FAIL
+        assert result.signal == Signal.FAIL

@@ -9,9 +9,9 @@ from __future__ import annotations
 from typing import Any, Protocol
 
 from dataing.core.investigation.entities import InvestigationContext
-from dataing.core.investigation.values import ExecutionSignal, StepType
+from dataing.core.investigation.values import StepType
 
-from .protocol import Step, StepResult
+from .protocol import Signal, Step, StepResult
 
 
 class DatabaseProtocol(Protocol):
@@ -63,7 +63,7 @@ class ExecuteQueryStep(Step[dict[str, Any], dict[str, Any]]):
         self,
         context: InvestigationContext,
         input_data: dict[str, Any] | None = None,
-    ) -> StepResult[dict[str, Any]]:
+    ) -> StepResult[InvestigationContext, dict[str, Any]]:
         """Execute SQL query via database adapter.
 
         Args:
@@ -77,33 +77,36 @@ class ExecuteQueryStep(Step[dict[str, Any], dict[str, Any]]):
         if context.current_query is None:
             return StepResult(
                 context=context,
-                signal=ExecutionSignal.FAIL,
-                output={"error": "No query available to execute"},
+                signal=Signal.FAIL,
+                error="No query available to execute",
             )
 
         # Execute query via database adapter
         try:
-            query_result: dict[str, Any] = await self.database.execute_query(
-                context.current_query
-            )
+            query_result = await self.database.execute_query(context.current_query)
+            # Convert QueryResult to dict if it's a Pydantic model
+            if hasattr(query_result, "model_dump"):
+                query_result_dict: dict[str, Any] = query_result.model_dump()
+            else:
+                query_result_dict = query_result
         except Exception as e:
             return StepResult(
                 context=context,
-                signal=ExecutionSignal.FAIL,
-                output={"error": f"Query execution failed: {e}"},
+                signal=Signal.FAIL,
+                error=f"Query execution failed: {e}",
             )
 
         # Update context with query result and incremented query count
         updated_context = context.model_copy(
             update={
-                "current_query_result": query_result,
+                "current_query_result": query_result_dict,
                 "total_queries_executed": context.total_queries_executed + 1,
             }
         )
 
         return StepResult(
             context=updated_context,
-            signal=ExecutionSignal.CONTINUE,
-            output=query_result,
-            next_step=StepType.INTERPRET_EVIDENCE,
+            signal=Signal.CONTINUE,
+            output=query_result_dict,
+            next_step=StepType.INTERPRET_EVIDENCE.value,
         )

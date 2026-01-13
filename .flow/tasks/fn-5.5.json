@@ -1,0 +1,25 @@
+{
+  "assignee": "bordumbb@gmail.com",
+  "claim_note": "",
+  "claimed_at": "2026-01-13T02:18:53.945091Z",
+  "created_at": "2026-01-13T00:33:16.468225Z",
+  "depends_on": [
+    "fn-5.4"
+  ],
+  "epic": "fn-5",
+  "evidence": {
+    "commits": [],
+    "prs": [],
+    "tests": [
+      "uv run mypy dataing/src/dataing/core/investigation/steps --strict",
+      "uv run pytest tests/ -v (68 passed)",
+      "python -c 'from dataing.core.investigation.steps import *'"
+    ]
+  },
+  "id": "fn-5.5",
+  "priority": null,
+  "spec_path": ".flow/tasks/fn-5.5.md",
+  "status": "done",
+  "title": "Port Existing Steps to Maestro Protocol",
+  "updated_at": "2026-01-13T02:27:22.280503Z"
+}

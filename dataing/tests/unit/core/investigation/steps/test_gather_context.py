@@ -7,7 +7,7 @@ import pytest
 from dataing.core.domain_types import AnomalyAlert, MetricSpec
 from dataing.core.investigation.entities import InvestigationContext
 from dataing.core.investigation.steps.gather_context import GatherContextStep
-from dataing.core.investigation.values import ExecutionSignal, StepType
+from maestro import Signal, StepType
 
 
 @pytest.fixture
@@ -67,7 +67,7 @@ class TestGatherContextStep:
 
         result = await step.execute(sample_context)
 
-        assert result.signal == ExecutionSignal.CONTINUE
+        assert result.signal == Signal.CONTINUE
         assert result.next_step == StepType.CHECK_PATTERNS
         assert result.context.schema_info is not None
         assert result.context.schema_info["tables"] == ["events", "users", "orders"]
@@ -102,7 +102,7 @@ class TestGatherContextStep:
 
         result = await step.execute(sample_context)
 
-        assert result.signal == ExecutionSignal.FAIL
+        assert result.signal == Signal.FAIL
         assert "empty schema" in str(result.output).lower()
 
     @pytest.mark.asyncio
@@ -117,7 +117,7 @@ class TestGatherContextStep:
 
         result = await step.execute(sample_context)
 
-        assert result.signal == ExecutionSignal.FAIL
+        assert result.signal == Signal.FAIL
         assert "Connection failed" in str(result.output)
 
     @pytest.mark.asyncio
@@ -138,6 +138,6 @@ class TestGatherContextStep:
 
         result = await step.execute(sample_context)
 
-        assert result.signal == ExecutionSignal.CONTINUE
+        assert result.signal == Signal.CONTINUE
         assert result.context.lineage_info is None
         assert result.context.schema_info is not None

@@ -8,6 +8,7 @@ license = { text = "MIT" }
 authors = [{ name = "dataing team" }]
 dependencies = [
     "bond",
+    "maestro-flow",
     "fastapi[standard]>=0.109.0",
     "uvicorn[standard]>=0.27.0",
     "pydantic[email]>=2.5.0",
@@ -68,7 +69,7 @@ packages = ["dataing/src/dataing"]
 
 [tool.mypy]
 python_version = "3.11"
-files = ["bond/src/bond", "dataing/src/dataing", "dataing-ee/src/dataing_ee"]
+files = ["maestro/src/maestro", "bond/src/bond", "dataing/src/dataing", "dataing-ee/src/dataing_ee"]
 # Strict mode flags (equivalent to --strict but with SQLAlchemy-compatible settings)
 warn_unused_configs = true
 disallow_untyped_calls = true
@@ -149,3 +150,4 @@ dev = [
 
 [tool.uv.sources]
 bond = { path = "bond", editable = true }
+maestro-flow = { path = "maestro", editable = true }

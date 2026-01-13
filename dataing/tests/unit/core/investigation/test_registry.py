@@ -3,7 +3,7 @@
 from dataing.core.investigation.entities import InvestigationContext
 from dataing.core.investigation.registry import StepRegistry
 from dataing.core.investigation.steps.protocol import Step, StepResult
-from dataing.core.investigation.values import ExecutionSignal, StepType
+from maestro import Signal, StepType
 
 
 class MockStep(Step[None, str]):
@@ -19,7 +19,7 @@ class MockStep(Step[None, str]):
         """Execute mock step."""
         return StepResult(
             context=context,
-            signal=ExecutionSignal.CONTINUE,
+            signal=Signal.CONTINUE,
             output="mock_output",
         )
 
@@ -75,7 +75,7 @@ class TestStepRegistry:
                 input_data: None = None,
             ) -> StepResult[str]:
                 """Execute step."""
-                return StepResult(context=context, signal=ExecutionSignal.CONTINUE)
+                return StepResult(context=context, signal=Signal.CONTINUE)
 
         class Step2(Step[None, str]):
             """Step for generating hypotheses."""
@@ -88,7 +88,7 @@ class TestStepRegistry:
                 input_data: None = None,
             ) -> StepResult[str]:
                 """Execute step."""
-                return StepResult(context=context, signal=ExecutionSignal.CONTINUE)
+                return StepResult(context=context, signal=Signal.CONTINUE)
 
         registry.register(Step1())
         registry.register(Step2())
@@ -122,7 +122,7 @@ class TestStepRegistry:
                 input_data: None = None,
             ) -> StepResult[str]:
                 """Execute step."""
-                return StepResult(context=context, signal=ExecutionSignal.CONTINUE)
+                return StepResult(context=context, signal=Signal.CONTINUE)
 
         class Step2(Step[None, str]):
             """Step for generating hypotheses."""
@@ -135,7 +135,7 @@ class TestStepRegistry:
                 input_data: None = None,
             ) -> StepResult[str]:
                 """Execute step."""
-                return StepResult(context=context, signal=ExecutionSignal.CONTINUE)
+                return StepResult(context=context, signal=Signal.CONTINUE)
 
         registry.register(Step1())
         registry.register(Step2())

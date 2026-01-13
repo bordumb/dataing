@@ -7,12 +7,16 @@ requires-python = ">=3.11"
 license = { text = "MIT" }
 authors = [{ name = "dataing team" }]
 dependencies = [
+    "maestro-flow",
     "pydantic>=2.5.0",
     "pydantic-ai>=0.0.14",
     "qdrant-client>=1.7.0",
     "sentence-transformers>=2.2.0",
     "asyncpg>=0.29.0",
 ]
+
+[tool.uv.sources]
+maestro-flow = { path = "../maestro", editable = true }
 
 [project.optional-dependencies]
 dev = [

@@ -16,10 +16,10 @@ from typing import Iterable
 ROOT_DIR = Path(".")
 
 SEARCH_PREFIXES = [
-    "dataing",
+    # "dataing",
     # "frontend",
-    # "ee",
-    # "docs",
+    # "bond",
+    "maestro",
     # "docs/feedback",
 ]
 

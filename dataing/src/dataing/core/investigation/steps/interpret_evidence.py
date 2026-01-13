@@ -9,9 +9,9 @@ from __future__ import annotations
 from typing import Any, Protocol
 
 from dataing.core.investigation.entities import InvestigationContext
-from dataing.core.investigation.values import ExecutionSignal, StepType
+from dataing.core.investigation.values import StepType
 
-from .protocol import Step, StepResult
+from .protocol import Signal, Step, StepResult
 
 
 class LLMProtocol(Protocol):
@@ -80,7 +80,7 @@ class InterpretEvidenceStep(Step[dict[str, Any], dict[str, Any]]):
         self,
         context: InvestigationContext,
         input_data: dict[str, Any] | None = None,
-    ) -> StepResult[dict[str, Any]]:
+    ) -> StepResult[InvestigationContext, dict[str, Any]]:
         """Interpret query results via LLM.
 
         Args:
@@ -90,23 +90,27 @@ class InterpretEvidenceStep(Step[dict[str, Any], dict[str, Any]]):
         Returns:
             StepResult with COMPLETE signal and evidence dict.
         """
-        # Validate input_data contains hypothesis
-        if input_data is None or "hypothesis" not in input_data:
+        # Get hypothesis from input_data or context
+        hypothesis: dict[str, Any] | None = None
+        if input_data and "hypothesis" in input_data:
+            hypothesis = input_data["hypothesis"]
+        elif context.current_hypothesis is not None:
+            hypothesis = context.current_hypothesis
+
+        if hypothesis is None:
             return StepResult(
                 context=context,
-                signal=ExecutionSignal.FAIL,
-                output={"error": "No hypothesis in input data"},
+                signal=Signal.FAIL,
+                error="No hypothesis available for interpretation",
             )
 
         # Validate context has current_query_result
         if context.current_query_result is None:
             return StepResult(
                 context=context,
-                signal=ExecutionSignal.FAIL,
-                output={"error": "No query result available to interpret"},
+                signal=Signal.FAIL,
+                error="No query result available to interpret",
             )
-
-        hypothesis: dict[str, Any] = input_data["hypothesis"]
 
         # Interpret evidence via LLM
         try:
@@ -118,8 +122,8 @@ class InterpretEvidenceStep(Step[dict[str, Any], dict[str, Any]]):
         except Exception as e:
             return StepResult(
                 context=context,
-                signal=ExecutionSignal.FAIL,
-                output={"error": f"Evidence interpretation failed: {e}"},
+                signal=Signal.FAIL,
+                error=f"Evidence interpretation failed: {e}",
             )
 
         # Update context by appending evidence to the list
@@ -128,6 +132,6 @@ class InterpretEvidenceStep(Step[dict[str, Any], dict[str, Any]]):
 
         return StepResult(
             context=updated_context,
-            signal=ExecutionSignal.COMPLETE,
+            signal=Signal.COMPLETE,
             output=evidence,
         )

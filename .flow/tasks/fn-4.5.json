@@ -1,0 +1,17 @@
+{
+  "assignee": null,
+  "claim_note": "",
+  "claimed_at": null,
+  "created_at": "2026-01-12T23:16:26.984998Z",
+  "depends_on": [
+    "fn-4.3",
+    "fn-4.4"
+  ],
+  "epic": "fn-4",
+  "id": "fn-4.5",
+  "priority": null,
+  "spec_path": ".flow/tasks/fn-4.5.md",
+  "status": "todo",
+  "title": "Programmatic branch triggering via request_branch",
+  "updated_at": "2026-01-12T23:19:27.270764Z"
+}

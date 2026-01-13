@@ -43,9 +43,20 @@ Wire the SSO callback endpoint to exchange auth code, validate tokens, and provi
 - [ ] Errors return appropriate HTTP status codes
 - [ ] Unit tests for happy path and error cases
 ## Done summary
-TBD
+Implemented SSO callback endpoint with JIT user provisioning:
 
+- Added sso_repo dependency to callback for SSO config and identity lookups
+- Exchange authorization code for tokens via OIDCProvider
+- Verify ID token signature and claims with nonce validation
+- Extract user info from ID token or userinfo endpoint
+- Look up existing SSO identity or JIT provision new user:
+  - If SSO identity exists, retrieve linked user
+  - If no SSO identity but user exists by email, link them
+  - If no user exists, create user and add to organization
+- Create SSO identity link for new SSO logins
+- Issue JWT access and refresh tokens with org membership and teams
+- Added 7 new tests for callback flow (disabled config, success paths, error handling)
 ## Evidence
 - Commits:
-- Tests:
+- Tests: dataing-ee/tests/unit/entrypoints/api/routes/test_sso.py (17 tests)
 - PRs:

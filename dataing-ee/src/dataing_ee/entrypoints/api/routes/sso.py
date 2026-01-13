@@ -10,8 +10,13 @@ from asyncpg import Connection
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from pydantic import BaseModel, EmailStr
 
+from dataing.adapters.auth.postgres import PostgresAuthRepository
 from dataing.adapters.db.app_db import AppDatabase
+from dataing.core.auth.jwt import create_access_token, create_refresh_token
+from dataing.core.auth.types import OrgRole
 from dataing_ee.adapters.sso import (
+    InvalidClaimsError,
+    InvalidSignatureError,
     OIDCConfig,
     OIDCProvider,
     SSORepository,
@@ -19,8 +24,9 @@ from dataing_ee.adapters.sso import (
     StateConsumedError,
     StateExpiredError,
     StateNotFoundError,
+    TokenExpiredError,
 )
-from dataing_ee.core.sso import SSOProviderType, decrypt_secret
+from dataing_ee.core.sso import SSOProviderType
 
 logger = logging.getLogger(__name__)
 
@@ -208,9 +214,11 @@ async def discover_sso_method(
 
 @router.get("/callback")
 async def sso_callback(
+    request: Request,
     code: str,
     state: str,
     state_repo: StateRepoDep,
+    sso_repo: SSORepoDep,
 ) -> SSOTokenResponse:
     """Handle SSO callback from IdP.
 
@@ -218,9 +226,11 @@ async def sso_callback(
     and issues JWT tokens.
 
     Args:
+        request: FastAPI request for accessing app state.
         code: Authorization code from IdP.
         state: State parameter for CSRF protection.
         state_repo: SSO state repository for state validation.
+        sso_repo: SSO repository for config and identity lookups.
 
     Returns:
         JWT access and refresh tokens.
@@ -249,15 +259,161 @@ async def sso_callback(
             detail="This SSO session has already been used",
         ) from None
 
-    # TODO: Implement token exchange (fn-6.5)
-    # 1. Get SSO config from sso_state.org_id
-    # 2. Exchange code for tokens with IdP
-    # 3. Verify ID token with sso_state.nonce
-    # 4. Extract user info from ID token
-    # 5. JIT create or update user
-    # 6. Issue JWT tokens
+    # Get SSO config for the organization
+    sso_config = await sso_repo.get_sso_config(sso_state.org_id)
+    if not sso_config or not sso_config.is_enabled:
+        logger.error(f"SSO config not found or disabled for org: {sso_state.org_id}")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="SSO is not configured for this organization",
+        )
 
-    raise HTTPException(
-        status_code=status.HTTP_501_NOT_IMPLEMENTED,
-        detail="SSO callback not yet implemented",
+    # Get decrypted client secret
+    client_secret = await sso_repo.get_decrypted_client_secret(sso_state.org_id)
+    if not client_secret or not sso_config.oidc_issuer_url or not sso_config.oidc_client_id:
+        logger.error(f"Incomplete OIDC config for org: {sso_state.org_id}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="SSO configuration is incomplete",
+        )
+
+    # Build OIDC provider
+    oidc_config = OIDCConfig(
+        issuer_url=sso_config.oidc_issuer_url,
+        client_id=sso_config.oidc_client_id,
+        client_secret=client_secret,
+        redirect_uri=_get_redirect_uri(),
+    )
+    provider = OIDCProvider(oidc_config)
+
+    # Exchange authorization code for tokens
+    try:
+        tokens = await provider.exchange_code(code)
+        logger.debug(f"Token exchange successful for org: {sso_state.org_id}")
+    except Exception as e:
+        logger.error(f"Token exchange failed: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Failed to exchange authorization code",
+        ) from None
+
+    # Verify ID token with nonce
+    try:
+        claims = await provider.verify_id_token(tokens.id_token, nonce=sso_state.nonce)
+        logger.debug(f"ID token verified for sub: {claims.get('sub')}")
+    except TokenExpiredError:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="ID token has expired",
+        ) from None
+    except InvalidSignatureError as e:
+        logger.error(f"ID token signature invalid: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="ID token signature verification failed",
+        ) from None
+    except InvalidClaimsError as e:
+        logger.error(f"ID token claims invalid: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="ID token validation failed",
+        ) from None
+
+    # Extract user info from claims
+    idp_user_id = claims["sub"]
+    email = claims.get("email")
+    if not email:
+        # Try to get email from userinfo endpoint
+        try:
+            user_info = await provider.get_user_info(tokens.access_token)
+            email = user_info.email
+        except Exception as e:
+            logger.error(f"Failed to get user info: {e}")
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Could not retrieve user email from identity provider",
+            ) from None
+
+    if not email:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Email not provided by identity provider",
+        )
+
+    # Get auth repository for user operations
+    app_db = get_app_db(request)
+    auth_repo = PostgresAuthRepository(app_db)
+
+    # Look up existing SSO identity
+    sso_identity = await sso_repo.get_sso_identity(sso_config.id, idp_user_id)
+
+    if sso_identity:
+        # Existing SSO identity - get the linked user
+        user = await auth_repo.get_user_by_id(sso_identity.user_id)
+        if not user:
+            logger.error(f"SSO identity exists but user not found: {sso_identity.user_id}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="User account not found",
+            )
+        logger.info(f"SSO login for existing user: {user.id}")
+    else:
+        # No SSO identity - JIT provision user
+        # First check if user exists by email
+        user = await auth_repo.get_user_by_email(email)
+
+        if user:
+            # User exists but no SSO identity - link them
+            # (fn-6.6 will handle the full linking flow with verification)
+            logger.info(f"Linking existing user {user.id} to SSO identity")
+        else:
+            # Create new user (JIT provisioning)
+            name = claims.get("name") or claims.get("given_name")
+            user = await auth_repo.create_user(
+                email=email,
+                name=name,
+                password_hash=None,  # SSO users don't have passwords
+            )
+            # Add user to organization
+            await auth_repo.add_user_to_org(
+                user_id=user.id,
+                org_id=sso_state.org_id,
+                role=OrgRole.MEMBER,
+            )
+            logger.info(f"JIT provisioned new user: {user.id}")
+
+        # Create SSO identity link
+        await sso_repo.create_sso_identity(
+            user_id=user.id,
+            sso_config_id=sso_config.id,
+            idp_user_id=idp_user_id,
+        )
+
+    # Get user's org membership for JWT claims
+    membership = await auth_repo.get_user_org_membership(user.id, sso_state.org_id)
+    if not membership:
+        # User isn't a member of this org - add them
+        membership = await auth_repo.add_user_to_org(
+            user_id=user.id,
+            org_id=sso_state.org_id,
+            role=OrgRole.MEMBER,
+        )
+
+    # Get user's teams for JWT claims
+    teams = await auth_repo.get_user_teams(user.id, sso_state.org_id)
+    team_ids = [str(t.id) for t in teams]
+
+    # Issue JWT tokens
+    access_token = create_access_token(
+        user_id=str(user.id),
+        org_id=str(sso_state.org_id),
+        role=membership.role.value,
+        teams=team_ids,
+    )
+    refresh_token = create_refresh_token(user_id=str(user.id))
+
+    logger.info(f"SSO authentication successful for user: {user.id}")
+    return SSOTokenResponse(
+        access_token=access_token,
+        refresh_token=refresh_token,
     )

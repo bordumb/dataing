@@ -397,41 +397,20 @@ nav {
   height: 100%;
 }
 
-/* Icon groups */
-.icon-group {
-  transition: transform 0.3s ease, opacity 0.3s ease;
+/* Logo images */
+.logo-img {
+  opacity: 0.9;
+  transition: opacity 0.3s ease;
 }
 
-.icon-group:hover {
-  transform: scale(1.05);
-}
-
-/* Staggered fade-in for icon groups */
-.node-1 { animation: nodeAppear 0.8s ease-out 0.1s both; }
-.node-2 { animation: nodeAppear 0.8s ease-out 0.2s both; }
-.node-3 { animation: nodeAppear 0.8s ease-out 0.3s both; }
-.node-4 { animation: nodeAppear 0.8s ease-out 0.4s both; }
-
-@keyframes nodeAppear {
-  from {
-    opacity: 0;
-    transform: translateX(-10px);
-  }
-  to {
-    opacity: 1;
-    transform: translateX(0);
-  }
+.logo-img:hover {
+  opacity: 1;
 }
 
 /* Output nodes pulsing */
-.output-nodes .output-node {
+.output-node {
   animation: outputPulse 3s ease-in-out infinite;
 }
-
-.output-nodes .output-node:nth-child(1) { animation-delay: 0s; }
-.output-nodes .output-node:nth-child(2) { animation-delay: 0.3s; }
-.output-nodes .output-node:nth-child(3) { animation-delay: 0.6s; }
-.output-nodes .output-node:nth-child(4) { animation-delay: 0.9s; }
 
 @keyframes outputPulse {
   0%, 100% { opacity: 0.7; }

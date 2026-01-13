@@ -3,7 +3,7 @@
   "framework": "vite",
   "buildCommand": "pnpm build",
   "outputDirectory": "dist",
-  "installCommand": "pnpm install",
+  "installCommand": "corepack enable && pnpm install",
   "rewrites": [
     { "source": "/(.*)", "destination": "/index.html" }
   ]

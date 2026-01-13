@@ -1,0 +1,6 @@
+{
+  "buildCommand": "pnpm build",
+  "outputDirectory": "dist",
+  "installCommand": "corepack enable && pnpm install",
+  "framework": "astro"
+}

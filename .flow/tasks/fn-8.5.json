@@ -1,0 +1,26 @@
+{
+  "assignee": "bordumbb@gmail.com",
+  "claim_note": "",
+  "claimed_at": "2026-01-14T01:10:37.573488Z",
+  "created_at": "2026-01-14T00:44:25.711380Z",
+  "depends_on": [
+    "fn-8.1",
+    "fn-8.2"
+  ],
+  "epic": "fn-8",
+  "evidence": {
+    "commits": [
+      "d7c6004accecd706278c3fb04adc95797d516eab"
+    ],
+    "prs": [],
+    "tests": [
+      "mkdocs build --strict"
+    ]
+  },
+  "id": "fn-8.5",
+  "priority": null,
+  "spec_path": ".flow/tasks/fn-8.5.md",
+  "status": "done",
+  "title": "Create quickstart guide (quickstart.md)",
+  "updated_at": "2026-01-14T01:12:10.393949Z"
+}

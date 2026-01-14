@@ -1,0 +1,25 @@
+{
+  "assignee": "bordumbb@gmail.com",
+  "claim_note": "",
+  "claimed_at": "2026-01-14T00:59:41.678367Z",
+  "created_at": "2026-01-14T00:44:25.191954Z",
+  "depends_on": [
+    "fn-8.1"
+  ],
+  "epic": "fn-8",
+  "evidence": {
+    "commits": [
+      "45b9d5a13249a3283d03b3bd547bc790151649c7"
+    ],
+    "prs": [],
+    "tests": [
+      "mkdocs build --strict"
+    ]
+  },
+  "id": "fn-8.2",
+  "priority": null,
+  "spec_path": ".flow/tasks/fn-8.2.md",
+  "status": "done",
+  "title": "Create custom CSS stylesheet for enterprise polish",
+  "updated_at": "2026-01-14T01:00:35.295081Z"
+}

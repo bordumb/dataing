@@ -1,78 +1,106 @@
-site_name: dataing
+site_name: Dataing
 site_description: Autonomous Data Quality Investigation
 site_url: https://dataing.dev
 
 theme:
   name: material
+  custom_dir: overrides
+  # logo: assets/logo.png  # TODO: Add logo
+  # favicon: assets/favicon.ico  # TODO: Add favicon
   palette:
+    # Light Mode (Stripe-ish)
     - scheme: default
-      primary: indigo
+      primary: white
       accent: indigo
       toggle:
-        icon: material/brightness-7
+        icon: material/weather-sunny
         name: Switch to dark mode
+    # Dark Mode (matches landing page)
     - scheme: slate
-      primary: indigo
-      accent: indigo
+      primary: custom
+      accent: custom
       toggle:
-        icon: material/brightness-4
+        icon: material/weather-night
         name: Switch to light mode
+  font:
+    text: Inter
+    code: JetBrains Mono
   features:
     - navigation.instant
-    - navigation.tracking
+    - navigation.tabs
+    - navigation.tabs.sticky
     - navigation.sections
     - navigation.expand
-    - search.suggest
-    - search.highlight
     - content.code.copy
+    - content.tooltips
+    - toc.integrate
 
 plugins:
   - search
   - mkdocstrings:
       handlers:
         python:
-          paths: [../backend/src]
+          paths: [../dataing/src]
           options:
             docstring_style: google
             show_source: true
-  - mermaid2
 
 markdown_extensions:
-  - pymdownx.highlight:
-      anchor_linenums: true
+  - admonition
+  - pymdownx.details
   - pymdownx.superfences:
       custom_fences:
         - name: mermaid
           class: mermaid
-          format: !!python/name:mermaid2.fence_mermaid_custom
+          format: !!python/name:pymdownx.superfences.fence_code_format
   - pymdownx.tabbed:
       alternate_style: true
-  - admonition
-  - pymdownx.details
-  - def_list
   - attr_list
   - md_in_html
+  - pymdownx.emoji:
+      emoji_index: !!python/name:material.extensions.emoji.twemoji
+      emoji_generator: !!python/name:material.extensions.emoji.to_svg
+  - pymdownx.highlight:
+      anchor_linenums: true
+      line_spans: __span
+      pygments_lang_class: true
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - def_list
+  - footnotes
+  - abbr
+  - toc:
+      permalink: true
+      toc_depth: 3
+
+extra_css:
+  - stylesheets/extra.css
 
 nav:
   - Home: index.md
-  - Architecture:
-      - Overview: architecture/overview.md
-      - ADRs:
-          - 001 - Monorepo Structure: architecture/adr-001-monorepo.md
-          - 002 - No LangGraph: architecture/adr-002-no-langgraph.md
-          - 003 - SQLGlot Safety: architecture/adr-003-sqlglot-safety.md
-          - 004 - Event Sourcing: architecture/adr-004-event-sourcing.md
-          - 005 - Fail Fast Schema: architecture/adr-005-fail-fast-schema.md
-  - API Reference:
-      - Core: api-reference/core.md
-      - Safety: api-reference/safety.md
-      - Adapters: api-reference/adapters.md
-  - User Guide:
-      - Getting Started: user-guide/getting-started.md
-      - Configuration: user-guide/configuration.md
-      - MCP Integration: user-guide/mcp-integration.md
+  - Quickstart: quickstart.md
+  - Architecture: architecture.md
+  - Concepts:
+      - "How Investigations Work": concepts/investigations.md
+      - "The Agent Engine (Maestro)": concepts/agent-workflows.md
+      - "Safety & Guardrails": concepts/guardrails.md
+  - Integrations:
+      - Warehouses:
+          - Snowflake: integrations/warehouses/snowflake.md
+          - BigQuery: integrations/warehouses/bigquery.md
+          - DuckDB: integrations/warehouses/duckdb.md
+          - Postgres: integrations/warehouses/postgres.md
+      - Lineage:
+          - dbt: integrations/lineage/dbt.md
+          - DataHub: integrations/lineage/datahub.md
+      - Notifications:
+          - Slack: integrations/notifications/slack.md
+  - Security:
+      - "Data Privacy": security/data-privacy.md
+      - "RBAC & SSO": security/rbac.md
+      - "Compliance": security/compliance.md
 
 extra:
   social:
     - icon: fontawesome/brands/github
-      link: https://github.com/dataing/dataing
+      link: https://github.com/bordumb/dataing

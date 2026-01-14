@@ -1,0 +1,26 @@
+{
+  "assignee": "bordumbb@gmail.com",
+  "claim_note": "",
+  "claimed_at": "2026-01-14T01:20:43.973034Z",
+  "created_at": "2026-01-14T00:49:55.078737Z",
+  "depends_on": [
+    "fn-8.1",
+    "fn-8.2"
+  ],
+  "epic": "fn-8",
+  "evidence": {
+    "commits": [
+      "7417e8ab7871809484ed7bb977a2047bcc320d89"
+    ],
+    "prs": [],
+    "tests": [
+      "mkdocs build --strict"
+    ]
+  },
+  "id": "fn-8.8",
+  "priority": null,
+  "spec_path": ".flow/tasks/fn-8.8.md",
+  "status": "done",
+  "title": "Create integrations section (warehouses, lineage, notifications)",
+  "updated_at": "2026-01-14T01:25:30.032800Z"
+}

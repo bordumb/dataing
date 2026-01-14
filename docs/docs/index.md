@@ -1,79 +1,134 @@
-# dataing
+---
+hide:
+  - navigation
+  - toc
+---
 
-**Autonomous Data Quality Investigation**
+<div align="center" style="margin-top: 4rem; margin-bottom: 4rem;" markdown="1">
 
-dataing is an AI-powered system that automatically investigates data quality anomalies
-and identifies root causes. When your data observability tool detects an anomaly,
-dataing takes over to determine what went wrong.
+<h1 class="hero-text">The AI Data Reliability Engineer</h1>
 
-## Key Features
+<p class="hero-subtitle">
+Dataing autonomously investigates data quality issues in your data. It doesn't just alert you—it finds the root cause.
+</p>
 
-- **Autonomous Investigation**: Generates hypotheses and tests them automatically
-- **SQL Safety**: All queries validated with sqlglot - no mutations allowed
-- **Event Sourcing**: Complete audit trail of every investigation
-- **Fail Fast**: Empty schema discovery stops immediately with clear error
-- **Parallel Processing**: Multiple hypotheses investigated concurrently
-- **MCP Integration**: Use as a tool in Claude and other MCP clients
+[Get Started](quickstart.md){ .md-button .md-button--primary }
+&nbsp;&nbsp;
+[Read Architecture](architecture.md){ .md-button }
 
-## Architecture
+</div>
+
+<div class="grid cards" markdown>
+
+-   :material-robot-excited: **Autonomous Agents**
+
+    ---
+
+    Unlike dumb monitors, Dataing orchestrates **Agents** to hypothesize, query, and verify issues just like a human engineer would.
+
+    [How it works](concepts/investigations.md)
+
+-   :material-shield-check: **Safety First**
+
+    ---
+
+    Built on a deterministic Finite State Machine. Read-only adapters, circuit breakers, and human-in-the-loop gates ensure safety.
+
+    [View Security](security/data-privacy.md)
+
+-   :material-connection: **Plug & Play**
+
+    ---
+
+    Flexible architecture means you can plug in **Snowflake**, **dbt**, **Slack**, or **DataHub** in minutes.
+
+    [See Integrations](integrations/warehouses/snowflake.md)
+
+-   :material-flash: **Instant RCA**
+
+    ---
+
+    Stop writing `SELECT *` to debug null spikes. Dataing correlates lineage, schema changes, and data stats automatically.
+
+    [Try Quickstart](quickstart.md)
+
+</div>
+
+---
+
+## Why Dataing?
+
+The modern data stack is great at **alerting** ("Something is wrong!") but terrible at **diagnosis** ("Why is it wrong?").
+
+Data Engineers spend 30% of their time debugging pipelines. Dataing automates the "Check Lineage → Check recent deployments → Check data distribution" loop so you can focus on building.
+
+---
+
+## How It Works
 
 ```mermaid
-graph TB
-    subgraph Entrypoints
-        API[FastAPI]
-        MCP[MCP Server]
+flowchart LR
+    subgraph Input
+        A[Anomaly Alert]
     end
 
-    subgraph Core
-        Orchestrator[Orchestrator]
-        State[Event-Sourced State]
-        Interfaces[Protocols]
+    subgraph Investigation
+        B[Gather Context]
+        C[Generate Hypotheses]
+        D[Test with SQL]
+        E[Synthesize Findings]
     end
 
-    subgraph Adapters
-        DB[Database Adapters]
-        LLM[LLM Client]
-        Context[Context Engine]
+    subgraph Output
+        F[Root Cause Report]
     end
 
-    subgraph Safety
-        Validator[SQL Validator]
-        CB[Circuit Breaker]
-        PII[PII Scanner]
-    end
+    A --> B
+    B --> C
+    C --> D
+    D --> E
+    E --> F
 
-    API --> Orchestrator
-    MCP --> Orchestrator
-    Orchestrator --> State
-    Orchestrator --> Interfaces
-    Interfaces --> DB
-    Interfaces --> LLM
-    Interfaces --> Context
-    Orchestrator --> Safety
+    D -->|More hypotheses| C
 ```
 
-## Quick Start
+1. **Gather Context** — Collects table schemas, column statistics, and lineage
+2. **Generate Hypotheses** — LLM analyzes patterns and proposes root causes
+3. **Test with SQL** — Validates each hypothesis with safe, read-only queries
+4. **Synthesize Findings** — Produces a clear report with supporting evidence
 
-```bash
-# Clone the repository
-git clone https://github.com/dataing/dataing
-cd dataing
+---
 
-# Install dependencies
-just setup
+## Integrations
 
-# Start development servers
-just dev
-```
+<div class="grid" markdown>
 
-## Design Principles
+| Data Warehouses | Status |
+|-----------------|--------|
+| Snowflake | :material-check-circle:{ .green } GA |
+| BigQuery | :material-check-circle:{ .green } GA |
+| DuckDB | :material-check-circle:{ .green } GA |
+| PostgreSQL | :material-check-circle:{ .green } GA |
+| Redshift | :material-clock-outline:{ .yellow } Coming Soon |
 
-| Principle | Implementation |
-|-----------|----------------|
-| **FAIL FAST** | Empty schema raises `SchemaDiscoveryError` immediately |
-| **Event Sourcing** | Retry counts derived from events, not mutable counters |
-| **Immutability** | All domain models are frozen |
-| **Safety First** | sqlglot parsing + circuit breakers + no mutations |
-| **Hexagonal Architecture** | Core has zero external imports |
-| **Pure Python** | No LangGraph, just asyncio.gather |
-| **< 5k Lines** | Simplicity over features |
+| Lineage & Notifications | Status |
+|-------------------------|--------|
+| dbt | :material-check-circle:{ .green } GA |
+| DataHub | :material-check-circle:{ .green } GA |
+| Slack | :material-check-circle:{ .green } GA |
+| OpenLineage | :material-clock-outline:{ .yellow } Coming Soon |
+
+</div>
+
+[View all integrations](integrations/warehouses/snowflake.md){ .md-button }
+
+---
+
+## Open Source
+
+Dataing is open-core:
+
+- **Community Edition** — Fully open source under Apache 2.0
+- **Enterprise Edition** — Adds SSO, SCIM, audit logging, and premium support
+
+[View on GitHub :material-github:](https://github.com/bordumb/dataing){ .md-button }

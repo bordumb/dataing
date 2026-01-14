@@ -1,0 +1,26 @@
+{
+  "assignee": "bordumbb@gmail.com",
+  "claim_note": "",
+  "claimed_at": "2026-01-14T01:16:22.755810Z",
+  "created_at": "2026-01-14T00:49:54.903853Z",
+  "depends_on": [
+    "fn-8.1",
+    "fn-8.2"
+  ],
+  "epic": "fn-8",
+  "evidence": {
+    "commits": [
+      "d26eeeb473e756dfdb6f1f0b1e2085856f0df863"
+    ],
+    "prs": [],
+    "tests": [
+      "mkdocs build --strict"
+    ]
+  },
+  "id": "fn-8.7",
+  "priority": null,
+  "spec_path": ".flow/tasks/fn-8.7.md",
+  "status": "done",
+  "title": "Create concepts section (investigations, agent-workflows, guardrails)",
+  "updated_at": "2026-01-14T01:19:11.157867Z"
+}

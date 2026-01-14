@@ -72,9 +72,14 @@ Create a comprehensive security section with three pages for B2B buyers (CISOs, 
 - [ ] Self-hosting option mentioned
 - [ ] All pages render in both themes
 ## Done summary
-TBD
-
+- Created comprehensive security section with 3 documentation pages
+- data-privacy.md: SQL validation with sqlglot, PII detection/redaction, circuit breaker limits
+- rbac.md: API keys, JWT, SSO (OIDC/SAML), RBAC model, SCIM provisioning (EE)
+- compliance.md: SOC 2 Type II roadmap (planned), self-hosted deployment, audit logging (EE)
+- All content sourced from actual codebase (validator.py, pii.py, circuit_breaker.py, rbac/types.py)
+- SOC 2 marked as "Planned" to avoid false compliance claims
+- Build passes with `mkdocs build --strict`
 ## Evidence
-- Commits:
-- Tests:
+- Commits: 9c109e53bc0f99ce1bf0a421b0d0172184274907
+- Tests: mkdocs build --strict
 - PRs:

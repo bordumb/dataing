@@ -16,6 +16,7 @@ import type {
   UseQueryResult,
 } from "@tanstack/react-query";
 import type {
+  CancelInvestigationResponse,
   HTTPValidationError,
   InvestigationListItem,
   InvestigationStateResponse,
@@ -202,6 +203,122 @@ export const useStartInvestigationApiV1InvestigationsPost = <
 
   return useMutation(mutationOptions);
 };
+/**
+ * Cancel an investigation and all its child jobs.
+
+Marks the investigation job as 'cancelling'. The worker will detect this
+at the next step boundary and exit cleanly after checkpointing.
+
+For investigations with branches (child jobs), all children are also
+cancelled recursively.
+
+Args:
+    http_request: The HTTP request for accessing app state.
+    investigation_id: UUID of the investigation to cancel.
+    auth: Authentication context from API key/JWT.
+
+Returns:
+    CancelInvestigationResponse with cancellation status.
+
+Raises:
+    HTTPException: If investigation not found or already complete.
+ * @summary Cancel Investigation
+ */
+export const cancelInvestigationApiV1InvestigationsInvestigationIdCancelPost = (
+  investigationId: string,
+) => {
+  return customInstance<CancelInvestigationResponse>({
+    url: `/api/v1/investigations/${investigationId}/cancel`,
+    method: "POST",
+  });
+};
+
+export const getCancelInvestigationApiV1InvestigationsInvestigationIdCancelPostMutationOptions =
+  <TError = HTTPValidationError, TContext = unknown>(options?: {
+    mutation?: UseMutationOptions<
+      Awaited<
+        ReturnType<
+          typeof cancelInvestigationApiV1InvestigationsInvestigationIdCancelPost
+        >
+      >,
+      TError,
+      { investigationId: string },
+      TContext
+    >;
+  }): UseMutationOptions<
+    Awaited<
+      ReturnType<
+        typeof cancelInvestigationApiV1InvestigationsInvestigationIdCancelPost
+      >
+    >,
+    TError,
+    { investigationId: string },
+    TContext
+  > => {
+    const { mutation: mutationOptions } = options ?? {};
+
+    const mutationFn: MutationFunction<
+      Awaited<
+        ReturnType<
+          typeof cancelInvestigationApiV1InvestigationsInvestigationIdCancelPost
+        >
+      >,
+      { investigationId: string }
+    > = (props) => {
+      const { investigationId } = props ?? {};
+
+      return cancelInvestigationApiV1InvestigationsInvestigationIdCancelPost(
+        investigationId,
+      );
+    };
+
+    return { mutationFn, ...mutationOptions };
+  };
+
+export type CancelInvestigationApiV1InvestigationsInvestigationIdCancelPostMutationResult =
+  NonNullable<
+    Awaited<
+      ReturnType<
+        typeof cancelInvestigationApiV1InvestigationsInvestigationIdCancelPost
+      >
+    >
+  >;
+
+export type CancelInvestigationApiV1InvestigationsInvestigationIdCancelPostMutationError =
+  HTTPValidationError;
+
+/**
+ * @summary Cancel Investigation
+ */
+export const useCancelInvestigationApiV1InvestigationsInvestigationIdCancelPost =
+  <TError = HTTPValidationError, TContext = unknown>(options?: {
+    mutation?: UseMutationOptions<
+      Awaited<
+        ReturnType<
+          typeof cancelInvestigationApiV1InvestigationsInvestigationIdCancelPost
+        >
+      >,
+      TError,
+      { investigationId: string },
+      TContext
+    >;
+  }): UseMutationResult<
+    Awaited<
+      ReturnType<
+        typeof cancelInvestigationApiV1InvestigationsInvestigationIdCancelPost
+      >
+    >,
+    TError,
+    { investigationId: string },
+    TContext
+  > => {
+    const mutationOptions =
+      getCancelInvestigationApiV1InvestigationsInvestigationIdCancelPostMutationOptions(
+        options,
+      );
+
+    return useMutation(mutationOptions);
+  };
 /**
  * Get investigation state including user branch if exists.
 

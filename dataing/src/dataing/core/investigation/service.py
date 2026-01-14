@@ -8,8 +8,8 @@ Uses maestro.Workflow for investigation execution.
 
 from __future__ import annotations
 
-import asyncio
 import logging
+import os
 from typing import TYPE_CHECKING, Any
 from uuid import UUID
 
@@ -127,20 +127,24 @@ class InvestigationService:
         alert: AnomalyAlert,
         data_adapter: BaseAdapter,
         user_id: UUID | None = None,
-    ) -> tuple[UUID, UUID]:
+        datasource_id: UUID | None = None,
+    ) -> tuple[UUID, UUID, str]:
         """Start a new investigation for an alert.
 
         Creates the investigation, main branch, and initial snapshot.
-        Then starts the maestro workflow in the background.
+        Then either queues the job for durable execution (if USE_DURABLE_QUEUE=1)
+        or starts the maestro workflow in the background (legacy mode).
 
         Args:
             tenant_id: ID of the tenant starting the investigation.
             alert: The anomaly alert triggering this investigation.
             data_adapter: Connected data source adapter for this investigation.
             user_id: Optional ID of the user starting the investigation.
+            datasource_id: Optional datasource ID for job reconstruction.
 
         Returns:
-            Tuple of (investigation_id, main_branch_id).
+            Tuple of (investigation_id, main_branch_id, status).
+            Status is "queued" for durable queue mode, "running" for legacy mode.
         """
         # Create investigation
         investigation = await self.repository.create_investigation(
@@ -195,19 +199,50 @@ class InvestigationService:
         # Update branch head
         await self.repository.update_branch_head(main_branch.id, snapshot.id)
 
-        # Start maestro workflow in the background
-        logger.info(f"Starting maestro workflow for investigation {investigation.id}")
-        asyncio.create_task(
-            self._run_investigation(
-                investigation_id=investigation.id,
-                main_branch_id=main_branch.id,
-                initial_context=initial_context,
-                data_adapter=data_adapter,
-            ),
-            name=f"investigation-{investigation.id}",
-        )
+        # Check if durable queue mode is enabled
+        use_durable_queue = os.getenv("USE_DURABLE_QUEUE", "0") == "1"
 
-        return investigation.id, main_branch.id
+        if use_durable_queue and self._app_db:
+            # Create job record for durable execution
+            job = await self._app_db.create_investigation_job(
+                investigation_id=investigation.id,
+                tenant_id=tenant_id,
+                datasource_id=datasource_id,
+                priority=0,
+            )
+            logger.info(
+                f"Created investigation job: job_id={job['id']}, "
+                f"investigation_id={investigation.id}"
+            )
+
+            # Queue for durable execution
+            from dataing.core.queue import enqueue_investigation
+
+            await enqueue_investigation(
+                investigation_id=str(investigation.id),
+                tenant_id=str(tenant_id),
+                datasource_id=str(datasource_id) if datasource_id else None,
+            )
+            logger.info(f"Enqueued investigation {investigation.id} for durable execution")
+
+            return investigation.id, main_branch.id, "queued"
+
+        else:
+            # Legacy mode: start maestro workflow in the background
+            import asyncio
+
+            logger.info(f"Starting maestro workflow for investigation {investigation.id}")
+            asyncio.create_task(
+                self._run_investigation(
+                    investigation_id=investigation.id,
+                    main_branch_id=main_branch.id,
+                    initial_context=initial_context,
+                    data_adapter=data_adapter,
+                ),
+                name=f"investigation-{investigation.id}",
+            )
+
+            return investigation.id, main_branch.id, "running"
 
     async def _run_investigation(
         self,
@@ -224,11 +259,12 @@ class InvestigationService:
             initial_context: Initial investigation context.
             data_adapter: Connected data source adapter.
         """
+        from maestro import WorkflowError
+
         from dataing.core.investigation.flow import (
             build_investigation_workflow,
             run_investigation,
         )
-        from maestro import WorkflowError
 
         logger.info(f"Starting maestro workflow for investigation {investigation_id}")
 

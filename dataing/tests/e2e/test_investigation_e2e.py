@@ -667,3 +667,264 @@ class TestWorkflowStepOrdering:
 
         assert result.signal == Signal.CONTINUE
         assert result.next_step == StepType.GENERATE_HYPOTHESES.value
+
+
+# =============================================================================
+# Durable Execution Tests
+# =============================================================================
+
+
+class TestDurableExecution:
+    """Tests for durable execution with checkpointing."""
+
+    @pytest.mark.asyncio
+    async def test_run_with_checkpointing_calls_callback_after_each_step(
+        self,
+        initial_context: InvestigationContext,
+        mock_context_engine: MockContextEngine,
+        mock_llm: MockLLM,
+        mock_database: MockDatabase,
+        mock_pattern_repo: MockPatternRepository,
+    ) -> None:
+        """Test that checkpointing callback is invoked after each step."""
+        from dataing.core.investigation.flow import run_with_checkpointing
+
+        # Configure LLM to return high confidence synthesis quickly
+        mock_llm.synthesis = {"root_cause": "Test bug", "confidence": 0.95}
+
+        workflow = build_investigation_workflow(
+            context_engine=mock_context_engine,
+            llm=mock_llm,
+            database=mock_database,
+            pattern_repository=mock_pattern_repo,
+        )
+
+        checkpoints: list[tuple[InvestigationContext, str | None]] = []
+
+        async def on_checkpoint(ctx: InvestigationContext, next_step: str | None) -> None:
+            checkpoints.append((ctx, next_step))
+
+        shutdown_signal = asyncio.Event()
+
+        await run_with_checkpointing(
+            workflow=workflow,
+            context=initial_context,
+            start_step=StepType.GATHER_CONTEXT.value,
+            on_step_complete=on_checkpoint,
+            shutdown_signal=shutdown_signal,
+            max_iterations=50,
+        )
+
+        # Verify checkpoints were recorded after each step
+        assert len(checkpoints) > 0
+        # First checkpoint should be after gather_context -> check_patterns
+        assert checkpoints[0][1] == StepType.CHECK_PATTERNS.value
+        # Should have multiple checkpoints as workflow progresses
+        assert len(checkpoints) >= 3  # At least gather_context, check_patterns, generate_hypotheses
+
+    @pytest.mark.asyncio
+    async def test_run_with_checkpointing_respects_shutdown_signal(
+        self,
+        initial_context: InvestigationContext,
+        mock_context_engine: MockContextEngine,
+        mock_llm: MockLLM,
+        mock_database: MockDatabase,
+        mock_pattern_repo: MockPatternRepository,
+    ) -> None:
+        """Test that shutdown signal causes graceful exit with checkpoint."""
+        from dataing.core.investigation.flow import (
+            WorkerShutdownError,
+            run_with_checkpointing,
+        )
+
+        workflow = build_investigation_workflow(
+            context_engine=mock_context_engine,
+            llm=mock_llm,
+            database=mock_database,
+            pattern_repository=mock_pattern_repo,
+        )
+
+        checkpoints: list[tuple[InvestigationContext, str | None]] = []
+
+        async def on_checkpoint(ctx: InvestigationContext, next_step: str | None) -> None:
+            checkpoints.append((ctx, next_step))
+
+        # Set shutdown signal before starting
+        shutdown_signal = asyncio.Event()
+        shutdown_signal.set()
+
+        with pytest.raises(WorkerShutdownError):
+            await run_with_checkpointing(
+                workflow=workflow,
+                context=initial_context,
+                start_step=StepType.GATHER_CONTEXT.value,
+                on_step_complete=on_checkpoint,
+                shutdown_signal=shutdown_signal,
+            )
+
+        # Verify checkpoint was saved before shutdown
+        assert len(checkpoints) == 1
+        assert checkpoints[0][1] == StepType.GATHER_CONTEXT.value
+
+    @pytest.mark.asyncio
+    async def test_run_with_checkpointing_tracks_iterations(
+        self,
+        initial_context: InvestigationContext,
+        mock_context_engine: MockContextEngine,
+        mock_llm: MockLLM,
+        mock_database: MockDatabase,
+        mock_pattern_repo: MockPatternRepository,
+    ) -> None:
+        """Test that iterations are tracked correctly."""
+        from dataing.core.investigation.flow import run_with_checkpointing
+
+        # Configure LLM to return high confidence to complete quickly
+        mock_llm.synthesis = {"root_cause": "Test bug", "confidence": 0.95}
+
+        workflow = build_investigation_workflow(
+            context_engine=mock_context_engine,
+            llm=mock_llm,
+            database=mock_database,
+            pattern_repository=mock_pattern_repo,
+        )
+
+        iteration_count = 0
+
+        async def on_checkpoint(
+            _ctx: InvestigationContext, _next_step: str | None
+        ) -> None:
+            nonlocal iteration_count
+            iteration_count += 1
+
+        shutdown_signal = asyncio.Event()
+
+        await run_with_checkpointing(
+            workflow=workflow,
+            context=initial_context,
+            start_step=StepType.GATHER_CONTEXT.value,
+            on_step_complete=on_checkpoint,
+            shutdown_signal=shutdown_signal,
+            max_iterations=100,  # High limit to allow completion
+        )
+
+        # Verify we tracked iterations through the checkpoints
+        assert iteration_count > 0
+        # With mocked LLM returning high confidence, should complete within iterations
+        assert iteration_count < 100
+
+    @pytest.mark.asyncio
+    async def test_run_with_checkpointing_raises_investigation_error_on_failure(
+        self,
+        initial_context: InvestigationContext,
+        mock_llm: MockLLM,
+        mock_database: MockDatabase,
+        mock_pattern_repo: MockPatternRepository,
+    ) -> None:
+        """Test that workflow failure raises InvestigationError."""
+        from dataing.core.investigation.flow import (
+            InvestigationError,
+            run_with_checkpointing,
+        )
+
+        # Configure context engine to fail
+        failing_engine = MockContextEngine(should_fail=True)
+
+        workflow = build_investigation_workflow(
+            context_engine=failing_engine,
+            llm=mock_llm,
+            database=mock_database,
+            pattern_repository=mock_pattern_repo,
+        )
+
+        async def on_checkpoint(
+            _ctx: InvestigationContext, _next_step: str | None
+        ) -> None:
+            pass
+
+        shutdown_signal = asyncio.Event()
+
+        with pytest.raises(InvestigationError) as exc_info:
+            await run_with_checkpointing(
+                workflow=workflow,
+                context=initial_context,
+                start_step=StepType.GATHER_CONTEXT.value,
+                on_step_complete=on_checkpoint,
+                shutdown_signal=shutdown_signal,
+            )
+
+        assert "Context gathering failed" in str(exc_info.value)
+
+
+class TestCancellationSupport:
+    """Tests for investigation cancellation."""
+
+    def test_investigation_cancelled_exception_exists(self) -> None:
+        """Test that InvestigationCancelled exception is defined."""
+        from dataing.core.investigation.flow import InvestigationCancelled
+
+        exc = InvestigationCancelled()
+        assert isinstance(exc, Exception)
+
+    def test_worker_shutdown_error_exists(self) -> None:
+        """Test that WorkerShutdownError exception is defined."""
+        from dataing.core.investigation.flow import WorkerShutdownError
+
+        exc = WorkerShutdownError("test message")
+        assert isinstance(exc, Exception)
+        assert "test message" in str(exc)
+
+    def test_awaiting_user_input_stores_next_step(self) -> None:
+        """Test that AwaitingUserInput stores the next step correctly."""
+        from dataing.core.investigation.flow import AwaitingUserInput
+
+        exc = AwaitingUserInput("generate_hypotheses")
+        assert exc.next_step == "generate_hypotheses"
+        assert "generate_hypotheses" in str(exc)
+
+
+class TestMergeStrategy:
+    """Tests for investigation merge strategy."""
+
+    def test_merge_strategy_combines_evidence(self) -> None:
+        """Test that merge strategy correctly combines evidence from branches."""
+        from maestro import BranchContext
+
+        from dataing.core.investigation.flow import InvestigationMergeStrategy
+
+        strategy = InvestigationMergeStrategy()
+
+        parent_context = InvestigationContext(
+            alert_summary="Test",
+            evidence=[{"id": "e1", "finding": "parent evidence"}],
+            total_queries_executed=1,
+        )
+
+        child1 = BranchContext(
+            name="branch1",
+            context=InvestigationContext(
+                alert_summary="Test",
+                evidence=[{"id": "e2", "finding": "child1 evidence"}],
+                total_queries_executed=2,
+            ),
+        )
+
+        child2 = BranchContext(
+            name="branch2",
+            context=InvestigationContext(
+                alert_summary="Test",
+                evidence=[{"id": "e3", "finding": "child2 evidence"}],
+                total_queries_executed=3,
+            ),
+        )
+
+        merged = strategy.merge(parent_context, [child1, child2])
+
+        # Verify evidence was combined
+        assert len(merged.evidence) == 3
+        evidence_ids = [e["id"] for e in merged.evidence]
+        assert "e1" in evidence_ids
+        assert "e2" in evidence_ids
+        assert "e3" in evidence_ids
+
+        # Verify query counts were summed
+        assert merged.total_queries_executed == 6  # 1 + 2 + 3

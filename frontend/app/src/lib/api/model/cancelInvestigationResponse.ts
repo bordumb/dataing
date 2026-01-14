@@ -7,10 +7,10 @@
  */
 
 /**
- * Response for starting an investigation.
+ * Response for cancelling an investigation.
  */
-export interface StartInvestigationResponse {
+export interface CancelInvestigationResponse {
   investigation_id: string;
-  main_branch_id: string;
-  status?: string;
+  jobs_cancelled?: number;
+  status: string;
 }

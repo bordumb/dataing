@@ -396,7 +396,7 @@ class TestInvestigationServiceStartInvestigation:
             pattern_repository=mock_pattern_repository,
         )
 
-        investigation_id, branch_id = await service.start_investigation(
+        investigation_id, branch_id, status = await service.start_investigation(
             tenant_id=tenant_id,
             alert=sample_alert,
             data_adapter=mock_data_adapter,
@@ -405,6 +405,7 @@ class TestInvestigationServiceStartInvestigation:
 
         assert investigation_id == sample_investigation.id
         assert branch_id == sample_main_branch.id
+        assert status == "running"  # Legacy mode (USE_DURABLE_QUEUE not set)
 
     @pytest.mark.asyncio
     async def test_works_without_user_id(
@@ -427,7 +428,7 @@ class TestInvestigationServiceStartInvestigation:
             pattern_repository=mock_pattern_repository,
         )
 
-        investigation_id, branch_id = await service.start_investigation(
+        investigation_id, branch_id, status = await service.start_investigation(
             tenant_id=tenant_id,
             alert=sample_alert,
             data_adapter=mock_data_adapter,
@@ -436,6 +437,7 @@ class TestInvestigationServiceStartInvestigation:
 
         assert investigation_id is not None
         assert branch_id is not None
+        assert status == "running"  # Legacy mode
         call_kwargs = mock_repository.create_investigation.call_args.kwargs
         assert call_kwargs["created_by"] is None
 

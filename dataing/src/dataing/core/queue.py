@@ -72,6 +72,8 @@ async def enqueue_investigation(
     tenant_id: str,
     datasource_id: str | None = None,
     priority: int = 0,
+    parent_job_id: str | None = None,
+    branch_spec: dict | None = None,
 ) -> str:
     """Enqueue an investigation job for processing.
 
@@ -80,6 +82,8 @@ async def enqueue_investigation(
         tenant_id: UUID of the tenant owning the investigation.
         datasource_id: Optional specific datasource ID to use.
         priority: Job priority (higher = more important). Defaults to 0.
+        parent_job_id: Optional parent job ID for branched execution.
+        branch_spec: Optional serialized BranchSpec for branched execution.
 
     Returns:
         The Arq job ID for tracking.
@@ -91,6 +95,8 @@ async def enqueue_investigation(
             investigation_id=investigation_id,
             tenant_id=tenant_id,
             datasource_id=datasource_id,
+            parent_job_id=parent_job_id,
+            branch_spec=branch_spec,
             _queue_name=INVESTIGATIONS_QUEUE,
         )
         if job is None:
@@ -102,3 +108,42 @@ async def enqueue_investigation(
         return job.job_id
     finally:
         await queue.close()
+
+
+async def enqueue_branch_jobs(
+    investigation_id: str,
+    tenant_id: str,
+    parent_job_id: str,
+    datasource_id: str | None,
+    branch_specs: list[dict],
+) -> list[str]:
+    """Enqueue multiple child jobs for branched execution.
+
+    Used when a workflow emits Signal.BRANCH to create parallel
+    execution paths. Each branch becomes its own job.
+
+    Args:
+        investigation_id: UUID of the investigation.
+        tenant_id: UUID of the tenant.
+        parent_job_id: UUID of the parent job creating the branches.
+        datasource_id: Optional datasource ID.
+        branch_specs: List of serialized BranchSpec dictionaries.
+
+    Returns:
+        List of Arq job IDs for the created branch jobs.
+    """
+    job_ids = []
+    for spec in branch_specs:
+        job_id = await enqueue_investigation(
+            investigation_id=investigation_id,
+            tenant_id=tenant_id,
+            datasource_id=datasource_id,
+            parent_job_id=parent_job_id,
+            branch_spec=spec,
+        )
+        job_ids.append(job_id)
+    logger.info(
+        f"Branch jobs enqueued: investigation_id={investigation_id}, "
+        f"parent_job_id={parent_job_id}, count={len(job_ids)}"
+    )
+    return job_ids

@@ -34,6 +34,7 @@ class StartInvestigationRequest(BaseModel):
     """Request body for starting an investigation."""
 
     alert: dict[str, Any]  # AnomalyAlert data
+    datasource_id: UUID | None = None  # Optional datasource ID for durable execution
 
 
 class StartInvestigationResponse(BaseModel):
@@ -41,6 +42,15 @@ class StartInvestigationResponse(BaseModel):
 
     investigation_id: UUID
     main_branch_id: UUID
+    status: str = "running"  # "queued" for durable queue, "running" for legacy
+
+
+class CancelInvestigationResponse(BaseModel):
+    """Response for cancelling an investigation."""
+
+    investigation_id: UUID
+    status: str  # "cancelling" or "already_complete"
+    jobs_cancelled: int = 0
 
 
 class StepHistoryItemResponse(BaseModel):
@@ -250,16 +260,84 @@ async def start_investigation(
             detail=f"Data adapter error: {e}",
         ) from e
 
-    investigation_id, main_branch_id = await service.start_investigation(
+    investigation_id, main_branch_id, status = await service.start_investigation(
         tenant_id=auth.tenant_id,
         alert=alert,
         data_adapter=data_adapter,
         user_id=auth.user_id,
+        datasource_id=request.datasource_id,
     )
 
     return StartInvestigationResponse(
         investigation_id=investigation_id,
         main_branch_id=main_branch_id,
+        status=status,
+    )
+
+
+@router.post("/{investigation_id}/cancel", response_model=CancelInvestigationResponse)
+async def cancel_investigation(
+    http_request: Request,
+    investigation_id: UUID,
+    auth: AuthDep,
+) -> CancelInvestigationResponse:
+    """Cancel an investigation and all its child jobs.
+
+    Marks the investigation job as 'cancelling'. The worker will detect this
+    at the next step boundary and exit cleanly after checkpointing.
+
+    For investigations with branches (child jobs), all children are also
+    cancelled recursively.
+
+    Args:
+        http_request: The HTTP request for accessing app state.
+        investigation_id: UUID of the investigation to cancel.
+        auth: Authentication context from API key/JWT.
+
+    Returns:
+        CancelInvestigationResponse with cancellation status.
+
+    Raises:
+        HTTPException: If investigation not found or already complete.
+    """
+    # Get database from app state
+    app_db: AppDatabase | None = http_request.app.state.app_db
+
+    if app_db is None:
+        raise HTTPException(
+            status_code=500,
+            detail="Database not configured",
+        )
+
+    # Cancel investigation and all child jobs
+    jobs_cancelled = await app_db.cancel_investigation_with_children(
+        investigation_id=investigation_id,
+        tenant_id=auth.tenant_id,
+    )
+
+    if jobs_cancelled == 0:
+        # Check if investigation exists but is already complete
+        job = await app_db.get_investigation_job(investigation_id)
+        if job and job.get("status") in ("completed", "failed", "cancelled"):
+            return CancelInvestigationResponse(
+                investigation_id=investigation_id,
+                status="already_complete",
+                jobs_cancelled=0,
+            )
+        raise HTTPException(
+            status_code=404,
+            detail="Investigation job not found",
+        )
+
+    logger.info(
+        f"Investigation cancelled: investigation_id={investigation_id}, "
+        f"tenant_id={auth.tenant_id}, jobs_cancelled={jobs_cancelled}"
+    )
+
+    return CancelInvestigationResponse(
+        investigation_id=investigation_id,
+        status="cancelling",
+        jobs_cancelled=jobs_cancelled,
     )
 
 

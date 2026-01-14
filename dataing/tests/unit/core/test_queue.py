@@ -3,11 +3,15 @@
 from __future__ import annotations
 
 import os
-from unittest.mock import patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from dataing.core.queue import get_redis_settings
+from dataing.core.queue import (
+    INVESTIGATIONS_QUEUE,
+    enqueue_investigation,
+    get_redis_settings,
+)
 
 
 class TestGetRedisSettings:
@@ -91,3 +95,75 @@ class TestGetRedisSettings:
                 assert settings.database == 0
             finally:
                 deps.settings = original_settings
+
+
+class TestEnqueueInvestigation:
+    """Tests for enqueue_investigation function."""
+
+    async def test_enqueue_creates_job(self) -> None:
+        """Test that enqueue_investigation creates an arq job."""
+        mock_job = MagicMock()
+        mock_job.job_id = "test-job-123"
+
+        mock_pool = AsyncMock()
+        mock_pool.enqueue_job = AsyncMock(return_value=mock_job)
+
+        with patch("dataing.core.queue.create_pool", return_value=mock_pool):
+            job_id = await enqueue_investigation(
+                investigation_id="inv-123",
+                tenant_id="tenant-456",
+            )
+
+            assert job_id == "test-job-123"
+            mock_pool.enqueue_job.assert_called_once()
+
+            # Check the call arguments
+            call_args = mock_pool.enqueue_job.call_args
+            assert call_args.args[0] == "run_investigation"
+            assert call_args.kwargs["investigation_id"] == "inv-123"
+            assert call_args.kwargs["tenant_id"] == "tenant-456"
+            assert call_args.kwargs["_queue_name"] == INVESTIGATIONS_QUEUE
+
+    async def test_enqueue_with_datasource_id(self) -> None:
+        """Test that enqueue_investigation passes datasource_id."""
+        mock_job = MagicMock()
+        mock_job.job_id = "test-job-456"
+
+        mock_pool = AsyncMock()
+        mock_pool.enqueue_job = AsyncMock(return_value=mock_job)
+
+        with patch("dataing.core.queue.create_pool", return_value=mock_pool):
+            job_id = await enqueue_investigation(
+                investigation_id="inv-789",
+                tenant_id="tenant-111",
+                datasource_id="ds-222",
+            )
+
+            assert job_id == "test-job-456"
+            call_kwargs = mock_pool.enqueue_job.call_args.kwargs
+            assert call_kwargs["datasource_id"] == "ds-222"
+
+    async def test_enqueue_with_priority(self) -> None:
+        """Test that enqueue_investigation respects priority."""
+        mock_job = MagicMock()
+        mock_job.job_id = "priority-job"
+
+        mock_pool = AsyncMock()
+        mock_pool.enqueue_job = AsyncMock(return_value=mock_job)
+
+        with patch("dataing.core.queue.create_pool", return_value=mock_pool):
+            job_id = await enqueue_investigation(
+                investigation_id="inv-priority",
+                tenant_id="tenant-priority",
+                priority=5,
+            )
+
+            assert job_id == "priority-job"
+
+
+class TestQueueConstants:
+    """Tests for queue module constants."""
+
+    def test_investigations_queue_name(self) -> None:
+        """Test that INVESTIGATIONS_QUEUE has expected value."""
+        assert INVESTIGATIONS_QUEUE == "investigations"

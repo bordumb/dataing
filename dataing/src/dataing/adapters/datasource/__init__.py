@@ -21,12 +21,14 @@ from dataing.adapters.datasource.errors import (
     AuthenticationFailedError,
     ConnectionFailedError,
     ConnectionTimeoutError,
+    DatasourceNotFoundError,
     QuerySyntaxError,
     QueryTimeoutError,
     RateLimitedError,
     SchemaFetchFailedError,
     TableNotFoundError,
 )
+from dataing.adapters.datasource.factory import create_adapter_for_datasource
 from dataing.adapters.datasource.filesystem.gcs import GCSAdapter
 from dataing.adapters.datasource.filesystem.hdfs import HDFSAdapter
 from dataing.adapters.datasource.filesystem.local import LocalFileAdapter
@@ -109,12 +111,14 @@ __all__ = [
     "Table",
     # Functions
     "normalize_type",
+    "create_adapter_for_datasource",
     # Errors
     "AdapterError",
     "ConnectionFailedError",
     "ConnectionTimeoutError",
     "AuthenticationFailedError",
     "AccessDeniedError",
+    "DatasourceNotFoundError",
     "QuerySyntaxError",
     "QueryTimeoutError",
     "RateLimitedError",

@@ -83,6 +83,16 @@ class InvestigationError(Exception):
         super().__init__(error or "Investigation failed")
 
 
+class InvestigationCancelled(Exception):
+    """Raised when investigation is cancelled by user.
+
+    The worker detects 'cancelling' status at a step boundary and raises
+    this after checkpointing. The job will be marked as 'cancelled'.
+    """
+
+    pass
+
+
 class InvestigationMergeStrategy(MergeStrategy[InvestigationContext]):
     """Merge strategy for investigation branch convergence.
 

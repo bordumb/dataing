@@ -1,7 +1,9 @@
-# Everything except frontend
+# Everything except frontend and docs
 *
 !/frontend
 !/frontend/**
+!/docs
+!/docs/**
 
 # Ignore node artifacts
 **/node_modules

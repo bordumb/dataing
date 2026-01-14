@@ -1,0 +1,78 @@
+---
+# Kubernetes Deployment for Arq workers processing investigation jobs
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: dataing-worker
+  labels:
+    app: dataing-worker
+    component: worker
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: dataing-worker
+  template:
+    metadata:
+      labels:
+        app: dataing-worker
+        component: worker
+    spec:
+      # Allow time for in-flight jobs to complete
+      # Must be > job_completion_wait (30s) + preStop (5s) + buffer
+      terminationGracePeriodSeconds: 60
+      containers:
+        - name: worker
+          image: dataing/worker:latest
+          command: ["python", "-m", "dataing.entrypoints.worker"]
+          resources:
+            requests:
+              memory: "2Gi"
+              cpu: "1000m"
+            limits:
+              memory: "4Gi"
+              cpu: "2000m"
+          envFrom:
+            - secretRef:
+                name: dataing-secrets
+          env:
+            - name: REDIS_HOST
+              value: redis-master
+            - name: REDIS_PORT
+              value: "6379"
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: dataing-secrets
+                  key: DATABASE_URL
+            - name: APP_DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: dataing-secrets
+                  key: APP_DATABASE_URL
+                  optional: true
+          lifecycle:
+            preStop:
+              exec:
+                # Allow load balancer to drain connections
+                command: ["sleep", "5"]
+          livenessProbe:
+            exec:
+              command:
+                - python
+                - -c
+                - "from dataing.core.queue import get_redis_settings; from arq import create_pool; import asyncio; asyncio.run(create_pool(get_redis_settings()))"
+            initialDelaySeconds: 10
+            periodSeconds: 30
+            timeoutSeconds: 10
+            failureThreshold: 3
+          readinessProbe:
+            exec:
+              command:
+                - python
+                - -c
+                - "from dataing.core.queue import get_redis_settings; from arq import create_pool; import asyncio; asyncio.run(create_pool(get_redis_settings()))"
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3

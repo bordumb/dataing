@@ -103,7 +103,8 @@ repos:
             package-lock\.json$|
             dist/.*|
             \.next/.*|
-            \.venv/.*
+            \.venv/.*|
+            \.flow/.*
           )$
 
   # Dockerfile linting

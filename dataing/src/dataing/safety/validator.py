@@ -31,6 +31,7 @@ FORBIDDEN_STATEMENTS: set[type[exp.Expression]] = {
     exp.Alter,
     exp.Grant,
     exp.Revoke,
+    exp.Merge,
 }
 
 # Forbidden keywords even in comments or subqueries
@@ -47,6 +48,7 @@ FORBIDDEN_KEYWORDS: set[str] = {
     "REVOKE",
     "EXECUTE",
     "EXEC",
+    "MERGE",
 }
 
 

@@ -56,6 +56,7 @@ def validate_query(sql: str, dialect: str = "postgres") -> None:
     """Validate that a SQL query is safe to execute.
 
     This function performs multiple layers of validation:
+    0. Check for multi-statement queries (rejected)
     1. Parse with sqlglot to get AST
     2. Check that it's a SELECT statement
     3. Check for forbidden statement types in the AST
@@ -77,7 +78,18 @@ def validate_query(sql: str, dialect: str = "postgres") -> None:
     if not sql or not sql.strip():
         raise QueryValidationError("Empty query")
 
-    # 1. Parse with sqlglot
+    # 0. Check for multi-statement queries (security risk)
+    try:
+        statements = sqlglot.parse(sql, dialect=dialect)
+        non_empty = [s for s in statements if s is not None]
+        if len(non_empty) > 1:
+            raise QueryValidationError("Multi-statement queries not allowed")
+    except QueryValidationError:
+        raise
+    except Exception as e:
+        raise QueryValidationError(f"Failed to parse SQL: {e}") from e
+
+    # 1. Parse with sqlglot (now safe - single statement)
     try:
         parsed = sqlglot.parse_one(sql, dialect=dialect)
     except Exception as e:

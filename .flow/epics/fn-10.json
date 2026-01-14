@@ -1,0 +1,13 @@
+{
+  "branch_name": "fn-10",
+  "created_at": "2026-01-14T20:45:25.187490Z",
+  "depends_on_epics": [],
+  "id": "fn-10",
+  "next_task": 1,
+  "plan_review_status": "unknown",
+  "plan_reviewed_at": null,
+  "spec_path": ".flow/specs/fn-10.md",
+  "status": "open",
+  "title": "Durable Execution Engine",
+  "updated_at": "2026-01-14T20:46:18.589828Z"
+}

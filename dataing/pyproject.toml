@@ -32,6 +32,8 @@ dependencies = [
     "faker>=40.1.0",
     "bcrypt>=5.0.0",
     "pyjwt>=2.10.1",
+    "arq>=0.26.0",
+    "redis>=5.0.0",
 ]
 
 [project.optional-dependencies]

@@ -1,0 +1,16 @@
+{
+  "assignee": null,
+  "claim_note": "",
+  "claimed_at": null,
+  "created_at": "2026-01-14T20:46:28.663924Z",
+  "depends_on": [
+    "fn-10.3"
+  ],
+  "epic": "fn-10",
+  "id": "fn-10.9",
+  "priority": null,
+  "spec_path": ".flow/tasks/fn-10.9.md",
+  "status": "todo",
+  "title": "Create Kubernetes worker Deployment",
+  "updated_at": "2026-01-14T20:49:07.482497Z"
+}

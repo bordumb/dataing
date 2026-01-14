@@ -1,0 +1,18 @@
+{
+  "assignee": null,
+  "claim_note": "",
+  "claimed_at": null,
+  "created_at": "2026-01-14T20:46:27.984099Z",
+  "depends_on": [
+    "fn-10.1",
+    "fn-10.3",
+    "fn-10.4"
+  ],
+  "epic": "fn-10",
+  "id": "fn-10.5",
+  "priority": null,
+  "spec_path": ".flow/tasks/fn-10.5.md",
+  "status": "todo",
+  "title": "Integrate queue with InvestigationService",
+  "updated_at": "2026-01-14T20:48:58.795694Z"
+}

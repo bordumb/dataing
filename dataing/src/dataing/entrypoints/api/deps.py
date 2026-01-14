@@ -73,6 +73,13 @@ class Settings:
         self.password_recovery_type = os.getenv("PASSWORD_RECOVERY_TYPE", "auto")
         self.admin_email = os.getenv("ADMIN_EMAIL", "")
 
+        # Redis settings for job queue
+        self.redis_url = os.getenv("REDIS_URL", "")
+        self.redis_host = os.getenv("REDIS_HOST", "localhost")
+        self.redis_port = int(os.getenv("REDIS_PORT", "6379"))
+        self.redis_password = os.getenv("REDIS_PASSWORD", "")
+        self.redis_db = int(os.getenv("REDIS_DB", "0"))
+
 
 settings = Settings()
 

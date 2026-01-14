@@ -52,13 +52,18 @@ FORBIDDEN_KEYWORDS: set[str] = {
 }
 
 
-def validate_query(sql: str, dialect: str = "postgres") -> None:
+def validate_query(
+    sql: str,
+    dialect: str = "postgres",
+    *,
+    require_select: bool = True,
+) -> None:
     """Validate that a SQL query is safe to execute.
 
     This function performs multiple layers of validation:
     0. Check for multi-statement queries (rejected)
     1. Parse with sqlglot to get AST
-    2. Check that it's a SELECT statement
+    2. Check that it's a SELECT statement (if require_select=True)
     3. Check for forbidden statement types in the AST
     4. Check for forbidden keywords as whole words
     5. Ensure LIMIT clause is present
@@ -66,6 +71,9 @@ def validate_query(sql: str, dialect: str = "postgres") -> None:
     Args:
         sql: The SQL query to validate.
         dialect: SQL dialect for parsing (default: postgres).
+        require_select: If True (default), query must be a SELECT statement.
+            Set to False for hypothesis queries where other read-only statements
+            might be acceptable.
 
     Raises:
         QueryValidationError: If query is not safe.
@@ -95,8 +103,8 @@ def validate_query(sql: str, dialect: str = "postgres") -> None:
     except Exception as e:
         raise QueryValidationError(f"Failed to parse SQL: {e}") from e
 
-    # 2. Check statement type - must be SELECT
-    if not isinstance(parsed, exp.Select):
+    # 2. Check statement type - must be SELECT (if required)
+    if require_select and not isinstance(parsed, exp.Select):
         raise QueryValidationError(f"Only SELECT statements allowed, got: {type(parsed).__name__}")
 
     # 3. Walk the AST and check for forbidden statement types

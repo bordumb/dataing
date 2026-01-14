@@ -14,6 +14,57 @@ import re
 from pydantic import BaseModel, Field, field_validator
 
 from dataing.core.domain_types import HypothesisCategory
+from dataing.core.exceptions import QueryValidationError
+from dataing.safety.validator import validate_query as _validate_query_safety
+
+
+def _strip_markdown(query: str) -> str:
+    """Strip markdown code blocks from query.
+
+    Handles various markdown formats:
+    - ```sql ... ```
+    - ```SQL ... ```
+    - ```postgresql ... ```
+    - Unclosed code blocks (just opening ```)
+    """
+    if query.startswith("```"):
+        lines = query.strip().split("\n")
+        # Handle both closed and unclosed blocks
+        if lines[-1] == "```":
+            return "\n".join(lines[1:-1])
+        return "\n".join(lines[1:])
+    return query
+
+
+def _validate_sql_query(
+    query: str,
+    *,
+    require_select: bool = False,
+    dialect: str = "postgres",
+) -> str:
+    """Validate SQL query using sqlglot. Returns stripped query.
+
+    Args:
+        query: The SQL query (may include markdown code blocks).
+        require_select: If True, query must be a SELECT statement.
+        dialect: SQL dialect for parsing.
+
+    Returns:
+        The stripped and validated query string.
+
+    Raises:
+        ValueError: If query is invalid (Pydantic-compatible error).
+    """
+    stripped = _strip_markdown(query).strip()
+    if not stripped:
+        raise ValueError("Empty query after stripping markdown")
+
+    try:
+        _validate_query_safety(stripped, dialect=dialect, require_select=require_select)
+    except QueryValidationError as e:
+        raise ValueError(str(e)) from None
+
+    return stripped
 
 
 class HypothesisResponse(BaseModel):

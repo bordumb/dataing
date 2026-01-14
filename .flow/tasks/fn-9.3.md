@@ -52,9 +52,13 @@ def _validate_sql_query(
 - [ ] No code duplication with safety/validator.py
 
 ## Done summary
-TBD
-
+- Added _strip_markdown() to handle markdown code blocks (```sql, unclosed, etc.)
+- Added _validate_sql_query() wrapper that calls safety validator and translates exceptions
+- Added require_select parameter to validate_query() in safety/validator.py
+- Both functions are private (underscore prefix)
+- All existing tests pass (38 validator tests)
+- Lint and type checks pass
 ## Evidence
-- Commits:
-- Tests:
+- Commits: 14c01768cc36594adf84434af8c9d1bfb89d3ede
+- Tests: uv run pytest dataing/tests/unit/safety/test_validator.py -v
 - PRs:

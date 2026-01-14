@@ -80,9 +80,17 @@ Create the concepts section explaining how investigations work, the Maestro FSM,
 - [ ] PII detection types listed
 - [ ] All pages render correctly
 ## Done summary
-TBD
-
+- Created comprehensive concepts section with 3 documentation pages
+- investigations.md: Investigation loop, context gathering, hypothesis testing, synthesis
+  - 4 mermaid diagrams (flow, query safety, parallel branches, lifecycle)
+- agent-workflows.md: Maestro FSM, Steps, Signals, branching/merging
+  - 2 mermaid diagrams (bounded vs unbounded, execution sequence)
+- guardrails.md: SQL validator, circuit breaker, PII redactor
+  - 2 mermaid diagrams (safety layer flow, PII flow)
+- All content sourced from actual codebase (step.py, signals.py, validator.py, pii.py, circuit_breaker.py)
+- Human-in-the-loop gates documented with AWAIT_USER signal
+- Build passes with `mkdocs build --strict`
 ## Evidence
-- Commits:
-- Tests:
+- Commits: d26eeeb473e756dfdb6f1f0b1e2085856f0df863
+- Tests: mkdocs build --strict
 - PRs:

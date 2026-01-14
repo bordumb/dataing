@@ -1,0 +1,42 @@
+---
+# KEDA ScaledObject for queue-based autoscaling of investigation workers
+# Requires KEDA to be installed in the cluster
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: dataing-worker-scaler
+  labels:
+    app: dataing-worker
+spec:
+  scaleTargetRef:
+    name: dataing-worker
+  pollingInterval: 15          # Check queue depth every 15 seconds
+  cooldownPeriod: 300          # Wait 5 minutes before scaling down
+  minReplicaCount: 2           # Keep minimum 2 workers for availability
+  maxReplicaCount: 20          # Maximum workers during peak load
+  triggers:
+    - type: redis
+      metadata:
+        # Redis connection address (use Redis service name)
+        address: redis-master:6379
+        # Arq queue name (matches INVESTIGATIONS_QUEUE in queue.py)
+        listName: arq:queue:investigations
+        # Scale up when >10 jobs queued per replica
+        listLength: "10"
+        # Activate scaling when at least 1 job (enables scale to zero if minReplicaCount=0)
+        activationListLength: "1"
+      authenticationRef:
+        name: redis-auth
+---
+# TriggerAuthentication for Redis password
+apiVersion: keda.sh/v1alpha1
+kind: TriggerAuthentication
+metadata:
+  name: redis-auth
+  labels:
+    app: dataing-worker
+spec:
+  secretTargetRef:
+    - parameter: password
+      name: redis-secrets
+      key: REDIS_PASSWORD

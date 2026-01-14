@@ -8,13 +8,6 @@ theme:
   # logo: assets/logo.png  # TODO: Add logo
   # favicon: assets/favicon.ico  # TODO: Add favicon
   palette:
-    # Light Mode (Stripe-ish)
-    - scheme: default
-      primary: white
-      accent: indigo
-      toggle:
-        icon: material/weather-sunny
-        name: Switch to dark mode
     # Dark Mode (matches landing page)
     - scheme: slate
       primary: custom
@@ -22,6 +15,13 @@ theme:
       toggle:
         icon: material/weather-night
         name: Switch to light mode
+    # Light Mode (Stripe-ish)
+    - scheme: default
+      primary: white
+      accent: indigo
+      toggle:
+        icon: material/weather-sunny
+        name: Switch to dark mode
   font:
     text: Inter
     code: JetBrains Mono

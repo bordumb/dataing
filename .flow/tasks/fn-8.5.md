@@ -57,9 +57,16 @@ Create a 5-minute quickstart guide that gets users to their first investigation.
 - [ ] No broken internal links
 - [ ] Code blocks have copy buttons
 ## Done summary
-TBD
-
+- Created comprehensive 5-minute quickstart guide at docs/docs/quickstart.md
+- Added tabbed installation instructions (pip vs uv)
+- Added tabbed data source configuration (DuckDB, BigQuery, Snowflake, PostgreSQL)
+- Included API and Python SDK examples for running investigations
+- Added sample JSON output showing root cause synthesis
+- Included demo scenarios table with 6 pre-built anomaly scenarios
+- Added next steps card grid linking to architecture, security, integrations
+- Added troubleshooting section for common issues
+- Build passes with `mkdocs build --strict`
 ## Evidence
-- Commits:
-- Tests:
+- Commits: d7c6004accecd706278c3fb04adc95797d516eab
+- Tests: mkdocs build --strict
 - PRs:

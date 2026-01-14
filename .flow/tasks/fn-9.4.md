@@ -36,9 +36,12 @@ Note: `require_select=False` because hypothesis queries don't strictly require S
 - [ ] Existing behavior preserved for valid queries
 
 ## Done summary
-TBD
-
+- Replaced regex-based validate_query_safety with _validate_sql_query wrapper
+- Uses sqlglot AST parsing instead of regex keyword matching
+- Removed unused 're' import
+- All 52 tests pass (14 model tests + 38 validator tests)
+- No false positives for column names like 'deleted_at', 'update_log'
 ## Evidence
-- Commits:
-- Tests:
+- Commits: 7a2398d7064f4d6113825d98d79a3dba6436c30f
+- Tests: uv run pytest dataing/tests/unit/agents/test_models.py dataing/tests/unit/safety/test_validator.py -v
 - PRs:

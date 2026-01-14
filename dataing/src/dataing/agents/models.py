@@ -9,8 +9,6 @@ Pydantic AI uses these for:
 
 from __future__ import annotations
 
-import re
-
 from pydantic import BaseModel, Field, field_validator
 
 from dataing.core.domain_types import HypothesisCategory
@@ -97,37 +95,7 @@ class HypothesisResponse(BaseModel):
     @classmethod
     def validate_query_safety(cls, v: str) -> str:
         """Validate query safety: strip markdown, require LIMIT, block mutations."""
-        # Strip markdown if present
-        if v.startswith("```"):
-            lines = v.strip().split("\n")
-            v = "\n".join(lines[1:-1] if lines[-1] == "```" else lines[1:])
-
-        upper_query = v.upper().strip()
-
-        # Ensure query has LIMIT clause for safety
-        if "LIMIT" not in upper_query:
-            raise ValueError("Query must include LIMIT clause")
-
-        # Ensure query is read-only using word boundary regex to avoid false positives
-        dangerous = [
-            "INSERT",
-            "UPDATE",
-            "DELETE",
-            "DROP",
-            "TRUNCATE",
-            "ALTER",
-            "CREATE",
-            "MERGE",
-            "GRANT",
-            "REVOKE",
-            "EXEC",
-            "EXECUTE",
-        ]
-        pattern = r"\b(" + "|".join(dangerous) + r")\b"
-        if re.search(pattern, upper_query):
-            raise ValueError("Query contains forbidden SQL operation")
-
-        return v.strip()
+        return _validate_sql_query(v, require_select=False)
 
 
 class HypothesesResponse(BaseModel):

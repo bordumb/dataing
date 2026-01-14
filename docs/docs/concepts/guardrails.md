@@ -317,6 +317,24 @@ All safety events are logged for compliance and debugging:
 
 ## Learn More
 
-- [Data Privacy](../security/data-privacy.md) - Full privacy documentation
-- [Architecture](../architecture.md) - System overview
-- [How Investigations Work](investigations.md) - Investigation workflow
+<div class="grid cards" markdown>
+
+-   :material-lock: **[Data Privacy](../security/data-privacy.md)**
+
+    ---
+
+    Full privacy documentation
+
+-   :material-hexagon-outline: **[Architecture](../architecture.md)**
+
+    ---
+
+    System overview and design
+
+-   :material-magnify: **[How Investigations Work](investigations.md)**
+
+    ---
+
+    Investigation workflow details
+
+</div>

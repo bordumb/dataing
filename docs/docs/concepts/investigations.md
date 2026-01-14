@@ -281,6 +281,24 @@ stateDiagram-v2
 
 ## Learn More
 
-- [Agent Workflows (Maestro)](agent-workflows.md) - The workflow engine
-- [Safety & Guardrails](guardrails.md) - Query validation and limits
-- [Data Privacy](../security/data-privacy.md) - PII protection
+<div class="grid cards" markdown>
+
+-   :material-state-machine: **[Agent Workflows (Maestro)](agent-workflows.md)**
+
+    ---
+
+    The workflow engine powering investigations
+
+-   :material-shield: **[Safety & Guardrails](guardrails.md)**
+
+    ---
+
+    Query validation and execution limits
+
+-   :material-lock: **[Data Privacy](../security/data-privacy.md)**
+
+    ---
+
+    PII protection and data handling
+
+</div>

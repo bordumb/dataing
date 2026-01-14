@@ -164,6 +164,24 @@ If queries are slow, consider:
 
 ## Learn More
 
-- [BigQuery Integration](bigquery.md)
-- [Architecture](../../architecture.md)
-- [Security](../../security/data-privacy.md)
+<div class="grid cards" markdown>
+
+-   :material-google-cloud: **[BigQuery Integration](bigquery.md)**
+
+    ---
+
+    Connect to Google BigQuery
+
+-   :material-hexagon-outline: **[Architecture](../../architecture.md)**
+
+    ---
+
+    System overview and design
+
+-   :material-shield: **[Security](../../security/data-privacy.md)**
+
+    ---
+
+    Data privacy and protection
+
+</div>

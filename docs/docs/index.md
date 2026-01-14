@@ -1,39 +1,70 @@
-# The AI Data Reliability Engineer
+---
+hide:
+  - navigation
+  - toc
+---
 
-**Detect anomalies. Generate hypotheses. Test with SQL. Find root causes.**
+<div align="center" style="margin-top: 4rem; margin-bottom: 4rem;" markdown="1">
 
-dataing is an autonomous AI agent that investigates data quality issues in your warehouse. When your data observability tool detects an anomaly, dataing takes over to determine *what went wrong* and *why*.
+<h1 class="hero-text">The AI Data Reliability Engineer</h1>
 
-<div class="grid cards" markdown>
+<p class="hero-subtitle">
+Dataing autonomously investigates data quality issues in your data. It doesn't just alert you—it finds the root cause.
+</p>
 
--   :material-magnify: **Auto Root Cause Analysis**
-
-    ---
-
-    LLMs generate and test multiple hypotheses in parallel. No more manual SQL hunting.
-
--   :material-shield-check: **Read-Only by Design**
-
-    ---
-
-    Only SELECT queries, never modifies your data. Every query validated with sqlglot.
-
--   :material-account-check: **Human-in-the-Loop Gates**
-
-    ---
-
-    Review and approve before any action. Full audit trail of every investigation.
+[Get Started](quickstart.md){ .md-button .md-button--primary }
+&nbsp;&nbsp;
+[Read Architecture](architecture.md){ .md-button }
 
 </div>
 
-[Get Started](quickstart.md){ .md-button .md-button--primary }
-[View on GitHub](https://github.com/bordumb/dataing){ .md-button }
+<div class="grid cards" markdown>
+
+-   :material-robot-excited: **Autonomous Agents**
+
+    ---
+
+    Unlike dumb monitors, Dataing orchestrates **Agents** to hypothesize, query, and verify issues just like a human engineer would.
+
+    [How it works](concepts/investigations.md)
+
+-   :material-shield-check: **Safety First**
+
+    ---
+
+    Built on a deterministic Finite State Machine. Read-only adapters, circuit breakers, and human-in-the-loop gates ensure safety.
+
+    [View Security](security/data-privacy.md)
+
+-   :material-connection: **Plug & Play**
+
+    ---
+
+    Flexible architecture means you can plug in **Snowflake**, **dbt**, **Slack**, or **DataHub** in minutes.
+
+    [See Integrations](integrations/warehouses/snowflake.md)
+
+-   :material-flash: **Instant RCA**
+
+    ---
+
+    Stop writing `SELECT *` to debug null spikes. Dataing correlates lineage, schema changes, and data stats automatically.
+
+    [Try Quickstart](quickstart.md)
+
+</div>
+
+---
+
+## Why Dataing?
+
+The modern data stack is great at **alerting** ("Something is wrong!") but terrible at **diagnosis** ("Why is it wrong?").
+
+Data Engineers spend 30% of their time debugging pipelines. Dataing automates the "Check Lineage → Check recent deployments → Check data distribution" loop so you can focus on building.
 
 ---
 
 ## How It Works
-
-dataing follows a systematic investigation workflow powered by an agentic finite state machine:
 
 ```mermaid
 flowchart LR
@@ -61,131 +92,43 @@ flowchart LR
     D -->|More hypotheses| C
 ```
 
-1. **Gather Context** - Collects table schemas, column statistics, and lineage information
-2. **Generate Hypotheses** - LLM analyzes patterns and proposes potential root causes
-3. **Test with SQL** - Validates each hypothesis with safe, read-only queries
-4. **Synthesize Findings** - Produces a clear root cause report with supporting evidence
-
----
-
-## Architecture
-
-Built on a hexagonal architecture with agentic workflows:
-
-<div class="grid" markdown>
-
-:material-hexagon-outline: **Hexagonal Architecture**
-
-Core domain logic is isolated from external dependencies. Swap adapters without touching business logic.
-
-:material-state-machine: **Agentic FSM (Maestro)**
-
-Workflow engine with typed steps, signals, and branching. Deterministic execution with human-in-the-loop gates.
-
-:material-robot: **Agent Runtime (Bond)**
-
-PydanticAI wrapper for LLM interactions with high-fidelity streaming and structured outputs.
-
-:material-shield-lock: **Safety Layer**
-
-Circuit breakers, query validation, and PII detection. Prevents runaway costs and data exposure.
-
-</div>
-
-[Learn more about the architecture](architecture.md){ .md-button }
+1. **Gather Context** — Collects table schemas, column statistics, and lineage
+2. **Generate Hypotheses** — LLM analyzes patterns and proposes root causes
+3. **Test with SQL** — Validates each hypothesis with safe, read-only queries
+4. **Synthesize Findings** — Produces a clear report with supporting evidence
 
 ---
 
 ## Integrations
 
-### Data Warehouses
-
 <div class="grid" markdown>
 
-| Warehouse | Status |
-|-----------|--------|
+| Data Warehouses | Status |
+|-----------------|--------|
 | Snowflake | :material-check-circle:{ .green } GA |
 | BigQuery | :material-check-circle:{ .green } GA |
 | DuckDB | :material-check-circle:{ .green } GA |
 | PostgreSQL | :material-check-circle:{ .green } GA |
-| Redshift | :material-clock-outline: Coming Soon |
+| Redshift | :material-clock-outline:{ .yellow } Coming Soon |
 
-</div>
-
-### Lineage Providers
-
-| Provider | Status |
-|----------|--------|
+| Lineage & Notifications | Status |
+|-------------------------|--------|
 | dbt | :material-check-circle:{ .green } GA |
 | DataHub | :material-check-circle:{ .green } GA |
-| OpenLineage | :material-clock-outline: Coming Soon |
-| Dagster | :material-clock-outline: Coming Soon |
+| Slack | :material-check-circle:{ .green } GA |
+| OpenLineage | :material-clock-outline:{ .yellow } Coming Soon |
+
+</div>
 
 [View all integrations](integrations/warehouses/snowflake.md){ .md-button }
 
 ---
 
-## Enterprise Ready
-
-<div class="grid cards" markdown>
-
--   :material-lock: **Security First**
-
-    ---
-
-    Read-only access, PII detection, and query validation. [Learn about our security model](security/data-privacy.md).
-
--   :material-account-group: **SSO & RBAC**
-
-    ---
-
-    OIDC/SAML authentication and role-based access control. Enterprise Edition feature.
-
--   :material-server: **Self-Hosted Option**
-
-    ---
-
-    Deploy in your own infrastructure. Data never leaves your network.
-
-</div>
-
----
-
-## Quick Start
-
-Get up and running in 5 minutes:
-
-=== "pip"
-
-    ```bash
-    pip install dataing-core
-    ```
-
-=== "uv"
-
-    ```bash
-    uv add dataing-core
-    ```
-
-Then configure your data warehouse and run your first investigation:
-
-```bash
-dataing investigate \
-  --datasource snowflake \
-  --table orders \
-  --column revenue \
-  --anomaly "null_rate spike on 2024-01-15"
-```
-
-[Full quickstart guide](quickstart.md){ .md-button .md-button--primary }
-
----
-
 ## Open Source
 
-dataing is open-core:
+Dataing is open-core:
 
-- **Community Edition** - Fully open source under Apache 2.0
-- **Enterprise Edition** - Adds SSO, SCIM, audit logging, and premium support
+- **Community Edition** — Fully open source under Apache 2.0
+- **Enterprise Edition** — Adds SSO, SCIM, audit logging, and premium support
 
 [View on GitHub :material-github:](https://github.com/bordumb/dataing){ .md-button }

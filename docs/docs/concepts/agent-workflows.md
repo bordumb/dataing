@@ -15,23 +15,54 @@ LLMs are powerful but unpredictable. Without structure, they can:
 
 Maestro solves these problems with **bounded, deterministic workflows**:
 
+<div class="grid" markdown>
+
+<div markdown>
+
+**Without Maestro**
+
 ```mermaid
 flowchart LR
-    subgraph Unbounded["Without Maestro"]
-        A1[LLM] -->|Any action| A2[LLM]
-        A2 -->|Any action| A3[LLM]
-        A3 -->|Any action| A4[...]
-    end
-
-    subgraph Bounded["With Maestro"]
-        B1[Step 1] -->|CONTINUE| B2[Step 2]
-        B2 -->|BRANCH| B3[Step 3a]
-        B2 -->|BRANCH| B4[Step 3b]
-        B3 -->|MERGE| B5[Step 4]
-        B4 -->|MERGE| B5
-        B5 -->|COMPLETE| B6[Done]
-    end
+    A1[LLM] -->|"Any action"| A2[LLM]
+    A2 -->|"Any action"| A3[LLM]
+    A3 -->|"Any action"| A4[...]
+    A4 -.->|"???"| A1
 ```
+
+</div>
+
+<div markdown>
+
+**With Maestro**
+
+```mermaid
+flowchart LR
+    B1[Step 1] -->|CONTINUE| B2[Step 2]
+    B2 -->|BRANCH| B3[Step 3a]
+    B2 -->|BRANCH| B4[Step 3b]
+    B3 -->|MERGE| B5[Step 4]
+    B4 -->|MERGE| B5
+    B5 -->|COMPLETE| B6[Done]
+```
+
+</div>
+
+</div>
+
+!!! success "Why Maestro Wins"
+
+    | | Without Maestro | With Maestro |
+    |---|---|---|
+    | **Termination** | May loop forever | Guaranteed to complete or fail |
+    | **Cost Control** | Unbounded token spend | Circuit breaker limits |
+    | **Auditability** | Black box decisions | Every step logged with signal |
+    | **Human Oversight** | None - autonomous agent | `AWAIT_USER` gates for approval |
+    | **Parallelism** | Sequential or uncoordinated | Structured `BRANCH`/`MERGE` |
+    | **Error Recovery** | Undefined behavior | Explicit `FAIL` signal handling |
+
+    **The unbounded approach** treats the LLM as an autonomous agent that can take any action at any time. This leads to runaway costs, infinite loops, and decisions made without human review.
+
+    **Maestro's FSM approach** constrains the LLM to well-defined steps with explicit transitions. The workflow always terminates, costs are bounded, and humans can gate critical decisions.
 
 ---
 
@@ -355,6 +386,24 @@ class GenerateHypothesesStep(BondStep[Context, None, list[Hypothesis], str]):
 
 ## Learn More
 
-- [How Investigations Work](investigations.md) - The investigation flow
-- [Safety & Guardrails](guardrails.md) - Execution limits
-- [Architecture](../architecture.md) - System overview
+<div class="grid cards" markdown>
+
+-   :material-magnify: **[How Investigations Work](investigations.md)**
+
+    ---
+
+    The investigation flow and methodology
+
+-   :material-shield: **[Safety & Guardrails](guardrails.md)**
+
+    ---
+
+    Execution limits and protections
+
+-   :material-hexagon-outline: **[Architecture](../architecture.md)**
+
+    ---
+
+    System overview and design
+
+</div>

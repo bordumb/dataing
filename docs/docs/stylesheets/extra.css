@@ -1,265 +1,348 @@
 /* ========================================
-   DATAING DOCUMENTATION - ENTERPRISE POLISH
-   Inspired by Stripe/Auth0 documentation aesthetics
+   DATAING DOCUMENTATION - ENTERPRISE SaaS STYLE
+   Inspired by Stripe/Linear documentation
    ======================================== */
 
 /* ----------------------------------------
-   COLOR SCHEME
+   TYPOGRAPHY - Tighter and cleaner
    ---------------------------------------- */
-:root {
-  /* Primary brand colors - Deep navy like Stripe */
-  --md-primary-fg-color: #0A2540;
-  --md-primary-fg-color--light: #425466;
-  --md-primary-fg-color--dark: #0A2540;
-
-  /* Accent for links and CTAs - Electric purple */
-  --md-accent-fg-color: #635BFF;
-  --md-accent-fg-color--transparent: rgba(99, 91, 255, 0.1);
-
-  /* Code highlighting tweaks */
-  --md-code-bg-color: #f6f8fa;
-  --md-code-fg-color: #24292f;
-}
-
-/* Dark mode overrides */
-[data-md-color-scheme="slate"] {
-  --md-primary-fg-color: #635BFF;
-  --md-primary-fg-color--light: #80E9FF;
-  --md-accent-fg-color: #80E9FF;
-  --md-default-bg-color: #0A1628;
-  --md-default-bg-color--light: #0F1D32;
-  --md-code-bg-color: #0d1117;
-  --md-code-fg-color: #c9d1d9;
+body {
+    -webkit-font-smoothing: antialiased;
+    letter-spacing: -0.01em;
 }
 
 /* ----------------------------------------
-   TYPOGRAPHY
+   SaaS HEADER STYLE (White with border)
    ---------------------------------------- */
-.md-typeset {
-  font-size: 0.85rem;
-  line-height: 1.7;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
+[data-md-color-scheme="default"] .md-header {
+    background-color: #fff;
+    box-shadow: none;
+    border-bottom: 1px solid #e5e7eb;
 }
 
-.md-typeset h1 {
-  font-weight: 700;
-  letter-spacing: -0.02em;
-  margin-bottom: 1rem;
+[data-md-color-scheme="default"] .md-tabs {
+    background-color: #fff;
+    border-bottom: 1px solid #e5e7eb;
 }
 
-.md-typeset h2 {
-  font-weight: 600;
-  letter-spacing: -0.01em;
-  border-bottom: 1px solid var(--md-default-fg-color--lightest);
-  padding-bottom: 0.5rem;
-  margin-top: 2rem;
+/* Fix text colors since we made header white */
+[data-md-color-scheme="default"] .md-header__button,
+[data-md-color-scheme="default"] .md-header__title,
+[data-md-color-scheme="default"] .md-tabs__link {
+    color: #0f172a; /* Slate 900 */
 }
 
-.md-typeset h3 {
-  font-weight: 600;
-  letter-spacing: -0.01em;
+[data-md-color-scheme="default"] .md-tabs__link--active {
+    color: #4f46e5; /* Indigo 600 */
+    font-weight: 700;
 }
 
-.md-typeset p {
-  margin-bottom: 1rem;
+/* Dark mode header */
+[data-md-color-scheme="slate"] .md-header {
+    background-color: #0f172a;
+    border-bottom: 1px solid #1e293b;
+}
+
+[data-md-color-scheme="slate"] .md-tabs {
+    background-color: #0f172a;
+    border-bottom: 1px solid #1e293b;
+}
+
+/* ----------------------------------------
+   HERO TEXT (Landing page)
+   ---------------------------------------- */
+.hero-text {
+    font-size: 3rem;
+    font-weight: 800;
+    line-height: 1.1;
+    margin-bottom: 1rem;
+    background: -webkit-linear-gradient(315deg, #1e293b 25%, #4f46e5);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+[data-md-color-scheme="slate"] .hero-text {
+    background: -webkit-linear-gradient(315deg, #f8fafc 25%, #818cf8);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+.hero-subtitle {
+    font-size: 1.25rem;
+    color: #64748b;
+    margin-bottom: 2rem;
+    max-width: 600px;
+    margin-left: auto;
+    margin-right: auto;
+}
+
+[data-md-color-scheme="slate"] .hero-subtitle {
+    color: #94a3b8;
+}
+
+/* ----------------------------------------
+   BUTTONS (Rounder, nicer)
+   ---------------------------------------- */
+.md-button {
+    border-radius: 50px;
+    font-weight: 600;
+    padding: 0.6em 1.2em;
+    transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.md-button:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.md-button--primary {
+    background-color: #4f46e5 !important;
+    border-color: #4f46e5 !important;
+    color: white !important;
+}
+
+.md-button--primary:hover {
+    background-color: #4338ca !important;
+    border-color: #4338ca !important;
+}
+
+/* ----------------------------------------
+   ADMONITIONS (Modern Pill Style)
+   ---------------------------------------- */
+.md-typeset .admonition,
+.md-typeset details {
+    border-radius: 8px;
+    border: 1px solid rgba(0, 0, 0, 0.1);
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+    background: white;
+    border-left-width: 4px;
+}
+
+[data-md-color-scheme="slate"] .md-typeset .admonition,
+[data-md-color-scheme="slate"] .md-typeset details {
+    background: var(--md-default-bg-color);
+    border-color: rgba(255, 255, 255, 0.1);
+}
+
+.md-typeset .admonition-title {
+    font-weight: 600;
+}
+
+/* Admonition colors */
+.md-typeset .admonition.note {
+    border-left-color: #4f46e5;
+}
+
+.md-typeset .admonition.tip,
+.md-typeset .admonition.success {
+    border-left-color: #10b981;
+}
+
+.md-typeset .admonition.warning {
+    border-left-color: #f59e0b;
+}
+
+.md-typeset .admonition.danger {
+    border-left-color: #ef4444;
 }
 
 /* ----------------------------------------
    CODE BLOCKS
    ---------------------------------------- */
 .md-typeset pre {
-  border-radius: 8px;
-  border: 1px solid var(--md-default-fg-color--lightest);
+    border-radius: 8px;
+    border: 1px solid var(--md-default-fg-color--lightest);
 }
 
 .md-typeset pre > code {
-  font-size: 0.8rem;
-  border-radius: 8px;
+    border-radius: 8px;
+    font-family: "JetBrains Mono", monospace;
+    font-size: 0.85em;
 }
 
 .md-typeset code {
-  font-size: 0.85em;
-  padding: 0.1em 0.3em;
-  border-radius: 4px;
-}
-
-/* Code copy button styling */
-.md-clipboard {
-  border-radius: 4px;
+    font-size: 0.85em;
+    padding: 0.1em 0.3em;
+    border-radius: 4px;
 }
 
 /* ----------------------------------------
-   ADMONITIONS (CALLOUTS)
+   GRID CARDS
    ---------------------------------------- */
-.md-typeset .admonition {
-  border-radius: 8px;
-  border-left-width: 4px;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+.md-typeset .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr));
+    gap: 1rem;
+    margin: 1.5rem 0;
 }
 
-.md-typeset .admonition-title {
-  border-radius: 8px 8px 0 0;
-  font-weight: 600;
+.md-typeset .grid.cards > ul {
+    display: contents;
+    list-style: none;
+    margin: 0;
+    padding: 0;
 }
 
-/* Softer admonition colors */
-.md-typeset .admonition.note {
-  border-color: #635BFF;
+.md-typeset .grid.cards > ul > li,
+.md-typeset .grid > .card {
+    display: flex;
+    flex-direction: column;
+    padding: 1.25rem 1.5rem;
+    border: 1px solid #e5e7eb;
+    border-radius: 12px;
+    background: white;
+    transition: border-color 0.2s, box-shadow 0.2s, transform 0.2s;
 }
 
-.md-typeset .admonition.note > .admonition-title {
-  background-color: rgba(99, 91, 255, 0.1);
+[data-md-color-scheme="slate"] .md-typeset .grid.cards > ul > li,
+[data-md-color-scheme="slate"] .md-typeset .grid > .card {
+    background: #1e293b;
+    border-color: #334155;
 }
 
-.md-typeset .admonition.tip {
-  border-color: #00d4aa;
+.md-typeset .grid.cards > ul > li:hover,
+.md-typeset .grid > .card:hover {
+    border-color: #4f46e5;
+    box-shadow: 0 8px 24px rgba(79, 70, 229, 0.12);
+    transform: translateY(-2px);
 }
 
-.md-typeset .admonition.tip > .admonition-title {
-  background-color: rgba(0, 212, 170, 0.1);
+.md-typeset .grid.cards > ul > li > hr,
+.md-typeset .grid > .card > hr {
+    margin: 0.75rem 0;
+    border: 0;
+    border-top: 1px solid #e5e7eb;
 }
 
-.md-typeset .admonition.warning {
-  border-color: #f59e0b;
+[data-md-color-scheme="slate"] .md-typeset .grid.cards > ul > li > hr {
+    border-top-color: #334155;
 }
 
-.md-typeset .admonition.warning > .admonition-title {
-  background-color: rgba(245, 158, 11, 0.1);
+.md-typeset .grid.cards > ul > li > :first-child,
+.md-typeset .grid > .card > :first-child {
+    margin-top: 0;
 }
 
-.md-typeset .admonition.danger {
-  border-color: #ef4444;
+.md-typeset .grid.cards > ul > li > :last-child,
+.md-typeset .grid > .card > :last-child {
+    margin-bottom: 0;
 }
 
-.md-typeset .admonition.danger > .admonition-title {
-  background-color: rgba(239, 68, 68, 0.1);
+/* Icon styling in cards */
+.md-typeset .grid.cards .twemoji,
+.md-typeset .grid .twemoji {
+    width: 1.5rem;
+    height: 1.5rem;
+    margin-right: 0.5rem;
+    vertical-align: middle;
 }
 
 /* ----------------------------------------
-   NAVIGATION
+   STATUS ICONS
    ---------------------------------------- */
-.md-nav__link {
-  font-size: 0.8rem;
+.md-typeset .green {
+    color: #10b981;
 }
 
-.md-tabs__link {
-  font-weight: 500;
-  text-transform: none;
-  letter-spacing: 0;
+.md-typeset .yellow {
+    color: #f59e0b;
 }
 
-/* Sidebar refinements */
-.md-sidebar__inner {
-  padding-top: 1rem;
-}
-
-/* ----------------------------------------
-   HEADER
-   ---------------------------------------- */
-.md-header {
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
-  background-color: rgba(255, 255, 255, 0.95);
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
-}
-
-[data-md-color-scheme="slate"] .md-header {
-  background-color: rgba(10, 22, 40, 0.95);
-}
-
-/* Search bar polish */
-.md-search__input {
-  border-radius: 8px;
-}
-
-/* ----------------------------------------
-   CONTENT TABS
-   ---------------------------------------- */
-.md-typeset .tabbed-labels > label {
-  font-weight: 500;
-  font-size: 0.8rem;
-  border-radius: 4px 4px 0 0;
-}
-
-.md-typeset .tabbed-content {
-  border-radius: 0 0 8px 8px;
+.md-typeset .red {
+    color: #ef4444;
 }
 
 /* ----------------------------------------
    TABLES
    ---------------------------------------- */
 .md-typeset table:not([class]) {
-  border-radius: 8px;
-  overflow: hidden;
-  border: 1px solid var(--md-default-fg-color--lightest);
+    border-radius: 8px;
+    overflow: hidden;
+    border: 1px solid #e5e7eb;
+}
+
+[data-md-color-scheme="slate"] .md-typeset table:not([class]) {
+    border-color: #334155;
 }
 
 .md-typeset table:not([class]) th {
-  font-weight: 600;
-  font-size: 0.8rem;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
+    font-weight: 600;
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    background: #f8fafc;
+}
+
+[data-md-color-scheme="slate"] .md-typeset table:not([class]) th {
+    background: #1e293b;
 }
 
 /* ----------------------------------------
-   FOOTER
+   CONTENT TABS
    ---------------------------------------- */
-.md-footer {
-  background-color: var(--md-primary-fg-color);
-}
-
-/* ----------------------------------------
-   BUTTONS/LINKS
-   ---------------------------------------- */
-.md-typeset a {
-  transition: color 0.2s ease;
-}
-
-.md-typeset a:hover {
-  text-decoration: underline;
-}
-
-/* ----------------------------------------
-   RESPONSIVE REFINEMENTS
-   ---------------------------------------- */
-@media screen and (max-width: 76.1875em) {
-  .md-nav__link {
+.md-typeset .tabbed-labels > label {
+    font-weight: 500;
     font-size: 0.85rem;
-  }
+    border-radius: 4px 4px 0 0;
+}
+
+.md-typeset .tabbed-content {
+    border-radius: 0 0 8px 8px;
 }
 
 /* ----------------------------------------
-   MERMAID DIAGRAM STYLING
+   NAVIGATION
+   ---------------------------------------- */
+.md-nav__link {
+    font-size: 0.85rem;
+}
+
+/* ----------------------------------------
+   MERMAID DIAGRAMS
    ---------------------------------------- */
 .mermaid {
-  background: transparent;
-  margin: 1rem 0;
+    background: transparent;
+    margin: 1rem 0;
 }
 
 /* ----------------------------------------
-   CUSTOM UTILITIES
+   CUSTOM BADGES
    ---------------------------------------- */
 .enterprise-badge {
-  display: inline-block;
-  padding: 0.2em 0.6em;
-  font-size: 0.7rem;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  background: linear-gradient(135deg, var(--md-accent-fg-color), #80E9FF);
-  color: white;
-  border-radius: 4px;
+    display: inline-block;
+    padding: 0.2em 0.6em;
+    font-size: 0.7rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    background: linear-gradient(135deg, #4f46e5, #818cf8);
+    color: white;
+    border-radius: 4px;
 }
 
 .beta-badge {
-  display: inline-block;
-  padding: 0.2em 0.6em;
-  font-size: 0.7rem;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  background: #f59e0b;
-  color: white;
-  border-radius: 4px;
+    display: inline-block;
+    padding: 0.2em 0.6em;
+    font-size: 0.7rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    background: #f59e0b;
+    color: white;
+    border-radius: 4px;
+}
+
+/* ----------------------------------------
+   RESPONSIVE
+   ---------------------------------------- */
+@media screen and (max-width: 76.1875em) {
+    .hero-text {
+        font-size: 2rem;
+    }
+
+    .hero-subtitle {
+        font-size: 1rem;
+    }
 }

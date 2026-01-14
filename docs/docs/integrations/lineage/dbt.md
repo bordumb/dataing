@@ -187,6 +187,24 @@ dataing lineage refresh --provider dbt
 
 ## Learn More
 
-- [DataHub Integration](datahub.md)
-- [How Investigations Work](../../concepts/investigations.md)
-- [Architecture](../../architecture.md)
+<div class="grid cards" markdown>
+
+-   :material-database-search: **[DataHub Integration](datahub.md)**
+
+    ---
+
+    Enterprise data catalog lineage
+
+-   :material-magnify: **[How Investigations Work](../../concepts/investigations.md)**
+
+    ---
+
+    Investigation workflow details
+
+-   :material-hexagon-outline: **[Architecture](../../architecture.md)**
+
+    ---
+
+    System overview and design
+
+</div>

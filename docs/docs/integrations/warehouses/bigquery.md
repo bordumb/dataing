@@ -113,6 +113,24 @@ Check that:
 
 ## Learn More
 
-- [Snowflake Integration](snowflake.md)
-- [Architecture](../../architecture.md)
-- [Security](../../security/data-privacy.md)
+<div class="grid cards" markdown>
+
+-   :material-snowflake: **[Snowflake Integration](snowflake.md)**
+
+    ---
+
+    Connect to Snowflake
+
+-   :material-hexagon-outline: **[Architecture](../../architecture.md)**
+
+    ---
+
+    System overview and design
+
+-   :material-shield: **[Security](../../security/data-privacy.md)**
+
+    ---
+
+    Data privacy and protection
+
+</div>

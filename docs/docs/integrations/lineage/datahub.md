@@ -184,6 +184,24 @@ export DATAING_DATAHUB_TIMEOUT=60
 
 ## Learn More
 
-- [dbt Integration](dbt.md)
-- [How Investigations Work](../../concepts/investigations.md)
-- [Architecture](../../architecture.md)
+<div class="grid cards" markdown>
+
+-   :material-pipe: **[dbt Integration](dbt.md)**
+
+    ---
+
+    Transform lineage from dbt
+
+-   :material-magnify: **[How Investigations Work](../../concepts/investigations.md)**
+
+    ---
+
+    Investigation workflow details
+
+-   :material-hexagon-outline: **[Architecture](../../architecture.md)**
+
+    ---
+
+    System overview and design
+
+</div>

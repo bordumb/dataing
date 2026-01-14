@@ -176,6 +176,24 @@ DuckDB is not suitable for:
 
 ## Learn More
 
-- [Snowflake Integration](snowflake.md)
-- [BigQuery Integration](bigquery.md)
-- [Quickstart](../../quickstart.md)
+<div class="grid cards" markdown>
+
+-   :material-snowflake: **[Snowflake Integration](snowflake.md)**
+
+    ---
+
+    Connect to Snowflake
+
+-   :material-google-cloud: **[BigQuery Integration](bigquery.md)**
+
+    ---
+
+    Connect to Google BigQuery
+
+-   :material-rocket-launch: **[Quickstart](../../quickstart.md)**
+
+    ---
+
+    Get started in 5 minutes
+
+</div>

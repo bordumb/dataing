@@ -1,38 +1,39 @@
-site_name: dataing
+site_name: Dataing
 site_description: Autonomous Data Quality Investigation
 site_url: https://dataing.dev
 
 theme:
   name: material
+  custom_dir: overrides
+  # logo: assets/logo.png  # TODO: Add logo
+  # favicon: assets/favicon.ico  # TODO: Add favicon
   palette:
+    # Light Mode (Stripe-ish)
     - scheme: default
-      primary: indigo
+      primary: white
       accent: indigo
       toggle:
-        icon: material/brightness-7
+        icon: material/weather-sunny
         name: Switch to dark mode
+    # Dark Mode (Slate)
     - scheme: slate
-      primary: indigo
+      primary: black
       accent: indigo
       toggle:
-        icon: material/brightness-4
+        icon: material/weather-night
         name: Switch to light mode
   font:
     text: Inter
     code: JetBrains Mono
   features:
     - navigation.instant
-    - navigation.instant.prefetch
-    - navigation.tracking
     - navigation.tabs
     - navigation.tabs.sticky
     - navigation.sections
-    - navigation.top
-    - search.suggest
-    - search.highlight
-    - search.share
+    - navigation.expand
     - content.code.copy
-    - content.tabs.link
+    - content.tooltips
+    - toc.integrate
 
 plugins:
   - search
@@ -43,32 +44,37 @@ plugins:
           options:
             docstring_style: google
             show_source: true
-  - mermaid2
 
 markdown_extensions:
+  - admonition
+  - pymdownx.details
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+  - pymdownx.tabbed:
+      alternate_style: true
+  - attr_list
+  - md_in_html
+  - pymdownx.emoji:
+      emoji_index: !!python/name:material.extensions.emoji.twemoji
+      emoji_generator: !!python/name:material.extensions.emoji.to_svg
   - pymdownx.highlight:
       anchor_linenums: true
       line_spans: __span
       pygments_lang_class: true
   - pymdownx.inlinehilite
   - pymdownx.snippets
-  - pymdownx.superfences:
-      custom_fences:
-        - name: mermaid
-          class: mermaid
-          format: !!python/name:mermaid2.fence_mermaid_custom
-  - pymdownx.tabbed:
-      alternate_style: true
-  - admonition
-  - pymdownx.details
   - def_list
-  - attr_list
-  - md_in_html
   - footnotes
   - abbr
   - toc:
       permalink: true
       toc_depth: 3
+
+extra_css:
+  - stylesheets/extra.css
 
 nav:
   - Home: index.md
@@ -98,6 +104,3 @@ extra:
   social:
     - icon: fontawesome/brands/github
       link: https://github.com/bordumb/dataing
-
-extra_css:
-  - stylesheets/extra.css

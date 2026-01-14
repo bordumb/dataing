@@ -201,6 +201,24 @@ Check:
 
 ## Learn More
 
-- [Architecture](../../architecture.md)
-- [Security](../../security/data-privacy.md)
-- [Quickstart](../../quickstart.md)
+<div class="grid cards" markdown>
+
+-   :material-hexagon-outline: **[Architecture](../../architecture.md)**
+
+    ---
+
+    System overview and design
+
+-   :material-shield: **[Security](../../security/data-privacy.md)**
+
+    ---
+
+    Data privacy and protection
+
+-   :material-rocket-launch: **[Quickstart](../../quickstart.md)**
+
+    ---
+
+    Get started in 5 minutes
+
+</div>

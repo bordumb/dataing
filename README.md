@@ -59,6 +59,9 @@ just test
 
 # Run linters
 just lint
+
+# Test docs
+uv run mkdocs serve -f docs/mkdocs.yml
 ```
 
 ## Project Structure

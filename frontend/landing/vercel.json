@@ -2,5 +2,9 @@
   "buildCommand": "pnpm build",
   "outputDirectory": "dist",
   "installCommand": "corepack enable && pnpm install",
-  "framework": "astro"
+  "framework": "astro",
+  "redirects": [
+    { "source": "/docs", "destination": "https://docs.dataing.dev", "permanent": false },
+    { "source": "/docs/:path*", "destination": "https://docs.dataing.dev/:path*", "permanent": false }
+  ]
 }

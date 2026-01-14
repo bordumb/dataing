@@ -190,3 +190,4 @@ reports/
 .worktrees/
 .vercel
 .env*.local
+docs/site/

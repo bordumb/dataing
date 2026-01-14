@@ -37,15 +37,59 @@ body {
     font-weight: 700;
 }
 
-/* Dark mode header */
+/* ----------------------------------------
+   DARK MODE - Matches landing page colors
+   ---------------------------------------- */
+[data-md-color-scheme="slate"] {
+    /* Landing page color palette */
+    --md-default-bg-color: #0a0a0f;
+    --md-default-bg-color--light: #12121a;
+    --md-default-bg-color--lighter: #16161f;
+    --md-default-bg-color--lightest: #2a2a3a;
+
+    --md-default-fg-color: #f0f0f5;
+    --md-default-fg-color--light: #8888a0;
+    --md-default-fg-color--lighter: #8888a0;
+    --md-default-fg-color--lightest: #2a2a3a;
+
+    /* Accent colors - teal gradient from landing */
+    --md-primary-fg-color: #00d4aa;
+    --md-primary-fg-color--light: #00d4aa33;
+    --md-primary-fg-color--dark: #00a88a;
+    --md-accent-fg-color: #00d4aa;
+    --md-accent-fg-color--transparent: #00d4aa1a;
+
+    /* Code blocks */
+    --md-code-bg-color: #12121a;
+    --md-code-fg-color: #00d4aa;
+    --md-code-hl-color: #00d4aa26;
+
+    /* Typeset */
+    --md-typeset-color: #f0f0f5;
+    --md-typeset-a-color: #00d4aa;
+
+    /* Footer */
+    --md-footer-bg-color: #0a0a0f;
+    --md-footer-bg-color--dark: #050508;
+}
+
 [data-md-color-scheme="slate"] .md-header {
-    background-color: #0f172a;
-    border-bottom: 1px solid #1e293b;
+    background-color: #0a0a0f;
+    border-bottom: 1px solid #2a2a3a;
 }
 
 [data-md-color-scheme="slate"] .md-tabs {
-    background-color: #0f172a;
-    border-bottom: 1px solid #1e293b;
+    background-color: #0a0a0f;
+    border-bottom: 1px solid #2a2a3a;
+}
+
+[data-md-color-scheme="slate"] .md-tabs__link--active {
+    color: #00d4aa;
+    font-weight: 700;
+}
+
+[data-md-color-scheme="slate"] .md-nav__link--active {
+    color: #00d4aa;
 }
 
 /* ----------------------------------------
@@ -63,7 +107,8 @@ body {
 }
 
 [data-md-color-scheme="slate"] .hero-text {
-    background: -webkit-linear-gradient(315deg, #f8fafc 25%, #818cf8);
+    /* Match landing page gradient: teal to blue */
+    background: -webkit-linear-gradient(135deg, #00d4aa 0%, #0088ff 100%);
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     background-clip: text;
@@ -79,7 +124,7 @@ body {
 }
 
 [data-md-color-scheme="slate"] .hero-subtitle {
-    color: #94a3b8;
+    color: #8888a0;
 }
 
 /* ----------------------------------------
@@ -106,6 +151,27 @@ body {
 .md-button--primary:hover {
     background-color: #4338ca !important;
     border-color: #4338ca !important;
+}
+
+/* Dark mode buttons - teal gradient */
+[data-md-color-scheme="slate"] .md-button--primary {
+    background: linear-gradient(135deg, #00d4aa, #0088ff) !important;
+    border-color: #00d4aa !important;
+    color: #0a0a0f !important;
+}
+
+[data-md-color-scheme="slate"] .md-button--primary:hover {
+    box-shadow: 0 8px 24px rgba(0, 212, 170, 0.3);
+}
+
+[data-md-color-scheme="slate"] .md-button:not(.md-button--primary) {
+    border-color: #2a2a3a;
+    color: #f0f0f5;
+}
+
+[data-md-color-scheme="slate"] .md-button:not(.md-button--primary):hover {
+    border-color: #00d4aa;
+    background: rgba(0, 212, 170, 0.1);
 }
 
 /* ----------------------------------------
@@ -198,8 +264,8 @@ body {
 
 [data-md-color-scheme="slate"] .md-typeset .grid.cards > ul > li,
 [data-md-color-scheme="slate"] .md-typeset .grid > .card {
-    background: #1e293b;
-    border-color: #334155;
+    background: #16161f;
+    border-color: #2a2a3a;
 }
 
 .md-typeset .grid.cards > ul > li:hover,
@@ -207,6 +273,12 @@ body {
     border-color: #4f46e5;
     box-shadow: 0 8px 24px rgba(79, 70, 229, 0.12);
     transform: translateY(-2px);
+}
+
+[data-md-color-scheme="slate"] .md-typeset .grid.cards > ul > li:hover,
+[data-md-color-scheme="slate"] .md-typeset .grid > .card:hover {
+    border-color: #00d4aa;
+    box-shadow: 0 8px 24px rgba(0, 212, 170, 0.15);
 }
 
 .md-typeset .grid.cards > ul > li > hr,
@@ -217,7 +289,7 @@ body {
 }
 
 [data-md-color-scheme="slate"] .md-typeset .grid.cards > ul > li > hr {
-    border-top-color: #334155;
+    border-top-color: #2a2a3a;
 }
 
 .md-typeset .grid.cards > ul > li > :first-child,
@@ -243,7 +315,7 @@ body {
    STATUS ICONS
    ---------------------------------------- */
 .md-typeset .green {
-    color: #10b981;
+    color: #00d4aa;
 }
 
 .md-typeset .yellow {
@@ -264,7 +336,7 @@ body {
 }
 
 [data-md-color-scheme="slate"] .md-typeset table:not([class]) {
-    border-color: #334155;
+    border-color: #2a2a3a;
 }
 
 .md-typeset table:not([class]) th {
@@ -276,7 +348,7 @@ body {
 }
 
 [data-md-color-scheme="slate"] .md-typeset table:not([class]) th {
-    background: #1e293b;
+    background: #16161f;
 }
 
 /* ----------------------------------------

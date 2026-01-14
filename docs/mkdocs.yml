@@ -15,10 +15,10 @@ theme:
       toggle:
         icon: material/weather-sunny
         name: Switch to dark mode
-    # Dark Mode (Slate)
+    # Dark Mode (matches landing page)
     - scheme: slate
-      primary: black
-      accent: indigo
+      primary: custom
+      accent: custom
       toggle:
         icon: material/weather-night
         name: Switch to light mode

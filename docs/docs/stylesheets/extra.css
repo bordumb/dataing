@@ -1,0 +1,265 @@
+/* ========================================
+   DATAING DOCUMENTATION - ENTERPRISE POLISH
+   Inspired by Stripe/Auth0 documentation aesthetics
+   ======================================== */
+
+/* ----------------------------------------
+   COLOR SCHEME
+   ---------------------------------------- */
+:root {
+  /* Primary brand colors - Deep navy like Stripe */
+  --md-primary-fg-color: #0A2540;
+  --md-primary-fg-color--light: #425466;
+  --md-primary-fg-color--dark: #0A2540;
+
+  /* Accent for links and CTAs - Electric purple */
+  --md-accent-fg-color: #635BFF;
+  --md-accent-fg-color--transparent: rgba(99, 91, 255, 0.1);
+
+  /* Code highlighting tweaks */
+  --md-code-bg-color: #f6f8fa;
+  --md-code-fg-color: #24292f;
+}
+
+/* Dark mode overrides */
+[data-md-color-scheme="slate"] {
+  --md-primary-fg-color: #635BFF;
+  --md-primary-fg-color--light: #80E9FF;
+  --md-accent-fg-color: #80E9FF;
+  --md-default-bg-color: #0A1628;
+  --md-default-bg-color--light: #0F1D32;
+  --md-code-bg-color: #0d1117;
+  --md-code-fg-color: #c9d1d9;
+}
+
+/* ----------------------------------------
+   TYPOGRAPHY
+   ---------------------------------------- */
+.md-typeset {
+  font-size: 0.85rem;
+  line-height: 1.7;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+.md-typeset h1 {
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  margin-bottom: 1rem;
+}
+
+.md-typeset h2 {
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  border-bottom: 1px solid var(--md-default-fg-color--lightest);
+  padding-bottom: 0.5rem;
+  margin-top: 2rem;
+}
+
+.md-typeset h3 {
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.md-typeset p {
+  margin-bottom: 1rem;
+}
+
+/* ----------------------------------------
+   CODE BLOCKS
+   ---------------------------------------- */
+.md-typeset pre {
+  border-radius: 8px;
+  border: 1px solid var(--md-default-fg-color--lightest);
+}
+
+.md-typeset pre > code {
+  font-size: 0.8rem;
+  border-radius: 8px;
+}
+
+.md-typeset code {
+  font-size: 0.85em;
+  padding: 0.1em 0.3em;
+  border-radius: 4px;
+}
+
+/* Code copy button styling */
+.md-clipboard {
+  border-radius: 4px;
+}
+
+/* ----------------------------------------
+   ADMONITIONS (CALLOUTS)
+   ---------------------------------------- */
+.md-typeset .admonition {
+  border-radius: 8px;
+  border-left-width: 4px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+.md-typeset .admonition-title {
+  border-radius: 8px 8px 0 0;
+  font-weight: 600;
+}
+
+/* Softer admonition colors */
+.md-typeset .admonition.note {
+  border-color: #635BFF;
+}
+
+.md-typeset .admonition.note > .admonition-title {
+  background-color: rgba(99, 91, 255, 0.1);
+}
+
+.md-typeset .admonition.tip {
+  border-color: #00d4aa;
+}
+
+.md-typeset .admonition.tip > .admonition-title {
+  background-color: rgba(0, 212, 170, 0.1);
+}
+
+.md-typeset .admonition.warning {
+  border-color: #f59e0b;
+}
+
+.md-typeset .admonition.warning > .admonition-title {
+  background-color: rgba(245, 158, 11, 0.1);
+}
+
+.md-typeset .admonition.danger {
+  border-color: #ef4444;
+}
+
+.md-typeset .admonition.danger > .admonition-title {
+  background-color: rgba(239, 68, 68, 0.1);
+}
+
+/* ----------------------------------------
+   NAVIGATION
+   ---------------------------------------- */
+.md-nav__link {
+  font-size: 0.8rem;
+}
+
+.md-tabs__link {
+  font-weight: 500;
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+/* Sidebar refinements */
+.md-sidebar__inner {
+  padding-top: 1rem;
+}
+
+/* ----------------------------------------
+   HEADER
+   ---------------------------------------- */
+.md-header {
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  background-color: rgba(255, 255, 255, 0.95);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+[data-md-color-scheme="slate"] .md-header {
+  background-color: rgba(10, 22, 40, 0.95);
+}
+
+/* Search bar polish */
+.md-search__input {
+  border-radius: 8px;
+}
+
+/* ----------------------------------------
+   CONTENT TABS
+   ---------------------------------------- */
+.md-typeset .tabbed-labels > label {
+  font-weight: 500;
+  font-size: 0.8rem;
+  border-radius: 4px 4px 0 0;
+}
+
+.md-typeset .tabbed-content {
+  border-radius: 0 0 8px 8px;
+}
+
+/* ----------------------------------------
+   TABLES
+   ---------------------------------------- */
+.md-typeset table:not([class]) {
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid var(--md-default-fg-color--lightest);
+}
+
+.md-typeset table:not([class]) th {
+  font-weight: 600;
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+/* ----------------------------------------
+   FOOTER
+   ---------------------------------------- */
+.md-footer {
+  background-color: var(--md-primary-fg-color);
+}
+
+/* ----------------------------------------
+   BUTTONS/LINKS
+   ---------------------------------------- */
+.md-typeset a {
+  transition: color 0.2s ease;
+}
+
+.md-typeset a:hover {
+  text-decoration: underline;
+}
+
+/* ----------------------------------------
+   RESPONSIVE REFINEMENTS
+   ---------------------------------------- */
+@media screen and (max-width: 76.1875em) {
+  .md-nav__link {
+    font-size: 0.85rem;
+  }
+}
+
+/* ----------------------------------------
+   MERMAID DIAGRAM STYLING
+   ---------------------------------------- */
+.mermaid {
+  background: transparent;
+  margin: 1rem 0;
+}
+
+/* ----------------------------------------
+   CUSTOM UTILITIES
+   ---------------------------------------- */
+.enterprise-badge {
+  display: inline-block;
+  padding: 0.2em 0.6em;
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  background: linear-gradient(135deg, var(--md-accent-fg-color), #80E9FF);
+  color: white;
+  border-radius: 4px;
+}
+
+.beta-badge {
+  display: inline-block;
+  padding: 0.2em 0.6em;
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  background: #f59e0b;
+  color: white;
+  border-radius: 4px;
+}

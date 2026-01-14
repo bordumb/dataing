@@ -1,17 +1,26 @@
 {
-  "assignee": null,
+  "assignee": "bordumbb@gmail.com",
   "claim_note": "",
-  "claimed_at": null,
+  "claimed_at": "2026-01-14T16:27:31.685819Z",
   "created_at": "2026-01-14T15:51:07.420904Z",
   "depends_on": [
     "fn-9.4",
     "fn-9.5"
   ],
   "epic": "fn-9",
+  "evidence": {
+    "commits": [
+      "548701828464cb9909da03c15f2304da66d8be2e"
+    ],
+    "prs": [],
+    "tests": [
+      "uv run pytest dataing/tests/unit/agents/test_models.py dataing/tests/unit/safety/test_validator.py -v"
+    ]
+  },
   "id": "fn-9.6",
   "priority": null,
   "spec_path": ".flow/tasks/fn-9.6.md",
-  "status": "todo",
+  "status": "done",
   "title": "Add comprehensive tests for query validators",
-  "updated_at": "2026-01-14T15:51:07.421087Z"
+  "updated_at": "2026-01-14T16:29:14.193342Z"
 }

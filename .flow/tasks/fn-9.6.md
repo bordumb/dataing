@@ -53,9 +53,13 @@ Add comprehensive tests to `dataing/tests/unit/agents/test_models.py` covering a
 - [ ] `uv run pytest dataing/tests/unit/agents/test_models.py -v` passes
 
 ## Done summary
-TBD
-
+- Added 25 comprehensive query validator tests
+- Covers: happy path, markdown stripping, validation errors, mutation blocking
+- False positive prevention: columns/tables with keyword-like names pass
+- Edge cases: multi-statement rejection, empty query handling
+- All 77 tests pass (38 validator + 39 model tests)
+- Lint and type checks pass
 ## Evidence
-- Commits:
-- Tests:
+- Commits: 548701828464cb9909da03c15f2304da66d8be2e
+- Tests: uv run pytest dataing/tests/unit/agents/test_models.py dataing/tests/unit/safety/test_validator.py -v
 - PRs:

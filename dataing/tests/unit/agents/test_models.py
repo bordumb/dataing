@@ -1,13 +1,189 @@
 """Tests for agent response models."""
 
 import pytest
+from pydantic import ValidationError
+
 from dataing.agents.models import (
     HypothesisResponse,
     InterpretationResponse,
+    QueryResponse,
     SynthesisResponse,
 )
 from dataing.core.domain_types import HypothesisCategory
-from pydantic import ValidationError
+
+
+class TestQueryValidation:
+    """Tests for query validators on HypothesisResponse and QueryResponse."""
+
+    # Happy path tests
+    def test_valid_select_with_limit_hypothesis(self) -> None:
+        """Test valid SELECT with LIMIT passes for HypothesisResponse."""
+        response = HypothesisResponse(
+            id="h1",
+            title="Test hypothesis with valid query",
+            category=HypothesisCategory.UPSTREAM_DEPENDENCY,
+            reasoning="Testing query validation works correctly",
+            suggested_query="SELECT * FROM users WHERE id = 1 LIMIT 100",
+            expected_if_true="Results showing the issue",
+            expected_if_false="No results indicating other cause",
+        )
+        assert "SELECT" in response.suggested_query.upper()
+
+    def test_valid_select_with_limit_query_response(self) -> None:
+        """Test valid SELECT with LIMIT passes for QueryResponse."""
+        response = QueryResponse(
+            query="SELECT id, name FROM users WHERE active = true LIMIT 50",
+            explanation="Get active users",
+        )
+        assert "SELECT" in response.query.upper()
+
+    def test_valid_select_with_subquery(self) -> None:
+        """Test valid SELECT with subquery and LIMIT passes."""
+        response = QueryResponse(
+            query="SELECT * FROM orders WHERE user_id IN (SELECT id FROM users) LIMIT 100",
+        )
+        assert response.query is not None
+
+    # Markdown stripping tests
+    def test_markdown_sql_stripped(self) -> None:
+        """Test query wrapped in ```sql ... ``` is stripped."""
+        response = QueryResponse(
+            query='```sql\nSELECT * FROM users LIMIT 10\n```',
+        )
+        assert not response.query.startswith("```")
+        assert "SELECT" in response.query
+
+    def test_markdown_uppercase_sql_stripped(self) -> None:
+        """Test query wrapped in ```SQL ... ``` is stripped."""
+        response = QueryResponse(
+            query='```SQL\nSELECT * FROM users LIMIT 10\n```',
+        )
+        assert not response.query.startswith("```")
+
+    def test_markdown_postgresql_stripped(self) -> None:
+        """Test query wrapped in ```postgresql ... ``` is stripped."""
+        response = QueryResponse(
+            query='```postgresql\nSELECT * FROM users LIMIT 10\n```',
+        )
+        assert not response.query.startswith("```")
+
+    def test_markdown_unclosed_block_handled(self) -> None:
+        """Test unclosed markdown block is handled gracefully."""
+        response = QueryResponse(
+            query='```sql\nSELECT * FROM users LIMIT 10',
+        )
+        assert not response.query.startswith("```")
+        assert "SELECT" in response.query
+
+    # Validation error tests
+    def test_missing_limit_raises_hypothesis(self) -> None:
+        """Test missing LIMIT raises ValueError for HypothesisResponse."""
+        with pytest.raises(ValidationError) as exc_info:
+            HypothesisResponse(
+                id="h1",
+                title="Test hypothesis without LIMIT",
+                category=HypothesisCategory.UPSTREAM_DEPENDENCY,
+                reasoning="Testing that LIMIT is required",
+                suggested_query="SELECT * FROM users",
+                expected_if_true="Should not pass",
+                expected_if_false="Should fail",
+            )
+        assert "LIMIT" in str(exc_info.value)
+
+    def test_missing_limit_raises_query_response(self) -> None:
+        """Test missing LIMIT raises ValueError for QueryResponse."""
+        with pytest.raises(ValidationError) as exc_info:
+            QueryResponse(query="SELECT * FROM users")
+        assert "LIMIT" in str(exc_info.value)
+
+    def test_query_response_requires_select(self) -> None:
+        """Test QueryResponse without SELECT raises ValueError."""
+        with pytest.raises(ValidationError) as exc_info:
+            QueryResponse(query="SHOW TABLES LIMIT 10")
+        assert "SELECT" in str(exc_info.value)
+
+    # Mutation blocking tests (parametrized)
+    @pytest.mark.parametrize(
+        "mutation_query",
+        [
+            "INSERT INTO users (name) VALUES ('test')",
+            "UPDATE users SET name = 'test' WHERE id = 1",
+            "DELETE FROM users WHERE id = 1",
+            "DROP TABLE users",
+            "TRUNCATE TABLE users",
+            "ALTER TABLE users ADD COLUMN foo INT",
+            "CREATE TABLE test (id INT)",
+            "GRANT SELECT ON users TO public",
+            "REVOKE SELECT ON users FROM public",
+        ],
+        ids=[
+            "insert",
+            "update",
+            "delete",
+            "drop",
+            "truncate",
+            "alter",
+            "create",
+            "grant",
+            "revoke",
+        ],
+    )
+    def test_mutation_statements_blocked_hypothesis(self, mutation_query: str) -> None:
+        """Test mutation statements are blocked for HypothesisResponse."""
+        with pytest.raises(ValidationError):
+            HypothesisResponse(
+                id="h1",
+                title="Test mutation blocking",
+                category=HypothesisCategory.UPSTREAM_DEPENDENCY,
+                reasoning="Attempting dangerous query",
+                suggested_query=mutation_query,
+                expected_if_true="Should not pass",
+                expected_if_false="Should fail",
+            )
+        # Test passes if ValidationError is raised (query is rejected)
+
+    # False positive prevention tests
+    def test_column_named_deleted_at_allowed(self) -> None:
+        """Test column named 'deleted_at' is allowed (no false positive)."""
+        response = QueryResponse(
+            query="SELECT id, deleted_at FROM users WHERE deleted_at IS NULL LIMIT 100",
+        )
+        assert "deleted_at" in response.query
+
+    def test_table_named_update_log_allowed(self) -> None:
+        """Test table named 'update_log' is allowed (no false positive)."""
+        response = QueryResponse(
+            query="SELECT * FROM update_log WHERE id = 1 LIMIT 100",
+        )
+        assert "update_log" in response.query
+
+    def test_column_named_created_by_allowed(self) -> None:
+        """Test column named 'created_by' is allowed (no false positive)."""
+        response = QueryResponse(
+            query="SELECT id, created_by FROM records LIMIT 100",
+        )
+        assert "created_by" in response.query
+
+    def test_column_named_inserted_at_allowed(self) -> None:
+        """Test column named 'inserted_at' is allowed (no false positive)."""
+        response = QueryResponse(
+            query="SELECT inserted_at FROM events LIMIT 100",
+        )
+        assert "inserted_at" in response.query
+
+    # Edge case tests
+    def test_multi_statement_query_rejected(self) -> None:
+        """Test multi-statement query is rejected."""
+        with pytest.raises(ValidationError) as exc_info:
+            QueryResponse(query="SELECT 1 LIMIT 1; DROP TABLE users")
+        assert "multi-statement" in str(exc_info.value).lower()
+
+    def test_empty_query_after_markdown_strip_raises(self) -> None:
+        """Test empty query after markdown strip raises ValueError."""
+        with pytest.raises(ValidationError) as exc_info:
+            QueryResponse(query="```sql\n```")
+        error_str = str(exc_info.value).lower()
+        assert "empty" in error_str or "parse" in error_str
 
 
 class TestInterpretationResponse:

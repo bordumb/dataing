@@ -388,13 +388,26 @@ nav {
   background: var(--landing-bg-secondary);
   border: 1px solid var(--landing-border);
   border-radius: 16px;
-  padding: 24px;
-  aspect-ratio: 4/3;
+  padding: 32px 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .data-svg {
   width: 100%;
-  height: 100%;
+  height: auto;
+  max-height: 320px;
+}
+
+/* Icon groups */
+.icon-group {
+  opacity: 0.95;
+  transition: opacity 0.3s ease;
+}
+
+.icon-group:hover {
+  opacity: 1;
 }
 
 /* Logo images */
@@ -452,6 +465,28 @@ nav {
 .packet-3 { fill: #f59e0b; filter: drop-shadow(0 0 6px #f59e0b); } /* Anomaly - amber */
 .packet-4 { fill: #3b82f6; filter: drop-shadow(0 0 6px #3b82f6); } /* Datasources - blue */
 .packet-5, .packet-6, .packet-7, .packet-8 { fill: #00d4aa; filter: drop-shadow(0 0 6px #00d4aa); } /* Output - accent */
+
+/* Row labels on the left side */
+.row-label {
+  fill: var(--landing-text-muted);
+  font-size: 10px;
+  font-weight: 600;
+  text-anchor: start;
+  letter-spacing: 0.04em;
+  opacity: 0.9;
+  font-family: 'DM Sans', sans-serif;
+}
+
+/* Output section label */
+.output-label {
+  fill: var(--landing-accent);
+  font-size: 9px;
+  font-weight: 700;
+  text-anchor: middle;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  opacity: 0.9;
+}
 
 .label {
   fill: var(--landing-text-muted);

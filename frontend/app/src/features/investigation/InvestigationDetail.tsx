@@ -5,6 +5,7 @@ import {
   useSendMessage,
   subscribeToInvestigation,
 } from '@/lib/api/investigations'
+import { useCancelInvestigationApiV1InvestigationsInvestigationIdCancelPost } from '@/lib/api/generated/investigations/investigations'
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card'
 import { Badge } from '@/components/ui/Badge'
 import { Button } from '@/components/ui/Button'
@@ -20,6 +21,7 @@ import {
   ChevronDown,
   GitBranch,
   X,
+  XCircle,
 } from 'lucide-react'
 
 import { StepTimeline, PatternList, EvidenceList } from './components'
@@ -364,6 +366,7 @@ export function InvestigationDetail() {
   const { id } = useParams<{ id: string }>()
   const { data, isLoading, error, refetch } = useInvestigation(id)
   const sendMessage = useSendMessage()
+  const cancelMutation = useCancelInvestigationApiV1InvestigationsInvestigationIdCancelPost()
   const [sseStatus, setSseStatus] = useState<'connecting' | 'connected' | 'error'>('connecting')
   const sseCleanupRef = useRef<(() => void) | null>(null)
   const [showShareMenu, setShowShareMenu] = useState(false)
@@ -413,6 +416,19 @@ export function InvestigationDetail() {
     // For now, use the same sendMessage API - this creates a branch with the user's direction
     await sendMessage.mutateAsync({ investigationId: id, message: context })
     setShowCollaborateModal(false)
+  }
+
+  const handleCancel = async () => {
+    if (!id) return
+    if (!confirm('Are you sure you want to cancel this investigation? This cannot be undone.')) {
+      return
+    }
+    try {
+      await cancelMutation.mutateAsync({ investigationId: id })
+      refetch()
+    } catch (err) {
+      console.error('Failed to cancel investigation:', err)
+    }
   }
 
   if (!id) {
@@ -526,6 +542,24 @@ export function InvestigationDetail() {
                 stepHistory={data.main_branch.step_history || []}
                 animated
               />
+
+              {/* Cancel Button - only show when investigation is active */}
+              {!isComplete && (
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  className="mt-4 gap-2"
+                  onClick={handleCancel}
+                  disabled={cancelMutation.isPending}
+                >
+                  {cancelMutation.isPending ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <XCircle className="h-4 w-4" />
+                  )}
+                  Cancel Investigation
+                </Button>
+              )}
             </div>
 
             {/* Matched Patterns */}

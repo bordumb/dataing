@@ -51,9 +51,16 @@ Create a compelling hero landing page that positions dataing as "The AI Data Rel
 - [ ] No Lorem Ipsum or placeholder content
 - [ ] Page renders correctly in both light and dark modes
 ## Done summary
-TBD
-
+- Created comprehensive hero landing page at docs/docs/index.md
+- Added "The AI Data Reliability Engineer" headline with clear value proposition
+- Included mermaid flowchart showing investigation workflow
+- Added feature grid with Auto Root Cause, Read-Only, Human-in-the-Loop cards
+- Added architecture highlights section explaining hexagonal architecture
+- Included integration tables for data warehouses and lineage providers
+- Added Enterprise Ready section with security, SSO/RBAC, self-hosted features
+- Added Quick Start with pip/uv tabbed installation code blocks
+- Build passes with `mkdocs build --strict`
 ## Evidence
-- Commits:
-- Tests:
+- Commits: 4dda9aa550541aa4b622bb38a30d320e5b85c684
+- Tests: mkdocs build --strict
 - PRs:

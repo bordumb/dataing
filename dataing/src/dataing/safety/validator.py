@@ -31,6 +31,7 @@ FORBIDDEN_STATEMENTS: set[type[exp.Expression]] = {
     exp.Alter,
     exp.Grant,
     exp.Revoke,
+    exp.Merge,
 }
 
 # Forbidden keywords even in comments or subqueries
@@ -47,15 +48,22 @@ FORBIDDEN_KEYWORDS: set[str] = {
     "REVOKE",
     "EXECUTE",
     "EXEC",
+    "MERGE",
 }
 
 
-def validate_query(sql: str, dialect: str = "postgres") -> None:
+def validate_query(
+    sql: str,
+    dialect: str = "postgres",
+    *,
+    require_select: bool = True,
+) -> None:
     """Validate that a SQL query is safe to execute.
 
     This function performs multiple layers of validation:
+    0. Check for multi-statement queries (rejected)
     1. Parse with sqlglot to get AST
-    2. Check that it's a SELECT statement
+    2. Check that it's a SELECT statement (if require_select=True)
     3. Check for forbidden statement types in the AST
     4. Check for forbidden keywords as whole words
     5. Ensure LIMIT clause is present
@@ -63,6 +71,9 @@ def validate_query(sql: str, dialect: str = "postgres") -> None:
     Args:
         sql: The SQL query to validate.
         dialect: SQL dialect for parsing (default: postgres).
+        require_select: If True (default), query must be a SELECT statement.
+            Set to False for hypothesis queries where other read-only statements
+            might be acceptable.
 
     Raises:
         QueryValidationError: If query is not safe.
@@ -75,14 +86,25 @@ def validate_query(sql: str, dialect: str = "postgres") -> None:
     if not sql or not sql.strip():
         raise QueryValidationError("Empty query")
 
-    # 1. Parse with sqlglot
+    # 0. Check for multi-statement queries (security risk)
+    try:
+        statements = sqlglot.parse(sql, dialect=dialect)
+        non_empty = [s for s in statements if s is not None]
+        if len(non_empty) > 1:
+            raise QueryValidationError("Multi-statement queries not allowed")
+    except QueryValidationError:
+        raise
+    except Exception as e:
+        raise QueryValidationError(f"Failed to parse SQL: {e}") from e
+
+    # 1. Parse with sqlglot (now safe - single statement)
     try:
         parsed = sqlglot.parse_one(sql, dialect=dialect)
     except Exception as e:
         raise QueryValidationError(f"Failed to parse SQL: {e}") from e
 
-    # 2. Check statement type - must be SELECT
-    if not isinstance(parsed, exp.Select):
+    # 2. Check statement type - must be SELECT (if required)
+    if require_select and not isinstance(parsed, exp.Select):
         raise QueryValidationError(f"Only SELECT statements allowed, got: {type(parsed).__name__}")
 
     # 3. Walk the AST and check for forbidden statement types

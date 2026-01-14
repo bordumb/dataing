@@ -148,6 +148,24 @@ class TestValidateQuery:
 
         assert "parse" in str(exc_info.value).lower()
 
+    def test_multi_statement_raises(self) -> None:
+        """Test that multi-statement queries are rejected."""
+        with pytest.raises(QueryValidationError) as exc_info:
+            validate_query("SELECT * FROM users LIMIT 10; DROP TABLE users")
+
+        assert "Multi-statement" in str(exc_info.value)
+
+    def test_multi_statement_injection_raises(self) -> None:
+        """Test that hidden multi-statement injection is rejected."""
+        with pytest.raises(QueryValidationError) as exc_info:
+            validate_query("SELECT 1 LIMIT 1; DELETE FROM users WHERE 1=1")
+
+        assert "Multi-statement" in str(exc_info.value)
+
+    def test_single_statement_with_trailing_semicolon_ok(self) -> None:
+        """Test that single statement with trailing semicolon passes."""
+        validate_query("SELECT * FROM users LIMIT 10;")  # Should not raise
+
 
 class TestAddLimitIfMissing:
     """Tests for add_limit_if_missing."""

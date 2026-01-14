@@ -1,0 +1,23 @@
+{
+  "assignee": "bordumbb@gmail.com",
+  "claim_note": "",
+  "claimed_at": "2026-01-14T16:17:40.763793Z",
+  "created_at": "2026-01-14T15:50:52.798473Z",
+  "depends_on": [],
+  "epic": "fn-9",
+  "evidence": {
+    "commits": [
+      "48a9195a8194fccadfd15604ae83608affb92435"
+    ],
+    "prs": [],
+    "tests": [
+      "uv run pytest dataing/tests/unit/safety/test_validator.py -v"
+    ]
+  },
+  "id": "fn-9.1",
+  "priority": null,
+  "spec_path": ".flow/tasks/fn-9.1.md",
+  "status": "done",
+  "title": "Add exp.Merge to FORBIDDEN_STATEMENTS",
+  "updated_at": "2026-01-14T16:18:37.504511Z"
+}

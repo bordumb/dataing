@@ -1,0 +1,23 @@
+{
+  "assignee": "bordumbb@gmail.com",
+  "claim_note": "",
+  "claimed_at": "2026-01-14T16:20:44.415916Z",
+  "created_at": "2026-01-14T15:50:56.317483Z",
+  "depends_on": [],
+  "epic": "fn-9",
+  "evidence": {
+    "commits": [
+      "4deb65e249b281d19bf8d5c5b3ca241ce1d23e00"
+    ],
+    "prs": [],
+    "tests": [
+      "uv run pytest dataing/tests/unit/safety/test_validator.py -v"
+    ]
+  },
+  "id": "fn-9.2",
+  "priority": null,
+  "spec_path": ".flow/tasks/fn-9.2.md",
+  "status": "done",
+  "title": "Add multi-statement detection to validator",
+  "updated_at": "2026-01-14T16:21:58.368011Z"
+}

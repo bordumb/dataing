@@ -1,0 +1,13 @@
+{
+  "branch_name": "fn-7",
+  "created_at": "2026-01-13T23:52:20.381484Z",
+  "depends_on_epics": [],
+  "id": "fn-7",
+  "next_task": 1,
+  "plan_review_status": "unknown",
+  "plan_reviewed_at": null,
+  "spec_path": ".flow/specs/fn-7.md",
+  "status": "open",
+  "title": "RBAC Enforcement for Investigation Routes (EE)",
+  "updated_at": "2026-01-13T23:52:49.658088Z"
+}

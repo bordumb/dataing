@@ -1,0 +1,16 @@
+{
+  "assignee": null,
+  "claim_note": "",
+  "claimed_at": null,
+  "created_at": "2026-01-14T00:44:25.191954Z",
+  "depends_on": [
+    "fn-8.1"
+  ],
+  "epic": "fn-8",
+  "id": "fn-8.2",
+  "priority": null,
+  "spec_path": ".flow/tasks/fn-8.2.md",
+  "status": "todo",
+  "title": "Create custom CSS stylesheet for enterprise polish",
+  "updated_at": "2026-01-14T00:45:50.929297Z"
+}

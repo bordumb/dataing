@@ -1,0 +1,17 @@
+{
+  "assignee": null,
+  "claim_note": "",
+  "claimed_at": null,
+  "created_at": "2026-01-14T00:49:54.903853Z",
+  "depends_on": [
+    "fn-8.1",
+    "fn-8.2"
+  ],
+  "epic": "fn-8",
+  "id": "fn-8.7",
+  "priority": null,
+  "spec_path": ".flow/tasks/fn-8.7.md",
+  "status": "todo",
+  "title": "Create concepts section (investigations, agent-workflows, guardrails)",
+  "updated_at": "2026-01-14T00:51:08.710945Z"
+}

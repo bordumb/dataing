@@ -17,21 +17,29 @@ theme:
       toggle:
         icon: material/brightness-4
         name: Switch to light mode
+  font:
+    text: Inter
+    code: JetBrains Mono
   features:
     - navigation.instant
+    - navigation.instant.prefetch
     - navigation.tracking
+    - navigation.tabs
+    - navigation.tabs.sticky
     - navigation.sections
-    - navigation.expand
+    - navigation.top
     - search.suggest
     - search.highlight
+    - search.share
     - content.code.copy
+    - content.tabs.link
 
 plugins:
   - search
   - mkdocstrings:
       handlers:
         python:
-          paths: [../backend/src]
+          paths: [../dataing/src]
           options:
             docstring_style: google
             show_source: true
@@ -40,6 +48,10 @@ plugins:
 markdown_extensions:
   - pymdownx.highlight:
       anchor_linenums: true
+      line_spans: __span
+      pygments_lang_class: true
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
   - pymdownx.superfences:
       custom_fences:
         - name: mermaid
@@ -52,27 +64,40 @@ markdown_extensions:
   - def_list
   - attr_list
   - md_in_html
+  - footnotes
+  - abbr
+  - toc:
+      permalink: true
+      toc_depth: 3
 
 nav:
   - Home: index.md
-  - Architecture:
-      - Overview: architecture/overview.md
-      - ADRs:
-          - 001 - Monorepo Structure: architecture/adr-001-monorepo.md
-          - 002 - No LangGraph: architecture/adr-002-no-langgraph.md
-          - 003 - SQLGlot Safety: architecture/adr-003-sqlglot-safety.md
-          - 004 - Event Sourcing: architecture/adr-004-event-sourcing.md
-          - 005 - Fail Fast Schema: architecture/adr-005-fail-fast-schema.md
-  - API Reference:
-      - Core: api-reference/core.md
-      - Safety: api-reference/safety.md
-      - Adapters: api-reference/adapters.md
-  - User Guide:
-      - Getting Started: user-guide/getting-started.md
-      - Configuration: user-guide/configuration.md
-      - MCP Integration: user-guide/mcp-integration.md
+  - Quickstart: quickstart.md
+  - Architecture: architecture.md
+  - Concepts:
+      - "How Investigations Work": concepts/investigations.md
+      - "The Agent Engine (Maestro)": concepts/agent-workflows.md
+      - "Safety & Guardrails": concepts/guardrails.md
+  - Integrations:
+      - Warehouses:
+          - Snowflake: integrations/warehouses/snowflake.md
+          - BigQuery: integrations/warehouses/bigquery.md
+          - DuckDB: integrations/warehouses/duckdb.md
+          - Postgres: integrations/warehouses/postgres.md
+      - Lineage:
+          - dbt: integrations/lineage/dbt.md
+          - DataHub: integrations/lineage/datahub.md
+      - Notifications:
+          - Slack: integrations/notifications/slack.md
+  - Security:
+      - "Data Privacy": security/data-privacy.md
+      - "RBAC & SSO": security/rbac.md
+      - "Compliance": security/compliance.md
 
 extra:
   social:
     - icon: fontawesome/brands/github
-      link: https://github.com/dataing/dataing
+      link: https://github.com/bordumb/dataing
+
+extra_css:
+  - stylesheets/extra.css

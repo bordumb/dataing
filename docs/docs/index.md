@@ -9,7 +9,7 @@ dataing takes over to determine what went wrong.
 ## Key Features
 
 - **Autonomous Investigation**: Generates hypotheses and tests them automatically
-- **SQL Safety**: All queries validated with sqlglot - no mutations allowed
+- **SQL Safety**: All queries validated with `sqlglot` - no mutations allowed
 - **Event Sourcing**: Complete audit trail of every investigation
 - **Fail Fast**: Empty schema discovery stops immediately with clear error
 - **Parallel Processing**: Multiple hypotheses investigated concurrently

@@ -1,0 +1,19 @@
+{
+  "assignee": null,
+  "claim_note": "",
+  "claimed_at": null,
+  "created_at": "2026-01-13T23:52:57.345131Z",
+  "depends_on": [
+    "fn-7.2",
+    "fn-7.3",
+    "fn-7.4",
+    "fn-7.5"
+  ],
+  "epic": "fn-7",
+  "id": "fn-7.6",
+  "priority": null,
+  "spec_path": ".flow/tasks/fn-7.6.md",
+  "status": "todo",
+  "title": "Add unit tests for RBAC enforcement",
+  "updated_at": "2026-01-13T23:53:58.636303Z"
+}

@@ -37,9 +37,12 @@ Note: `require_select=True` because QueryResponse queries must be SELECT stateme
 - [ ] Existing behavior preserved for valid queries
 
 ## Done summary
-TBD
-
+- Replaced string-based validate_query with _validate_sql_query wrapper
+- Uses sqlglot AST for SELECT requirement (not string prefix check)
+- Consistent validation with HypothesisResponse
+- All 52 tests pass
+- Lint and type checks pass
 ## Evidence
-- Commits:
-- Tests:
+- Commits: 24d1d77662843c2efb49a72fa44ac1cd28af8978
+- Tests: uv run pytest dataing/tests/unit/agents/test_models.py dataing/tests/unit/safety/test_validator.py -v
 - PRs:

@@ -121,20 +121,7 @@ class QueryResponse(BaseModel):
     @classmethod
     def validate_query(cls, v: str) -> str:
         """Validate the generated SQL."""
-        # Strip markdown if present
-        if v.startswith("```"):
-            lines = v.strip().split("\n")
-            v = "\n".join(lines[1:-1] if lines[-1] == "```" else lines[1:])
-
-        upper_query = v.upper().strip()
-
-        if not upper_query.startswith("SELECT"):
-            raise ValueError("Query must be a SELECT statement")
-
-        if "LIMIT" not in upper_query:
-            raise ValueError("Query must include LIMIT clause")
-
-        return v.strip()
+        return _validate_sql_query(v, require_select=True)
 
 
 class InterpretationResponse(BaseModel):

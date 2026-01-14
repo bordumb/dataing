@@ -61,9 +61,17 @@ Create a high-level architecture overview page with a Mermaid diagram showing Co
 - [ ] Data flow visualized or described
 - [ ] Links to deeper concept pages
 ## Done summary
-TBD
-
+- Created comprehensive architecture overview at docs/docs/architecture.md
+- Added high-level mermaid flowchart showing Core, Adapters, External Services
+- Explained hexagonal architecture with ports and adapters pattern
+- Documented package dependency order (maestro → bond → dataing)
+- Described Maestro workflow engine: Steps protocol, Signals, Branching
+- Described Bond agent runtime with BondStep template pattern
+- Added safety layer overview (validator, PII, circuit breaker)
+- Included sequence diagram showing investigation data flow
+- Added "Learn More" card grid linking to concept pages
+- Build passes with `mkdocs build --strict`
 ## Evidence
-- Commits:
-- Tests:
+- Commits: 1511058136a8603174ed5f777bb36bd4f2651c46
+- Tests: mkdocs build --strict
 - PRs:

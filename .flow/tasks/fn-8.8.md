@@ -59,9 +59,15 @@ Each warehouse page should include:
 - [ ] Navigation renders all integration pages
 - [ ] No broken internal links
 ## Done summary
-TBD
-
+- Created comprehensive integrations section with 7 documentation pages
+- Warehouses (4 pages): snowflake.md, bigquery.md, duckdb.md, postgres.md
+  - Each includes prerequisites, permissions, env vars, Python SDK, features table
+- Lineage (2 pages): dbt.md (manifest.json, column lineage), datahub.md (GraphQL, cross-platform)
+- Notifications (1 page): slack.md (webhook setup, message format, filtering)
+- All pages use tabbed code blocks for env vars, SDK, CLI
+- Troubleshooting sections for common issues
+- Build passes with `mkdocs build --strict`
 ## Evidence
-- Commits:
-- Tests:
+- Commits: 7417e8ab7871809484ed7bb977a2047bcc320d89
+- Tests: mkdocs build --strict
 - PRs:

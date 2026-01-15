@@ -94,7 +94,7 @@ docker run -d --name jaeger \
   -p 16686:16686 \
   -p 4317:4317 \
   -p 4318:4318 \
-  jaegertracing/all-in-one:1.54
+  jaegertracing/all-in-one:2.14
 ```
 
 ---
@@ -326,7 +326,7 @@ Jaeger all-in-one stores traces in memory:
 
 ```bash
 # Limit trace storage (default: unlimited)
-docker run -e MEMORY_MAX_TRACES=10000 jaegertracing/all-in-one:1.54
+docker run -e MEMORY_MAX_TRACES=10000 jaegertracing/all-in-one:2.14
 ```
 
 ---

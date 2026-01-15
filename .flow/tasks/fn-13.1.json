@@ -1,0 +1,16 @@
+{
+  "id": "fn-13.1",
+  "epic": "fn-13",
+  "title": "Chart Scaffolding",
+  "status": "ready",
+  "priority": 1,
+  "depends_on": [],
+  "created_at": "2026-01-15T22:00:00.000000Z",
+  "updated_at": "2026-01-15T22:00:00.000000Z",
+  "spec_path": ".flow/tasks/fn-13.1.md",
+  "evidence": {
+    "commits": [],
+    "tests": [],
+    "prs": []
+  }
+}

@@ -1,0 +1,16 @@
+{
+  "id": "fn-13.6",
+  "epic": "fn-13",
+  "title": "Documentation & Testing",
+  "status": "blocked",
+  "priority": 6,
+  "depends_on": ["fn-13.4", "fn-13.5"],
+  "created_at": "2026-01-15T22:00:00.000000Z",
+  "updated_at": "2026-01-15T22:00:00.000000Z",
+  "spec_path": ".flow/tasks/fn-13.6.md",
+  "evidence": {
+    "commits": [],
+    "tests": [],
+    "prs": []
+  }
+}

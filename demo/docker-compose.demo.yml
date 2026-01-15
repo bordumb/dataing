@@ -6,9 +6,9 @@ services:
   # =============================================================================
   otel-collector:
     image: otel/opentelemetry-collector-contrib:0.96.0
-    command: ["--config=/etc/otel-collector-config.yaml"]
+    command: ["--config=/etc/otelcol-contrib/config.yaml"]
     volumes:
-      - ./demo/otel-collector-config.yaml:/etc/otel-collector-config.yaml:ro
+      - ./otel-collector-config.yaml:/etc/otelcol-contrib/config.yaml:ro
     ports:
       - "4317:4317"   # OTLP gRPC
       - "4318:4318"   # OTLP HTTP

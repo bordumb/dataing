@@ -214,6 +214,24 @@ demo: demo-fixtures
         sleep 1
     done
 
+    # Start Jaeger (for trace visualization)
+    echo "Setting up Jaeger..."
+    docker rm -f dataing-demo-jaeger 2>/dev/null || true
+    docker run -d --name dataing-demo-jaeger \
+        -e COLLECTOR_OTLP_ENABLED=true \
+        -p 16686:16686 \
+        -p 4317:4317 \
+        -p 4318:4318 \
+        jaegertracing/all-in-one:1.54
+    echo "Waiting for Jaeger to be ready..."
+    for i in {1..10}; do
+        if curl -s http://localhost:16686 > /dev/null 2>&1; then
+            echo "Jaeger is ready!"
+            break
+        fi
+        sleep 1
+    done
+
     # Run migrations in order
     # IMPORTANT: Order matters! 007_auth_tables creates organizations/users/teams,
     # 007_sso_scim adds SSO columns, 008_seed_demo_auth creates demo data
@@ -237,6 +255,7 @@ demo: demo-fixtures
     PGPASSWORD=dataing psql -h localhost -U dataing -d dataing_demo -f dataing/migrations/014_notifications.sql 2>&1 | grep -v "^NOTICE:" || true
     PGPASSWORD=dataing psql -h localhost -U dataing -d dataing_demo -f dataing/migrations/015_sso_states.sql 2>&1 | grep -v "^NOTICE:" || true
     PGPASSWORD=dataing psql -h localhost -U dataing -d dataing_demo -f dataing/migrations/016_investigation_jobs.sql 2>&1 | grep -v "^NOTICE:" || true
+    PGPASSWORD=dataing psql -h localhost -U dataing -d dataing_demo -f dataing/migrations/017_add_trace_context.sql 2>&1 | grep -v "^NOTICE:" || true
 
     trap 'kill 0' EXIT
 
@@ -245,8 +264,9 @@ demo: demo-fixtures
     echo "  Dataing Demo Ready!"
     echo "========================================="
     echo ""
-    echo "  Frontend: http://localhost:3000"
-    echo "  Backend:  http://localhost:8000"
+    echo "  Frontend:  http://localhost:3000"
+    echo "  Backend:   http://localhost:8000"
+    echo "  Telemetry: http://localhost:16686"
     echo ""
     echo "  Login credentials:"
     echo "    Email:    demo@dataing.io"
@@ -265,6 +285,11 @@ demo: demo-fixtures
     export REDIS_PORT=6379
     # Stable demo encryption key (valid Fernet key)
     export ENCRYPTION_KEY=ZnxhCyx4-ZjziPWtUguwGOFMMiLNioSwso5-qNPAGZI=
+    # OpenTelemetry configuration
+    export OTEL_SERVICE_NAME=dataing-demo
+    export OTEL_TRACES_ENABLED=true
+    export OTEL_METRICS_ENABLED=true
+    export OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318
 
     # Load .env file if it exists (check both root and dataing/)
     if [ -f .env ]; then
@@ -340,6 +365,9 @@ demo-stop:
 
     docker stop dataing-demo-postgres 2>/dev/null || true
     docker rm -f dataing-demo-postgres 2>/dev/null || true
+
+    docker stop dataing-demo-jaeger 2>/dev/null || true
+    docker rm -f dataing-demo-jaeger 2>/dev/null || true
 
     # Stop docker-compose stack with volume cleanup
     docker-compose -f demo/docker-compose.demo.yml down -v 2>/dev/null || true

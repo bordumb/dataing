@@ -120,7 +120,7 @@ disallow_any_generics = false
 [tool.ruff]
 target-version = "py311"
 line-length = 100
-src = ["bond/src", "dataing/src", "dataing-ee/src"]
+src = ["bond/src", "dataing/src", "dataing-ee", "maestro/src"]
 
 [tool.ruff.lint]
 select = [

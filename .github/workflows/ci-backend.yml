@@ -4,16 +4,22 @@ on:
   push:
     branches: [main]
     paths:
+      - 'bond/**'
+      - 'maestro/**'
       - 'dataing/**'
       - 'dataing-ee/**'
       - 'pyproject.toml'
+      - 'uv.lock'
       - '.github/workflows/ci-backend.yml'
   pull_request:
     branches: [main]
     paths:
+      - 'bond/**'
+      - 'maestro/**'
       - 'dataing/**'
       - 'dataing-ee/**'
       - 'pyproject.toml'
+      - 'uv.lock'
       - '.github/workflows/ci-backend.yml'
 
 jobs:
@@ -52,13 +58,13 @@ jobs:
         run: uv sync --all-extras
 
       - name: Run Ruff
-        run: uv run ruff check dataing/ dataing-ee/
+        run: uv run ruff check bond/ maestro/ dataing/ dataing-ee/
 
       - name: Run mypy
-        run: uv run mypy dataing/ dataing-ee/
+        run: uv run mypy
 
       - name: Run tests
-        run: uv run pytest --cov=dataing/ dataing-ee/ --cov-report=xml
+        run: uv run pytest maestro/tests bond/tests dataing/tests dataing-ee/tests --cov=maestro/src/maestro --cov-report=xml
         env:
           DATABASE_URL: postgresql://test:test@localhost:5432/test
 

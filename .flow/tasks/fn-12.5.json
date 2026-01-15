@@ -12,8 +12,8 @@
   },
   "id": "fn-12.5",
   "priority": 5,
-  "spec_path": ".flow/tasks/fn-12.5-prometheus-metrics.md",
-  "status": "blocked",
+  "spec_path": ".flow/tasks/fn-12.5.md",
+  "status": "ready",
   "title": "Metrics via OTEL Collector",
   "updated_at": "2026-01-15T12:00:00.000000Z"
 }

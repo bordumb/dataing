@@ -6,7 +6,7 @@ schema defined in migrations/013_unified_investigation.sql.
 
 from __future__ import annotations
 
-import json
+
 from datetime import UTC, datetime, timedelta
 from typing import TYPE_CHECKING, Any
 from uuid import UUID
@@ -249,7 +249,7 @@ class PostgresInvestigationRepository:
             parent_snapshot_id,
             step.value,
             json.dumps(step_cursor or {}),
-            json.dumps(context.model_dump()),
+            context.model_dump_json(),
             created_by,
             trigger,
         )

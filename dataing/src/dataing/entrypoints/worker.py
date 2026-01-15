@@ -38,7 +38,14 @@ from dataing.core.investigation.flow import (
 from dataing.core.investigation.values import StepType, VersionId
 from dataing.core.json_utils import to_json_string
 from dataing.core.queue import INVESTIGATIONS_QUEUE, get_redis_settings
-from dataing.telemetry import get_tracer, init_telemetry, restore_trace_context
+from dataing.telemetry import (
+    get_tracer,
+    init_metrics,
+    init_telemetry,
+    record_investigation_completed,
+    record_queue_wait_time,
+    restore_trace_context,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -93,6 +100,7 @@ async def run_investigation(
     worker_start = datetime.now(UTC)
     if enqueued_at:
         queue_wait_seconds = (worker_start - enqueued_at).total_seconds()
+        record_queue_wait_time(queue_wait_seconds)
         logger.info(f"Queue wait time: {queue_wait_seconds:.3f}s")
 
     is_branch = parent_job_id is not None
@@ -295,6 +303,7 @@ async def run_investigation(
                 }
                 await repository.update_investigation_outcome(inv_uuid, outcome)
                 await db.update_job_status(job_id, status="completed")
+                record_investigation_completed("completed")
                 logger.info(f"Investigation completed: {investigation_id}")
 
                 # Record E2E duration from enqueue to completion
@@ -343,6 +352,7 @@ async def run_investigation(
             except InvestigationCancelled:
                 # User cancelled the investigation
                 job_span.set_attribute("investigation.status", "cancelled")
+                record_investigation_completed("cancelled")
                 logger.info(f"Investigation cancelled: {investigation_id}")
                 await db.mark_job_cancelled(job_id)
                 await db.execute(
@@ -364,6 +374,7 @@ async def run_investigation(
                 # Workflow failed
                 job_span.record_exception(e)
                 job_span.set_attribute("investigation.status", "failed")
+                record_investigation_completed("failed")
                 logger.error(f"Investigation failed: {investigation_id}, error={e.error}")
                 await db.update_job_status(job_id, status="failed")
                 await db.execute(
@@ -391,6 +402,7 @@ async def run_investigation(
                 # Unexpected error
                 job_span.record_exception(e)
                 job_span.set_attribute("investigation.status", "failed")
+                record_investigation_completed("failed")
                 logger.exception(f"Unexpected error in investigation: {investigation_id}")
                 await db.update_job_status(job_id, status="failed")
                 await db.execute(
@@ -546,8 +558,9 @@ async def startup(ctx: dict[str, Any]) -> None:
     Args:
         ctx: Worker context dictionary to populate with resources.
     """
-    # Initialize OpenTelemetry SDK (idempotent)
+    # Initialize OpenTelemetry SDK and metrics (idempotent)
     init_telemetry()
+    init_metrics()
 
     logger.info(f"Worker starting: worker_id={WORKER_ID}")
 

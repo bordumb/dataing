@@ -285,10 +285,10 @@ demo: demo-fixtures
     export REDIS_PORT=6379
     # Stable demo encryption key (valid Fernet key)
     export ENCRYPTION_KEY=ZnxhCyx4-ZjziPWtUguwGOFMMiLNioSwso5-qNPAGZI=
-    # OpenTelemetry configuration
+    # OpenTelemetry configuration (Jaeger supports traces only, not metrics)
     export OTEL_SERVICE_NAME=dataing-demo
     export OTEL_TRACES_ENABLED=true
-    export OTEL_METRICS_ENABLED=true
+    export OTEL_METRICS_ENABLED=false
     export OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318
 
     # Load .env file if it exists (check both root and dataing/)

@@ -13,6 +13,15 @@ a clean separation between business logic and infrastructure.
 4. **Evidence Interpretation**: LLM interprets query results
 5. **Synthesis**: Combine all evidence into a finding
 
+### Durable Execution Engine
+
+Investigations are executed durably using a Redis-backed job queue (Arq):
+
+- **Asynchronous**: Investigations run in background workers
+- **Resilient**: Workers checkpoint state to PostgreSQL after every step
+- **Scalable**: Workers can be scaled horizontally
+- **Recovery**: Interrupted jobs resume automatically from the last checkpoint
+
 ### Event Sourcing
 
 All investigation state is derived from an event stream:
@@ -66,7 +75,8 @@ backend/src/dataing/
 │   └── pii.py
 ├── prompts/        # YAML prompt templates
 └── entrypoints/    # External interfaces
-    ├── api/        # FastAPI
+    ├── api/        # FastAPI (Job Producer)
+    ├── worker/     # Arq Worker (Job Consumer)
     └── mcp/        # MCP server
 ```
 

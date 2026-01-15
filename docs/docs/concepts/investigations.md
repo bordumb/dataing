@@ -6,6 +6,8 @@ dataing follows a systematic investigation workflow to transform anomaly alerts 
 
 ## The Investigation Loop
 
+Investigations run **asynchronously** in the background. When you start an investigation, the API returns immediately with an ID, while a worker process handles the execution. This ensures resilience for long-running analyses.
+
 Every investigation follows a deterministic loop:
 
 ```mermaid

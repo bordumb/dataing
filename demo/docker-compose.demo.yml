@@ -18,6 +18,18 @@ services:
       timeout: 5s
       retries: 5
 
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
   backend:
     build:
       context: ./backend
@@ -29,6 +41,8 @@ services:
       DATADR_FIXTURE_PATH: /app/fixtures/null_spike
       DATADR_ENCRYPTION_KEY: ${DATADR_ENCRYPTION_KEY:-fj_HDi4E6H02W11I5cJtMB_u7HoUrc8AMN6_L0rqGcg=}
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
     volumes:
       - ./demo/fixtures:/app/fixtures:ro
     ports:
@@ -36,7 +50,31 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      redis:
+        condition: service_healthy
     command: ["uvicorn", "dataing.entrypoints.api.app:app", "--host", "0.0.0.0", "--port", "8000"]
+
+  worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    environment:
+      DATADR_DEMO_MODE: "true"
+      DATABASE_URL: postgresql://dataing:dataing@postgres:5432/dataing_demo
+      APP_DATABASE_URL: postgresql://dataing:dataing@postgres:5432/dataing_demo
+      DATADR_FIXTURE_PATH: /app/fixtures/null_spike
+      DATADR_ENCRYPTION_KEY: ${DATADR_ENCRYPTION_KEY:-fj_HDi4E6H02W11I5cJtMB_u7HoUrc8AMN6_L0rqGcg=}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+    volumes:
+      - ./demo/fixtures:/app/fixtures:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    command: ["python", "-m", "dataing.entrypoints.worker"]
 
   frontend:
     build:
@@ -51,3 +89,4 @@ services:
 
 volumes:
   demo-pgdata:
+  redis_data:

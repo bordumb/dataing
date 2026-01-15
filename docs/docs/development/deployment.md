@@ -6,11 +6,13 @@
 |-----------|----------|-----|
 | Frontend | Vercel | `https://dataing.dev` |
 | Backend | Railway | `https://dataing-production.up.railway.app` |
+| Worker | Railway | Internal service |
 | Database | Railway PostgreSQL | Internal networking |
+| Redis | Railway Redis | Internal networking |
 
 ---
 
-## Backend (Railway)
+## Backend & Worker (Railway)
 
 URL: https://railway.com/project/5b7c7807-517c-451b-9408-03c13ca2b2ca
 
@@ -22,19 +24,29 @@ railway login
 railway init
 ```
 
-### 2. Add PostgreSQL
+### 2. Add Services
 
-Railway Dashboard → **+ New** → **Database** → **PostgreSQL**
+Railway Dashboard → **+ New**:
+- **Database** → **PostgreSQL**
+- **Database** → **Redis**
 
-### 3. Link Database to Backend
+### 3. Link Services
 
 Backend service → **Variables** → **Add Variable**:
 
 ```
 DATABASE_URL = ${{Postgres.DATABASE_URL}}
+REDIS_URL = ${{Redis.REDIS_URL}}
 ```
 
-### 4. Run Database Migrations
+### 4. Configure Worker
+
+The worker runs in a separate service (or same image with different command).
+Command: `python -m dataing.entrypoints.worker`
+
+Env vars same as Backend (needs `DATABASE_URL` and `REDIS_URL`).
+
+### 5. Run Database Migrations
 
 The PostgreSQL database needs tables created. Run migrations from your local machine:
 

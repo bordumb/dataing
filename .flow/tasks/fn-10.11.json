@@ -1,0 +1,25 @@
+{
+  "assignee": "bordumbb@gmail.com",
+  "claim_note": "",
+  "claimed_at": "2026-01-14T21:45:54.518859Z",
+  "created_at": "2026-01-14T20:46:29.012302Z",
+  "depends_on": [
+    "fn-10.1",
+    "fn-10.3",
+    "fn-10.4"
+  ],
+  "epic": "fn-10",
+  "evidence": {
+    "commits": [],
+    "prs": [],
+    "tests": [
+      "pytest dataing/tests/unit/core/test_queue.py dataing/tests/unit/entrypoints/test_worker.py -v"
+    ]
+  },
+  "id": "fn-10.11",
+  "priority": null,
+  "spec_path": ".flow/tasks/fn-10.11.md",
+  "status": "done",
+  "title": "Add unit tests for queue and worker",
+  "updated_at": "2026-01-14T21:47:56.124421Z"
+}

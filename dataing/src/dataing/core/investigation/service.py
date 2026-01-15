@@ -8,7 +8,6 @@ Uses maestro.Workflow for investigation execution.
 
 from __future__ import annotations
 
-import asyncio
 import logging
 from typing import TYPE_CHECKING, Any
 from uuid import UUID
@@ -127,20 +126,26 @@ class InvestigationService:
         alert: AnomalyAlert,
         data_adapter: BaseAdapter,
         user_id: UUID | None = None,
-    ) -> tuple[UUID, UUID]:
+        datasource_id: UUID | None = None,
+    ) -> tuple[UUID, UUID, str]:
         """Start a new investigation for an alert.
 
-        Creates the investigation, main branch, and initial snapshot.
-        Then starts the maestro workflow in the background.
+        Creates the investigation, main branch, and initial snapshot,
+        then queues the job for durable execution via Redis/Arq.
 
         Args:
             tenant_id: ID of the tenant starting the investigation.
             alert: The anomaly alert triggering this investigation.
-            data_adapter: Connected data source adapter for this investigation.
+            data_adapter: Connected data source adapter (unused, for interface compat).
             user_id: Optional ID of the user starting the investigation.
+            datasource_id: Datasource ID for worker adapter reconstruction.
 
         Returns:
-            Tuple of (investigation_id, main_branch_id).
+            Tuple of (investigation_id, main_branch_id, status).
+            Status is always "queued".
+
+        Raises:
+            RuntimeError: If app_db is not configured (required for job creation).
         """
         # Create investigation
         investigation = await self.repository.create_investigation(
@@ -195,105 +200,33 @@ class InvestigationService:
         # Update branch head
         await self.repository.update_branch_head(main_branch.id, snapshot.id)
 
-        # Start maestro workflow in the background
-        logger.info(f"Starting maestro workflow for investigation {investigation.id}")
-        asyncio.create_task(
-            self._run_investigation(
-                investigation_id=investigation.id,
-                main_branch_id=main_branch.id,
-                initial_context=initial_context,
-                data_adapter=data_adapter,
-            ),
-            name=f"investigation-{investigation.id}",
+        # Require app_db for job creation
+        if not self._app_db:
+            raise RuntimeError("app_db is required for investigation job creation")
+
+        # Create job record for durable execution
+        job = await self._app_db.create_investigation_job(
+            investigation_id=investigation.id,
+            tenant_id=tenant_id,
+            datasource_id=datasource_id,
+            priority=0,
+        )
+        logger.info(
+            f"Created investigation job: job_id={job['id']}, "
+            f"investigation_id={investigation.id}"
         )
 
-        return investigation.id, main_branch.id
+        # Queue for durable execution
+        from dataing.core.queue import enqueue_investigation
 
-    async def _run_investigation(
-        self,
-        investigation_id: UUID,
-        main_branch_id: UUID,
-        initial_context: InvestigationContext,
-        data_adapter: BaseAdapter,
-    ) -> None:
-        """Run investigation using maestro workflow.
-
-        Args:
-            investigation_id: ID of the investigation.
-            main_branch_id: ID of the main branch.
-            initial_context: Initial investigation context.
-            data_adapter: Connected data source adapter.
-        """
-        from dataing.core.investigation.flow import (
-            build_investigation_workflow,
-            run_investigation,
+        await enqueue_investigation(
+            investigation_id=str(investigation.id),
+            tenant_id=str(tenant_id),
+            datasource_id=str(datasource_id) if datasource_id else None,
         )
-        from maestro import WorkflowError
+        logger.info(f"Enqueued investigation {investigation.id} for durable execution")
 
-        logger.info(f"Starting maestro workflow for investigation {investigation_id}")
-
-        try:
-            # Build workflow with dependencies
-            workflow = build_investigation_workflow(
-                context_engine=self._context_engine,
-                llm=self._agent_client,
-                database=data_adapter,
-                pattern_repository=self._pattern_repository,
-            )
-
-            # Run the workflow to completion
-            final_context = await run_investigation(
-                workflow=workflow,
-                initial_context=initial_context,
-            )
-
-            logger.info(
-                f"Maestro workflow completed for investigation {investigation_id}"
-            )
-
-            # Update investigation outcome
-            outcome = final_context.current_synthesis or {}
-            await self.repository.update_investigation_outcome(
-                investigation_id, outcome
-            )
-
-            # Create final snapshot for persistence
-            final_snapshot = await self.repository.create_snapshot(
-                investigation_id=investigation_id,
-                branch_id=main_branch_id,
-                version=VersionId(major=1),
-                step=StepType.COMPLETE,
-                context=final_context,
-            )
-
-            # Update branch head to point to final snapshot
-            await self.repository.update_branch_head(main_branch_id, final_snapshot.id)
-
-            # Mark branch as completed
-            await self.repository.update_branch_status(
-                main_branch_id, BranchStatus.COMPLETED
-            )
-
-            # Create completion notification
-            await self._create_completion_notification(main_branch_id, "completed")
-
-        except WorkflowError as e:
-            logger.error(f"Maestro workflow failed: {e}", exc_info=True)
-            await self.repository.update_branch_status(
-                main_branch_id, BranchStatus.ABANDONED
-            )
-            await self._create_completion_notification(
-                main_branch_id, "failed", str(e)
-            )
-
-        except Exception as e:
-            logger.error(f"Unexpected error in maestro workflow: {e}", exc_info=True)
-            await self.repository.update_branch_status(
-                main_branch_id, BranchStatus.ABANDONED
-            )
-            await self._create_completion_notification(
-                main_branch_id, "failed", f"Unexpected error: {e}"
-            )
+        return investigation.id, main_branch.id, "queued"
 
     async def _create_completion_notification(
         self,
@@ -420,7 +353,10 @@ class InvestigationService:
         # Determine overall status
         status = "active"
         if investigation.outcome:
-            status = "completed"
+            outcome_status = None
+            if isinstance(investigation.outcome, dict):
+                outcome_status = investigation.outcome.get("status")
+            status = outcome_status or "completed"
         elif main_branch and main_branch.status == BranchStatus.ABANDONED:
             status = "failed"
 
@@ -501,13 +437,17 @@ class InvestigationService:
             # Build step history from workflow steps
             workflow_steps = [
                 StepType.GATHER_CONTEXT,
+                StepType.CHECK_PATTERNS,
                 StepType.GENERATE_HYPOTHESES,
                 StepType.GENERATE_QUERY,
                 StepType.EXECUTE_QUERY,
                 StepType.INTERPRET_EVIDENCE,
                 StepType.SYNTHESIZE,
-                StepType.COMPLETE,
             ]
+            terminal_step = (
+                StepType.FAIL if current_step == StepType.FAIL.value else StepType.COMPLETE
+            )
+            workflow_steps.append(terminal_step)
             current_idx = -1
             for i, step in enumerate(workflow_steps):
                 if step.value == current_step:

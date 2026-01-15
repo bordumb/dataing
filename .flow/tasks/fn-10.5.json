@@ -1,0 +1,25 @@
+{
+  "assignee": "bordumbb@gmail.com",
+  "claim_note": "",
+  "claimed_at": "2026-01-14T21:42:36.249800Z",
+  "created_at": "2026-01-14T20:46:27.984099Z",
+  "depends_on": [
+    "fn-10.1",
+    "fn-10.3",
+    "fn-10.4"
+  ],
+  "epic": "fn-10",
+  "evidence": {
+    "commits": [],
+    "prs": [],
+    "tests": [
+      "pytest dataing/tests/unit/core/investigation/test_service.py -v"
+    ]
+  },
+  "id": "fn-10.5",
+  "priority": null,
+  "spec_path": ".flow/tasks/fn-10.5.md",
+  "status": "done",
+  "title": "Integrate queue with InvestigationService",
+  "updated_at": "2026-01-14T21:45:41.993058Z"
+}

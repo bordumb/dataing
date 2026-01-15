@@ -409,6 +409,58 @@
         ]
       }
     },
+    "/api/v1/investigations/{investigation_id}/cancel": {
+      "post": {
+        "tags": [
+          "investigations"
+        ],
+        "summary": "Cancel Investigation",
+        "description": "Cancel an investigation and all its child jobs.\n\nMarks the investigation job as 'cancelling'. The worker detects this\nat the next step boundary and exits cleanly. Child jobs are cancelled\nrecursively.\n\nArgs:\n    http_request: The HTTP request for accessing app state.\n    investigation_id: UUID of the investigation to cancel.\n    auth: Authentication context from API key/JWT.\n\nReturns:\n    CancelInvestigationResponse with cancellation status.\n\nRaises:\n    HTTPException: If investigation not found or already complete.",
+        "operationId": "cancel_investigation_api_v1_investigations__investigation_id__cancel_post",
+        "security": [
+          {
+            "APIKeyHeader": []
+          },
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "investigation_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Investigation Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CancelInvestigationResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/investigations/{investigation_id}": {
       "get": {
         "tags": [
@@ -6695,6 +6747,31 @@
         "title": "BranchStateResponse",
         "description": "State of a branch for API responses."
       },
+      "CancelInvestigationResponse": {
+        "properties": {
+          "investigation_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Investigation Id"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "jobs_cancelled": {
+            "type": "integer",
+            "title": "Jobs Cancelled",
+            "default": 0
+          }
+        },
+        "type": "object",
+        "required": [
+          "investigation_id",
+          "status"
+        ],
+        "title": "CancelInvestigationResponse",
+        "description": "Response for cancelling an investigation."
+      },
       "ColumnLineageListResponse": {
         "properties": {
           "lineage": {
@@ -9155,6 +9232,18 @@
             "additionalProperties": true,
             "type": "object",
             "title": "Alert"
+          },
+          "datasource_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Datasource Id"
           }
         },
         "type": "object",
@@ -9175,6 +9264,11 @@
             "type": "string",
             "format": "uuid",
             "title": "Main Branch Id"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status",
+            "default": "queued"
           }
         },
         "type": "object",

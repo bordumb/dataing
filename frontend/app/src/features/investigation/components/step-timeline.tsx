@@ -8,6 +8,7 @@ import type { StepHistoryItem } from '@/lib/api/investigations'
 
 const STEP_LABELS: Record<string, string> = {
   gather_context: 'Gather Context',
+  check_patterns: 'Check Patterns',
   generate_hypotheses: 'Generate Hypotheses',
   generate_query: 'Generate Query',
   execute_query: 'Execute Query',
@@ -40,6 +41,7 @@ export function StepTimeline({ currentStep, stepHistory, animated = true }: Step
     ? stepHistory
     : [
         { step: 'gather_context', completed: false, timestamp: null },
+        { step: 'check_patterns', completed: false, timestamp: null },
         { step: 'generate_hypotheses', completed: false, timestamp: null },
         { step: 'generate_query', completed: false, timestamp: null },
         { step: 'execute_query', completed: false, timestamp: null },

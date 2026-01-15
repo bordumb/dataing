@@ -7,6 +7,7 @@ Get up and running with dataing in under 5 minutes. You'll install the package, 
 ## Prerequisites
 
 - **Python 3.11+** (check with `python --version`)
+- **Redis** (for durable job queue)
 - **pip** or **uv** package manager
 - **Data warehouse access** (or use DuckDB for local testing)
 
@@ -17,13 +18,13 @@ Get up and running with dataing in under 5 minutes. You'll install the package, 
 === "pip"
 
     ```bash
-    pip install dataing-core
+    pip install dataing-core redis arq
     ```
 
 === "uv"
 
     ```bash
-    uv add dataing-core
+    uv add dataing-core redis arq
     ```
 
 Verify the installation:
@@ -37,6 +38,14 @@ python -c "import dataing; print(dataing.__version__)"
 ## Step 2: Configure Your Data Source
 
 dataing connects to your data warehouse using environment variables.
+
+### Common Configuration
+
+All setups require Redis:
+
+```bash
+export REDIS_URL=redis://localhost:6379
+```
 
 === "DuckDB (Local Testing)"
 
@@ -97,14 +106,33 @@ export ANTHROPIC_API_KEY=sk-ant-...
 
 ## Step 4: Run Your First Investigation
 
-### Using the API
+Investigations run asynchronously using Redis and Workers.
 
-Start the API server:
+### 1. Start Infrastructure
+
+Start Redis (if not running):
+
+```bash
+docker run -d -p 6379:6379 redis
+```
+
+Start the Worker (in a separate terminal):
+
+```bash
+# Processes the investigation queue
+python -m dataing.entrypoints.worker
+```
+
+### 2. Start the API
+
+Start the API server (in another terminal):
 
 ```bash
 # Start the development server
 uvicorn dataing.entrypoints.api.app:app --host 0.0.0.0 --port 8000
 ```
+
+### 3. Trigger Investigation
 
 Send an investigation request:
 
@@ -124,14 +152,17 @@ curl -X POST http://localhost:8000/api/v1/investigations \
   }'
 ```
 
+The API will return a `202 Accepted` response with an `investigation_id`.
+
 ### Using Python SDK
 
 ```python
 import asyncio
+from uuid import UUID
 from dataing.core.investigation.service import InvestigationService
 from dataing.core.domain_types import AnomalyAlert
 
-async def run_investigation():
+async def trigger_investigation():
     # Create an anomaly alert
     alert = AnomalyAlert(
         table="orders",
@@ -142,23 +173,32 @@ async def run_investigation():
     )
 
     # Initialize the service
-    service = InvestigationService()
+    service = InvestigationService(...) # Requires dependencies
 
-    # Run the investigation
-    result = await service.investigate(alert)
+    # Start the investigation (returns immediately)
+    investigation_id, _, status = await service.start_investigation(
+        tenant_id=UUID("..."),
+        alert=alert,
+        data_adapter=...,
+    )
 
-    print(f"Root cause: {result.synthesis.root_cause}")
-    print(f"Confidence: {result.synthesis.confidence}")
-    print(f"Evidence: {len(result.evidence)} queries executed")
+    print(f"Investigation started: {investigation_id} (Status: {status})")
+    print("Check the worker logs for progress.")
 
-asyncio.run(run_investigation())
+asyncio.run(trigger_investigation())
 ```
 
 ---
 
 ## Step 5: View Results
 
-A successful investigation returns a synthesis with the root cause:
+When the worker completes the investigation, results are available via the API:
+
+```bash
+curl http://localhost:8000/api/v1/investigations/{investigation_id}
+```
+
+Response:
 
 ```json
 {
@@ -199,7 +239,7 @@ We provide pre-built demo scenarios to explore dataing's capabilities:
 git clone https://github.com/bordumb/dataing.git
 cd dataing
 
-# Set up the demo environment
+# Set up the demo environment (starts API, Worker, Redis, DB)
 just demo
 ```
 
@@ -271,6 +311,7 @@ export ANTHROPIC_API_KEY=sk-ant-...
 ### "Connection refused" errors
 
 Check that your data warehouse credentials are correct and the server is reachable.
+Ensure Redis is running if starting manually.
 
 ### Need help?
 

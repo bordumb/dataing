@@ -12,4 +12,5 @@
 export interface StartInvestigationResponse {
   investigation_id: string;
   main_branch_id: string;
+  status?: string;
 }

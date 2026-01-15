@@ -178,8 +178,7 @@ demo: demo-fixtures
     # Generate OpenAPI client for frontend
     echo "Generating OpenAPI client..."
     uv run python dataing/scripts/export_openapi.py
-    cd frontend/app && pnpm orval
-    cd ..
+    (cd frontend/app && pnpm orval)
     echo ""
 
     # Start PostgreSQL - clean start every time for reliability
@@ -195,6 +194,21 @@ demo: demo-fixtures
     for i in {1..30}; do
         if PGPASSWORD=dataing psql -h localhost -U dataing -d dataing_demo -c "SELECT 1" > /dev/null 2>&1; then
             echo "PostgreSQL is ready!"
+            break
+        fi
+        sleep 1
+    done
+
+    # Start Redis
+    echo "Setting up Redis..."
+    docker rm -f dataing-demo-redis 2>/dev/null || true
+    docker run -d --name dataing-demo-redis \
+        -p 6379:6379 \
+        redis:7-alpine
+    echo "Waiting for Redis to be ready..."
+    for i in {1..10}; do
+        if docker exec dataing-demo-redis redis-cli ping > /dev/null 2>&1; then
+            echo "Redis is ready!"
             break
         fi
         sleep 1
@@ -221,6 +235,8 @@ demo: demo-fixtures
     PGPASSWORD=dataing psql -h localhost -U dataing -d dataing_demo -f dataing/migrations/012_agent_memories.sql 2>&1 | grep -v "^NOTICE:" || true
     PGPASSWORD=dataing psql -h localhost -U dataing -d dataing_demo -f dataing/migrations/013_unified_investigation.sql 2>&1 | grep -v "^NOTICE:" || true
     PGPASSWORD=dataing psql -h localhost -U dataing -d dataing_demo -f dataing/migrations/014_notifications.sql 2>&1 | grep -v "^NOTICE:" || true
+    PGPASSWORD=dataing psql -h localhost -U dataing -d dataing_demo -f dataing/migrations/015_sso_states.sql 2>&1 | grep -v "^NOTICE:" || true
+    PGPASSWORD=dataing psql -h localhost -U dataing -d dataing_demo -f dataing/migrations/016_investigation_jobs.sql 2>&1 | grep -v "^NOTICE:" || true
 
     trap 'kill 0' EXIT
 
@@ -245,6 +261,8 @@ demo: demo-fixtures
     export DATADR_FIXTURE_PATH="$(pwd)/demo/fixtures/null_spike"
     export DATABASE_URL=postgresql://dataing:dataing@localhost:5432/dataing_demo
     export APP_DATABASE_URL=postgresql://dataing:dataing@localhost:5432/dataing_demo
+    export REDIS_HOST=localhost
+    export REDIS_PORT=6379
     # Stable demo encryption key (valid Fernet key)
     export ENCRYPTION_KEY=ZnxhCyx4-ZjziPWtUguwGOFMMiLNioSwso5-qNPAGZI=
 
@@ -258,6 +276,11 @@ demo: demo-fixtures
     # Start backend
     (uv run fastapi dev dataing/src/dataing/entrypoints/api/app.py --host 0.0.0.0 --port 8000) &
     BACKEND_PID=$!
+
+    # Start worker (processes investigation jobs from Redis queue)
+    echo "Starting worker..."
+    (uv run python -m dataing.entrypoints.worker) &
+    WORKER_PID=$!
 
     # Wait for backend to be ready, then sync datasets
     (
@@ -284,16 +307,37 @@ demo-stop:
     #!/usr/bin/env bash
     echo "Stopping demo services..."
 
-    # Kill by process pattern
+    # Stop worker first and wait for it to exit (needs Redis for cleanup)
+    WORKER_PIDS=$(pgrep -f "dataing.entrypoints.worker" 2>/dev/null || true)
+    if [ -n "$WORKER_PIDS" ]; then
+        echo "Stopping worker (pid: $WORKER_PIDS)..."
+        pkill -TERM -f "dataing.entrypoints.worker" 2>/dev/null || true
+        # Wait for worker to actually exit (up to 10 seconds)
+        for i in {1..10}; do
+            if ! pgrep -f "dataing.entrypoints.worker" > /dev/null 2>&1; then
+                echo "Worker stopped."
+                break
+            fi
+            sleep 1
+        done
+        # Force kill if still running
+        pkill -9 -f "dataing.entrypoints.worker" 2>/dev/null || true
+    fi
+
+    # Now stop other processes
     pkill -f "fastapi dev" 2>/dev/null || true
     pkill -f "vite.*3000" 2>/dev/null || true
     pkill -f "pnpm dev" 2>/dev/null || true
+    sleep 1
 
-    # Kill by port (more reliable fallback)
+    # Kill by port (fallback)
     lsof -ti:8000 | xargs kill -9 2>/dev/null || true
     lsof -ti:3000 | xargs kill -9 2>/dev/null || true
 
-    # Stop and remove postgres container (docker run approach)
+    # Now safe to stop infrastructure
+    docker stop dataing-demo-redis 2>/dev/null || true
+    docker rm -f dataing-demo-redis 2>/dev/null || true
+
     docker stop dataing-demo-postgres 2>/dev/null || true
     docker rm -f dataing-demo-postgres 2>/dev/null || true
 

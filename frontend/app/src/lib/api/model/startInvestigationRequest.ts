@@ -6,10 +6,12 @@
  * OpenAPI spec version: 2.0.0
  */
 import type { StartInvestigationRequestAlert } from "./startInvestigationRequestAlert";
+import type { StartInvestigationRequestDatasourceId } from "./startInvestigationRequestDatasourceId";
 
 /**
  * Request body for starting an investigation.
  */
 export interface StartInvestigationRequest {
   alert: StartInvestigationRequestAlert;
+  datasource_id?: StartInvestigationRequestDatasourceId;
 }

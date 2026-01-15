@@ -37,6 +37,9 @@ class ErrorCode(str, Enum):
     COLUMN_NOT_FOUND = "COLUMN_NOT_FOUND"
     SCHEMA_FETCH_FAILED = "SCHEMA_FETCH_FAILED"
 
+    # Datasource errors
+    DATASOURCE_NOT_FOUND = "DATASOURCE_NOT_FOUND"
+
     # Configuration errors
     INVALID_CONFIG = "INVALID_CONFIG"
     MISSING_REQUIRED_FIELD = "MISSING_REQUIRED_FIELD"
@@ -401,6 +404,27 @@ class InternalError(AdapterError):
         super().__init__(
             code=ErrorCode.INTERNAL_ERROR,
             message=message,
+            details=details,
+            retryable=False,
+        )
+
+
+class DatasourceNotFoundError(AdapterError):
+    """Datasource not found or not accessible."""
+
+    def __init__(
+        self,
+        datasource_id: str,
+        tenant_id: str | None = None,
+        message: str | None = None,
+    ) -> None:
+        """Initialize datasource not found error."""
+        details: dict[str, Any] = {"datasource_id": datasource_id}
+        if tenant_id:
+            details["tenant_id"] = tenant_id
+        super().__init__(
+            code=ErrorCode.DATASOURCE_NOT_FOUND,
+            message=message or f"Datasource not found: {datasource_id}",
             details=details,
             retryable=False,
         )

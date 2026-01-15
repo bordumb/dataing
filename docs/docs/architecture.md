@@ -36,6 +36,33 @@ flowchart TB
 
 ---
 
+## Runtime Architecture
+
+While the logical architecture is hexagonal, the runtime architecture is distributed to ensure reliable, long-running investigation execution.
+
+```mermaid
+flowchart LR
+    API[FastAPI] -->|Enqueue| Redis[Redis Queue]
+    Worker[Arq Worker] -->|Poll| Redis
+    Worker -->|Execute| Core[Investigation Core]
+    Worker -->|State| DB[(PostgreSQL)]
+```
+
+| Component | Role |
+|-----------|------|
+| **FastAPI** | Handles HTTP requests, authentication, and enqueues investigation jobs. |
+| **Redis** | Durable job queue that persists jobs until successfully processed. |
+| **Arq Worker** | Background worker that executes investigation steps, handling retries and timeouts. |
+| **PostgreSQL** | Stores investigation state (checkpoints), results, and history. |
+
+This separation ensures that:
+
+1.  **Resilience**: Worker crashes don't lose data; jobs are retried from the last checkpoint.
+2.  **Scalability**: Workers can be scaled horizontally (e.g., via KEDA) based on queue depth.
+3.  **Responsiveness**: API requests remain fast even for long-running investigations.
+
+---
+
 ## Hexagonal Architecture
 
 The hexagonal (ports & adapters) architecture separates business logic from external concerns:

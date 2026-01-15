@@ -1,0 +1,23 @@
+{
+  "assignee": "bordumbb@gmail.com",
+  "claim_note": "",
+  "claimed_at": "2026-01-14T21:08:38.988364Z",
+  "created_at": "2026-01-14T20:46:27.815994Z",
+  "depends_on": [],
+  "epic": "fn-10",
+  "evidence": {
+    "commits": [
+      "f36934983ba22bd56432f2667031fb9d6d540aa0"
+    ],
+    "prs": [],
+    "tests": [
+      "pytest dataing/tests/unit/core/investigation/test_flow.py -v"
+    ]
+  },
+  "id": "fn-10.4",
+  "priority": null,
+  "spec_path": ".flow/tasks/fn-10.4.md",
+  "status": "done",
+  "title": "Add checkpoint callbacks to orchestrator",
+  "updated_at": "2026-01-14T21:11:28.244218Z"
+}

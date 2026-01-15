@@ -1,0 +1,23 @@
+{
+  "assignee": "bordumbb@gmail.com",
+  "claim_note": "",
+  "claimed_at": "2026-01-14T21:06:51.505104Z",
+  "created_at": "2026-01-14T20:46:27.458668Z",
+  "depends_on": [],
+  "epic": "fn-10",
+  "evidence": {
+    "commits": [
+      "c6b002e6eba2b5a1e51dce9b7d46cdbc2a725106"
+    ],
+    "prs": [],
+    "tests": [
+      "psql -f dataing/migrations/016_investigation_jobs.sql"
+    ]
+  },
+  "id": "fn-10.2",
+  "priority": null,
+  "spec_path": ".flow/tasks/fn-10.2.md",
+  "status": "done",
+  "title": "Create investigation_jobs migration",
+  "updated_at": "2026-01-14T21:08:01.427728Z"
+}

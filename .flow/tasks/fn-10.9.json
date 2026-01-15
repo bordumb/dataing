@@ -1,0 +1,25 @@
+{
+  "assignee": "bordumbb@gmail.com",
+  "claim_note": "",
+  "claimed_at": "2026-01-14T21:15:46.799841Z",
+  "created_at": "2026-01-14T20:46:28.663924Z",
+  "depends_on": [
+    "fn-10.3"
+  ],
+  "epic": "fn-10",
+  "evidence": {
+    "commits": [
+      "dbed01db004dbd55d5bd484c10fa8d9667c615cb"
+    ],
+    "prs": [],
+    "tests": [
+      "kubectl apply --dry-run=client"
+    ]
+  },
+  "id": "fn-10.9",
+  "priority": null,
+  "spec_path": ".flow/tasks/fn-10.9.md",
+  "status": "done",
+  "title": "Create Kubernetes worker Deployment",
+  "updated_at": "2026-01-14T21:16:40.366402Z"
+}

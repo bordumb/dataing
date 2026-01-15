@@ -3,11 +3,12 @@
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
+from maestro import Signal
 
 from dataing.core.domain_types import AnomalyAlert, MetricSpec
 from dataing.core.investigation.entities import InvestigationContext
 from dataing.core.investigation.steps.gather_context import GatherContextStep
-from maestro import Signal, StepType
+from dataing.core.investigation.values import StepType
 
 
 @pytest.fixture
@@ -27,10 +28,17 @@ def sample_alert() -> AnomalyAlert:
 
 @pytest.fixture
 def sample_context(sample_alert: AnomalyAlert) -> InvestigationContext:
-    """Create context with alert summary."""
+    """Create context with alert summary and alert data."""
     return InvestigationContext(
-        alert_summary=f"{sample_alert.anomaly_type} in {sample_alert.dataset_id}"
+        alert_summary=f"{sample_alert.anomaly_type} in {sample_alert.dataset_id}",
+        alert=sample_alert.model_dump(mode="json"),
     )
+
+
+@pytest.fixture
+def mock_adapter() -> AsyncMock:
+    """Create mock database adapter."""
+    return AsyncMock()
 
 
 @pytest.fixture
@@ -39,11 +47,24 @@ def mock_context_engine() -> AsyncMock:
     engine = AsyncMock()
     engine.gather.return_value = MagicMock(
         schema=MagicMock(
-            is_empty=MagicMock(return_value=False),
-            table_count=MagicMock(return_value=3),
-            to_dict=MagicMock(return_value={"tables": ["events", "users", "orders"]}),
+            model_dump=MagicMock(
+                return_value={
+                    "catalogs": [
+                        {
+                            "name": "default",
+                            "schemas": [
+                                {"name": "public", "tables": ["events", "users", "orders"]}
+                            ],
+                        }
+                    ]
+                }
+            ),
         ),
-        lineage=MagicMock(to_dict=MagicMock(return_value={"upstream": ["raw.events"]})),
+        lineage=MagicMock(
+            target="analytics.events",
+            upstream=["raw.events"],
+            downstream=[],
+        ),
     )
     return engine
 
@@ -51,90 +72,101 @@ def mock_context_engine() -> AsyncMock:
 class TestGatherContextStep:
     """Tests for GatherContextStep."""
 
-    def test_step_type(self) -> None:
+    def test_step_type(self, mock_adapter: AsyncMock) -> None:
         """Step has correct type."""
-        step = GatherContextStep(context_engine=AsyncMock())
+        step = GatherContextStep(context_engine=AsyncMock(), adapter=mock_adapter)
         assert step.step_type == StepType.GATHER_CONTEXT
 
-    @pytest.mark.asyncio
     async def test_execute_gathers_schema(
         self,
         sample_context: InvestigationContext,
         mock_context_engine: AsyncMock,
+        mock_adapter: AsyncMock,
     ) -> None:
         """Execute gathers schema from context engine."""
-        step = GatherContextStep(context_engine=mock_context_engine)
+        step = GatherContextStep(context_engine=mock_context_engine, adapter=mock_adapter)
 
         result = await step.execute(sample_context)
 
         assert result.signal == Signal.CONTINUE
-        assert result.next_step == StepType.CHECK_PATTERNS
+        assert result.next_step == StepType.CHECK_PATTERNS.value
         assert result.context.schema_info is not None
-        assert result.context.schema_info["tables"] == ["events", "users", "orders"]
+        # Check we have the expected schema structure
+        assert "catalogs" in result.context.schema_info
 
-    @pytest.mark.asyncio
     async def test_execute_gathers_lineage(
         self,
         sample_context: InvestigationContext,
         mock_context_engine: AsyncMock,
+        mock_adapter: AsyncMock,
     ) -> None:
         """Execute gathers lineage from context engine."""
-        step = GatherContextStep(context_engine=mock_context_engine)
+        step = GatherContextStep(context_engine=mock_context_engine, adapter=mock_adapter)
 
         result = await step.execute(sample_context)
 
         assert result.context.lineage_info is not None
         assert result.context.lineage_info["upstream"] == ["raw.events"]
 
-    @pytest.mark.asyncio
     async def test_execute_fails_on_empty_schema(
         self,
         sample_context: InvestigationContext,
+        mock_adapter: AsyncMock,
     ) -> None:
         """Execute returns FAIL signal when schema is empty."""
         engine = AsyncMock()
         engine.gather.return_value = MagicMock(
             schema=MagicMock(
-                is_empty=MagicMock(return_value=True),
+                model_dump=MagicMock(
+                    return_value={"catalogs": [{"schemas": [{"tables": []}]}]}
+                ),
             ),
         )
-        step = GatherContextStep(context_engine=engine)
+        step = GatherContextStep(context_engine=engine, adapter=mock_adapter)
 
         result = await step.execute(sample_context)
 
         assert result.signal == Signal.FAIL
-        assert "empty schema" in str(result.output).lower()
+        assert "empty schema" in str(result.error).lower()
 
-    @pytest.mark.asyncio
     async def test_execute_handles_context_engine_error(
         self,
         sample_context: InvestigationContext,
+        mock_adapter: AsyncMock,
     ) -> None:
         """Execute returns FAIL signal when context engine raises exception."""
         engine = AsyncMock()
         engine.gather.side_effect = Exception("Connection failed")
-        step = GatherContextStep(context_engine=engine)
+        step = GatherContextStep(context_engine=engine, adapter=mock_adapter)
 
         result = await step.execute(sample_context)
 
         assert result.signal == Signal.FAIL
-        assert "Connection failed" in str(result.output)
+        assert "Connection failed" in str(result.error)
 
-    @pytest.mark.asyncio
     async def test_execute_handles_none_lineage(
         self,
         sample_context: InvestigationContext,
+        mock_adapter: AsyncMock,
     ) -> None:
         """Execute handles case where lineage is None."""
         engine = AsyncMock()
         engine.gather.return_value = MagicMock(
             schema=MagicMock(
-                is_empty=MagicMock(return_value=False),
-                to_dict=MagicMock(return_value={"tables": ["events"]}),
+                model_dump=MagicMock(
+                    return_value={
+                        "catalogs": [
+                            {
+                                "name": "default",
+                                "schemas": [{"name": "public", "tables": ["events"]}],
+                            }
+                        ]
+                    }
+                ),
             ),
             lineage=None,
         )
-        step = GatherContextStep(context_engine=engine)
+        step = GatherContextStep(context_engine=engine, adapter=mock_adapter)
 
         result = await step.execute(sample_context)
 

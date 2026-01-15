@@ -1,0 +1,25 @@
+{
+  "assignee": "bordumbb@gmail.com",
+  "claim_note": "",
+  "claimed_at": "2026-01-14T21:17:02.061253Z",
+  "created_at": "2026-01-14T20:46:28.845647Z",
+  "depends_on": [
+    "fn-10.9"
+  ],
+  "epic": "fn-10",
+  "evidence": {
+    "commits": [
+      "32c6e6b01d88e0bd9d8ed0968e9de580ff0acc8d"
+    ],
+    "prs": [],
+    "tests": [
+      "YAML syntax validation"
+    ]
+  },
+  "id": "fn-10.10",
+  "priority": null,
+  "spec_path": ".flow/tasks/fn-10.10.md",
+  "status": "done",
+  "title": "Create KEDA ScaledObject for autoscaling",
+  "updated_at": "2026-01-14T21:17:40.710491Z"
+}

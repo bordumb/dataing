@@ -5,6 +5,7 @@ import {
   useSendMessage,
   subscribeToInvestigation,
 } from '@/lib/api/investigations'
+import { useCancelInvestigationApiV1InvestigationsInvestigationIdCancelPost } from '@/lib/api/generated/investigations/investigations'
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card'
 import { Badge } from '@/components/ui/Badge'
 import { Button } from '@/components/ui/Button'
@@ -20,6 +21,7 @@ import {
   ChevronDown,
   GitBranch,
   X,
+  XCircle,
 } from 'lucide-react'
 
 import { StepTimeline, PatternList, EvidenceList } from './components'
@@ -32,6 +34,8 @@ function getStatusVariant(status: string) {
       return 'destructive'
     case 'active':
       return 'warning'
+    case 'cancelled':
+    case 'inconclusive':
     case 'suspended':
       return 'secondary'
     default:
@@ -364,6 +368,7 @@ export function InvestigationDetail() {
   const { id } = useParams<{ id: string }>()
   const { data, isLoading, error, refetch } = useInvestigation(id)
   const sendMessage = useSendMessage()
+  const cancelMutation = useCancelInvestigationApiV1InvestigationsInvestigationIdCancelPost()
   const [sseStatus, setSseStatus] = useState<'connecting' | 'connected' | 'error'>('connecting')
   const sseCleanupRef = useRef<(() => void) | null>(null)
   const [showShareMenu, setShowShareMenu] = useState(false)
@@ -415,6 +420,19 @@ export function InvestigationDetail() {
     setShowCollaborateModal(false)
   }
 
+  const handleCancel = async () => {
+    if (!id) return
+    if (!confirm('Are you sure you want to cancel this investigation? This cannot be undone.')) {
+      return
+    }
+    try {
+      await cancelMutation.mutateAsync({ investigationId: id })
+      refetch()
+    } catch (err) {
+      console.error('Failed to cancel investigation:', err)
+    }
+  }
+
   if (!id) {
     return (
       <Card>
@@ -451,7 +469,7 @@ export function InvestigationDetail() {
     )
   }
 
-  const isComplete = data.status === 'completed' || data.status === 'failed'
+  const isComplete = ['completed', 'failed', 'cancelled', 'inconclusive'].includes(data.status)
 
   return (
     <div className="h-[calc(100vh-8rem)] flex flex-col gap-4">
@@ -522,10 +540,28 @@ export function InvestigationDetail() {
             {/* Step Timeline */}
             <div className="p-4 bg-muted/50 rounded-lg">
               <StepTimeline
-                currentStep={data.main_branch.current_step}
+                currentStep={isComplete ? '' : data.main_branch.current_step}
                 stepHistory={data.main_branch.step_history || []}
                 animated
               />
+
+              {/* Cancel Button - only show when investigation is active */}
+              {!isComplete && (
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  className="mt-4 gap-2"
+                  onClick={handleCancel}
+                  disabled={cancelMutation.isPending}
+                >
+                  {cancelMutation.isPending ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <XCircle className="h-4 w-4" />
+                  )}
+                  Cancel Investigation
+                </Button>
+              )}
             </div>
 
             {/* Matched Patterns */}

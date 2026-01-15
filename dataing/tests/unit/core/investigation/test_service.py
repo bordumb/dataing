@@ -1,6 +1,6 @@
 """Tests for InvestigationService."""
 
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, patch
 from uuid import UUID, uuid4
 
 import pytest
@@ -190,18 +190,29 @@ def mock_collaboration() -> AsyncMock:
     return AsyncMock(spec=CollaborationService)
 
 
+@pytest.fixture
+def mock_app_db() -> AsyncMock:
+    """Create mock app database for job creation."""
+    db = AsyncMock()
+    db.create_investigation_job.return_value = {"id": uuid4()}
+    return db
+
+
 class TestInvestigationServiceStartInvestigation:
     """Tests for InvestigationService.start_investigation."""
 
     @pytest.mark.asyncio
+    @patch("dataing.core.queue.enqueue_investigation")
     async def test_creates_investigation(
         self,
+        mock_enqueue: AsyncMock,
         mock_repository: AsyncMock,
         mock_agent_client: AsyncMock,
         mock_context_engine: AsyncMock,
         mock_pattern_repository: AsyncMock,
         mock_data_adapter: AsyncMock,
         mock_collaboration: AsyncMock,
+        mock_app_db: AsyncMock,
         tenant_id: UUID,
         user_id: UUID,
         sample_alert: AnomalyAlert,
@@ -213,6 +224,7 @@ class TestInvestigationServiceStartInvestigation:
             agent_client=mock_agent_client,
             context_engine=mock_context_engine,
             pattern_repository=mock_pattern_repository,
+            app_db=mock_app_db,
         )
 
         await service.start_investigation(
@@ -228,14 +240,17 @@ class TestInvestigationServiceStartInvestigation:
         assert call_kwargs["created_by"] == user_id
 
     @pytest.mark.asyncio
+    @patch("dataing.core.queue.enqueue_investigation")
     async def test_creates_main_branch(
         self,
+        mock_enqueue: AsyncMock,
         mock_repository: AsyncMock,
         mock_agent_client: AsyncMock,
         mock_context_engine: AsyncMock,
         mock_pattern_repository: AsyncMock,
         mock_data_adapter: AsyncMock,
         mock_collaboration: AsyncMock,
+        mock_app_db: AsyncMock,
         tenant_id: UUID,
         user_id: UUID,
         sample_alert: AnomalyAlert,
@@ -248,6 +263,7 @@ class TestInvestigationServiceStartInvestigation:
             agent_client=mock_agent_client,
             context_engine=mock_context_engine,
             pattern_repository=mock_pattern_repository,
+            app_db=mock_app_db,
         )
 
         await service.start_investigation(
@@ -264,14 +280,17 @@ class TestInvestigationServiceStartInvestigation:
         assert call_kwargs["name"] == "main"
 
     @pytest.mark.asyncio
+    @patch("dataing.core.queue.enqueue_investigation")
     async def test_sets_main_branch_on_investigation(
         self,
+        mock_enqueue: AsyncMock,
         mock_repository: AsyncMock,
         mock_agent_client: AsyncMock,
         mock_context_engine: AsyncMock,
         mock_pattern_repository: AsyncMock,
         mock_data_adapter: AsyncMock,
         mock_collaboration: AsyncMock,
+        mock_app_db: AsyncMock,
         tenant_id: UUID,
         user_id: UUID,
         sample_alert: AnomalyAlert,
@@ -285,6 +304,7 @@ class TestInvestigationServiceStartInvestigation:
             agent_client=mock_agent_client,
             context_engine=mock_context_engine,
             pattern_repository=mock_pattern_repository,
+            app_db=mock_app_db,
         )
 
         await service.start_investigation(
@@ -299,14 +319,17 @@ class TestInvestigationServiceStartInvestigation:
         )
 
     @pytest.mark.asyncio
+    @patch("dataing.core.queue.enqueue_investigation")
     async def test_creates_initial_snapshot(
         self,
+        mock_enqueue: AsyncMock,
         mock_repository: AsyncMock,
         mock_agent_client: AsyncMock,
         mock_context_engine: AsyncMock,
         mock_pattern_repository: AsyncMock,
         mock_data_adapter: AsyncMock,
         mock_collaboration: AsyncMock,
+        mock_app_db: AsyncMock,
         tenant_id: UUID,
         user_id: UUID,
         sample_alert: AnomalyAlert,
@@ -320,6 +343,7 @@ class TestInvestigationServiceStartInvestigation:
             agent_client=mock_agent_client,
             context_engine=mock_context_engine,
             pattern_repository=mock_pattern_repository,
+            app_db=mock_app_db,
         )
 
         await service.start_investigation(
@@ -338,14 +362,17 @@ class TestInvestigationServiceStartInvestigation:
         assert call_kwargs["trigger"] == "user"
 
     @pytest.mark.asyncio
+    @patch("dataing.core.queue.enqueue_investigation")
     async def test_updates_branch_head(
         self,
+        mock_enqueue: AsyncMock,
         mock_repository: AsyncMock,
         mock_agent_client: AsyncMock,
         mock_context_engine: AsyncMock,
         mock_pattern_repository: AsyncMock,
         mock_data_adapter: AsyncMock,
         mock_collaboration: AsyncMock,
+        mock_app_db: AsyncMock,
         tenant_id: UUID,
         user_id: UUID,
         sample_alert: AnomalyAlert,
@@ -359,6 +386,7 @@ class TestInvestigationServiceStartInvestigation:
             agent_client=mock_agent_client,
             context_engine=mock_context_engine,
             pattern_repository=mock_pattern_repository,
+            app_db=mock_app_db,
         )
 
         await service.start_investigation(
@@ -373,14 +401,17 @@ class TestInvestigationServiceStartInvestigation:
         )
 
     @pytest.mark.asyncio
+    @patch("dataing.core.queue.enqueue_investigation")
     async def test_returns_investigation_and_branch_ids(
         self,
+        mock_enqueue: AsyncMock,
         mock_repository: AsyncMock,
         mock_agent_client: AsyncMock,
         mock_context_engine: AsyncMock,
         mock_pattern_repository: AsyncMock,
         mock_data_adapter: AsyncMock,
         mock_collaboration: AsyncMock,
+        mock_app_db: AsyncMock,
         tenant_id: UUID,
         user_id: UUID,
         sample_alert: AnomalyAlert,
@@ -394,9 +425,10 @@ class TestInvestigationServiceStartInvestigation:
             agent_client=mock_agent_client,
             context_engine=mock_context_engine,
             pattern_repository=mock_pattern_repository,
+            app_db=mock_app_db,
         )
 
-        investigation_id, branch_id = await service.start_investigation(
+        investigation_id, branch_id, status = await service.start_investigation(
             tenant_id=tenant_id,
             alert=sample_alert,
             data_adapter=mock_data_adapter,
@@ -405,16 +437,20 @@ class TestInvestigationServiceStartInvestigation:
 
         assert investigation_id == sample_investigation.id
         assert branch_id == sample_main_branch.id
+        assert status == "queued"
 
     @pytest.mark.asyncio
+    @patch("dataing.core.queue.enqueue_investigation")
     async def test_works_without_user_id(
         self,
+        mock_enqueue: AsyncMock,
         mock_repository: AsyncMock,
         mock_agent_client: AsyncMock,
         mock_context_engine: AsyncMock,
         mock_pattern_repository: AsyncMock,
         mock_data_adapter: AsyncMock,
         mock_collaboration: AsyncMock,
+        mock_app_db: AsyncMock,
         tenant_id: UUID,
         sample_alert: AnomalyAlert,
     ) -> None:
@@ -425,9 +461,10 @@ class TestInvestigationServiceStartInvestigation:
             agent_client=mock_agent_client,
             context_engine=mock_context_engine,
             pattern_repository=mock_pattern_repository,
+            app_db=mock_app_db,
         )
 
-        investigation_id, branch_id = await service.start_investigation(
+        investigation_id, branch_id, status = await service.start_investigation(
             tenant_id=tenant_id,
             alert=sample_alert,
             data_adapter=mock_data_adapter,
@@ -436,6 +473,7 @@ class TestInvestigationServiceStartInvestigation:
 
         assert investigation_id is not None
         assert branch_id is not None
+        assert status == "queued"
         call_kwargs = mock_repository.create_investigation.call_args.kwargs
         assert call_kwargs["created_by"] is None
 

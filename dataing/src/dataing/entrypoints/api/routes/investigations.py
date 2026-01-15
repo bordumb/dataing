@@ -20,6 +20,7 @@ from sse_starlette.sse import EventSourceResponse
 from dataing.adapters.db.app_db import AppDatabase
 from dataing.core.domain_types import AnomalyAlert, MetricSpec
 from dataing.core.investigation.service import InvestigationService
+from dataing.core.json_utils import to_json_string
 from dataing.entrypoints.api.middleware.auth import ApiKeyContext, verify_api_key
 
 logger = logging.getLogger(__name__)
@@ -538,7 +539,7 @@ async def stream_updates(
                     if current_step != last_step:
                         yield {
                             "event": "step_changed",
-                            "data": json.dumps({
+                            "data": to_json_string({
                                 "step": current_step,
                                 "branch_id": str(state.main_branch.branch_id),
                             }),
@@ -548,7 +549,7 @@ async def stream_updates(
                     if current_status != last_status:
                         yield {
                             "event": "status_changed",
-                            "data": json.dumps({
+                            "data": to_json_string({
                                 "status": current_status,
                                 "investigation_id": str(state.investigation_id),
                             }),
@@ -560,7 +561,7 @@ async def stream_updates(
                         # Send final state
                         yield {
                             "event": "investigation_ended",
-                            "data": json.dumps({
+                            "data": to_json_string({
                                 "status": current_status,
                                 "synthesis": state.main_branch.synthesis,
                             }),
@@ -571,7 +572,7 @@ async def stream_updates(
                     # Investigation not found
                     yield {
                         "event": "error",
-                        "data": json.dumps({
+                        "data": to_json_string({
                             "error": "Investigation not found",
                         }),
                     }
@@ -584,7 +585,7 @@ async def stream_updates(
             if poll_count >= max_polls:
                 yield {
                     "event": "timeout",
-                    "data": json.dumps({
+                    "data": to_json_string({
                         "message": "Stream timeout, please reconnect",
                     }),
                 }

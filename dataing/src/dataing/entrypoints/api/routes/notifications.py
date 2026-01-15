@@ -15,6 +15,7 @@ from pydantic import BaseModel, Field
 from sse_starlette.sse import EventSourceResponse
 
 from dataing.adapters.db.app_db import AppDatabase
+from dataing.core.json_utils import to_json_string
 from dataing.entrypoints.api.deps import get_app_db
 from dataing.entrypoints.api.middleware.auth import ApiKeyContext, verify_api_key
 
@@ -225,7 +226,7 @@ async def notification_stream(
                 if (now - last_heartbeat).total_seconds() >= 30:
                     yield {
                         "event": "heartbeat",
-                        "data": json.dumps({"ts": now.isoformat()}),
+                        "data": to_json_string({"ts": now.isoformat()}),
                     }
                     last_heartbeat = now
 
@@ -251,7 +252,7 @@ async def notification_stream(
                         yield {
                             "event": "notification",
                             "id": str(n["id"]),  # For client-side Last-Event-ID
-                            "data": json.dumps(notification_data),
+                            "data": to_json_string(notification_data),
                         }
                         last_id = n["id"]
 
@@ -259,7 +260,7 @@ async def notification_stream(
                     logger.error(f"Error polling notifications: {e}")
                     yield {
                         "event": "error",
-                        "data": json.dumps({"error": "Failed to fetch notifications"}),
+                        "data": to_json_string({"error": "Failed to fetch notifications"}),
                     }
 
                 await asyncio.sleep(0.5)
@@ -269,7 +270,7 @@ async def notification_stream(
             if poll_count >= max_polls:
                 yield {
                     "event": "timeout",
-                    "data": json.dumps({"message": "Stream timeout, please reconnect"}),
+                    "data": to_json_string({"message": "Stream timeout, please reconnect"}),
                 }
 
         except asyncio.CancelledError:

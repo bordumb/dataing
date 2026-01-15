@@ -1,14 +1,14 @@
 {
-  "assignee": null,
+  "assignee": "bordumbb@gmail.com",
   "claim_note": "",
-  "claimed_at": null,
+  "claimed_at": "2026-01-15T02:17:21.387913Z",
   "created_at": "2026-01-15T01:58:38.390640Z",
   "depends_on": [],
   "epic": "fn-11",
   "id": "fn-11.3",
   "priority": null,
   "spec_path": ".flow/tasks/fn-11.3.md",
-  "status": "todo",
+  "status": "in_progress",
   "title": "Refactor API and Worker payloads",
-  "updated_at": "2026-01-15T01:58:38.390832Z"
+  "updated_at": "2026-01-15T02:17:21.388094Z"
 }

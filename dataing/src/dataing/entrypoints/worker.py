@@ -14,10 +14,12 @@ import logging
 import os
 import signal
 from contextlib import AsyncExitStack
+from datetime import UTC, datetime
 from typing import Any
 from uuid import UUID, uuid4
 
 from arq import Worker
+from opentelemetry.trace import SpanKind
 
 from dataing.adapters.context.engine import ContextEngine
 from dataing.adapters.datasource import create_adapter_for_datasource
@@ -36,6 +38,7 @@ from dataing.core.investigation.flow import (
 from dataing.core.investigation.values import StepType, VersionId
 from dataing.core.json_utils import to_json_string
 from dataing.core.queue import INVESTIGATIONS_QUEUE, get_redis_settings
+from dataing.telemetry import get_tracer, init_telemetry, restore_trace_context
 
 logger = logging.getLogger(__name__)
 
@@ -53,8 +56,9 @@ async def run_investigation(
     datasource_id: str | None = None,
     parent_job_id: str | None = None,
     branch_spec: dict[str, Any] | None = None,
+    trace_context: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
-    """Execute an investigation workflow.
+    """Execute an investigation workflow with proper trace context restoration.
 
     This is the main job handler. Supports both root jobs and branch jobs
     (child jobs created from BRANCH signal).
@@ -66,15 +70,37 @@ async def run_investigation(
         datasource_id: Optional specific datasource ID to use.
         parent_job_id: Parent job ID if this is a branch job.
         branch_spec: BranchSpec data if this is a branch job.
+        trace_context: Optional trace context from queue for distributed tracing.
 
     Returns:
         Dictionary with job result status and investigation_id.
     """
+    tracer = get_tracer("dataing.worker")
+
+    # Extract parent context from queue payload for proper span linking
+    parent_ctx = None
+    enqueued_at: datetime | None = None
+    correlation_id: str | None = None
+
+    if trace_context:
+        # Restore W3C trace context (creates proper parent link)
+        parent_ctx = restore_trace_context(trace_context)
+        if trace_context.get("enqueued_at"):
+            enqueued_at = datetime.fromisoformat(trace_context["enqueued_at"])
+        correlation_id = trace_context.get("correlation_id")
+
+    # Calculate queue wait time for SLOs
+    worker_start = datetime.now(UTC)
+    if enqueued_at:
+        queue_wait_seconds = (worker_start - enqueued_at).total_seconds()
+        logger.info(f"Queue wait time: {queue_wait_seconds:.3f}s")
+
     is_branch = parent_job_id is not None
     logger.info(
         f"Processing investigation: investigation_id={investigation_id}, "
         f"tenant_id={tenant_id}, worker_id={WORKER_ID}, "
-        f"is_branch={is_branch}, parent_job_id={parent_job_id}"
+        f"is_branch={is_branch}, parent_job_id={parent_job_id}, "
+        f"correlation_id={correlation_id}"
     )
 
     db: AppDatabase = ctx["db"]
@@ -194,7 +220,9 @@ async def run_investigation(
     )
 
     # Checkpoint callback - saves state after each step
-    async def on_step_complete(context: Any, next_step: str | None, step_cursor: dict[str, Any] | None = None) -> None:
+    async def on_step_complete(
+        context: Any, next_step: str | None, step_cursor: dict[str, Any] | None = None
+    ) -> None:
         """Save checkpoint after each step completes."""
         step_type = StepType(next_step) if next_step else StepType.COMPLETE
         new_snapshot = await repository.create_snapshot(
@@ -225,122 +253,166 @@ async def run_investigation(
 
         logger.info(f"Checkpoint saved: step={step_type.value}, snapshot={new_snapshot.id}")
 
-    async with AsyncExitStack() as stack:
-        if adapter:
-            await stack.enter_async_context(adapter)
+    # Create consumer span linked to producer span from API
+    with tracer.start_as_current_span(
+        "investigation.process",
+        context=parent_ctx,  # Links to parent span from queue producer
+        kind=SpanKind.CONSUMER,
+        attributes={
+            # Safe attributes only - no PII
+            "investigation.id": investigation_id,
+            "tenant.id": tenant_id,
+            "worker.id": WORKER_ID,
+            "job.is_branch": is_branch,
+            "correlation_id": correlation_id or "",
+            "messaging.system": "redis",
+            "messaging.operation": "process",
+        },
+    ) as job_span:
+        async with AsyncExitStack() as stack:
+            if adapter:
+                await stack.enter_async_context(adapter)
 
-        # Run the workflow
-        try:
-            final_context = await run_with_checkpointing(
-                workflow=workflow,
-                context=snapshot.context,
-                start_step=snapshot.step.value,
-                on_step_complete=on_step_complete,
-                shutdown_signal=shutdown_event,
-                start_cursor=snapshot.step_cursor,
-                max_iterations=50,
-            )
+            # Run the workflow
+            try:
+                final_context = await run_with_checkpointing(
+                    workflow=workflow,
+                    context=snapshot.context,
+                    start_step=snapshot.step.value,
+                    on_step_complete=on_step_complete,
+                    shutdown_signal=shutdown_event,
+                    start_cursor=snapshot.step_cursor,
+                    max_iterations=50,
+                )
 
-            # Workflow completed successfully
-            outcome = {
-                "status": "completed",
-                "synthesis": final_context.current_synthesis,
-                "evidence_count": len(final_context.evidence),
-                "queries_executed": final_context.total_queries_executed,
-            }
-            await repository.update_investigation_outcome(inv_uuid, outcome)
-            await db.update_job_status(job_id, status="completed")
-            logger.info(f"Investigation completed: {investigation_id}")
+                # Workflow completed successfully
+                job_span.set_attribute("investigation.status", "completed")
+                outcome = {
+                    "status": "completed",
+                    "synthesis": final_context.current_synthesis,
+                    "evidence_count": len(final_context.evidence),
+                    "queries_executed": final_context.total_queries_executed,
+                }
+                await repository.update_investigation_outcome(inv_uuid, outcome)
+                await db.update_job_status(job_id, status="completed")
+                logger.info(f"Investigation completed: {investigation_id}")
 
-            # If this is a branch job, check if parent can merge
-            if is_branch and parent_job_id:
-                await check_and_trigger_merge(db, UUID(parent_job_id))
+                # Record E2E duration from enqueue to completion
+                if enqueued_at:
+                    e2e_duration = (datetime.now(UTC) - enqueued_at).total_seconds()
+                    job_span.set_attribute("investigation.e2e_duration_seconds", e2e_duration)
+                    logger.info(f"E2E duration: {e2e_duration:.3f}s")
 
-            return {
-                "status": "completed",
-                "investigation_id": investigation_id,
-                "worker_id": WORKER_ID,
-            }
+                # If this is a branch job, check if parent can merge
+                if is_branch and parent_job_id:
+                    await check_and_trigger_merge(db, UUID(parent_job_id))
 
-        except WorkerShutdownError:
-            # Graceful shutdown - job will be retried
-            logger.info(f"Worker shutdown, job checkpointed: {investigation_id}")
-            await db.update_job_status(job_id, status="pending")
-            return {
-                "status": "shutdown",
-                "investigation_id": investigation_id,
-                "worker_id": WORKER_ID,
-            }
+                return {
+                    "status": "completed",
+                    "investigation_id": investigation_id,
+                    "worker_id": WORKER_ID,
+                }
 
-        except AwaitingUserInput as e:
-            # Workflow paused for user input
-            logger.info(f"Awaiting user input: {investigation_id}, next_step={e.next_step}")
-            await db.update_job_status(job_id, status="awaiting_input", current_step=e.next_step)
-            return {
-                "status": "awaiting_input",
-                "investigation_id": investigation_id,
-                "worker_id": WORKER_ID,
-                "next_step": e.next_step,
-            }
+            except WorkerShutdownError:
+                # Graceful shutdown - job will be retried
+                job_span.set_attribute("investigation.status", "shutdown")
+                logger.info(f"Worker shutdown, job checkpointed: {investigation_id}")
+                await db.update_job_status(job_id, status="pending")
+                return {
+                    "status": "shutdown",
+                    "investigation_id": investigation_id,
+                    "worker_id": WORKER_ID,
+                }
 
-        except InvestigationCancelled:
-            # User cancelled the investigation
-            logger.info(f"Investigation cancelled: {investigation_id}")
-            await db.mark_job_cancelled(job_id)
-            await db.execute(
-                """
-                            UPDATE investigations
-                            SET outcome = $1
-                            WHERE id = $2
-                            """,
-                to_json_string({"status": "cancelled", "reason": "User cancelled"}),
-                inv_uuid,
-            )
-            return {
-                "status": "cancelled",
-                "investigation_id": investigation_id,
-                "worker_id": WORKER_ID,
-            }
+            except AwaitingUserInput as e:
+                # Workflow paused for user input
+                job_span.set_attribute("investigation.status", "awaiting_input")
+                logger.info(
+                    f"Awaiting user input: {investigation_id}, next_step={e.next_step}"
+                )
+                await db.update_job_status(
+                    job_id, status="awaiting_input", current_step=e.next_step
+                )
+                return {
+                    "status": "awaiting_input",
+                    "investigation_id": investigation_id,
+                    "worker_id": WORKER_ID,
+                    "next_step": e.next_step,
+                }
 
-        except InvestigationError as e:
-            # Workflow failed
-            logger.error(f"Investigation failed: {investigation_id}, error={e.error}")
-            await db.update_job_status(job_id, status="failed")
-            await db.execute(
-                """
-                            UPDATE investigations
-                            SET outcome = $1
-                            WHERE id = $2
-                            """,
-                to_json_string({"status": "failed", "error": e.error}),
-                inv_uuid,
-            )
-            return {
-                "status": "failed",
-                "investigation_id": investigation_id,
-                "worker_id": WORKER_ID,
-                "error": e.error,
-            }
+            except InvestigationCancelled:
+                # User cancelled the investigation
+                job_span.set_attribute("investigation.status", "cancelled")
+                logger.info(f"Investigation cancelled: {investigation_id}")
+                await db.mark_job_cancelled(job_id)
+                await db.execute(
+                    """
+                                UPDATE investigations
+                                SET outcome = $1
+                                WHERE id = $2
+                                """,
+                    to_json_string({"status": "cancelled", "reason": "User cancelled"}),
+                    inv_uuid,
+                )
+                return {
+                    "status": "cancelled",
+                    "investigation_id": investigation_id,
+                    "worker_id": WORKER_ID,
+                }
 
-        except Exception as e:
-            # Unexpected error
-            logger.exception(f"Unexpected error in investigation: {investigation_id}")
-            await db.update_job_status(job_id, status="failed")
-            await db.execute(
-                """
-                            UPDATE investigations
-                            SET outcome = $1
-                            WHERE id = $2
-                            """,
-                to_json_string({"status": "failed", "error": str(e)}),
-                inv_uuid,
-            )
-            return {
-                "status": "failed",
-                "investigation_id": investigation_id,
-                "worker_id": WORKER_ID,
-                "error": str(e),
-            }
+            except InvestigationError as e:
+                # Workflow failed
+                job_span.record_exception(e)
+                job_span.set_attribute("investigation.status", "failed")
+                logger.error(f"Investigation failed: {investigation_id}, error={e.error}")
+                await db.update_job_status(job_id, status="failed")
+                await db.execute(
+                    """
+                                UPDATE investigations
+                                SET outcome = $1
+                                WHERE id = $2
+                                """,
+                    to_json_string({"status": "failed", "error": e.error}),
+                    inv_uuid,
+                )
+
+                if enqueued_at:
+                    e2e_duration = (datetime.now(UTC) - enqueued_at).total_seconds()
+                    job_span.set_attribute("investigation.e2e_duration_seconds", e2e_duration)
+
+                return {
+                    "status": "failed",
+                    "investigation_id": investigation_id,
+                    "worker_id": WORKER_ID,
+                    "error": e.error,
+                }
+
+            except Exception as e:
+                # Unexpected error
+                job_span.record_exception(e)
+                job_span.set_attribute("investigation.status", "failed")
+                logger.exception(f"Unexpected error in investigation: {investigation_id}")
+                await db.update_job_status(job_id, status="failed")
+                await db.execute(
+                    """
+                                UPDATE investigations
+                                SET outcome = $1
+                                WHERE id = $2
+                                """,
+                    to_json_string({"status": "failed", "error": str(e)}),
+                    inv_uuid,
+                )
+
+                if enqueued_at:
+                    e2e_duration = (datetime.now(UTC) - enqueued_at).total_seconds()
+                    job_span.set_attribute("investigation.e2e_duration_seconds", e2e_duration)
+
+                return {
+                    "status": "failed",
+                    "investigation_id": investigation_id,
+                    "worker_id": WORKER_ID,
+                    "error": str(e),
+                }
 
 
 async def check_and_trigger_merge(db: AppDatabase, parent_job_id: UUID) -> bool:
@@ -469,11 +541,14 @@ async def handle_cancellation(db: AppDatabase, job_id: UUID) -> dict[str, Any]:
 async def startup(ctx: dict[str, Any]) -> None:
     """Initialize worker resources on startup.
 
-    Sets up database connection, LLM client, and signal handlers.
+    Sets up database connection, LLM client, telemetry, and signal handlers.
 
     Args:
         ctx: Worker context dictionary to populate with resources.
     """
+    # Initialize OpenTelemetry SDK (idempotent)
+    init_telemetry()
+
     logger.info(f"Worker starting: worker_id={WORKER_ID}")
 
     # Initialize database connection

@@ -474,6 +474,44 @@ async def get_default_tenant_adapter(request: Request, tenant_id: UUID) -> BaseA
     return await get_tenant_adapter(request, tenant_id)
 
 
+async def resolve_datasource_id(
+    request: Request,
+    tenant_id: UUID,
+    data_source_id: UUID | None = None,
+) -> UUID:
+    """Resolve the datasource ID for a tenant.
+
+    If data_source_id is provided, validates it exists. Otherwise returns
+    the tenant's default active data source ID.
+
+    Args:
+        request: The current request (for accessing app state).
+        tenant_id: The tenant's UUID.
+        data_source_id: Optional specific data source ID.
+
+    Returns:
+        The resolved datasource UUID.
+
+    Raises:
+        ValueError: If data source not found or no active sources.
+    """
+    app_db: AppDatabase = request.app.state.app_db
+
+    if data_source_id:
+        ds = await app_db.get_data_source(data_source_id, tenant_id)
+        if not ds:
+            raise ValueError(f"Data source {data_source_id} not found for tenant {tenant_id}")
+        return data_source_id
+
+    # Get default data source
+    data_sources = await app_db.list_data_sources(tenant_id)
+    active_sources = [d for d in data_sources if d.get("is_active", True)]
+    if not active_sources:
+        raise ValueError(f"No active data sources found for tenant {tenant_id}")
+    result: UUID = active_sources[0]["id"]
+    return result
+
+
 async def get_tenant_lineage_adapter(
     request: Request,
     tenant_id: UUID,

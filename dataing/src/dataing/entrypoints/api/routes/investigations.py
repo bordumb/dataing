@@ -42,7 +42,7 @@ class StartInvestigationResponse(BaseModel):
 
     investigation_id: UUID
     main_branch_id: UUID
-    status: str = "running"  # "queued" for durable queue, "running" for legacy
+    status: str = "queued"
 
 
 class CancelInvestigationResponse(BaseModel):
@@ -168,7 +168,10 @@ async def list_investigations(
     try:
         results = await db.fetch_all(
             """
-            SELECT id, alert, created_at, status
+            SELECT id,
+                   alert,
+                   created_at,
+                   COALESCE(outcome->>'status', status) AS status
             FROM investigations
             WHERE tenant_id = $1
             ORDER BY created_at DESC
@@ -217,7 +220,7 @@ async def start_investigation(
     Returns:
         StartInvestigationResponse with investigation and branch IDs.
     """
-    from dataing.entrypoints.api.deps import get_tenant_adapter
+    from dataing.entrypoints.api.deps import get_tenant_adapter, resolve_datasource_id
 
     # Parse alert from request
     alert_data = request.alert
@@ -246,9 +249,20 @@ async def start_investigation(
         metadata=alert_data.get("metadata"),
     )
 
+    # Resolve datasource_id (use provided or get default)
+    try:
+        datasource_id = await resolve_datasource_id(
+            http_request, auth.tenant_id, request.datasource_id
+        )
+    except ValueError as e:
+        raise HTTPException(
+            status_code=400,
+            detail=str(e),
+        ) from e
+
     # Get data adapter for this tenant
     try:
-        data_adapter = await get_tenant_adapter(http_request, auth.tenant_id)
+        data_adapter = await get_tenant_adapter(http_request, auth.tenant_id, datasource_id)
     except ValueError as e:
         raise HTTPException(
             status_code=400,
@@ -265,7 +279,7 @@ async def start_investigation(
         alert=alert,
         data_adapter=data_adapter,
         user_id=auth.user_id,
-        datasource_id=request.datasource_id,
+        datasource_id=datasource_id,
     )
 
     return StartInvestigationResponse(
@@ -283,11 +297,9 @@ async def cancel_investigation(
 ) -> CancelInvestigationResponse:
     """Cancel an investigation and all its child jobs.
 
-    Marks the investigation job as 'cancelling'. The worker will detect this
-    at the next step boundary and exit cleanly after checkpointing.
-
-    For investigations with branches (child jobs), all children are also
-    cancelled recursively.
+    Marks the investigation job as 'cancelling'. The worker detects this
+    at the next step boundary and exits cleanly. Child jobs are cancelled
+    recursively.
 
     Args:
         http_request: The HTTP request for accessing app state.
@@ -315,29 +327,29 @@ async def cancel_investigation(
         tenant_id=auth.tenant_id,
     )
 
-    if jobs_cancelled == 0:
-        # Check if investigation exists but is already complete
-        job = await app_db.get_investigation_job(investigation_id)
-        if job and job.get("status") in ("completed", "failed", "cancelled"):
-            return CancelInvestigationResponse(
-                investigation_id=investigation_id,
-                status="already_complete",
-                jobs_cancelled=0,
-            )
-        raise HTTPException(
-            status_code=404,
-            detail="Investigation job not found",
+    if jobs_cancelled > 0:
+        logger.info(
+            f"Investigation cancelled: investigation_id={investigation_id}, "
+            f"tenant_id={auth.tenant_id}, jobs_cancelled={jobs_cancelled}"
+        )
+        return CancelInvestigationResponse(
+            investigation_id=investigation_id,
+            status="cancelling",
+            jobs_cancelled=jobs_cancelled,
         )
 
-    logger.info(
-        f"Investigation cancelled: investigation_id={investigation_id}, "
-        f"tenant_id={auth.tenant_id}, jobs_cancelled={jobs_cancelled}"
-    )
+    # Check if investigation exists but is already complete
+    job = await app_db.get_investigation_job(investigation_id)
+    if job and job.get("status") in ("completed", "failed", "cancelled"):
+        return CancelInvestigationResponse(
+            investigation_id=investigation_id,
+            status="already_complete",
+            jobs_cancelled=0,
+        )
 
-    return CancelInvestigationResponse(
-        investigation_id=investigation_id,
-        status="cancelling",
-        jobs_cancelled=jobs_cancelled,
+    raise HTTPException(
+        status_code=404,
+        detail="Investigation job not found",
     )
 
 
@@ -544,7 +556,7 @@ async def stream_updates(
                         last_status = current_status
 
                     # Check for completion
-                    if current_status in ("completed", "failed"):
+                    if current_status in ("completed", "failed", "cancelled", "inconclusive"):
                         # Send final state
                         yield {
                             "event": "investigation_ended",

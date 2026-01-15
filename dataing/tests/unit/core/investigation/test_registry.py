@@ -1,9 +1,11 @@
 """Tests for StepRegistry."""
 
+from maestro import Signal
+
 from dataing.core.investigation.entities import InvestigationContext
 from dataing.core.investigation.registry import StepRegistry
 from dataing.core.investigation.steps.protocol import Step, StepResult
-from maestro import Signal, StepType
+from dataing.core.investigation.values import StepType
 
 
 class MockStep(Step[None, str]):
@@ -15,7 +17,7 @@ class MockStep(Step[None, str]):
         self,
         context: InvestigationContext,
         input_data: None = None,
-    ) -> StepResult[str]:
+    ) -> StepResult[InvestigationContext, str]:
         """Execute mock step."""
         return StepResult(
             context=context,
@@ -73,7 +75,7 @@ class TestStepRegistry:
                 self,
                 context: InvestigationContext,
                 input_data: None = None,
-            ) -> StepResult[str]:
+            ) -> StepResult[InvestigationContext, str]:
                 """Execute step."""
                 return StepResult(context=context, signal=Signal.CONTINUE)
 
@@ -86,7 +88,7 @@ class TestStepRegistry:
                 self,
                 context: InvestigationContext,
                 input_data: None = None,
-            ) -> StepResult[str]:
+            ) -> StepResult[InvestigationContext, str]:
                 """Execute step."""
                 return StepResult(context=context, signal=Signal.CONTINUE)
 
@@ -120,7 +122,7 @@ class TestStepRegistry:
                 self,
                 context: InvestigationContext,
                 input_data: None = None,
-            ) -> StepResult[str]:
+            ) -> StepResult[InvestigationContext, str]:
                 """Execute step."""
                 return StepResult(context=context, signal=Signal.CONTINUE)
 
@@ -133,7 +135,7 @@ class TestStepRegistry:
                 self,
                 context: InvestigationContext,
                 input_data: None = None,
-            ) -> StepResult[str]:
+            ) -> StepResult[InvestigationContext, str]:
                 """Execute step."""
                 return StepResult(context=context, signal=Signal.CONTINUE)
 

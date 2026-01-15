@@ -107,11 +107,12 @@ class TestWorkerLifecycle:
 class TestRunInvestigation:
     """Tests for the run_investigation job handler."""
 
-    async def test_returns_complete_status(self) -> None:
-        """Test that run_investigation returns completion status."""
-        from dataing.entrypoints.worker import WORKER_ID, run_investigation
+    async def test_job_not_found_returns_failed(self) -> None:
+        """Test that run_investigation returns failed when job not found."""
+        from dataing.entrypoints.worker import run_investigation
 
         mock_db = AsyncMock()
+        mock_db.get_investigation_job = AsyncMock(return_value=None)
         ctx = {"db": mock_db}
         investigation_id = str(uuid4())
         tenant_id = str(uuid4())
@@ -122,44 +123,47 @@ class TestRunInvestigation:
             tenant_id=tenant_id,
         )
 
-        assert result["status"] == "complete"
-        assert result["investigation_id"] == investigation_id
-        assert result["worker_id"] == WORKER_ID
+        assert result["status"] == "failed"
+        assert "Job not found" in result["error"]
 
-    async def test_with_datasource_reconstructs_adapter(self) -> None:
-        """Test that run_investigation reconstructs adapter when datasource_id provided."""
+    async def test_missing_agent_client_returns_failed(self) -> None:
+        """Test that run_investigation returns failed when agent_client missing."""
         from dataing.entrypoints.worker import run_investigation
 
         mock_db = AsyncMock()
-        mock_adapter = MagicMock()
-        mock_adapter.__class__.__name__ = "PostgresAdapter"
+        mock_db.get_investigation_job = AsyncMock(return_value={"id": uuid4(), "status": "pending"})
+        mock_repository = AsyncMock()
 
-        ctx = {"db": mock_db}
+        ctx = {
+            "db": mock_db,
+            "repository": mock_repository,
+            "agent_client": None,  # Missing
+            "pattern_repository": MagicMock(),
+            "context_engine": MagicMock(),
+        }
         investigation_id = str(uuid4())
         tenant_id = str(uuid4())
-        datasource_id = str(uuid4())
 
-        with patch(
-            "dataing.entrypoints.worker.create_adapter_for_datasource",
-            new_callable=AsyncMock,
-            return_value=mock_adapter,
-        ) as mock_create:
-            result = await run_investigation(
-                ctx,
-                investigation_id=investigation_id,
-                tenant_id=tenant_id,
-                datasource_id=datasource_id,
-            )
+        result = await run_investigation(
+            ctx,
+            investigation_id=investigation_id,
+            tenant_id=tenant_id,
+        )
 
-            mock_create.assert_called_once()
-            assert result["adapter_type"] == "PostgresAdapter"
-            assert result["status"] == "complete"
+        assert result["status"] == "failed"
+        assert "ANTHROPIC_API_KEY" in result["error"]
 
-    async def test_without_datasource_no_adapter(self) -> None:
-        """Test that run_investigation works without datasource_id."""
+    async def test_cancelled_job_returns_cancelled(self) -> None:
+        """Test that a cancelling job is handled correctly."""
         from dataing.entrypoints.worker import run_investigation
 
         mock_db = AsyncMock()
+        mock_db.get_investigation_job = AsyncMock(
+            return_value={"id": uuid4(), "status": "cancelling"}
+        )
+        mock_db.mark_job_cancelled = AsyncMock()
+        mock_db.execute = AsyncMock()
+
         ctx = {"db": mock_db}
         investigation_id = str(uuid4())
         tenant_id = str(uuid4())
@@ -168,17 +172,17 @@ class TestRunInvestigation:
             ctx,
             investigation_id=investigation_id,
             tenant_id=tenant_id,
-            datasource_id=None,
         )
 
-        assert result["adapter_type"] is None
-        assert result["status"] == "complete"
+        assert result["status"] == "cancelled"
+        mock_db.mark_job_cancelled.assert_called_once()
 
     async def test_adapter_failure_returns_failed_status(self) -> None:
         """Test that adapter reconstruction failure returns failed status."""
         from dataing.entrypoints.worker import run_investigation
 
         mock_db = AsyncMock()
+        mock_db.get_investigation_job = AsyncMock(return_value={"id": uuid4(), "status": "pending"})
         ctx = {"db": mock_db}
         investigation_id = str(uuid4())
         tenant_id = str(uuid4())
@@ -273,13 +277,16 @@ class TestBranchHandling:
         assert result is False
         mock_db.update_job_status.assert_not_called()
 
-    async def test_branch_job_triggers_merge_check(self) -> None:
-        """Test that branch job completion triggers merge check."""
+    async def test_branch_job_with_cancelled_status(self) -> None:
+        """Test that branch job respects cancellation status."""
         from dataing.entrypoints.worker import run_investigation
 
         mock_db = AsyncMock()
-        mock_db.get_pending_children_count = AsyncMock(return_value=0)
-        mock_db.update_job_status = AsyncMock()
+        mock_db.get_investigation_job = AsyncMock(
+            return_value={"id": uuid4(), "status": "cancelling"}
+        )
+        mock_db.mark_job_cancelled = AsyncMock()
+        mock_db.execute = AsyncMock()
 
         ctx = {"db": mock_db}
         investigation_id = str(uuid4())
@@ -294,9 +301,8 @@ class TestBranchHandling:
             branch_spec={"branch_id": "test"},
         )
 
-        assert result["status"] == "complete"
-        assert result["is_branch"] is True
-        mock_db.get_pending_children_count.assert_called_once()
+        assert result["status"] == "cancelled"
+        mock_db.mark_job_cancelled.assert_called_once()
 
 
 class TestCancellation:

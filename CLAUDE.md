@@ -3,6 +3,8 @@
 We are pre-launch. Optimize for forward progress and quality; do not preserve legacy
 behavior unless the request calls for it.
 
+DO NOT WORRY ABOUT LEGACY CODE.
+
 ## Repository Map (Monorepo)
 
 - maestro/ - Generic workflow engine (zero deps, protocol-based steps)

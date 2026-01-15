@@ -206,11 +206,9 @@ export const useStartInvestigationApiV1InvestigationsPost = <
 /**
  * Cancel an investigation and all its child jobs.
 
-Marks the investigation job as 'cancelling'. The worker will detect this
-at the next step boundary and exit cleanly after checkpointing.
-
-For investigations with branches (child jobs), all children are also
-cancelled recursively.
+Marks the investigation job as 'cancelling'. The worker detects this
+at the next step boundary and exits cleanly. Child jobs are cancelled
+recursively.
 
 Args:
     http_request: The HTTP request for accessing app state.

@@ -4,10 +4,11 @@ from typing import Any
 from unittest.mock import AsyncMock
 
 import pytest
+from maestro import Signal
 
 from dataing.core.investigation.entities import InvestigationContext
 from dataing.core.investigation.steps.generate_query import GenerateQueryStep
-from maestro import Signal, StepType
+from dataing.core.investigation.values import StepType
 
 
 @pytest.fixture

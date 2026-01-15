@@ -415,7 +415,7 @@
           "investigations"
         ],
         "summary": "Cancel Investigation",
-        "description": "Cancel an investigation and all its child jobs.\n\nMarks the investigation job as 'cancelling'. The worker will detect this\nat the next step boundary and exit cleanly after checkpointing.\n\nFor investigations with branches (child jobs), all children are also\ncancelled recursively.\n\nArgs:\n    http_request: The HTTP request for accessing app state.\n    investigation_id: UUID of the investigation to cancel.\n    auth: Authentication context from API key/JWT.\n\nReturns:\n    CancelInvestigationResponse with cancellation status.\n\nRaises:\n    HTTPException: If investigation not found or already complete.",
+        "description": "Cancel an investigation and all its child jobs.\n\nMarks the investigation job as 'cancelling'. The worker detects this\nat the next step boundary and exits cleanly. Child jobs are cancelled\nrecursively.\n\nArgs:\n    http_request: The HTTP request for accessing app state.\n    investigation_id: UUID of the investigation to cancel.\n    auth: Authentication context from API key/JWT.\n\nReturns:\n    CancelInvestigationResponse with cancellation status.\n\nRaises:\n    HTTPException: If investigation not found or already complete.",
         "operationId": "cancel_investigation_api_v1_investigations__investigation_id__cancel_post",
         "security": [
           {
@@ -9268,7 +9268,7 @@
           "status": {
             "type": "string",
             "title": "Status",
-            "default": "running"
+            "default": "queued"
           }
         },
         "type": "object",

@@ -127,7 +127,7 @@ export function useInvestigation(investigationId: string | undefined) {
     enabled: !!investigationId,
     refetchInterval: (query) => {
       const data = query.state.data
-      if (data?.status === 'completed' || data?.status === 'failed') {
+      if (['completed', 'failed', 'cancelled', 'inconclusive'].includes(data?.status ?? '')) {
         return false
       }
       return 2000

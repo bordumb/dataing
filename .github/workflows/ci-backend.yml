@@ -4,13 +4,15 @@ on:
   push:
     branches: [main]
     paths:
-      - 'backend/**'
+      - 'dataing/**'
+      - 'dataing-ee/**'
       - 'pyproject.toml'
       - '.github/workflows/ci-backend.yml'
   pull_request:
     branches: [main]
     paths:
-      - 'backend/**'
+      - 'dataing/**'
+      - 'dataing-ee/**'
       - 'pyproject.toml'
       - '.github/workflows/ci-backend.yml'
 
@@ -50,13 +52,13 @@ jobs:
         run: uv sync --all-extras
 
       - name: Run Ruff
-        run: uv run ruff check backend/
+        run: uv run ruff check dataing/ dataing-ee/
 
       - name: Run mypy
-        run: uv run mypy backend/
+        run: uv run mypy dataing/ dataing-ee/
 
       - name: Run tests
-        run: uv run pytest --cov=backend/src/dataing --cov-report=xml
+        run: uv run pytest --cov=dataing/ dataing-ee/ --cov-report=xml
         env:
           DATABASE_URL: postgresql://test:test@localhost:5432/test
 

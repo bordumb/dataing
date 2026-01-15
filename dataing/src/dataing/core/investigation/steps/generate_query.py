@@ -78,20 +78,24 @@ class GenerateQueryStep(Step[dict[str, Any], str]):
 
         Args:
             context: Current investigation context with schema.
-            input_data: Step cursor data containing the hypothesis.
+            input_data: Step cursor data containing the hypothesis (optional).
 
         Returns:
             StepResult with CONTINUE signal and generated query.
         """
-        # Validate input_data contains hypothesis
-        if input_data is None or "hypothesis" not in input_data:
+        # Get hypothesis from input_data or context.current_hypothesis
+        hypothesis: dict[str, Any] | None = None
+        if input_data and "hypothesis" in input_data:
+            hypothesis = input_data["hypothesis"]
+        elif context.current_hypothesis:
+            hypothesis = context.current_hypothesis
+
+        if hypothesis is None:
             return StepResult(
                 context=context,
                 signal=Signal.FAIL,
-                error="No hypothesis in input data for query generation",
+                error="No hypothesis available for query generation",
             )
-
-        hypothesis: dict[str, Any] = input_data["hypothesis"]
 
         # Generate query via LLM
         try:

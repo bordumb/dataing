@@ -739,7 +739,15 @@ class AppDatabase:
         Returns:
             The updated job record.
         """
-        updates = ["status = $2"]
+        # Protect against overwriting cancellation state with running state
+        # If the job is already cancelling, we shouldn't set it back to running
+        if status == "running":
+            updates = [
+                "status = CASE WHEN status = 'cancelling' THEN 'cancelling' ELSE $2 END"
+            ]
+        else:
+            updates = ["status = $2"]
+
         args: list[Any] = [job_id, status]
         idx = 3
 

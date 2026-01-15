@@ -10,16 +10,31 @@ Usage:
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
 import os
 import signal
+from contextlib import AsyncExitStack
 from typing import Any
 from uuid import UUID, uuid4
 
 from arq import Worker
 
+from dataing.adapters.context.engine import ContextEngine
 from dataing.adapters.datasource import create_adapter_for_datasource
 from dataing.adapters.db.app_db import AppDatabase
+from dataing.adapters.db.investigation_repository import PostgresInvestigationRepository
+from dataing.adapters.investigation.pattern_adapter import InMemoryPatternRepository
+from dataing.agents.client import AgentClient
+from dataing.core.investigation.flow import (
+    AwaitingUserInput,
+    InvestigationCancelled,
+    InvestigationError,
+    WorkerShutdownError,
+    build_investigation_workflow,
+    run_with_checkpointing,
+)
+from dataing.core.investigation.values import StepType, VersionId
 from dataing.core.queue import INVESTIGATIONS_QUEUE, get_redis_settings
 
 logger = logging.getLogger(__name__)
@@ -63,6 +78,42 @@ async def run_investigation(
     )
 
     db: AppDatabase = ctx["db"]
+    inv_uuid = UUID(investigation_id)
+
+    # Get the job record
+    job = await db.get_investigation_job(inv_uuid)
+    if not job:
+        logger.error(f"No job found for investigation: {investigation_id}")
+        return {
+            "status": "failed",
+            "investigation_id": investigation_id,
+            "worker_id": WORKER_ID,
+            "error": "Job not found",
+        }
+
+    job_id = job["id"]
+
+    # Check for cancellation before starting
+    if job.get("status") == "cancelling":
+        logger.info(f"Job already cancelled: job_id={job_id}")
+        await db.mark_job_cancelled(job_id)
+        await db.execute(
+            """
+            UPDATE investigations
+            SET outcome = $1
+            WHERE id = $2
+            """,
+            json.dumps({"status": "cancelled", "reason": "User cancelled before execution"}),
+            inv_uuid,
+        )
+        return {
+            "status": "cancelled",
+            "investigation_id": investigation_id,
+            "worker_id": WORKER_ID,
+        }
+
+    # Mark job as running
+    await db.update_job_status(job_id, status="running", current_step="starting")
 
     # Reconstruct adapter from stored datasource config if specified
     adapter = None
@@ -76,6 +127,7 @@ async def run_investigation(
             logger.info(f"Adapter reconstructed for datasource: {datasource_id}")
         except Exception as e:
             logger.error(f"Failed to reconstruct adapter: {e}")
+            await db.update_job_status(job_id, status="failed")
             return {
                 "status": "failed",
                 "investigation_id": investigation_id,
@@ -83,24 +135,204 @@ async def run_investigation(
                 "error": str(e),
             }
 
-    # TODO: Full workflow implementation
-    # - Load/create job record
-    # - Run workflow with checkpointing
-    # - Handle BRANCH signal by creating child jobs
-    # - Update job status
+    # Get workflow dependencies from context
+    repository: PostgresInvestigationRepository = ctx["repository"]
+    agent_client: AgentClient | None = ctx["agent_client"]
+    pattern_repository: InMemoryPatternRepository = ctx["pattern_repository"]
+    context_engine: ContextEngine = ctx["context_engine"]
 
-    # If this is a branch job, check if parent can merge after completion
-    if is_branch and parent_job_id:
-        await check_and_trigger_merge(db, UUID(parent_job_id))
+    if not agent_client:
+        logger.error("AgentClient not available - cannot run workflow")
+        await db.update_job_status(job_id, status="failed")
+        return {
+            "status": "failed",
+            "investigation_id": investigation_id,
+            "worker_id": WORKER_ID,
+            "error": "ANTHROPIC_API_KEY not configured",
+        }
 
-    return {
-        "status": "complete",
-        "investigation_id": investigation_id,
-        "worker_id": WORKER_ID,
-        "adapter_type": type(adapter).__name__ if adapter else None,
-        "is_branch": is_branch,
-        "branch_spec": branch_spec,
-    }
+    # Load investigation and current state
+    investigation = await repository.get_investigation(inv_uuid)
+    if not investigation or not investigation.main_branch_id:
+        logger.error(f"Investigation or main branch not found: {investigation_id}")
+        await db.update_job_status(job_id, status="failed")
+        return {
+            "status": "failed",
+            "investigation_id": investigation_id,
+            "worker_id": WORKER_ID,
+            "error": "Investigation or main branch not found",
+        }
+
+    main_branch = await repository.get_branch(investigation.main_branch_id)
+    if not main_branch or not main_branch.head_snapshot_id:
+        logger.error(f"Main branch or snapshot not found: {investigation.main_branch_id}")
+        await db.update_job_status(job_id, status="failed")
+        return {
+            "status": "failed",
+            "investigation_id": investigation_id,
+            "worker_id": WORKER_ID,
+            "error": "Main branch or snapshot not found",
+        }
+
+    snapshot = await repository.get_snapshot(main_branch.head_snapshot_id)
+    if not snapshot:
+        logger.error(f"Snapshot not found: {main_branch.head_snapshot_id}")
+        await db.update_job_status(job_id, status="failed")
+        return {
+            "status": "failed",
+            "investigation_id": investigation_id,
+            "worker_id": WORKER_ID,
+            "error": "Snapshot not found",
+        }
+
+    # Build the workflow
+    workflow = build_investigation_workflow(
+        context_engine=context_engine,
+        llm=agent_client,
+        database=adapter,
+        pattern_repository=pattern_repository,
+    )
+
+    # Checkpoint callback - saves state after each step
+    async def on_step_complete(context: Any, next_step: str | None) -> None:
+        """Save checkpoint after each step completes."""
+        step_type = StepType(next_step) if next_step else StepType.COMPLETE
+        new_snapshot = await repository.create_snapshot(
+            investigation_id=inv_uuid,
+            branch_id=main_branch.id,
+            version=VersionId(
+                major=snapshot.version.major,
+                minor=snapshot.version.minor,
+                patch=snapshot.version.patch + 1,
+            ),
+            step=step_type,
+            context=context,
+            parent_snapshot_id=snapshot.id,
+            trigger="worker",
+        )
+        await repository.update_branch_head(main_branch.id, new_snapshot.id)
+        await db.update_job_status(job_id, status="running", current_step=step_type.value)
+
+        # Check for cancellation at step boundaries
+        if await check_cancellation(db, job_id):
+            raise InvestigationCancelled()
+
+        logger.info(f"Checkpoint saved: step={step_type.value}, snapshot={new_snapshot.id}")
+
+    async with AsyncExitStack() as stack:
+        if adapter:
+            await stack.enter_async_context(adapter)
+
+        # Run the workflow
+        try:
+            final_context = await run_with_checkpointing(
+                workflow=workflow,
+                context=snapshot.context,
+                start_step=snapshot.step.value,
+                on_step_complete=on_step_complete,
+                shutdown_signal=shutdown_event,
+            )
+
+            # Workflow completed successfully
+            outcome = {
+                "status": "completed",
+                "synthesis": final_context.current_synthesis,
+                "evidence_count": len(final_context.evidence),
+                "queries_executed": final_context.total_queries_executed,
+            }
+            await repository.update_investigation_outcome(inv_uuid, outcome)
+            await db.update_job_status(job_id, status="completed")
+            logger.info(f"Investigation completed: {investigation_id}")
+
+            # If this is a branch job, check if parent can merge
+            if is_branch and parent_job_id:
+                await check_and_trigger_merge(db, UUID(parent_job_id))
+
+            return {
+                "status": "completed",
+                "investigation_id": investigation_id,
+                "worker_id": WORKER_ID,
+            }
+
+        except WorkerShutdownError:
+            # Graceful shutdown - job will be retried
+            logger.info(f"Worker shutdown, job checkpointed: {investigation_id}")
+            await db.update_job_status(job_id, status="pending")
+            return {
+                "status": "shutdown",
+                "investigation_id": investigation_id,
+                "worker_id": WORKER_ID,
+            }
+
+        except AwaitingUserInput as e:
+            # Workflow paused for user input
+            logger.info(f"Awaiting user input: {investigation_id}, next_step={e.next_step}")
+            await db.update_job_status(job_id, status="awaiting_input", current_step=e.next_step)
+            return {
+                "status": "awaiting_input",
+                "investigation_id": investigation_id,
+                "worker_id": WORKER_ID,
+                "next_step": e.next_step,
+            }
+
+        except InvestigationCancelled:
+            # User cancelled the investigation
+            logger.info(f"Investigation cancelled: {investigation_id}")
+            await db.mark_job_cancelled(job_id)
+            await db.execute(
+                """
+                UPDATE investigations
+                SET outcome = $1
+                WHERE id = $2
+                """,
+                json.dumps({"status": "cancelled", "reason": "User cancelled"}),
+                inv_uuid,
+            )
+            return {
+                "status": "cancelled",
+                "investigation_id": investigation_id,
+                "worker_id": WORKER_ID,
+            }
+
+        except InvestigationError as e:
+            # Workflow failed
+            logger.error(f"Investigation failed: {investigation_id}, error={e.error}")
+            await db.update_job_status(job_id, status="failed")
+            await db.execute(
+                """
+                UPDATE investigations
+                SET outcome = $1
+                WHERE id = $2
+                """,
+                json.dumps({"status": "failed", "error": e.error}),
+                inv_uuid,
+            )
+            return {
+                "status": "failed",
+                "investigation_id": investigation_id,
+                "worker_id": WORKER_ID,
+                "error": e.error,
+            }
+
+        except Exception as e:
+            # Unexpected error
+            logger.exception(f"Unexpected error in investigation: {investigation_id}")
+            await db.update_job_status(job_id, status="failed")
+            await db.execute(
+                """
+                UPDATE investigations
+                SET outcome = $1
+                WHERE id = $2
+                """,
+                json.dumps({"status": "failed", "error": str(e)}),
+                inv_uuid,
+            )
+            return {
+                "status": "failed",
+                "investigation_id": investigation_id,
+                "worker_id": WORKER_ID,
+                "error": str(e),
+            }
 
 
 async def check_and_trigger_merge(db: AppDatabase, parent_job_id: UUID) -> bool:
@@ -205,7 +437,7 @@ async def check_cancellation(db: AppDatabase, job_id: UUID) -> bool:
     Returns:
         True if job status is 'cancelling', False otherwise.
     """
-    status = await db.get_job_status(job_id)
+    status: str | None = await db.get_job_status(job_id)
     return status == "cancelling"
 
 
@@ -221,8 +453,6 @@ async def handle_cancellation(db: AppDatabase, job_id: UUID) -> dict[str, Any]:
     Returns:
         Dictionary with cancelled status.
     """
-    from dataing.core.investigation.flow import InvestigationCancelled
-
     await db.mark_job_cancelled(job_id)
     logger.info(f"Job cancelled: job_id={job_id}")
     raise InvestigationCancelled()
@@ -231,7 +461,7 @@ async def handle_cancellation(db: AppDatabase, job_id: UUID) -> dict[str, Any]:
 async def startup(ctx: dict[str, Any]) -> None:
     """Initialize worker resources on startup.
 
-    Sets up database connection and signal handlers for graceful shutdown.
+    Sets up database connection, LLM client, and signal handlers.
 
     Args:
         ctx: Worker context dictionary to populate with resources.
@@ -247,6 +477,24 @@ async def startup(ctx: dict[str, Any]) -> None:
     ctx["db"] = db
     ctx["worker_id"] = WORKER_ID
     ctx["shutdown_event"] = shutdown_event
+
+    # Initialize investigation repository
+    ctx["repository"] = PostgresInvestigationRepository(db)
+
+    # Initialize LLM client (required for workflow steps)
+    anthropic_api_key = os.getenv("ANTHROPIC_API_KEY")
+    if anthropic_api_key:
+        ctx["agent_client"] = AgentClient(api_key=anthropic_api_key)
+        logger.info("AgentClient initialized")
+    else:
+        logger.warning("ANTHROPIC_API_KEY not set - workflow execution will fail")
+        ctx["agent_client"] = None
+
+    # Initialize pattern repository (in-memory for now)
+    ctx["pattern_repository"] = InMemoryPatternRepository()
+
+    # Initialize context engine
+    ctx["context_engine"] = ContextEngine()
 
     # Register signal handlers for graceful shutdown
     loop = asyncio.get_running_loop()
@@ -326,7 +574,21 @@ def main() -> None:
         format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
     )
     logger.info("Starting Arq worker")
-    Worker(WorkerSettings).run()
+
+    # Pass settings as keyword arguments - Worker expects explicit params, not a class
+    Worker(
+        functions=WorkerSettings.functions,
+        queue_name=WorkerSettings.queue_name,
+        redis_settings=WorkerSettings.redis_settings,
+        on_startup=WorkerSettings.on_startup,
+        on_shutdown=WorkerSettings.on_shutdown,
+        max_jobs=WorkerSettings.max_jobs,
+        job_timeout=WorkerSettings.job_timeout,
+        keep_result_forever=False,
+        health_check_interval=WorkerSettings.health_check_interval,
+        handle_signals=WorkerSettings.handle_signals,
+        retry_jobs=WorkerSettings.retry_jobs,
+    ).run()
 
 
 if __name__ == "__main__":

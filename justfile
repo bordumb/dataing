@@ -217,8 +217,12 @@ demo: demo-fixtures
     # Start Jaeger (for trace visualization)
     echo "Setting up Jaeger..."
     docker rm -f dataing-demo-jaeger 2>/dev/null || true
+    # Create Jaeger UI config for dark mode
+    echo '{"darkMode":true}' > /tmp/jaeger-ui-config.json
     docker run -d --name dataing-demo-jaeger \
         -e COLLECTOR_OTLP_ENABLED=true \
+        -v /tmp/jaeger-ui-config.json:/etc/jaeger/ui-config.json:ro \
+        -e QUERY_UI_CONFIG=/etc/jaeger/ui-config.json \
         -p 16686:16686 \
         -p 4317:4317 \
         -p 4318:4318 \

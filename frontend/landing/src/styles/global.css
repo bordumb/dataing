@@ -142,33 +142,36 @@ nav {
 /* Tabs */
 .tabs {
   display: flex;
-  gap: 4px;
+  gap: 6px;
   background: var(--landing-bg-secondary);
-  padding: 4px;
-  border-radius: 10px;
+  padding: 6px;
+  border-radius: 14px;
   border: 1px solid var(--landing-border);
 }
 
 .tab {
-  padding: 8px 20px;
-  font-size: 0.875rem;
+  padding: 12px 42px;
+  font-size: 0.9rem;
   font-weight: 500;
   color: var(--landing-text-muted);
   background: transparent;
   border: none;
-  border-radius: 6px;
+  border-radius: 10px;
   cursor: pointer;
   transition: all 0.2s ease;
   text-decoration: none;
+  letter-spacing: 0.02em;
 }
 
 .tab:hover {
   color: var(--landing-text);
+  background: rgba(255, 255, 255, 0.04);
 }
 
 .tab.active {
   background: var(--landing-accent);
   color: var(--landing-bg);
+  font-weight: 600;
 }
 
 /* Nav actions */

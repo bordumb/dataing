@@ -61,9 +61,7 @@ async def verify_api_key(
                 scopes=scopes,
             )
             request.state.auth_context = context
-            logger.debug(
-                f"jwt_verified_via_query: user_id={payload.sub}, org_id={payload.org_id}"
-            )
+            logger.debug(f"jwt_verified_via_query: user_id={payload.sub}, org_id={payload.org_id}")
             return context
         except TokenError as e:
             logger.warning(f"jwt_query_param_validation_failed: {e}")

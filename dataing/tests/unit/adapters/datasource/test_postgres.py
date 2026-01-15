@@ -175,7 +175,6 @@ class TestPostgresAdapterConnect:
             assert "asyncpg is not installed" in str(exc_info.value)
 
 
-
 class TestPostgresAdapterDisconnect:
     """Tests for PostgresAdapter.disconnect method."""
 

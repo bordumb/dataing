@@ -290,7 +290,7 @@ class TestPostgresAuthRepository:
                 "name": "Test User",
                 "password_hash": "hashed",  # pragma: allowlist secret
                 "is_active": True,
-                "created_at": datetime.now(timezone.utc),
+                "created_at": datetime.now(datetime.UTC),
             }
         )
 
@@ -317,7 +317,7 @@ class TestPostgresAuthRepository:
     ) -> None:
         """Should create user and return it."""
         user_id = uuid4()
-        created_at = datetime.now(timezone.utc)
+        created_at = datetime.now(datetime.UTC)
         mock_db.fetch_one = AsyncMock(
             return_value={
                 "id": user_id,
@@ -485,7 +485,7 @@ class PostgresAuthRepository:
             return await self.get_user_by_id(user_id)
 
         updates.append(f"updated_at = ${param_idx}")
-        params.append(datetime.now(timezone.utc))
+        params.append(datetime.now(datetime.UTC))
         param_idx += 1
 
         params.append(user_id)
@@ -722,7 +722,7 @@ class TestAuthServiceLogin:
                 name="Test",
                 password_hash=password_hash,
                 is_active=True,
-                created_at=datetime.now(timezone.utc),
+                created_at=datetime.now(datetime.UTC),
             )
         )
         mock_repo.get_user_orgs = AsyncMock(
@@ -733,7 +733,7 @@ class TestAuthServiceLogin:
                         name="Test Org",
                         slug="test-org",
                         plan="free",
-                        created_at=datetime.now(timezone.utc),
+                        created_at=datetime.now(datetime.UTC),
                     ),
                     OrgRole.ADMIN,
                 )
@@ -761,7 +761,7 @@ class TestAuthServiceLogin:
                 name="Test",
                 password_hash=hash_password("correct_password"),
                 is_active=True,
-                created_at=datetime.now(timezone.utc),
+                created_at=datetime.now(datetime.UTC),
             )
         )
 
@@ -803,7 +803,7 @@ class TestAuthServiceRegister:
         """Should create user and organization."""
         user_id = uuid4()
         org_id = uuid4()
-        created_at = datetime.now(timezone.utc)
+        created_at = datetime.now(datetime.UTC)
 
         mock_repo.get_user_by_email = AsyncMock(return_value=None)
         mock_repo.get_org_by_slug = AsyncMock(return_value=None)
@@ -851,7 +851,7 @@ class TestAuthServiceRegister:
                 name="Existing",
                 password_hash="hash",  # pragma: allowlist secret
                 is_active=True,
-                created_at=datetime.now(timezone.utc),
+                created_at=datetime.now(datetime.UTC),
             )
         )
 

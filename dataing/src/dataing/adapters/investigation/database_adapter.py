@@ -51,10 +51,7 @@ def _serialize_rows(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
     Returns:
         Rows with all values JSON-serializable.
     """
-    return [
-        {k: _serialize_value(v) for k, v in row.items()}
-        for row in rows
-    ]
+    return [{k: _serialize_value(v) for k, v in row.items()} for row in rows]
 
 
 class DatabaseAdapter:

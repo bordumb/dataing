@@ -281,7 +281,7 @@ class TestFullInvestigationFlow:
 
         checkpoints: list[tuple[str, str]] = []
 
-        async def on_checkpoint(ctx: InvestigationContext, next_step: str | None) -> None:
+        async def on_checkpoint(ctx: InvestigationContext, next_step: str | None, step_cursor: dict[str, Any] | None = None) -> None:
             step_name = next_step or "COMPLETE"
             checkpoints.append((step_name, str(len(ctx.evidence))))
             print(f"  Checkpoint: step={step_name}, evidence_count={len(ctx.evidence)}")
@@ -307,6 +307,62 @@ class TestFullInvestigationFlow:
         assert len(checkpoints) > 0
         # First checkpoint should be check_patterns (after gather_context)
         assert checkpoints[0][0] == StepType.CHECK_PATTERNS.value
+
+    async def test_sequential_branch_execution_ordering(
+        self,
+        initial_context: InvestigationContext,
+        context_engine: ContextEngine,
+        agent_client,
+        duckdb_adapter: DuckDBAdapter,
+        pattern_repository: InMemoryPatternRepository,
+    ) -> None:
+        """Test that sequential branch execution follows the correct step sequence.
+
+        Specifically, verify that it cycles through hypothesis steps for each branch
+        and does NOT flash 'synthesize' between branches.
+        """
+        workflow = build_investigation_workflow(
+            context_engine=context_engine,
+            llm=agent_client,
+            database=duckdb_adapter,
+            pattern_repository=pattern_repository,
+        )
+
+        steps_sequence: list[str] = []
+
+        async def on_checkpoint(ctx: InvestigationContext, next_step: str | None, step_cursor: dict[str, Any] | None = None) -> None:
+            step_name = next_step or "complete"
+            steps_sequence.append(step_name)
+
+        shutdown_signal = asyncio.Event()
+
+        await run_with_checkpointing(
+            workflow=workflow,
+            context=initial_context,
+            start_step=StepType.GATHER_CONTEXT.value,
+            on_step_complete=on_checkpoint,
+            shutdown_signal=shutdown_signal,
+            max_iterations=50,
+        )
+
+        print(f"\nStep sequence: {steps_sequence}")
+
+        # Basic sequence check
+        assert StepType.GATHER_CONTEXT.value not in steps_sequence # next_step is always AFTER
+        assert StepType.CHECK_PATTERNS.value in steps_sequence
+        assert StepType.GENERATE_HYPOTHESES.value in steps_sequence
+
+        # Verify loop behavior: it should go to generate_query multiple times if there are multiple hypotheses
+        gen_query_count = steps_sequence.count(StepType.GENERATE_QUERY.value)
+        assert gen_query_count > 0
+
+        # Critical check: synthesize should only appear once at the end (or near end)
+        # It should NOT appear between hypothesis loops.
+        synthesize_indices = [i for i, s in enumerate(steps_sequence) if s == StepType.SYNTHESIZE.value]
+        assert len(synthesize_indices) == 1, f"Synthesize should only appear once, got: {steps_sequence}"
+
+        # Ensure 'complete' is the last step
+        assert steps_sequence[-1] == "complete"
 
 
 class TestStepByStepExecution:
@@ -351,7 +407,9 @@ class TestStepByStepExecution:
             print(f"  Hypotheses: {len(result.context.hypotheses)}")
 
             if result.context.current_synthesis:
-                print(f"  Synthesis confidence: {result.context.current_synthesis.get('confidence')}")
+                print(
+                    f"  Synthesis confidence: {result.context.current_synthesis.get('confidence')}"
+                )
 
             if result.error:
                 print(f"  ERROR: {result.error}")
@@ -392,7 +450,7 @@ class TestShutdownAndCancellation:
 
         checkpoints: list[str] = []
 
-        async def on_checkpoint(ctx: InvestigationContext, next_step: str | None) -> None:
+        async def on_checkpoint(ctx: InvestigationContext, next_step: str | None, step_cursor: dict[str, Any] | None = None) -> None:
             checkpoints.append(next_step or "COMPLETE")
 
         # Set shutdown signal BEFORE starting

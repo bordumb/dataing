@@ -190,13 +190,15 @@ class TestSQLAdapterCountRows:
         """Test counting rows in a table."""
         adapter = ConcreteSQLAdapter({})
         await adapter.connect()
-        adapter.set_query_results([
-            QueryResult(
-                columns=[{"name": "cnt", "data_type": "integer"}],
-                rows=[{"cnt": 5000}],
-                row_count=1,
-            )
-        ])
+        adapter.set_query_results(
+            [
+                QueryResult(
+                    columns=[{"name": "cnt", "data_type": "integer"}],
+                    rows=[{"cnt": 5000}],
+                    row_count=1,
+                )
+            ]
+        )
 
         count = await adapter.count_rows("users")
         assert count == 5000
@@ -229,13 +231,15 @@ class TestSQLAdapterCountRows:
         """Test count returns 0 for empty results."""
         adapter = ConcreteSQLAdapter({})
         await adapter.connect()
-        adapter.set_query_results([
-            QueryResult(
-                columns=[],
-                rows=[],
-                row_count=0,
-            )
-        ])
+        adapter.set_query_results(
+            [
+                QueryResult(
+                    columns=[],
+                    rows=[],
+                    row_count=0,
+                )
+            ]
+        )
 
         count = await adapter.count_rows("empty_table")
         assert count == 0
@@ -269,25 +273,29 @@ class TestSQLAdapterGetColumnStats:
         """Test getting stats for a single column."""
         adapter = ConcreteSQLAdapter({})
         await adapter.connect()
-        adapter.set_query_results([
-            QueryResult(
-                columns=[
-                    {"name": "total_count", "data_type": "integer"},
-                    {"name": "non_null_count", "data_type": "integer"},
-                    {"name": "distinct_count", "data_type": "integer"},
-                    {"name": "min_value", "data_type": "string"},
-                    {"name": "max_value", "data_type": "string"},
-                ],
-                rows=[{
-                    "total_count": 1000,
-                    "non_null_count": 950,
-                    "distinct_count": 100,
-                    "min_value": "1",
-                    "max_value": "100",
-                }],
-                row_count=1,
-            )
-        ])
+        adapter.set_query_results(
+            [
+                QueryResult(
+                    columns=[
+                        {"name": "total_count", "data_type": "integer"},
+                        {"name": "non_null_count", "data_type": "integer"},
+                        {"name": "distinct_count", "data_type": "integer"},
+                        {"name": "min_value", "data_type": "string"},
+                        {"name": "max_value", "data_type": "string"},
+                    ],
+                    rows=[
+                        {
+                            "total_count": 1000,
+                            "non_null_count": 950,
+                            "distinct_count": 100,
+                            "min_value": "1",
+                            "max_value": "100",
+                        }
+                    ],
+                    row_count=1,
+                )
+            ]
+        )
 
         stats = await adapter.get_column_stats("users", ["age"])
 
@@ -303,30 +311,36 @@ class TestSQLAdapterGetColumnStats:
         """Test getting stats for multiple columns."""
         adapter = ConcreteSQLAdapter({})
         await adapter.connect()
-        adapter.set_query_results([
-            QueryResult(
-                columns=[],
-                rows=[{
-                    "total_count": 100,
-                    "non_null_count": 100,
-                    "distinct_count": 10,
-                    "min_value": "a",
-                    "max_value": "z",
-                }],
-                row_count=1,
-            ),
-            QueryResult(
-                columns=[],
-                rows=[{
-                    "total_count": 100,
-                    "non_null_count": 80,
-                    "distinct_count": 50,
-                    "min_value": "0",
-                    "max_value": "999",
-                }],
-                row_count=1,
-            ),
-        ])
+        adapter.set_query_results(
+            [
+                QueryResult(
+                    columns=[],
+                    rows=[
+                        {
+                            "total_count": 100,
+                            "non_null_count": 100,
+                            "distinct_count": 10,
+                            "min_value": "a",
+                            "max_value": "z",
+                        }
+                    ],
+                    row_count=1,
+                ),
+                QueryResult(
+                    columns=[],
+                    rows=[
+                        {
+                            "total_count": 100,
+                            "non_null_count": 80,
+                            "distinct_count": 50,
+                            "min_value": "0",
+                            "max_value": "999",
+                        }
+                    ],
+                    row_count=1,
+                ),
+            ]
+        )
 
         stats = await adapter.get_column_stats("users", ["name", "age"])
 
@@ -346,13 +360,15 @@ class TestSQLAdapterGetColumnStats:
             captured_sql.append(sql)
             return QueryResult(
                 columns=[],
-                rows=[{
-                    "total_count": 100,
-                    "non_null_count": 100,
-                    "distinct_count": 10,
-                    "min_value": "1",
-                    "max_value": "10",
-                }],
+                rows=[
+                    {
+                        "total_count": 100,
+                        "non_null_count": 100,
+                        "distinct_count": 10,
+                        "min_value": "1",
+                        "max_value": "10",
+                    }
+                ],
                 row_count=1,
             )
 
@@ -386,19 +402,23 @@ class TestSQLAdapterGetColumnStats:
         """Test stats calculation when table has zero rows."""
         adapter = ConcreteSQLAdapter({})
         await adapter.connect()
-        adapter.set_query_results([
-            QueryResult(
-                columns=[],
-                rows=[{
-                    "total_count": 0,
-                    "non_null_count": 0,
-                    "distinct_count": 0,
-                    "min_value": None,
-                    "max_value": None,
-                }],
-                row_count=1,
-            )
-        ])
+        adapter.set_query_results(
+            [
+                QueryResult(
+                    columns=[],
+                    rows=[
+                        {
+                            "total_count": 0,
+                            "non_null_count": 0,
+                            "distinct_count": 0,
+                            "min_value": None,
+                            "max_value": None,
+                        }
+                    ],
+                    row_count=1,
+                )
+            ]
+        )
 
         stats = await adapter.get_column_stats("empty_table", ["col"])
 

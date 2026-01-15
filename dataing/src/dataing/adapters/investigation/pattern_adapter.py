@@ -111,10 +111,12 @@ class InMemoryPatternRepository:
             confidence = success_count / match_count if match_count > 0 else 0.5
 
             if confidence >= min_confidence:
-                matches.append({
-                    **pattern,
-                    "confidence": confidence,
-                })
+                matches.append(
+                    {
+                        **pattern,
+                        "confidence": confidence,
+                    }
+                )
 
         return matches
 

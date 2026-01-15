@@ -222,8 +222,7 @@ class SQLiteAdapter(SQLAdapter):
                 )
 
             columns = [
-                {"name": desc[0], "data_type": "string"}
-                for desc in (cursor.description or [])
+                {"name": desc[0], "data_type": "string"} for desc in (cursor.description or [])
             ]
 
             row_dicts = [dict(row) for row in rows]
@@ -263,12 +262,14 @@ class SQLiteAdapter(SQLAdapter):
         )
         tables = []
         for row in cursor:
-            tables.append({
-                "table_catalog": DEFAULT_CATALOG,
-                "table_schema": DEFAULT_SCHEMA,
-                "table_name": row["name"],
-                "table_type": row["type"].upper(),
-            })
+            tables.append(
+                {
+                    "table_catalog": DEFAULT_CATALOG,
+                    "table_schema": DEFAULT_SCHEMA,
+                    "table_name": row["name"],
+                    "table_type": row["type"].upper(),
+                }
+            )
         cursor.close()
         return tables
 
@@ -293,13 +294,12 @@ class SQLiteAdapter(SQLAdapter):
                 if filter.table_pattern:
                     pattern = filter.table_pattern.replace("%", ".*").replace("_", ".")
                     table_rows = [
-                        r for r in table_rows
-                        if re.match(pattern, r["name"], re.IGNORECASE)
+                        r for r in table_rows if re.match(pattern, r["name"], re.IGNORECASE)
                     ]
                 if not filter.include_views:
                     table_rows = [r for r in table_rows if r["type"] == "table"]
                 if filter.max_tables:
-                    table_rows = table_rows[:filter.max_tables]
+                    table_rows = table_rows[: filter.max_tables]
 
             tables = []
             for table_row in table_rows:
@@ -314,23 +314,27 @@ class SQLiteAdapter(SQLAdapter):
 
                 columns = []
                 for col in col_rows:
-                    columns.append({
-                        "name": col["name"],
-                        "data_type": normalize_type(col["type"] or "TEXT", SourceType.SQLITE),
-                        "native_type": col["type"] or "TEXT",
-                        "nullable": not col["notnull"],
-                        "is_primary_key": bool(col["pk"]),
-                        "is_partition_key": False,
-                        "default_value": col["dflt_value"],
-                    })
+                    columns.append(
+                        {
+                            "name": col["name"],
+                            "data_type": normalize_type(col["type"] or "TEXT", SourceType.SQLITE),
+                            "native_type": col["type"] or "TEXT",
+                            "nullable": not col["notnull"],
+                            "is_primary_key": bool(col["pk"]),
+                            "is_partition_key": False,
+                            "default_value": col["dflt_value"],
+                        }
+                    )
 
-                tables.append({
-                    "name": table_name,
-                    "table_type": table_type,
-                    "native_type": table_row["type"].upper(),
-                    "native_path": table_name,
-                    "columns": columns,
-                })
+                tables.append(
+                    {
+                        "name": table_name,
+                        "table_type": table_type,
+                        "native_type": table_row["type"].upper(),
+                        "native_path": table_name,
+                        "columns": columns,
+                    }
+                )
 
             catalogs = [
                 {

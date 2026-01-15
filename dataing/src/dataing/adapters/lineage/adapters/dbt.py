@@ -194,8 +194,7 @@ class DbtAdapter(BaseLineageAdapter):
 
                 # Get artifacts from latest run
                 artifact_response = await self._client.get(
-                    f"/accounts/{self._account_id}/runs/{latest_run['id']}"
-                    "/artifacts/manifest.json"
+                    f"/accounts/{self._account_id}/runs/{latest_run['id']}/artifacts/manifest.json"
                 )
                 artifact_response.raise_for_status()
                 self._manifest = artifact_response.json()
@@ -476,8 +475,7 @@ class DbtAdapter(BaseLineageAdapter):
             ),
             name=source.get("name", ""),
             qualified_name=(
-                f"{source.get('database', '')}.{source.get('schema', '')}."
-                f"{source.get('name', '')}"
+                f"{source.get('database', '')}.{source.get('schema', '')}.{source.get('name', '')}"
             ),
             dataset_type=DatasetType.SOURCE,
             platform=self._target_platform,

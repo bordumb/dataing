@@ -301,13 +301,15 @@ class TestFileSystemAdapterPreview:
         """Test that preview delegates to read_file."""
         adapter = ConcreteFileSystemAdapter({})
         await adapter.connect()
-        adapter.set_read_results([
-            QueryResult(
-                columns=[{"name": "id", "data_type": "integer"}],
-                rows=[{"id": 1}, {"id": 2}, {"id": 3}],
-                row_count=3,
-            )
-        ])
+        adapter.set_read_results(
+            [
+                QueryResult(
+                    columns=[{"name": "id", "data_type": "integer"}],
+                    rows=[{"id": 1}, {"id": 2}, {"id": 3}],
+                    row_count=3,
+                )
+            ]
+        )
 
         result = await adapter.preview("s3://bucket/data.parquet", n=10)
 
@@ -322,13 +324,15 @@ class TestFileSystemAdapterSample:
         """Test that sample delegates to read_file."""
         adapter = ConcreteFileSystemAdapter({})
         await adapter.connect()
-        adapter.set_read_results([
-            QueryResult(
-                columns=[{"name": "id", "data_type": "integer"}],
-                rows=[{"id": 1}, {"id": 2}],
-                row_count=2,
-            )
-        ])
+        adapter.set_read_results(
+            [
+                QueryResult(
+                    columns=[{"name": "id", "data_type": "integer"}],
+                    rows=[{"id": 1}, {"id": 2}],
+                    row_count=2,
+                )
+            ]
+        )
 
         result = await adapter.sample("s3://bucket/data.parquet", n=50)
 

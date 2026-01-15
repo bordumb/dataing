@@ -92,7 +92,11 @@ class TestAdapterRegistryContracts:
         assert len(definition.display_name) > 0
 
         # Category must be valid
-        assert definition.category in [SourceCategory.DATABASE, SourceCategory.API, SourceCategory.FILESYSTEM]
+        assert definition.category in [
+            SourceCategory.DATABASE,
+            SourceCategory.API,
+            SourceCategory.FILESYSTEM,
+        ]
 
         # Must have capabilities
         assert definition.capabilities is not None
@@ -258,7 +262,9 @@ class TestConfigSchemaContracts:
         # All field groups referenced by fields must exist
         for field in schema.fields:
             if field.group:
-                assert field.group in group_ids, f"Field {field.name} references unknown group {field.group}"
+                assert field.group in group_ids, (
+                    f"Field {field.name} references unknown group {field.group}"
+                )
 
 
 class TestNormalizedTypeContracts:

@@ -31,7 +31,7 @@ class TestRunWithCheckpointing:
         context = create_test_context()
         checkpoints: list[tuple[InvestigationContext, str | None]] = []
 
-        async def on_checkpoint(ctx: InvestigationContext, next_step: str | None) -> None:
+        async def on_checkpoint(ctx: InvestigationContext, next_step: str | None, cursor: dict[str, Any] | None = None) -> None:
             checkpoints.append((ctx, next_step))
 
         # Mock workflow that runs 3 steps then completes
@@ -65,7 +65,7 @@ class TestRunWithCheckpointing:
         context = create_test_context()
         checkpoints: list[tuple[InvestigationContext, str | None]] = []
 
-        async def on_checkpoint(ctx: InvestigationContext, next_step: str | None) -> None:
+        async def on_checkpoint(ctx: InvestigationContext, next_step: str | None, cursor: dict[str, Any] | None = None) -> None:
             checkpoints.append((ctx, next_step))
 
         workflow = MagicMock(spec=Workflow)
@@ -92,7 +92,7 @@ class TestRunWithCheckpointing:
         context = create_test_context()
         checkpoints: list[tuple[InvestigationContext, str | None]] = []
 
-        async def on_checkpoint(ctx: InvestigationContext, next_step: str | None) -> None:
+        async def on_checkpoint(ctx: InvestigationContext, next_step: str | None, cursor: dict[str, Any] | None = None) -> None:
             checkpoints.append((ctx, next_step))
 
         workflow = MagicMock(spec=Workflow)
@@ -125,7 +125,7 @@ class TestRunWithCheckpointing:
         context = create_test_context()
         checkpoints: list[tuple[InvestigationContext, str | None]] = []
 
-        async def on_checkpoint(ctx: InvestigationContext, next_step: str | None) -> None:
+        async def on_checkpoint(ctx: InvestigationContext, next_step: str | None, cursor: dict[str, Any] | None = None) -> None:
             checkpoints.append((ctx, next_step))
 
         workflow = MagicMock(spec=Workflow)
@@ -158,7 +158,7 @@ class TestRunWithCheckpointing:
         """Test that exceeding max iterations raises RuntimeError."""
         context = create_test_context()
 
-        async def on_checkpoint(ctx: InvestigationContext, next_step: str | None) -> None:
+        async def on_checkpoint(ctx: InvestigationContext, next_step: str | None, cursor: dict[str, Any] | None = None) -> None:
             pass
 
         workflow = MagicMock(spec=Workflow)

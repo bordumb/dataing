@@ -151,9 +151,7 @@ class DataHubAdapter(BaseLineageAdapter):
         Returns:
             DataHub URN string.
         """
-        return (
-            f"urn:li:dataset:(urn:li:dataPlatform:{dataset_id.platform}," f"{dataset_id.name},PROD)"
-        )
+        return f"urn:li:dataset:(urn:li:dataPlatform:{dataset_id.platform},{dataset_id.name},PROD)"
 
     def _from_datahub_urn(self, urn: str) -> DatasetId:
         """Parse DataHub URN to DatasetId.

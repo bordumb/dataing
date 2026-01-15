@@ -15,6 +15,7 @@ from fastapi.testclient import TestClient
 
 from dataing.adapters.datasource.types import QueryResult
 from dataing.core.domain_types import Finding
+
 # SchemaContext and TableSchema also seem missing from domain_types.
 # Let's check where they are.
 from dataing.entrypoints.api.app import app
@@ -214,7 +215,7 @@ class TestAPIAuthenticationFlow:
             "tenant_id": uuid.uuid4(),
             "user_id": None,
             "scopes": ["read", "write"],
-            "expires_at": datetime.now(timezone.utc) - timedelta(days=1),
+            "expires_at": datetime.now(datetime.UTC) - timedelta(days=1),
             "tenant_slug": "test-tenant",
             "tenant_name": "Test Tenant",
         }

@@ -147,7 +147,7 @@ class TestSSOConfig:
             is_enabled=True,
             oidc_issuer_url="https://acme.okta.com",
             oidc_client_id="client123",
-            created_at=datetime.now(timezone.utc),
+            created_at=datetime.now(datetime.UTC),
         )
         assert config.provider_type == SSOProviderType.OIDC
         assert config.oidc_issuer_url == "https://acme.okta.com"
@@ -161,7 +161,7 @@ class TestSSOConfig:
             display_name="Sign in with Azure AD",
             is_enabled=True,
             saml_idp_entity_id="https://sts.windows.net/xxx",
-            created_at=datetime.now(timezone.utc),
+            created_at=datetime.now(datetime.UTC),
         )
         assert config.provider_type == SSOProviderType.SAML
 
@@ -177,7 +177,7 @@ class TestDomainClaim:
             domain="acme.com",
             is_verified=False,
             verification_token="dataing-verify=abc123",
-            created_at=datetime.now(timezone.utc),
+            created_at=datetime.now(datetime.UTC),
         )
         assert claim.domain == "acme.com"
         assert claim.is_verified is False
@@ -510,8 +510,8 @@ class PostgresSSORepository:
     async def create_domain_claim(self, org_id: UUID, domain: str) -> DomainClaim:
         """Create a domain claim with verification token."""
         token = f"dataing-verify={secrets.token_hex(16)}"
-        expires_at = datetime.now(timezone.utc).replace(
-            day=datetime.now(timezone.utc).day + 7
+        expires_at = datetime.now(datetime.UTC).replace(
+            day=datetime.now(datetime.UTC).day + 7
         )
 
         row = await self._db.fetch_one(
@@ -670,7 +670,7 @@ class TestSSODiscover:
             org_id=org_id,
             domain="acme.com",
             is_verified=True,
-            created_at=datetime.now(timezone.utc),
+            created_at=datetime.now(datetime.UTC),
         )
         mock_repo.get_sso_config_by_org_id.return_value = SSOConfig(
             id=uuid4(),
@@ -678,7 +678,7 @@ class TestSSODiscover:
             provider_type=SSOProviderType.OIDC,
             oidc_issuer_url="https://acme.okta.com",
             oidc_client_id="client123",
-            created_at=datetime.now(timezone.utc),
+            created_at=datetime.now(datetime.UTC),
         )
 
         result = await discover_sso_method(

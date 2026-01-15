@@ -51,10 +51,13 @@ def test_registry_create_adapter():
     registry = get_lineage_registry()
 
     # Create dbt adapter
-    adapter = registry.create("dbt", {
-        "manifest_path": "/path/to/manifest.json",
-        "target_platform": "snowflake",
-    })
+    adapter = registry.create(
+        "dbt",
+        {
+            "manifest_path": "/path/to/manifest.json",
+            "target_platform": "snowflake",
+        },
+    )
 
     assert adapter is not None
     assert adapter.provider_info.provider == LineageProviderType.DBT
@@ -76,9 +79,7 @@ def test_dataset_id_from_urn():
     assert ds1.name == "db.schema.table"
 
     # DataHub format
-    ds2 = DatasetId.from_urn(
-        "urn:li:dataset:(urn:li:dataPlatform:postgres,mydb.public.users,PROD)"
-    )
+    ds2 = DatasetId.from_urn("urn:li:dataset:(urn:li:dataPlatform:postgres,mydb.public.users,PROD)")
     assert ds2.platform == "postgres"
     assert ds2.name == "mydb.public.users"
 

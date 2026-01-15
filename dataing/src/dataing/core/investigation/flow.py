@@ -243,8 +243,9 @@ async def run_with_checkpointing(
     workflow: Workflow[InvestigationContext],
     context: InvestigationContext,
     start_step: str,
-    on_step_complete: Callable[[InvestigationContext, str | None], Awaitable[None]],
+    on_step_complete: Callable[[InvestigationContext, str | None, dict[str, Any] | None], Awaitable[None]],
     shutdown_signal: asyncio.Event,
+    start_cursor: dict[str, Any] | None = None,
     max_iterations: int = 100,
 ) -> InvestigationContext:
     """Run investigation workflow with checkpoint callbacks for durable execution.
@@ -258,10 +259,9 @@ async def run_with_checkpointing(
         context: Current investigation context (may be from a previous checkpoint).
         start_step: Step to start (or resume) execution from.
         on_step_complete: Async callback invoked after each step with
-            (context, next_step). next_step indicates the resume point
-            (e.g., branch child start step or terminal fail/complete step).
-        shutdown_signal: Event that signals worker shutdown. When set,
-            the function checkpoints and raises WorkerShutdownError.
+            (context, next_step, step_cursor). next_step indicates the resume point.
+        shutdown_signal: Event that signals worker shutdown.
+        start_cursor: Optional cursor data from previous checkpoint.
         max_iterations: Maximum steps before timeout (default 100).
 
     Returns:
@@ -274,6 +274,7 @@ async def run_with_checkpointing(
         RuntimeError: If max iterations exceeded.
     """
     current_step: str | None = start_step
+    current_cursor: dict[str, Any] | None = start_cursor
     iterations = 0
 
     while current_step:
@@ -283,22 +284,26 @@ async def run_with_checkpointing(
 
         # Check for graceful shutdown before executing step
         if shutdown_signal.is_set():
-            await on_step_complete(context, current_step)
+            await on_step_complete(context, current_step, current_cursor)
             raise WorkerShutdownError("Worker shutting down, checkpointed")
 
         # Execute step via maestro
-        result = await workflow.tick(context, current_step)
+        result = await workflow.tick(context, current_step, input_data=current_cursor)
 
         checkpoint_step = result.next_step
+        checkpoint_cursor = None
+
         if result.signal == Signal.BRANCH and result.branch_request:
             checkpoint_step = result.branch_request.child_start_step
+            # For BRANCH, we don't store a cursor on the parent step,
+            # instead the branching logic will handle it.
         elif result.signal == Signal.FAIL:
             checkpoint_step = StepType.FAIL.value
         elif result.signal == Signal.AWAIT_USER and checkpoint_step is None:
             checkpoint_step = StepType.AWAIT_USER.value
 
         # Checkpoint after each step completes
-        await on_step_complete(result.context, checkpoint_step)
+        await on_step_complete(result.context, checkpoint_step, checkpoint_cursor)
 
         # Handle signals
         if result.signal == Signal.COMPLETE:
@@ -325,11 +330,13 @@ async def run_with_checkpointing(
                 )
                 context = merged_context
                 current_step = branch_request.merge_step
+                current_cursor = None
                 continue
 
         # Continue to next step
         context = result.context
         current_step = result.next_step
+        current_cursor = None  # Clear cursor after it's used
 
     return context
 
@@ -339,7 +346,7 @@ async def _run_branches_sequentially(
     workflow: Workflow[InvestigationContext],
     parent_context: InvestigationContext,
     branch_request: Any,
-    on_step_complete: Callable[[InvestigationContext, str | None], Awaitable[None]],
+    on_step_complete: Callable[[InvestigationContext, str | None, dict[str, Any] | None], Awaitable[None]],
     shutdown_signal: asyncio.Event,
     max_iterations: int,
 ) -> InvestigationContext:
@@ -365,7 +372,8 @@ async def _run_branches_sequentially(
     merge_step = branch_request.merge_step
     iterations_used = 0
 
-    for branch in branch_request.branches:
+    for i, branch in enumerate(branch_request.branches):
+        is_last_branch = i == len(branch_request.branches) - 1
         # Create child context with branch-specific hypothesis
         branch_data = branch.data or {}
         hypothesis = branch_data.get("hypothesis")
@@ -387,22 +395,35 @@ async def _run_branches_sequentially(
             iterations_used += 1
 
             if iterations_used > max_iterations:
-                raise RuntimeError(f"Max iterations exceeded during branch execution")
+                raise RuntimeError("Max iterations exceeded during branch execution")
 
             if shutdown_signal.is_set():
-                await on_step_complete(child_context, current_step)
+                await on_step_complete(child_context, current_step, {"hypothesis": hypothesis})
                 raise WorkerShutdownError("Worker shutting down during branch")
 
-            result = await workflow.tick(child_context, current_step)
+            # Pass hypothesis in cursor for every step in the branch
+            result = await workflow.tick(child_context, current_step, input_data={"hypothesis": hypothesis})
+
             checkpoint_step = result.next_step
+            checkpoint_cursor = {"hypothesis": hypothesis}
+
             if result.signal in (Signal.COMPLETE, Signal.FAIL):
-                checkpoint_step = merge_step or checkpoint_step
+                # Only move to merge step if this is the last branch
+                if is_last_branch:
+                    checkpoint_step = merge_step or checkpoint_step
+                    checkpoint_cursor = None # Clear cursor when moving to merge
+                else:
+                    # Otherwise, indicate we are cycling back to start of next branch
+                    checkpoint_step = child_start or checkpoint_step
+                    # The cursor for NEXT branch will be set by the loop
+                    # But we checkpoint the END of this branch pointing to START of next.
+                    checkpoint_cursor = None
             elif result.signal == Signal.AWAIT_USER and checkpoint_step is None:
                 checkpoint_step = StepType.AWAIT_USER.value
             elif result.signal == Signal.BRANCH and result.branch_request:
                 checkpoint_step = result.branch_request.child_start_step
 
-            await on_step_complete(result.context, checkpoint_step)
+            await on_step_complete(result.context, checkpoint_step, checkpoint_cursor)
 
             if result.signal == Signal.FAIL:
                 # Branch failed, continue to next branch

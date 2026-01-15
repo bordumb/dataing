@@ -16,6 +16,7 @@ const STEP_LABELS: Record<string, string> = {
   synthesize: 'Synthesize',
   complete: 'Complete',
   fail: 'Failed',
+  cancelled: 'Cancelled',
 }
 
 interface StepTimelineProps {
@@ -54,8 +55,9 @@ export function StepTimeline({ currentStep, stepHistory, animated = true }: Step
     <div className="flex flex-col gap-1">
       {steps.map((item, index) => {
         const isCurrent = item.step === currentStep
-        // Treat 'complete' step as completed when it's the current step
-        const isCompleted = item.completed || (item.step === 'complete' && isCurrent)
+        // Treat terminal steps as completed when it's the current step
+        const isTerminalStep = ['complete', 'fail', 'cancelled'].includes(item.step)
+        const isCompleted = item.completed || (isTerminalStep && isCurrent)
         const isAnimating = animatingStep === item.step
         const label = STEP_LABELS[item.step] || item.step
 

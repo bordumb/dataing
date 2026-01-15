@@ -30,8 +30,7 @@ class QualityAssessment(BaseModel):
         ge=0.0,
         le=1.0,
         description=(
-            "Are there concrete data points? "
-            "0=vague, 0.5=some numbers, 1=timestamps+counts+names"
+            "Are there concrete data points? 0=vague, 0.5=some numbers, 1=timestamps+counts+names"
         ),
     )
     actionability: float = Field(
@@ -44,7 +43,7 @@ class QualityAssessment(BaseModel):
     )
     lowest_dimension: str = Field(
         description=(
-            "Which dimension scored lowest: " "'causal_depth', 'specificity', or 'actionability'"
+            "Which dimension scored lowest: 'causal_depth', 'specificity', or 'actionability'"
         )
     )
     improvement_suggestion: str = Field(

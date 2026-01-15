@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import asyncio
-import json
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from typing import Any
@@ -744,9 +743,7 @@ class AppDatabase:
         # Protect against overwriting cancellation state with running state
         # If the job is already cancelling, we shouldn't set it back to running
         if status == "running":
-            updates = [
-                "status = CASE WHEN status = 'cancelling' THEN 'cancelling' ELSE $2 END"
-            ]
+            updates = ["status = CASE WHEN status = 'cancelling' THEN 'cancelling' ELSE $2 END"]
         else:
             updates = ["status = $2"]
 

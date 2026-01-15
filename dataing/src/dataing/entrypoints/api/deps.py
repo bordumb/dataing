@@ -253,7 +253,6 @@ async def _seed_demo_data(app_db: AppDatabase) -> None:
     Creates a demo tenant, API key, and data source pointing to fixtures.
     """
     import hashlib
-    import json
     from uuid import UUID
 
     from cryptography.fernet import Fernet

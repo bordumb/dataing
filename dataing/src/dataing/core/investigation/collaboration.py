@@ -66,16 +66,12 @@ class CollaborationService:
             raise ValueError(f"Investigation not found: {investigation_id}")
 
         if investigation.main_branch_id is None:
-            raise ValueError(
-                f"Investigation has no main branch: {investigation_id}"
-            )
+            raise ValueError(f"Investigation has no main branch: {investigation_id}")
 
         # Get main branch and its current snapshot
         main_branch = await self.repository.get_branch(investigation.main_branch_id)
         if main_branch is None:
-            raise ValueError(
-                f"Main branch not found: {investigation.main_branch_id}"
-            )
+            raise ValueError(f"Main branch not found: {investigation.main_branch_id}")
 
         # Fork from main's current snapshot
         return await self.repository.create_branch(
@@ -131,9 +127,7 @@ class CollaborationService:
             raise ValueError(f"Branch not found: {branch_id}")
 
         if not branch.can_accept_input:
-            raise ValueError(
-                f"Branch cannot accept input: {branch_id} (status: {branch.status})"
-            )
+            raise ValueError(f"Branch cannot accept input: {branch_id} (status: {branch.status})")
 
         await self.repository.update_branch_status(branch_id, BranchStatus.ACTIVE)
 
@@ -165,13 +159,9 @@ class CollaborationService:
             raise ValueError(f"Branch has no forked snapshot: {branch_id}")
 
         # Get the parent snapshot to copy context from
-        parent_snapshot = await self.repository.get_snapshot(
-            branch.forked_from_snapshot_id
-        )
+        parent_snapshot = await self.repository.get_snapshot(branch.forked_from_snapshot_id)
         if parent_snapshot is None:
-            raise ValueError(
-                f"Forked snapshot not found: {branch.forked_from_snapshot_id}"
-            )
+            raise ValueError(f"Forked snapshot not found: {branch.forked_from_snapshot_id}")
 
         # Create new snapshot at CLASSIFY_INTENT step
         new_snapshot = await self.repository.create_snapshot(

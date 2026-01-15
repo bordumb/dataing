@@ -215,9 +215,7 @@ class TestPatternExtractionServiceShouldExtractPattern:
         result = await service.should_extract_pattern(investigation_id)
 
         assert result is True
-        mock_investigation_repository.get_investigation.assert_called_once_with(
-            investigation_id
-        )
+        mock_investigation_repository.get_investigation.assert_called_once_with(investigation_id)
 
     @pytest.mark.asyncio
     async def test_returns_false_for_investigation_without_outcome(
@@ -230,12 +228,8 @@ class TestPatternExtractionServiceShouldExtractPattern:
     ) -> None:
         """Should return False for investigation without outcome."""
         # Investigation without outcome (still in progress)
-        incomplete_investigation = sample_investigation.model_copy(
-            update={"outcome": None}
-        )
-        mock_investigation_repository.get_investigation.return_value = (
-            incomplete_investigation
-        )
+        incomplete_investigation = sample_investigation.model_copy(update={"outcome": None})
+        mock_investigation_repository.get_investigation.return_value = incomplete_investigation
 
         service = PatternExtractionService(
             repository=mock_investigation_repository,
@@ -262,9 +256,7 @@ class TestPatternExtractionServiceShouldExtractPattern:
         low_confidence_investigation = sample_investigation.model_copy(
             update={"outcome": low_confidence_outcome}
         )
-        mock_investigation_repository.get_investigation.return_value = (
-            low_confidence_investigation
-        )
+        mock_investigation_repository.get_investigation.return_value = low_confidence_investigation
 
         service = PatternExtractionService(
             repository=mock_investigation_repository,
@@ -290,9 +282,7 @@ class TestPatternExtractionServiceShouldExtractPattern:
         no_confidence_investigation = sample_investigation.model_copy(
             update={"outcome": {"root_cause": "Some cause", "recommendations": []}}
         )
-        mock_investigation_repository.get_investigation.return_value = (
-            no_confidence_investigation
-        )
+        mock_investigation_repository.get_investigation.return_value = no_confidence_investigation
 
         service = PatternExtractionService(
             repository=mock_investigation_repository,
@@ -417,12 +407,8 @@ class TestPatternExtractionServiceExtractPattern:
     ) -> None:
         """Should return None if investigation has no outcome."""
         # Investigation without outcome
-        incomplete_investigation = sample_investigation.model_copy(
-            update={"outcome": None}
-        )
-        mock_investigation_repository.get_investigation.return_value = (
-            incomplete_investigation
-        )
+        incomplete_investigation = sample_investigation.model_copy(update={"outcome": None})
+        mock_investigation_repository.get_investigation.return_value = incomplete_investigation
 
         service = PatternExtractionService(
             repository=mock_investigation_repository,

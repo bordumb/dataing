@@ -48,7 +48,7 @@ class TestQueryValidation:
     def test_markdown_sql_stripped(self) -> None:
         """Test query wrapped in ```sql ... ``` is stripped."""
         response = QueryResponse(
-            query='```sql\nSELECT * FROM users LIMIT 10\n```',
+            query="```sql\nSELECT * FROM users LIMIT 10\n```",
         )
         assert not response.query.startswith("```")
         assert "SELECT" in response.query
@@ -56,21 +56,21 @@ class TestQueryValidation:
     def test_markdown_uppercase_sql_stripped(self) -> None:
         """Test query wrapped in ```SQL ... ``` is stripped."""
         response = QueryResponse(
-            query='```SQL\nSELECT * FROM users LIMIT 10\n```',
+            query="```SQL\nSELECT * FROM users LIMIT 10\n```",
         )
         assert not response.query.startswith("```")
 
     def test_markdown_postgresql_stripped(self) -> None:
         """Test query wrapped in ```postgresql ... ``` is stripped."""
         response = QueryResponse(
-            query='```postgresql\nSELECT * FROM users LIMIT 10\n```',
+            query="```postgresql\nSELECT * FROM users LIMIT 10\n```",
         )
         assert not response.query.startswith("```")
 
     def test_markdown_unclosed_block_handled(self) -> None:
         """Test unclosed markdown block is handled gracefully."""
         response = QueryResponse(
-            query='```sql\nSELECT * FROM users LIMIT 10',
+            query="```sql\nSELECT * FROM users LIMIT 10",
         )
         assert not response.query.startswith("```")
         assert "SELECT" in response.query
@@ -224,8 +224,7 @@ class TestInterpretationResponse:
                 supports_hypothesis=True,
                 confidence=0.85,
                 interpretation=(
-                    "The 485 orphaned orders appeared after 03:14 UTC "
-                    "when the users table stopped."
+                    "The 485 orphaned orders appeared after 03:14 UTC when the users table stopped."
                 ),
                 causal_chain="too short",
                 key_findings=["485 orders affected"],
@@ -239,8 +238,7 @@ class TestInterpretationResponse:
                 supports_hypothesis=True,
                 confidence=0.85,
                 interpretation=(
-                    "The 485 orphaned orders appeared after 03:14 UTC "
-                    "when the users table stopped."
+                    "The 485 orphaned orders appeared after 03:14 UTC when the users table stopped."
                 ),
                 causal_chain="users ETL stopped at 03:14 -> stale table -> JOIN produces NULLs",
                 key_findings=[],

@@ -79,7 +79,7 @@ class TestCircuitBreaker:
         events = [
             Event(
                 type="query_submitted",
-                timestamp=datetime.now(timezone.utc),
+                timestamp=datetime.now(datetime.UTC),
                 data={"hypothesis_id": f"h{i:03d}", "query": f"SELECT {i}"},
             )
             for i in range(3)
@@ -98,7 +98,7 @@ class TestCircuitBreaker:
         events = [
             Event(
                 type="query_submitted",
-                timestamp=datetime.now(timezone.utc),
+                timestamp=datetime.now(datetime.UTC),
                 data={"hypothesis_id": "h001", "query": f"SELECT {i}"},
             )
             for i in range(2)
@@ -117,7 +117,7 @@ class TestCircuitBreaker:
         events = [
             Event(
                 type="reflexion_attempted",
-                timestamp=datetime.now(timezone.utc),
+                timestamp=datetime.now(datetime.UTC),
                 data={"hypothesis_id": "h001"},
             )
         ]
@@ -135,7 +135,7 @@ class TestCircuitBreaker:
         events = [
             Event(
                 type="query_failed",
-                timestamp=datetime.now(timezone.utc),
+                timestamp=datetime.now(datetime.UTC),
                 data={},
             )
             for _ in range(2)
@@ -154,17 +154,17 @@ class TestCircuitBreaker:
         events = [
             Event(
                 type="query_failed",
-                timestamp=datetime.now(timezone.utc),
+                timestamp=datetime.now(datetime.UTC),
                 data={},
             ),
             Event(
                 type="query_succeeded",
-                timestamp=datetime.now(timezone.utc),
+                timestamp=datetime.now(datetime.UTC),
                 data={},
             ),
             Event(
                 type="query_failed",
-                timestamp=datetime.now(timezone.utc),
+                timestamp=datetime.now(datetime.UTC),
                 data={},
             ),
         ]
@@ -177,12 +177,12 @@ class TestCircuitBreaker:
         events = [
             Event(
                 type="query_submitted",
-                timestamp=datetime.now(timezone.utc),
+                timestamp=datetime.now(datetime.UTC),
                 data={"hypothesis_id": "h001", "query": "SELECT 1"},
             ),
             Event(
                 type="query_submitted",
-                timestamp=datetime.now(timezone.utc),
+                timestamp=datetime.now(datetime.UTC),
                 data={"hypothesis_id": "h001", "query": "SELECT 1"},
             ),
         ]
@@ -197,12 +197,12 @@ class TestCircuitBreaker:
         events = [
             Event(
                 type="query_submitted",
-                timestamp=datetime.now(timezone.utc),
+                timestamp=datetime.now(datetime.UTC),
                 data={"hypothesis_id": "h001", "query": "SELECT 1"},
             ),
             Event(
                 type="query_submitted",
-                timestamp=datetime.now(timezone.utc),
+                timestamp=datetime.now(datetime.UTC),
                 data={"hypothesis_id": "h001", "query": "SELECT 2"},
             ),
         ]
@@ -217,12 +217,12 @@ class TestCircuitBreaker:
         events = [
             Event(
                 type="query_submitted",
-                timestamp=datetime.now(timezone.utc),
+                timestamp=datetime.now(datetime.UTC),
                 data={"hypothesis_id": "h001", "query": "SELECT 1"},
             ),
             Event(
                 type="query_submitted",
-                timestamp=datetime.now(timezone.utc),
+                timestamp=datetime.now(datetime.UTC),
                 data={"hypothesis_id": "h001", "query": "SELECT 2"},
             ),
         ]
@@ -235,7 +235,7 @@ class TestCircuitBreaker:
         events = [
             Event(
                 type="query_failed",
-                timestamp=datetime.now(timezone.utc),
+                timestamp=datetime.now(datetime.UTC),
                 data={},
             ),
         ]

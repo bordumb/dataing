@@ -216,13 +216,15 @@ class TestAPIAdapterPreview:
         """Test that preview delegates to query_object."""
         adapter = ConcreteAPIAdapter({})
         await adapter.connect()
-        adapter.set_query_results([
-            QueryResult(
-                columns=[{"name": "Id", "data_type": "string"}],
-                rows=[{"Id": "1"}, {"Id": "2"}, {"Id": "3"}],
-                row_count=3,
-            )
-        ])
+        adapter.set_query_results(
+            [
+                QueryResult(
+                    columns=[{"name": "Id", "data_type": "string"}],
+                    rows=[{"Id": "1"}, {"Id": "2"}, {"Id": "3"}],
+                    row_count=3,
+                )
+            ]
+        )
 
         result = await adapter.preview("Account", n=10)
 
@@ -237,13 +239,15 @@ class TestAPIAdapterSample:
         """Test that sample delegates to query_object."""
         adapter = ConcreteAPIAdapter({})
         await adapter.connect()
-        adapter.set_query_results([
-            QueryResult(
-                columns=[{"name": "Id", "data_type": "string"}],
-                rows=[{"Id": "abc"}, {"Id": "def"}],
-                row_count=2,
-            )
-        ])
+        adapter.set_query_results(
+            [
+                QueryResult(
+                    columns=[{"name": "Id", "data_type": "string"}],
+                    rows=[{"Id": "abc"}, {"Id": "def"}],
+                    row_count=2,
+                )
+            ]
+        )
 
         result = await adapter.sample("Lead", n=50)
 

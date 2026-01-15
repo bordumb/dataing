@@ -1258,7 +1258,7 @@ class TestUser:
             email="test@example.com",
             name="Test User",
             is_active=True,
-            created_at=datetime.now(timezone.utc),
+            created_at=datetime.now(datetime.UTC),
         )
         assert user.email == "test@example.com"
         assert user.password_hash is None
@@ -1270,7 +1270,7 @@ class TestUser:
             email="sso@example.com",
             name="SSO User",
             is_active=True,
-            created_at=datetime.now(timezone.utc),
+            created_at=datetime.now(datetime.UTC),
         )
         assert user.password_hash is None
 
@@ -1285,7 +1285,7 @@ class TestOrganization:
             name="Acme Corp",
             slug="acme",
             plan="free",
-            created_at=datetime.now(timezone.utc),
+            created_at=datetime.now(datetime.UTC),
         )
         assert org.slug == "acme"
         assert org.plan == "free"
@@ -1686,7 +1686,7 @@ class TestDecodeToken:
         # Create token that's already expired
         with patch("dataing.core.auth.jwt.datetime") as mock_dt:
             # Set current time to 2 hours ago so token is created expired
-            past = datetime.now(timezone.utc) - timedelta(hours=2)
+            past = datetime.now(datetime.UTC) - timedelta(hours=2)
             mock_dt.now.return_value = past
             mock_dt.side_effect = lambda *args, **kw: datetime(*args, **kw)
 
@@ -1780,7 +1780,7 @@ def create_access_token(
     Returns:
         Encoded JWT string
     """
-    now = datetime.now(timezone.utc)
+    now = datetime.now(datetime.UTC)
     expire = now + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
 
     payload = {
@@ -1804,7 +1804,7 @@ def create_refresh_token(user_id: str) -> str:
     Returns:
         Encoded JWT string
     """
-    now = datetime.now(timezone.utc)
+    now = datetime.now(datetime.UTC)
     expire = now + timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS)
 
     payload = {

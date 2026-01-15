@@ -33,7 +33,9 @@ class TestInvestigationFeedbackIntegration:
         """Create feedback adapter."""
         return InvestigationFeedbackAdapter(db=db)
 
-    async def test_emit_and_retrieve_event(self, adapter: InvestigationFeedbackAdapter, db: AppDatabase) -> None:
+    async def test_emit_and_retrieve_event(
+        self, adapter: InvestigationFeedbackAdapter, db: AppDatabase
+    ) -> None:
         """Events can be emitted and retrieved."""
         # Get a valid tenant_id from the database
         tenant = await db.fetch_one("SELECT id FROM tenants LIMIT 1")

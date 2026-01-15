@@ -147,10 +147,12 @@ class ClassifyIntentStep(Step[dict[str, Any] | None, RefinementIntent]):
 
         # Add user message to chat_history
         new_chat_history = list(context.chat_history)
-        new_chat_history.append({
-            "role": "user",
-            "content": user_message,
-        })
+        new_chat_history.append(
+            {
+                "role": "user",
+                "content": user_message,
+            }
+        )
 
         # Handle CLARIFY intent - generate response
         if intent == RefinementIntent.CLARIFY:
@@ -159,10 +161,12 @@ class ClassifyIntentStep(Step[dict[str, Any] | None, RefinementIntent]):
                     message=user_message,
                     context=context.current_synthesis,
                 )
-                new_chat_history.append({
-                    "role": "assistant",
-                    "content": clarification,
-                })
+                new_chat_history.append(
+                    {
+                        "role": "assistant",
+                        "content": clarification,
+                    }
+                )
             except Exception:
                 # If clarification fails, just proceed without response
                 pass

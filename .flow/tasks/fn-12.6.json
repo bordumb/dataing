@@ -9,14 +9,29 @@
   ],
   "epic": "fn-12",
   "evidence": {
-    "commits": [],
+    "commits": [
+      "61ee29bf"
+    ],
     "prs": [],
-    "tests": []
+    "tests": [
+      "dataing/tests/e2e/test_observability.py::TestTraceContextPropagation::test_serialize_deserialize_trace_context",
+      "dataing/tests/e2e/test_observability.py::TestTraceContextPropagation::test_serialize_without_active_span",
+      "dataing/tests/e2e/test_observability.py::TestTraceContextPropagation::test_restore_with_invalid_context",
+      "dataing/tests/e2e/test_observability.py::TestSpanAttributes::test_no_pii_in_custom_spans",
+      "dataing/tests/e2e/test_observability.py::TestGracefulDegradation::test_tracing_works_when_disabled",
+      "dataing/tests/e2e/test_observability.py::TestGracefulDegradation::test_metrics_work_when_disabled",
+      "dataing/tests/e2e/test_observability.py::TestMetricsRecording::test_metrics_initialization_is_idempotent",
+      "dataing/tests/e2e/test_observability.py::TestMetricsRecording::test_recording_functions_work_after_init",
+      "dataing/tests/e2e/test_observability.py::TestMetricsRecording::test_recording_without_init_is_safe",
+      "dataing/tests/e2e/test_observability.py::TestCorrelationId::test_correlation_id_in_span_attributes",
+      "dataing/tests/e2e/test_observability.py::TestTelemetryInitialization::test_init_telemetry_is_idempotent",
+      "dataing/tests/e2e/test_observability.py::TestTelemetryInitialization::test_reset_telemetry_clears_state"
+    ]
   },
   "id": "fn-12.6",
   "priority": 6,
   "spec_path": ".flow/tasks/fn-12.6.md",
-  "status": "in_progress",
+  "status": "done",
   "title": "Integration Testing",
-  "updated_at": "2026-01-15T21:52:29.172998Z"
+  "updated_at": "2026-01-15T21:55:40.264840Z"
 }

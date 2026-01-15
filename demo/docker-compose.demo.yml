@@ -1,6 +1,36 @@
 version: '3.8'
 
 services:
+  # =============================================================================
+  # Observability Stack
+  # =============================================================================
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.96.0
+    command: ["--config=/etc/otel-collector-config.yaml"]
+    volumes:
+      - ./demo/otel-collector-config.yaml:/etc/otel-collector-config.yaml:ro
+    ports:
+      - "4317:4317"   # OTLP gRPC
+      - "4318:4318"   # OTLP HTTP
+    depends_on:
+      - jaeger
+
+  jaeger:
+    image: jaegertracing/all-in-one:1.54
+    environment:
+      COLLECTOR_OTLP_ENABLED: "true"
+    ports:
+      - "16686:16686" # Jaeger UI
+      - "14268:14268" # Jaeger HTTP collector
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:16686"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  # =============================================================================
+  # Core Services
+  # =============================================================================
   postgres:
     image: pgvector/pgvector:pg16
     environment:
@@ -43,6 +73,11 @@ services:
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
       REDIS_HOST: redis
       REDIS_PORT: 6379
+      # OpenTelemetry Configuration
+      OTEL_SERVICE_NAME: dataing-api
+      OTEL_TRACES_ENABLED: "true"
+      OTEL_METRICS_ENABLED: "true"
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318
     volumes:
       - ./demo/fixtures:/app/fixtures:ro
     ports:
@@ -52,6 +87,8 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+      otel-collector:
+        condition: service_started
     command: ["uvicorn", "dataing.entrypoints.api.app:app", "--host", "0.0.0.0", "--port", "8000"]
 
   worker:
@@ -67,6 +104,11 @@ services:
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
       REDIS_HOST: redis
       REDIS_PORT: 6379
+      # OpenTelemetry Configuration
+      OTEL_SERVICE_NAME: dataing-worker
+      OTEL_TRACES_ENABLED: "true"
+      OTEL_METRICS_ENABLED: "true"
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318
     volumes:
       - ./demo/fixtures:/app/fixtures:ro
     depends_on:
@@ -74,6 +116,8 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+      otel-collector:
+        condition: service_started
     command: ["python", "-m", "dataing.entrypoints.worker"]
 
   frontend:

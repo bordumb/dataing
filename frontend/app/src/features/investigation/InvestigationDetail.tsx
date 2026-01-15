@@ -34,6 +34,8 @@ function getStatusVariant(status: string) {
       return 'destructive'
     case 'active':
       return 'warning'
+    case 'cancelled':
+    case 'inconclusive':
     case 'suspended':
       return 'secondary'
     default:
@@ -467,7 +469,7 @@ export function InvestigationDetail() {
     )
   }
 
-  const isComplete = data.status === 'completed' || data.status === 'failed'
+  const isComplete = ['completed', 'failed', 'cancelled', 'inconclusive'].includes(data.status)
 
   return (
     <div className="h-[calc(100vh-8rem)] flex flex-col gap-4">
@@ -538,7 +540,7 @@ export function InvestigationDetail() {
             {/* Step Timeline */}
             <div className="p-4 bg-muted/50 rounded-lg">
               <StepTimeline
-                currentStep={data.main_branch.current_step}
+                currentStep={isComplete ? '' : data.main_branch.current_step}
                 stepHistory={data.main_branch.step_history || []}
                 animated
               />

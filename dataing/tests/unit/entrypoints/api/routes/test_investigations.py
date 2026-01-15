@@ -300,9 +300,7 @@ class TestInvestigationServiceIntegration:
                     metric_type=request.alert["metric_spec"]["metric_type"],
                     expression=request.alert["metric_spec"]["expression"],
                     display_name=request.alert["metric_spec"]["display_name"],
-                    columns_referenced=request.alert["metric_spec"].get(
-                        "columns_referenced", []
-                    ),
+                    columns_referenced=request.alert["metric_spec"].get("columns_referenced", []),
                 ),
                 anomaly_type=request.alert["anomaly_type"],
                 expected_value=request.alert["expected_value"],

@@ -10,6 +10,7 @@ from cryptography.fernet import Fernet
 from sqlalchemy import Boolean, Enum, ForeignKey, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
+from dataing.core.json_utils import to_json_string
 from dataing.models.base import BaseModel
 
 if TYPE_CHECKING:
@@ -65,5 +66,5 @@ class DataSource(BaseModel):
     def encrypt_connection_config(config: dict[str, Any], encryption_key: bytes) -> str:
         """Encrypt connection config for storage."""
         f = Fernet(encryption_key)
-        encrypted = f.encrypt(json.dumps(config).encode())
+        encrypted = f.encrypt(to_json_string(config).encode())
         return encrypted.decode()

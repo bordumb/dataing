@@ -29,9 +29,7 @@ def get_encryption_key() -> bytes:
     """
     key = os.getenv("DATADR_ENCRYPTION_KEY") or os.getenv("ENCRYPTION_KEY")
     if not key:
-        raise ValueError(
-            "ENCRYPTION_KEY or DATADR_ENCRYPTION_KEY environment variable must be set"
-        )
+        raise ValueError("ENCRYPTION_KEY or DATADR_ENCRYPTION_KEY environment variable must be set")
     return key.encode() if isinstance(key, str) else key
 
 

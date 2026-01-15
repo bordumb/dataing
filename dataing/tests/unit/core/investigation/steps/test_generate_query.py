@@ -176,9 +176,7 @@ class TestGenerateQueryStep:
 
         # Context should have current_query set
         assert result.context.current_query == result.output
-        assert result.context.current_query == (
-            "SELECT COUNT(*) FROM events WHERE user_id IS NULL"
-        )
+        assert result.context.current_query == ("SELECT COUNT(*) FROM events WHERE user_id IS NULL")
 
     @pytest.mark.asyncio
     async def test_execute_handles_llm_error(

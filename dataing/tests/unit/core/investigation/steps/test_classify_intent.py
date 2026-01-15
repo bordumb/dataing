@@ -334,8 +334,6 @@ class TestClassifyIntentStepClarifyResponse:
         result = await step.execute(sample_context, {"user_message": "What does that mean?"})
 
         # Response should be in chat_history
-        assistant_messages = [
-            m for m in result.context.chat_history if m["role"] == "assistant"
-        ]
+        assistant_messages = [m for m in result.context.chat_history if m["role"] == "assistant"]
         assert len(assistant_messages) > 0
         assert assistant_messages[-1]["content"] == clarification

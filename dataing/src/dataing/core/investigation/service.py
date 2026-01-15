@@ -212,8 +212,7 @@ class InvestigationService:
             priority=0,
         )
         logger.info(
-            f"Created investigation job: job_id={job['id']}, "
-            f"investigation_id={investigation.id}"
+            f"Created investigation job: job_id={job['id']}, investigation_id={investigation.id}"
         )
 
         # Queue for durable execution
@@ -253,9 +252,7 @@ class InvestigationService:
                 return  # Only notify for main branch completion
 
             # Get investigation for tenant_id and alert info
-            investigation = await self.repository.get_investigation(
-                branch.investigation_id
-            )
+            investigation = await self.repository.get_investigation(branch.investigation_id)
             if investigation is None:
                 return
 
@@ -293,9 +290,7 @@ class InvestigationService:
                     severity="error",
                 )
 
-            logger.info(
-                f"Created {status} notification for investigation {investigation.id}"
-            )
+            logger.info(f"Created {status} notification for investigation {investigation.id}")
 
         except Exception as e:
             # Don't fail the investigation if notification creation fails
@@ -333,9 +328,7 @@ class InvestigationService:
         main_branch = await self.repository.get_branch(investigation.main_branch_id)
         main_snapshot = None
         if main_branch and main_branch.head_snapshot_id:
-            main_snapshot = await self.repository.get_snapshot(
-                main_branch.head_snapshot_id
-            )
+            main_snapshot = await self.repository.get_snapshot(main_branch.head_snapshot_id)
 
         main_branch_state = self._create_branch_state(main_branch, main_snapshot)
 
@@ -345,9 +338,7 @@ class InvestigationService:
         if user_branch:
             user_snapshot = None
             if user_branch.head_snapshot_id:
-                user_snapshot = await self.repository.get_snapshot(
-                    user_branch.head_snapshot_id
-                )
+                user_snapshot = await self.repository.get_snapshot(user_branch.head_snapshot_id)
             user_branch_state = self._create_branch_state(user_branch, user_snapshot)
 
         # Determine overall status
@@ -387,9 +378,7 @@ class InvestigationService:
             The branch ID that received the message.
         """
         # Get or create user branch
-        branch = await self.collaboration.get_or_create_user_branch(
-            investigation_id, user_id
-        )
+        branch = await self.collaboration.get_or_create_user_branch(investigation_id, user_id)
 
         # Add message
         await self.collaboration.send_message(branch.id, user_id, message)
@@ -444,10 +433,16 @@ class InvestigationService:
                 StepType.INTERPRET_EVIDENCE,
                 StepType.SYNTHESIZE,
             ]
-            terminal_step = (
-                StepType.FAIL if current_step == StepType.FAIL.value else StepType.COMPLETE
-            )
-            workflow_steps.append(terminal_step)
+
+            # Add terminal step
+            if current_step == StepType.FAIL.value:
+                workflow_steps.append(StepType.FAIL)
+            elif current_step == "cancelled":
+                # Special case for cancelled
+                pass # Handled below
+            else:
+                workflow_steps.append(StepType.COMPLETE)
+
             current_idx = -1
             for i, step in enumerate(workflow_steps):
                 if step.value == current_step:
@@ -455,24 +450,41 @@ class InvestigationService:
                     break
 
             for i, step in enumerate(workflow_steps):
-                step_history.append(StepHistoryItem(
-                    step=step.value,
-                    completed=i < current_idx,
-                ))
+                # A step is completed if it's before current, or if it IS current and terminal
+                is_completed = i < current_idx
+                if i == current_idx and step in (StepType.COMPLETE, StepType.FAIL):
+                    is_completed = True
+
+                step_history.append(
+                    StepHistoryItem(
+                        step=step.value,
+                        completed=is_completed,
+                    )
+                )
+
+            # Handle cancelled as a special terminal step if needed
+            if current_step == "cancelled":
+                step_history.append(
+                    StepHistoryItem(
+                        step="cancelled",
+                        completed=True,
+                    )
+                )
 
             # Extract matched patterns from context
             for pattern in snapshot.context.matched_patterns:
-                matched_patterns.append(MatchedPattern(
-                    pattern_id=pattern.get("id", "unknown"),
-                    pattern_name=pattern.get("name", "Unknown Pattern"),
-                    confidence=pattern.get("confidence", 0.0),
-                    description=pattern.get("description"),
-                ))
+                matched_patterns.append(
+                    MatchedPattern(
+                        pattern_id=pattern.get("id", "unknown"),
+                        pattern_name=pattern.get("name", "Unknown Pattern"),
+                        confidence=pattern.get("confidence", 0.0),
+                        description=pattern.get("description"),
+                    )
+                )
 
         # Check if branch can merge (user branches that are completed)
         can_merge = (
-            branch.branch_type == BranchType.USER
-            and branch.status == BranchStatus.COMPLETED
+            branch.branch_type == BranchType.USER and branch.status == BranchStatus.COMPLETED
         )
 
         return BranchState(

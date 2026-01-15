@@ -352,9 +352,7 @@ class TestCollaborationServiceResumeBranch:
         service = CollaborationService(repository=mock_repository)
         await service.resume_branch(branch_id=branch_id)
 
-        mock_repository.update_branch_status.assert_called_once_with(
-            branch_id, BranchStatus.ACTIVE
-        )
+        mock_repository.update_branch_status.assert_called_once_with(branch_id, BranchStatus.ACTIVE)
 
     @pytest.mark.asyncio
     async def test_raises_when_branch_not_found(
@@ -409,9 +407,7 @@ class TestCollaborationServiceResumeBranch:
         service = CollaborationService(repository=mock_repository)
         await service.resume_branch(branch_id=branch_id)
 
-        mock_repository.update_branch_status.assert_called_once_with(
-            branch_id, BranchStatus.ACTIVE
-        )
+        mock_repository.update_branch_status.assert_called_once_with(branch_id, BranchStatus.ACTIVE)
 
 
 class TestCollaborationServiceCreateInitialSnapshot:

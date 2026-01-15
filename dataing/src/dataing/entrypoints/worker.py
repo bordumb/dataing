@@ -10,7 +10,6 @@ Usage:
 from __future__ import annotations
 
 import asyncio
-import json
 import logging
 import os
 import signal
@@ -35,6 +34,7 @@ from dataing.core.investigation.flow import (
     run_with_checkpointing,
 )
 from dataing.core.investigation.values import StepType, VersionId
+from dataing.core.json_utils import to_json_string
 from dataing.core.queue import INVESTIGATIONS_QUEUE, get_redis_settings
 
 logger = logging.getLogger(__name__)
@@ -103,7 +103,7 @@ async def run_investigation(
             SET outcome = $1
             WHERE id = $2
             """,
-            json.dumps({"status": "cancelled", "reason": "User cancelled before execution"}),
+            to_json_string({"status": "cancelled", "reason": "User cancelled before execution"}),
             inv_uuid,
         )
         return {
@@ -194,7 +194,7 @@ async def run_investigation(
     )
 
     # Checkpoint callback - saves state after each step
-    async def on_step_complete(context: Any, next_step: str | None) -> None:
+    async def on_step_complete(context: Any, next_step: str | None, step_cursor: dict[str, Any] | None = None) -> None:
         """Save checkpoint after each step completes."""
         step_type = StepType(next_step) if next_step else StepType.COMPLETE
         new_snapshot = await repository.create_snapshot(
@@ -209,9 +209,15 @@ async def run_investigation(
             context=context,
             parent_snapshot_id=snapshot.id,
             trigger="worker",
+            step_cursor=step_cursor,
         )
         await repository.update_branch_head(main_branch.id, new_snapshot.id)
-        await db.update_job_status(job_id, status="running", current_step=step_type.value)
+        await db.update_job_status(
+            job_id,
+            status="running",
+            current_step=step_type.value,
+            checkpoint=step_cursor, # Also store in job record for easy inspection
+        )
 
         # Check for cancellation at step boundaries
         if await check_cancellation(db, job_id):
@@ -231,6 +237,8 @@ async def run_investigation(
                 start_step=snapshot.step.value,
                 on_step_complete=on_step_complete,
                 shutdown_signal=shutdown_event,
+                start_cursor=snapshot.step_cursor,
+                max_iterations=50,
             )
 
             # Workflow completed successfully
@@ -281,11 +289,11 @@ async def run_investigation(
             await db.mark_job_cancelled(job_id)
             await db.execute(
                 """
-                UPDATE investigations
-                SET outcome = $1
-                WHERE id = $2
-                """,
-                json.dumps({"status": "cancelled", "reason": "User cancelled"}),
+                            UPDATE investigations
+                            SET outcome = $1
+                            WHERE id = $2
+                            """,
+                to_json_string({"status": "cancelled", "reason": "User cancelled"}),
                 inv_uuid,
             )
             return {
@@ -300,11 +308,11 @@ async def run_investigation(
             await db.update_job_status(job_id, status="failed")
             await db.execute(
                 """
-                UPDATE investigations
-                SET outcome = $1
-                WHERE id = $2
-                """,
-                json.dumps({"status": "failed", "error": e.error}),
+                            UPDATE investigations
+                            SET outcome = $1
+                            WHERE id = $2
+                            """,
+                to_json_string({"status": "failed", "error": e.error}),
                 inv_uuid,
             )
             return {
@@ -320,11 +328,11 @@ async def run_investigation(
             await db.update_job_status(job_id, status="failed")
             await db.execute(
                 """
-                UPDATE investigations
-                SET outcome = $1
-                WHERE id = $2
-                """,
-                json.dumps({"status": "failed", "error": str(e)}),
+                            UPDATE investigations
+                            SET outcome = $1
+                            WHERE id = $2
+                            """,
+                to_json_string({"status": "failed", "error": str(e)}),
                 inv_uuid,
             )
             return {

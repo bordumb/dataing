@@ -471,6 +471,17 @@ export function InvestigationDetail() {
 
   const isComplete = ['completed', 'failed', 'cancelled', 'inconclusive'].includes(data.status)
 
+  // Map investigation status to terminal step name
+  const terminalStepMap: Record<string, string> = {
+    completed: 'complete',
+    failed: 'fail',
+    cancelled: 'cancelled',
+    inconclusive: 'complete',
+  }
+  const currentStep = isComplete
+    ? terminalStepMap[data.status] || 'complete'
+    : data.main_branch.current_step
+
   return (
     <div className="h-[calc(100vh-8rem)] flex flex-col gap-4">
       {/* Header */}
@@ -540,7 +551,7 @@ export function InvestigationDetail() {
             {/* Step Timeline */}
             <div className="p-4 bg-muted/50 rounded-lg">
               <StepTimeline
-                currentStep={isComplete ? '' : data.main_branch.current_step}
+                currentStep={currentStep}
                 stepHistory={data.main_branch.step_history || []}
                 animated
               />

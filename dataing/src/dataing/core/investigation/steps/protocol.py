@@ -10,7 +10,7 @@ They don't know about persistence, locking, or orchestration.
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import Any, Generic, TypeVar
+from typing import Generic, TypeVar
 
 from maestro import BranchRequest, BranchSpec, Signal, StepResult
 

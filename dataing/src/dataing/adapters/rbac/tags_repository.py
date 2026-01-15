@@ -92,7 +92,7 @@ class TagsRepository:
             return await self.get_by_id(tag_id)
 
         query = f"""
-            UPDATE resource_tags SET {', '.join(updates)}
+            UPDATE resource_tags SET {", ".join(updates)}
             WHERE id = $1
             RETURNING id, org_id, name, color, created_at
         """

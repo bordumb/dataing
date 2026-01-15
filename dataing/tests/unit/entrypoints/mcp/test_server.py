@@ -6,12 +6,8 @@ from unittest.mock import AsyncMock
 
 import pytest
 
-from dataing.core.domain_types import (
-    Finding,
-    QueryResult,
-    SchemaContext,
-    TableSchema,
-)
+from dataing.adapters.datasource.types import QueryResult
+from dataing.core.domain_types import Finding
 
 
 class TestMCPServer:
@@ -22,8 +18,8 @@ class TestMCPServer:
         """Return a mock database adapter."""
         mock = AsyncMock()
         mock.execute_query.return_value = QueryResult(
-            columns=("count",),
-            rows=({"count": 500},),
+            columns=[{"name": "count", "data_type": "integer"}],
+            rows=[{"count": 500}],
             row_count=1,
         )
         mock.get_schema.return_value = SchemaContext(
@@ -172,11 +168,15 @@ class TestMCPServer:
     def test_query_result_formatting(self) -> None:
         """Test that query results are formatted correctly."""
         result = QueryResult(
-            columns=("id", "name", "total"),
-            rows=(
+            columns=[
+                {"name": "id", "data_type": "integer"},
+                {"name": "name", "data_type": "string"},
+                {"name": "total", "data_type": "float"},
+            ],
+            rows=[
                 {"id": 1, "name": "Order 1", "total": 100.0},
                 {"id": 2, "name": "Order 2", "total": 200.0},
-            ),
+            ],
             row_count=2,
         )
 

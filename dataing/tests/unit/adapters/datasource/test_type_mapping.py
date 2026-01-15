@@ -48,7 +48,12 @@ class TestNormalizeType:
 
     def test_postgresql_timestamp(self):
         """Test PostgreSQL timestamp normalization."""
-        ts_types = ["timestamp", "timestamp without time zone", "timestamp with time zone", "timestamptz"]
+        ts_types = [
+            "timestamp",
+            "timestamp without time zone",
+            "timestamp with time zone",
+            "timestamptz",
+        ]
         for ts_type in ts_types:
             result = normalize_type(ts_type, SourceType.POSTGRESQL)
             assert result == NormalizedType.TIMESTAMP, f"Failed for {ts_type}"

@@ -20,6 +20,7 @@ from sse_starlette.sse import EventSourceResponse
 from dataing.adapters.db.app_db import AppDatabase
 from dataing.core.domain_types import AnomalyAlert, MetricSpec
 from dataing.core.investigation.service import InvestigationService
+from dataing.core.json_utils import to_json_string
 from dataing.entrypoints.api.middleware.auth import ApiKeyContext, verify_api_key
 
 logger = logging.getLogger(__name__)
@@ -126,9 +127,7 @@ def get_investigation_service(request: Request) -> InvestigationService:
     Raises:
         HTTPException: If service is not configured.
     """
-    service: InvestigationService | None = getattr(
-        request.app.state, "investigation_service", None
-    )
+    service: InvestigationService | None = getattr(request.app.state, "investigation_service", None)
     if service is None:
         raise HTTPException(
             status_code=503,
@@ -137,9 +136,7 @@ def get_investigation_service(request: Request) -> InvestigationService:
     return service
 
 
-InvestigationServiceDep = Annotated[
-    InvestigationService, Depends(get_investigation_service)
-]
+InvestigationServiceDep = Annotated[InvestigationService, Depends(get_investigation_service)]
 
 
 def get_app_db(request: Request) -> AppDatabase:
@@ -189,12 +186,14 @@ async def list_investigations(
         if isinstance(alert_data, str):
             alert_data = json.loads(alert_data)
 
-        items.append(InvestigationListItem(
-            investigation_id=row["id"],
-            status=row.get("status", "active"),
-            created_at=row["created_at"].isoformat(),
-            dataset_id=alert_data.get("dataset_id", "unknown"),
-        ))
+        items.append(
+            InvestigationListItem(
+                investigation_id=row["id"],
+                status=row.get("status", "active"),
+                created_at=row["created_at"].isoformat(),
+                dataset_id=alert_data.get("dataset_id", "unknown"),
+            )
+        )
 
     return items
 
@@ -538,20 +537,24 @@ async def stream_updates(
                     if current_step != last_step:
                         yield {
                             "event": "step_changed",
-                            "data": json.dumps({
-                                "step": current_step,
-                                "branch_id": str(state.main_branch.branch_id),
-                            }),
+                            "data": to_json_string(
+                                {
+                                    "step": current_step,
+                                    "branch_id": str(state.main_branch.branch_id),
+                                }
+                            ),
                         }
                         last_step = current_step
 
                     if current_status != last_status:
                         yield {
                             "event": "status_changed",
-                            "data": json.dumps({
-                                "status": current_status,
-                                "investigation_id": str(state.investigation_id),
-                            }),
+                            "data": to_json_string(
+                                {
+                                    "status": current_status,
+                                    "investigation_id": str(state.investigation_id),
+                                }
+                            ),
                         }
                         last_status = current_status
 
@@ -560,10 +563,12 @@ async def stream_updates(
                         # Send final state
                         yield {
                             "event": "investigation_ended",
-                            "data": json.dumps({
-                                "status": current_status,
-                                "synthesis": state.main_branch.synthesis,
-                            }),
+                            "data": to_json_string(
+                                {
+                                    "status": current_status,
+                                    "synthesis": state.main_branch.synthesis,
+                                }
+                            ),
                         }
                         break
 
@@ -571,9 +576,11 @@ async def stream_updates(
                     # Investigation not found
                     yield {
                         "event": "error",
-                        "data": json.dumps({
-                            "error": "Investigation not found",
-                        }),
+                        "data": to_json_string(
+                            {
+                                "error": "Investigation not found",
+                            }
+                        ),
                     }
                     break
 
@@ -584,9 +591,11 @@ async def stream_updates(
             if poll_count >= max_polls:
                 yield {
                     "event": "timeout",
-                    "data": json.dumps({
-                        "message": "Stream timeout, please reconnect",
-                    }),
+                    "data": to_json_string(
+                        {
+                            "message": "Stream timeout, please reconnect",
+                        }
+                    ),
                 }
 
         except asyncio.CancelledError:

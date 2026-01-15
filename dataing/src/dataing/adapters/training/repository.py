@@ -2,11 +2,12 @@
 
 from __future__ import annotations
 
-import json
 from typing import TYPE_CHECKING, Any
 from uuid import UUID, uuid4
 
 import structlog
+
+from dataing.core.json_utils import to_json_string
 
 from .types import TrainingSignal
 
@@ -79,10 +80,10 @@ class TrainingSignalRepository:
             signal_type,
             tenant_id,
             investigation_id,
-            json.dumps(input_context),
-            json.dumps(output_response),
+            to_json_string(input_context),
+            to_json_string(output_response),
             automated_score,
-            json.dumps(automated_dimensions) if automated_dimensions else None,
+            to_json_string(automated_dimensions) if automated_dimensions else None,
             model_version,
             source_event_id,
         )

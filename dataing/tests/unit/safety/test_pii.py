@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import pytest
-
 from dataing.safety.pii import (
     contains_pii,
     redact_dict,

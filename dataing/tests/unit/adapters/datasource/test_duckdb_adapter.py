@@ -73,9 +73,7 @@ class TestDuckDBAdapter:
     async def test_execute_query_multiple_rows(self, connected_adapter):
         """Test executing query with multiple rows."""
         # Create a table and insert data
-        await connected_adapter.execute_query(
-            "CREATE TABLE test_table (id INTEGER, name VARCHAR)"
-        )
+        await connected_adapter.execute_query("CREATE TABLE test_table (id INTEGER, name VARCHAR)")
         await connected_adapter.execute_query(
             "INSERT INTO test_table VALUES (1, 'Alice'), (2, 'Bob'), (3, 'Charlie')"
         )
@@ -141,16 +139,16 @@ class TestDuckDBDirectoryMode:
             import duckdb
 
             conn = duckdb.connect(":memory:")
-            conn.execute(
-                f"COPY (SELECT 1 as id, 'test' as name) TO '{tmpdir}/test.parquet'"
-            )
+            conn.execute(f"COPY (SELECT 1 as id, 'test' as name) TO '{tmpdir}/test.parquet'")
             conn.close()
 
             # Create adapter in directory mode
-            adapter = DuckDBAdapter({
-                "path": tmpdir,
-                "source_type": "directory",
-            })
+            adapter = DuckDBAdapter(
+                {
+                    "path": tmpdir,
+                    "source_type": "directory",
+                }
+            )
 
             async with adapter:
                 result = await adapter.test_connection()
@@ -169,10 +167,12 @@ class TestDuckDBDirectoryMode:
             with open(csv_path, "w") as f:
                 f.write("id,name\n1,Alice\n2,Bob\n")
 
-            adapter = DuckDBAdapter({
-                "path": tmpdir,
-                "source_type": "directory",
-            })
+            adapter = DuckDBAdapter(
+                {
+                    "path": tmpdir,
+                    "source_type": "directory",
+                }
+            )
 
             async with adapter:
                 result = await adapter.test_connection()
@@ -187,10 +187,12 @@ class TestDuckDBAdapterErrors:
         """Test connect raises error for non-existent database file."""
         from dataing.adapters.datasource.errors import ConnectionFailedError
 
-        adapter = DuckDBAdapter({
-            "path": "/nonexistent/path/to/db.duckdb",
-            "source_type": "database",
-        })
+        adapter = DuckDBAdapter(
+            {
+                "path": "/nonexistent/path/to/db.duckdb",
+                "source_type": "database",
+            }
+        )
 
         with pytest.raises(ConnectionFailedError) as exc_info:
             await adapter.connect()
@@ -274,9 +276,7 @@ class TestDuckDBAdapterSampling:
     @pytest.mark.asyncio
     async def test_preview_method(self, connected_adapter):
         """Test preview method works correctly."""
-        await connected_adapter.execute_query(
-            "CREATE TABLE preview_test (id INTEGER)"
-        )
+        await connected_adapter.execute_query("CREATE TABLE preview_test (id INTEGER)")
         await connected_adapter.execute_query(
             "INSERT INTO preview_test SELECT i FROM range(50) t(i)"
         )
@@ -291,9 +291,7 @@ class TestDuckDBAdapterQueryLimit:
     @pytest.mark.asyncio
     async def test_execute_query_with_limit(self, connected_adapter):
         """Test execute_query respects limit parameter."""
-        await connected_adapter.execute_query(
-            "CREATE TABLE limit_test (id INTEGER)"
-        )
+        await connected_adapter.execute_query("CREATE TABLE limit_test (id INTEGER)")
         await connected_adapter.execute_query(
             "INSERT INTO limit_test SELECT i FROM range(100) t(i)"
         )

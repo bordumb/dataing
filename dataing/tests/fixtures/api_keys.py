@@ -50,7 +50,7 @@ def sample_api_key_record(
         "is_active": True,
         "last_used_at": None,
         "expires_at": None,
-        "created_at": datetime.now(timezone.utc),
+        "created_at": datetime.now(datetime.UTC),
         "tenant_slug": "test-tenant",
         "tenant_name": "Test Tenant",
     }
@@ -60,5 +60,5 @@ def sample_api_key_record(
 def expired_api_key_record(sample_api_key_record: dict) -> dict:
     """Return an expired API key database record."""
     record = sample_api_key_record.copy()
-    record["expires_at"] = datetime.now(timezone.utc) - timedelta(days=1)
+    record["expires_at"] = datetime.now(datetime.UTC) - timedelta(days=1)
     return record

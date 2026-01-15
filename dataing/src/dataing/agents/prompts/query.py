@@ -51,7 +51,7 @@ def build_system(
         alert_context = f"""ALERT CONTEXT (use these values in your queries):
 - Anomaly Date: {alert.anomaly_date}
 - Table: {alert.dataset_id}
-- Column: {alert.metric_spec.expression or ', '.join(alert.metric_spec.columns_referenced)}
+- Column: {alert.metric_spec.expression or ", ".join(alert.metric_spec.columns_referenced)}
 - Anomaly Type: {alert.anomaly_type}
 - Expected Value: {alert.expected_value}
 - Actual Value: {alert.actual_value}

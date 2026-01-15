@@ -2,13 +2,14 @@
 
 import hashlib
 import hmac
-import json
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any
 
 import httpx
 import structlog
+
+from dataing.core.json_utils import to_json_string
 
 logger = structlog.get_logger()
 
@@ -38,13 +39,12 @@ class WebhookNotifier:
 
         Returns True if the webhook was delivered successfully (2xx response).
         """
-        body = json.dumps(
+        body = to_json_string(
             {
                 "event_type": event_type,
                 "timestamp": datetime.now(UTC).isoformat(),
                 "payload": payload,
-            },
-            default=str,
+            }
         )
 
         headers = {

@@ -117,9 +117,7 @@ class TestGatherContextStep:
         engine = AsyncMock()
         engine.gather.return_value = MagicMock(
             schema=MagicMock(
-                model_dump=MagicMock(
-                    return_value={"catalogs": [{"schemas": [{"tables": []}]}]}
-                ),
+                model_dump=MagicMock(return_value={"catalogs": [{"schemas": [{"tables": []}]}]}),
             ),
         )
         step = GatherContextStep(context_engine=engine, adapter=mock_adapter)

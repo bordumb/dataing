@@ -85,9 +85,7 @@ class TestExecuteQueryStep:
 
         await step.execute(sample_context)
 
-        mock_database.execute_query.assert_called_once_with(
-            sample_context.current_query
-        )
+        mock_database.execute_query.assert_called_once_with(sample_context.current_query)
 
     @pytest.mark.asyncio
     async def test_execute_returns_query_result(

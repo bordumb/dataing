@@ -76,7 +76,7 @@ class TestVerifyApiKey:
         sample_api_key_record: dict,
     ) -> None:
         """Test that expired API key raises 401."""
-        sample_api_key_record["expires_at"] = datetime.now(timezone.utc) - timedelta(days=1)
+        sample_api_key_record["expires_at"] = datetime.now(datetime.UTC) - timedelta(days=1)
         mock_request.app.state.db.get_api_key_by_hash.return_value = sample_api_key_record
 
         with pytest.raises(HTTPException) as exc_info:

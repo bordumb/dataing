@@ -142,9 +142,7 @@ class TestCreateAdapterForDatasource:
                 return_value=mock_registry,
             ),
         ):
-            result = await create_adapter_for_datasource(
-                mock_db, tenant_id, datasource_id
-            )
+            result = await create_adapter_for_datasource(mock_db, tenant_id, datasource_id)
 
         assert result == mock_adapter
         mock_registry.create.assert_called_once()

@@ -1,0 +1,21 @@
+{
+  "assignee": "bordumbb@gmail.com",
+  "claim_note": "",
+  "claimed_at": "2026-01-15T02:19:51.802828Z",
+  "created_at": "2026-01-15T01:58:38.493915Z",
+  "depends_on": [],
+  "epic": "fn-11",
+  "evidence": {
+    "commits": [
+      "862ca578"
+    ],
+    "prs": [],
+    "tests": []
+  },
+  "id": "fn-11.4",
+  "priority": null,
+  "spec_path": ".flow/tasks/fn-11.4.md",
+  "status": "done",
+  "title": "Validate serialization fixes",
+  "updated_at": "2026-01-15T02:51:30.538965Z"
+}

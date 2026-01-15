@@ -4,22 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from dataing.core.domain_types import (
-    AnomalyAlert,
-    ApprovalDecision,
-    ApprovalDecisionType,
-    ApprovalRequest,
-    ApprovalRequestType,
-    Evidence,
-    Finding,
-    Hypothesis,
-    HypothesisCategory,
-    InvestigationContext,
-    LineageContext,
-    QueryResult,
-    SchemaContext,
-    TableSchema,
-)
+from dataing.core.domain_types import Finding
 
 
 class TestAnomalyAlert:
@@ -304,7 +289,7 @@ class TestApprovalRequest:
             investigation_id="inv-001",
             request_type=ApprovalRequestType.QUERY_APPROVAL,
             context={"query": "SELECT 1"},
-            requested_at=datetime.now(timezone.utc),
+            requested_at=datetime.now(datetime.UTC),
             requested_by="system",
         )
 
@@ -328,7 +313,7 @@ class TestApprovalDecision:
             request_id="req-001",
             decision=ApprovalDecisionType.APPROVED,
             decided_by="admin",
-            decided_at=datetime.now(timezone.utc),
+            decided_at=datetime.now(datetime.UTC),
         )
 
         assert decision.decision == ApprovalDecisionType.APPROVED

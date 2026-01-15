@@ -1,5 +1,6 @@
 """Integration tests for knowledge comments with real database."""
 
+import os
 from collections.abc import AsyncGenerator
 from uuid import UUID, uuid4
 
@@ -14,7 +15,8 @@ class TestKnowledgeCommentsIntegration:
     @pytest.fixture
     async def db(self) -> AsyncGenerator[AppDatabase, None]:
         """Create database connection."""
-        db = AppDatabase(dsn="postgresql://localhost/dataing")  # pragma: allowlist secret
+        dsn = os.getenv("DATABASE_URL", "postgresql://dataing:dataing@localhost:5432/dataing_demo")
+        db = AppDatabase(dsn=dsn)
         try:
             await db.connect()
         except Exception as e:
@@ -250,7 +252,8 @@ class TestKnowledgeCommentVotingIntegration:
     @pytest.fixture
     async def db(self) -> AsyncGenerator[AppDatabase, None]:
         """Create database connection."""
-        db = AppDatabase(dsn="postgresql://localhost/dataing")  # pragma: allowlist secret
+        dsn = os.getenv("DATABASE_URL", "postgresql://dataing:dataing@localhost:5432/dataing_demo")
+        db = AppDatabase(dsn=dsn)
         try:
             await db.connect()
         except Exception as e:

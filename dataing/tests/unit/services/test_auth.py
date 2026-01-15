@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 from unittest.mock import AsyncMock
 
 import pytest
@@ -108,7 +108,7 @@ class TestAuthService:
         )
 
         assert result.expires_at is not None
-        assert result.expires_at > datetime.now(timezone.utc)
+        assert result.expires_at > datetime.now(datetime.UTC)
 
     async def test_list_api_keys(
         self,

@@ -148,9 +148,7 @@ class TestContextEngineWithLineageAdapter:
         """Create a context engine with the mock lineage adapter."""
         return ContextEngine(lineage_adapter=mock_lineage_adapter)
 
-    async def test_fetch_lineage_returns_context(
-        self, context_engine: ContextEngine
-    ) -> None:
+    async def test_fetch_lineage_returns_context(self, context_engine: ContextEngine) -> None:
         """Test that _fetch_lineage returns proper LineageContext."""
         lineage = await context_engine._fetch_lineage("analytics.orders")
 
@@ -237,10 +235,16 @@ class TestLineageRegistry:
         """Test creating a composite adapter."""
         registry = get_lineage_registry()
 
-        adapter = registry.create_composite([
-            {"provider": "dbt", "priority": 10, "config": {"manifest_path": "/tmp/m.json"}},
-            {"provider": "openlineage", "priority": 5, "config": {"base_url": "http://localhost:5000"}},
-        ])
+        adapter = registry.create_composite(
+            [
+                {"provider": "dbt", "priority": 10, "config": {"manifest_path": "/tmp/m.json"}},
+                {
+                    "provider": "openlineage",
+                    "priority": 5,
+                    "config": {"base_url": "http://localhost:5000"},
+                },
+            ]
+        )
 
         assert adapter is not None
         # Composite adapter has multiple providers

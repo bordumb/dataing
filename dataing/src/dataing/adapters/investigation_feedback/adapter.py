@@ -2,11 +2,12 @@
 
 from __future__ import annotations
 
-import json
 from typing import TYPE_CHECKING, Any
 from uuid import UUID
 
 import structlog
+
+from dataing.core.json_utils import to_json_string
 
 from .types import EventType, FeedbackEvent
 
@@ -95,7 +96,7 @@ class InvestigationFeedbackAdapter:
             event.investigation_id,
             event.dataset_id,
             event.event_type.value,
-            json.dumps(event.event_data),
+            to_json_string(event.event_data),
             event.actor_id,
             event.actor_type,
             event.created_at,

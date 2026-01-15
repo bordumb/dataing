@@ -28,9 +28,9 @@ def sample_data_source(
         "connection_config_encrypted": "encrypted_connection_string",
         "is_default": True,
         "is_active": True,
-        "last_health_check_at": datetime.now(timezone.utc),
+        "last_health_check_at": datetime.now(datetime.UTC),
         "last_health_check_status": "healthy",
-        "created_at": datetime.now(timezone.utc),
+        "created_at": datetime.now(datetime.UTC),
     }
 
 
@@ -66,7 +66,7 @@ def sample_investigation_record(
         "started_at": None,
         "completed_at": None,
         "duration_seconds": None,
-        "created_at": datetime.now(timezone.utc),
+        "created_at": datetime.now(datetime.UTC),
     }
 
 
@@ -91,5 +91,5 @@ def sample_webhook_record(
         "is_active": True,
         "last_triggered_at": None,
         "last_status": None,
-        "created_at": datetime.now(timezone.utc),
+        "created_at": datetime.now(datetime.UTC),
     }

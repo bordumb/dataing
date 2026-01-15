@@ -204,13 +204,15 @@ class TestDocumentAdapterPreview:
         """Test that preview delegates to scan_collection."""
         adapter = ConcreteDocumentAdapter({})
         await adapter.connect()
-        adapter.set_scan_results([
-            QueryResult(
-                columns=[{"name": "id", "data_type": "string"}],
-                rows=[{"id": "1"}, {"id": "2"}, {"id": "3"}],
-                row_count=3,
-            )
-        ])
+        adapter.set_scan_results(
+            [
+                QueryResult(
+                    columns=[{"name": "id", "data_type": "string"}],
+                    rows=[{"id": "1"}, {"id": "2"}, {"id": "3"}],
+                    row_count=3,
+                )
+            ]
+        )
 
         result = await adapter.preview("users", n=10)
 

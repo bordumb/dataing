@@ -176,7 +176,7 @@ def sample_event() -> Event:
     """Return a sample event."""
     return Event(
         type="investigation_started",
-        timestamp=datetime.now(timezone.utc),
+        timestamp=datetime.now(datetime.UTC),
         data={"dataset_id": "public.orders"},
     )
 
@@ -188,7 +188,7 @@ def sample_approval_request() -> ApprovalRequest:
         investigation_id="inv-001",
         request_type=ApprovalRequestType.QUERY_APPROVAL,
         context={"query": "SELECT * FROM users LIMIT 10"},
-        requested_at=datetime.now(timezone.utc),
+        requested_at=datetime.now(datetime.UTC),
         requested_by="system",
     )
 
@@ -200,6 +200,6 @@ def sample_approval_decision() -> ApprovalDecision:
         request_id="req-001",
         decision=ApprovalDecisionType.APPROVED,
         decided_by="admin",
-        decided_at=datetime.now(timezone.utc),
+        decided_at=datetime.now(datetime.UTC),
         comment="Approved for testing",
     )

@@ -161,9 +161,7 @@ class TestSQLiteAdapter:
     async def test_execute_query_empty_result(self, sample_db: str) -> None:
         """Test query with no results."""
         async with SQLiteAdapter({"path": sample_db}) as adapter:
-            result = await adapter.execute_query(
-                "SELECT * FROM users WHERE age > 100"
-            )
+            result = await adapter.execute_query("SELECT * FROM users WHERE age > 100")
             assert result.row_count == 0
             assert result.rows == []
 
@@ -209,9 +207,7 @@ class TestSQLiteAdapter:
     async def test_get_schema_exclude_views(self, sample_db: str) -> None:
         """Test schema discovery with views excluded."""
         async with SQLiteAdapter({"path": sample_db}) as adapter:
-            schema = await adapter.get_schema(
-                filter=SchemaFilter(include_views=False)
-            )
+            schema = await adapter.get_schema(filter=SchemaFilter(include_views=False))
 
             tables = schema.get_all_tables()
             table_names = [t.name for t in tables]
@@ -221,9 +217,7 @@ class TestSQLiteAdapter:
     async def test_get_schema_table_pattern(self, sample_db: str) -> None:
         """Test schema discovery with table pattern filter."""
         async with SQLiteAdapter({"path": sample_db}) as adapter:
-            schema = await adapter.get_schema(
-                filter=SchemaFilter(table_pattern="user%")
-            )
+            schema = await adapter.get_schema(filter=SchemaFilter(table_pattern="user%"))
 
             tables = schema.get_all_tables()
             table_names = [t.name for t in tables]
@@ -233,9 +227,7 @@ class TestSQLiteAdapter:
     async def test_get_schema_max_tables(self, sample_db: str) -> None:
         """Test schema discovery with max tables limit."""
         async with SQLiteAdapter({"path": sample_db}) as adapter:
-            schema = await adapter.get_schema(
-                filter=SchemaFilter(max_tables=1)
-            )
+            schema = await adapter.get_schema(filter=SchemaFilter(max_tables=1))
 
             tables = schema.get_all_tables()
             assert len(tables) == 1
@@ -285,9 +277,7 @@ class TestSQLiteAdapter:
             assert result.row_count == 3
 
             with pytest.raises(Exception):
-                await adapter.execute_query(
-                    "INSERT INTO users (name) VALUES ('Test')"
-                )
+                await adapter.execute_query("INSERT INTO users (name) VALUES ('Test')")
 
     async def test_context_manager(self, sample_db: str) -> None:
         """Test async context manager."""
@@ -301,9 +291,7 @@ class TestSQLiteAdapter:
         """Test type normalization in schema."""
         async with SQLiteAdapter({"path": sample_db}) as adapter:
             schema = await adapter.get_schema()
-            users_table = next(
-                t for t in schema.get_all_tables() if t.name == "users"
-            )
+            users_table = next(t for t in schema.get_all_tables() if t.name == "users")
 
             id_col = next(c for c in users_table.columns if c.name == "id")
             assert id_col.data_type == NormalizedType.INTEGER
@@ -311,18 +299,14 @@ class TestSQLiteAdapter:
             name_col = next(c for c in users_table.columns if c.name == "name")
             assert name_col.data_type == NormalizedType.STRING
 
-            created_col = next(
-                c for c in users_table.columns if c.name == "created_at"
-            )
+            created_col = next(c for c in users_table.columns if c.name == "created_at")
             assert created_col.data_type == NormalizedType.DATETIME
 
     async def test_column_nullability(self, sample_db: str) -> None:
         """Test column nullability is correctly detected."""
         async with SQLiteAdapter({"path": sample_db}) as adapter:
             schema = await adapter.get_schema()
-            users_table = next(
-                t for t in schema.get_all_tables() if t.name == "users"
-            )
+            users_table = next(t for t in schema.get_all_tables() if t.name == "users")
 
             name_col = next(c for c in users_table.columns if c.name == "name")
             assert name_col.nullable is False
@@ -390,15 +374,9 @@ class TestSQLiteAdapterInMemory:
 
     async def test_memory_database_create_table(self) -> None:
         """Test creating tables in in-memory database."""
-        async with SQLiteAdapter(
-            {"path": ":memory:", "read_only": False}
-        ) as adapter:
-            await adapter.execute_query(
-                "CREATE TABLE test (id INTEGER PRIMARY KEY, name TEXT)"
-            )
-            await adapter.execute_query(
-                "INSERT INTO test (name) VALUES ('Alice'), ('Bob')"
-            )
+        async with SQLiteAdapter({"path": ":memory:", "read_only": False}) as adapter:
+            await adapter.execute_query("CREATE TABLE test (id INTEGER PRIMARY KEY, name TEXT)")
+            await adapter.execute_query("INSERT INTO test (name) VALUES ('Alice'), ('Bob')")
 
             result = await adapter.execute_query("SELECT * FROM test")
             assert result.row_count == 2

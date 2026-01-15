@@ -152,7 +152,7 @@ class BaseLineageAdapter(ABC):
         """
         if not self.capabilities.supports_column_lineage:
             raise ColumnLineageNotSupportedError(
-                f"Provider {self.provider_info.provider.value} " "does not support column lineage"
+                f"Provider {self.provider_info.provider.value} does not support column lineage"
             )
         return []
 

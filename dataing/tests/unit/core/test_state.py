@@ -6,7 +6,8 @@ from datetime import datetime, timezone
 
 import pytest
 
-from dataing.core.domain_types import AnomalyAlert, SchemaContext, TableSchema, LineageContext
+from dataing.adapters.datasource.types import SchemaResponse
+from dataing.core.domain_types import InvestigationContext, LineageContext
 from dataing.core.state import Event, InvestigationState
 
 
@@ -17,7 +18,7 @@ class TestEvent:
         """Test creating an event."""
         event = Event(
             type="investigation_started",
-            timestamp=datetime.now(timezone.utc),
+            timestamp=datetime.now(datetime.UTC),
             data={"dataset_id": "public.orders"},
         )
 
@@ -28,7 +29,7 @@ class TestEvent:
         """Test that event is immutable."""
         event = Event(
             type="investigation_started",
-            timestamp=datetime.now(timezone.utc),
+            timestamp=datetime.now(datetime.UTC),
             data={},
         )
 
@@ -73,7 +74,7 @@ class TestInvestigationState:
         """Test status is completed after synthesis."""
         event = Event(
             type="synthesis_completed",
-            timestamp=datetime.now(timezone.utc),
+            timestamp=datetime.now(datetime.UTC),
             data={},
         )
         state.events.append(event)
@@ -84,7 +85,7 @@ class TestInvestigationState:
         """Test status is failed after failure event."""
         event = Event(
             type="investigation_failed",
-            timestamp=datetime.now(timezone.utc),
+            timestamp=datetime.now(datetime.UTC),
             data={"error": "Something went wrong"},
         )
         state.events.append(event)
@@ -95,7 +96,7 @@ class TestInvestigationState:
         """Test status is in_progress during investigation."""
         event = Event(
             type="hypothesis_generated",
-            timestamp=datetime.now(timezone.utc),
+            timestamp=datetime.now(datetime.UTC),
             data={},
         )
         state.events.append(event)
@@ -107,17 +108,17 @@ class TestInvestigationState:
         events = [
             Event(
                 type="reflexion_attempted",
-                timestamp=datetime.now(timezone.utc),
+                timestamp=datetime.now(datetime.UTC),
                 data={"hypothesis_id": "h001"},
             ),
             Event(
                 type="reflexion_attempted",
-                timestamp=datetime.now(timezone.utc),
+                timestamp=datetime.now(datetime.UTC),
                 data={"hypothesis_id": "h001"},
             ),
             Event(
                 type="reflexion_attempted",
-                timestamp=datetime.now(timezone.utc),
+                timestamp=datetime.now(datetime.UTC),
                 data={"hypothesis_id": "h002"},
             ),
         ]
@@ -132,12 +133,12 @@ class TestInvestigationState:
         events = [
             Event(
                 type="query_submitted",
-                timestamp=datetime.now(timezone.utc),
+                timestamp=datetime.now(datetime.UTC),
                 data={"hypothesis_id": "h001", "query": "SELECT 1"},
             ),
             Event(
                 type="query_submitted",
-                timestamp=datetime.now(timezone.utc),
+                timestamp=datetime.now(datetime.UTC),
                 data={"hypothesis_id": "h002", "query": "SELECT 2"},
             ),
         ]
@@ -150,17 +151,17 @@ class TestInvestigationState:
         events = [
             Event(
                 type="query_submitted",
-                timestamp=datetime.now(timezone.utc),
+                timestamp=datetime.now(datetime.UTC),
                 data={"hypothesis_id": "h001", "query": "SELECT 1"},
             ),
             Event(
                 type="query_submitted",
-                timestamp=datetime.now(timezone.utc),
+                timestamp=datetime.now(datetime.UTC),
                 data={"hypothesis_id": "h001", "query": "SELECT 2"},
             ),
             Event(
                 type="query_submitted",
-                timestamp=datetime.now(timezone.utc),
+                timestamp=datetime.now(datetime.UTC),
                 data={"hypothesis_id": "h002", "query": "SELECT 3"},
             ),
         ]
@@ -174,12 +175,12 @@ class TestInvestigationState:
         events = [
             Event(
                 type="query_failed",
-                timestamp=datetime.now(timezone.utc),
+                timestamp=datetime.now(datetime.UTC),
                 data={"hypothesis_id": "h001", "query": "SELECT invalid"},
             ),
             Event(
                 type="query_failed",
-                timestamp=datetime.now(timezone.utc),
+                timestamp=datetime.now(datetime.UTC),
                 data={"hypothesis_id": "h001", "query": "SELECT also_invalid"},
             ),
         ]
@@ -196,12 +197,12 @@ class TestInvestigationState:
         events = [
             Event(
                 type="query_submitted",
-                timestamp=datetime.now(timezone.utc),
+                timestamp=datetime.now(datetime.UTC),
                 data={"hypothesis_id": "h001", "query": "SELECT 1"},
             ),
             Event(
                 type="query_submitted",
-                timestamp=datetime.now(timezone.utc),
+                timestamp=datetime.now(datetime.UTC),
                 data={"hypothesis_id": "h001", "query": "SELECT 2"},
             ),
         ]
@@ -218,22 +219,22 @@ class TestInvestigationState:
         events = [
             Event(
                 type="query_succeeded",
-                timestamp=datetime.now(timezone.utc),
+                timestamp=datetime.now(datetime.UTC),
                 data={},
             ),
             Event(
                 type="query_failed",
-                timestamp=datetime.now(timezone.utc),
+                timestamp=datetime.now(datetime.UTC),
                 data={},
             ),
             Event(
                 type="query_failed",
-                timestamp=datetime.now(timezone.utc),
+                timestamp=datetime.now(datetime.UTC),
                 data={},
             ),
             Event(
                 type="query_failed",
-                timestamp=datetime.now(timezone.utc),
+                timestamp=datetime.now(datetime.UTC),
                 data={},
             ),
         ]
@@ -246,22 +247,22 @@ class TestInvestigationState:
         events = [
             Event(
                 type="query_failed",
-                timestamp=datetime.now(timezone.utc),
+                timestamp=datetime.now(datetime.UTC),
                 data={},
             ),
             Event(
                 type="query_failed",
-                timestamp=datetime.now(timezone.utc),
+                timestamp=datetime.now(datetime.UTC),
                 data={},
             ),
             Event(
                 type="query_succeeded",
-                timestamp=datetime.now(timezone.utc),
+                timestamp=datetime.now(datetime.UTC),
                 data={},
             ),
             Event(
                 type="query_failed",
-                timestamp=datetime.now(timezone.utc),
+                timestamp=datetime.now(datetime.UTC),
                 data={},
             ),
         ]
@@ -273,7 +274,7 @@ class TestInvestigationState:
         """Test appending an event returns new state."""
         event = Event(
             type="investigation_started",
-            timestamp=datetime.now(timezone.utc),
+            timestamp=datetime.now(datetime.UTC),
             data={},
         )
 

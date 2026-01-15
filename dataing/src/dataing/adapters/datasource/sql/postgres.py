@@ -428,9 +428,11 @@ class PostgresAdapter(SQLAdapter):
                     ON tc.constraint_name = kcu.constraint_name
                     AND tc.table_schema = kcu.table_schema
                 WHERE tc.constraint_type = 'PRIMARY KEY'
-                    AND {where_clause.replace('table_schema', 'tc.table_schema')
-                        .replace('table_name', 'tc.table_name')
-                        .replace('table_type', "'BASE TABLE'")}
+                    AND {
+                where_clause.replace("table_schema", "tc.table_schema")
+                .replace("table_name", "tc.table_name")
+                .replace("table_type", "'BASE TABLE'")
+            }
             """
             try:
                 pk_result = await self.execute_query(pk_sql)

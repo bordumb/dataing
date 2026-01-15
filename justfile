@@ -222,7 +222,7 @@ demo: demo-fixtures
         -p 16686:16686 \
         -p 4317:4317 \
         -p 4318:4318 \
-        jaegertracing/all-in-one:2.14
+        jaegertracing/all-in-one:1.76.0
     echo "Waiting for Jaeger to be ready..."
     for i in {1..10}; do
         if curl -s http://localhost:16686 > /dev/null 2>&1; then

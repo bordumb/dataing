@@ -6,7 +6,8 @@ from datetime import datetime, timezone
 
 import pytest
 
-from dataing.core.domain_types import AnomalyAlert, SchemaContext, TableSchema, LineageContext
+from dataing.adapters.datasource.types import SchemaResponse
+from dataing.core.domain_types import InvestigationContext, LineageContext
 from dataing.core.state import Event, InvestigationState
 
 

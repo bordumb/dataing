@@ -1,21 +1,26 @@
 """Integration tests for feedback system with real database."""
 
+import os
 from collections.abc import AsyncGenerator
+from uuid import UUID
 
 import pytest
 from dataing.adapters.db.app_db import AppDatabase
-from dataing.adapters.investigation_feedback import EventType, InvestigationFeedbackAdapter
+from dataing.adapters.investigation_feedback.adapter import (
+    InvestigationFeedbackAdapter,
+)
+from dataing.adapters.investigation_feedback.types import EventType
 
 
 @pytest.mark.integration
-class TestFeedbackIntegration:
-    """Integration tests for feedback event storage."""
+class TestInvestigationFeedbackIntegration:
+    """Integration tests for investigation feedback with real database."""
 
     @pytest.fixture
     async def db(self) -> AsyncGenerator[AppDatabase, None]:
         """Create database connection."""
-        # Uses demo database - adjust DSN as needed
-        db = AppDatabase(dsn="postgresql://localhost/dataing")  # pragma: allowlist secret
+        dsn = os.getenv("DATABASE_URL", "postgresql://dataing:dataing@localhost:5432/dataing_demo")
+        db = AppDatabase(dsn=dsn)
         try:
             await db.connect()
         except Exception as e:

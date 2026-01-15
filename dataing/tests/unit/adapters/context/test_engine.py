@@ -8,11 +8,9 @@ import pytest
 
 from dataing.adapters.context.engine import DefaultContextEngine
 from dataing.core.domain_types import (
-    AnomalyAlert,
-    LineageContext,
-    SchemaContext,
-    TableSchema,
+    InvestigationContext,
 )
+
 from dataing.core.exceptions import SchemaDiscoveryError
 
 

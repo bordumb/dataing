@@ -26,6 +26,7 @@ from dataing.core.investigation.values import (
     StepType,
     VersionId,
 )
+from dataing.core.json_utils import to_json_string
 
 if TYPE_CHECKING:
     from dataing.adapters.db.app_db import AppDatabase

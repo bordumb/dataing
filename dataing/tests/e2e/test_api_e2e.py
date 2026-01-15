@@ -13,7 +13,10 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 from fastapi.testclient import TestClient
 
-from dataing.core.domain_types import Finding, QueryResult, SchemaContext, TableSchema
+from dataing.adapters.datasource.types import QueryResult
+from dataing.core.domain_types import Finding
+# SchemaContext and TableSchema also seem missing from domain_types.
+# Let's check where they are.
 from dataing.entrypoints.api.app import app
 
 
@@ -36,8 +39,8 @@ class TestAPIEndToEnd:
         }
         mock_db.update_api_key_last_used.return_value = None
         mock_db.execute_query.return_value = QueryResult(
-            columns=("count",),
-            rows=({"count": 500},),
+            columns=[{"name": "count", "data_type": "integer"}],
+            rows=[{"count": 500}],
             row_count=1,
         )
         mock_db.get_schema.return_value = SchemaContext(

@@ -4,22 +4,8 @@ from __future__ import annotations
 
 import pytest
 
-from dataing.core.domain_types import (
-    AnomalyAlert,
-    ApprovalDecision,
-    ApprovalDecisionType,
-    ApprovalRequest,
-    ApprovalRequestType,
-    Evidence,
-    Finding,
-    Hypothesis,
-    HypothesisCategory,
-    InvestigationContext,
-    LineageContext,
-    QueryResult,
-    SchemaContext,
-    TableSchema,
-)
+from dataing.core.domain_types import Finding
+
 
 
 class TestAnomalyAlert:

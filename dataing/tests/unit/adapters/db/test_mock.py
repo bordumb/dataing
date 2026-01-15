@@ -5,7 +5,8 @@ from __future__ import annotations
 import pytest
 
 from dataing.adapters.db.mock import MockDatabaseAdapter
-from dataing.core.domain_types import QueryResult, SchemaContext, TableSchema
+from dataing.adapters.datasource.types import QueryResult
+# from dataing.core.domain_types import SchemaContext, TableSchema # These seem to be legacy
 
 
 class TestMockDatabaseAdapter:
@@ -46,7 +47,7 @@ class TestMockDatabaseAdapter:
         """Test that execute_query returns empty result by default."""
         result = await adapter.execute_query("SELECT * FROM unknown")
 
-        assert result.columns == ()
+        assert result.columns == []
         assert result.rows == ()
         assert result.row_count == 0
 
@@ -68,8 +69,8 @@ class TestMockDatabaseAdapter:
     ) -> None:
         """Test that execute_query matches patterns case-insensitively."""
         expected_result = QueryResult(
-            columns=("count",),
-            rows=({"count": 42},),
+            columns=[{"name": "count", "data_type": "integer"}],
+            rows=[{"count": 42}],
             row_count=1,
         )
         adapter.add_response("users", expected_result)
@@ -86,7 +87,7 @@ class TestMockDatabaseAdapter:
         """Test that get_schema returns default schema."""
         schema = await adapter.get_schema()
 
-        assert len(schema.tables) == 3
+        assert len(schema.get_all_tables()) == 3
         table_names = [t.table_name for t in schema.tables]
         assert "public.users" in table_names
         assert "public.orders" in table_names
@@ -111,14 +112,14 @@ class TestMockDatabaseAdapter:
         """Test that get_schema filters by pattern."""
         schema = await adapter.get_schema(table_pattern="orders")
 
-        assert len(schema.tables) == 1
+        assert len(schema.get_all_tables()) == 1
         assert schema.tables[0].table_name == "public.orders"
 
     def test_add_response(self, adapter: MockDatabaseAdapter) -> None:
         """Test that add_response adds a canned response."""
         result = QueryResult(
-            columns=("value",),
-            rows=({"value": "test"},),
+            columns=[{"name": "value", "data_type": "string"}],
+            rows=[{"value": "test"}],
             row_count=1,
         )
         adapter.add_response("test_pattern", result)

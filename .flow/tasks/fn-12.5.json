@@ -8,14 +8,26 @@
   ],
   "epic": "fn-12",
   "evidence": {
-    "commits": [],
+    "commits": [
+      "b9b4d8f8"
+    ],
     "prs": [],
-    "tests": []
+    "tests": [
+      "dataing/tests/unit/telemetry/test_metrics.py::TestMetricsInitialization::test_init_metrics_sets_initialized_flag",
+      "dataing/tests/unit/telemetry/test_metrics.py::TestMetricsInitialization::test_init_metrics_is_idempotent",
+      "dataing/tests/unit/telemetry/test_metrics.py::TestMetricsInitialization::test_reset_metrics_clears_state",
+      "dataing/tests/unit/telemetry/test_metrics.py::TestRecordingFunctions::test_record_investigation_duration",
+      "dataing/tests/unit/telemetry/test_metrics.py::TestRecordingFunctions::test_record_queue_wait_time",
+      "dataing/tests/unit/telemetry/test_metrics.py::TestRecordingFunctions::test_record_worker_duration",
+      "dataing/tests/unit/telemetry/test_metrics.py::TestRecordingFunctions::test_record_step_duration",
+      "dataing/tests/unit/telemetry/test_metrics.py::TestRecordingFunctions::test_record_investigation_completed",
+      "dataing/tests/unit/telemetry/test_metrics.py::TestRecordingWithoutInit::test_recording_without_init_is_safe"
+    ]
   },
   "id": "fn-12.5",
   "priority": 5,
   "spec_path": ".flow/tasks/fn-12.5.md",
-  "status": "in_progress",
+  "status": "done",
   "title": "Metrics via OTEL Collector",
-  "updated_at": "2026-01-15T21:46:52.995851Z"
+  "updated_at": "2026-01-15T21:51:56.059228Z"
 }

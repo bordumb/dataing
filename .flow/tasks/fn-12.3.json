@@ -1,0 +1,24 @@
+{
+  "assignee": "bordumbb@gmail.com",
+  "claim_note": "",
+  "claimed_at": "2026-01-15T21:36:46.370726Z",
+  "created_at": "2026-01-15T12:00:00.000000Z",
+  "depends_on": [
+    "fn-12.2"
+  ],
+  "epic": "fn-12",
+  "evidence": {
+    "commits": [
+      "087fa31c"
+    ],
+    "tests": [
+      "dataing/tests/unit/core/test_queue_tracing.py"
+    ]
+  },
+  "id": "fn-12.3",
+  "priority": 3,
+  "spec_path": ".flow/tasks/fn-12.3.md",
+  "status": "done",
+  "title": "Queue Context Propagation",
+  "updated_at": "2026-01-15T21:41:38.593782Z"
+}

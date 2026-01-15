@@ -8,11 +8,15 @@ Redis configuration.
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING
+from datetime import UTC, datetime
+from typing import TYPE_CHECKING, Any
 from urllib.parse import urlparse
 
 from arq import ArqRedis, create_pool
 from arq.connections import RedisSettings
+from opentelemetry.trace import SpanKind
+
+from dataing.telemetry import get_tracer, serialize_trace_context
 
 if TYPE_CHECKING:
     pass
@@ -73,9 +77,10 @@ async def enqueue_investigation(
     datasource_id: str | None = None,
     priority: int = 0,
     parent_job_id: str | None = None,
-    branch_spec: dict | None = None,
+    branch_spec: dict[str, Any] | None = None,
+    correlation_id: str | None = None,
 ) -> str:
-    """Enqueue an investigation job for processing.
+    """Enqueue an investigation job for processing with trace context propagation.
 
     Args:
         investigation_id: UUID of the investigation to process.
@@ -84,30 +89,58 @@ async def enqueue_investigation(
         priority: Job priority (higher = more important). Defaults to 0.
         parent_job_id: Optional parent job ID for branched execution.
         branch_spec: Optional serialized BranchSpec for branched execution.
+        correlation_id: Optional correlation ID for log correlation.
 
     Returns:
         The Arq job ID for tracking.
     """
-    queue = await get_queue()
-    try:
-        job = await queue.enqueue_job(
-            "run_investigation",
-            investigation_id=investigation_id,
-            tenant_id=tenant_id,
-            datasource_id=datasource_id,
-            parent_job_id=parent_job_id,
-            branch_spec=branch_spec,
-            _queue_name=INVESTIGATIONS_QUEUE,
-        )
-        if job is None:
-            raise RuntimeError("Failed to enqueue investigation job")
-        logger.info(
-            f"Investigation enqueued: investigation_id={investigation_id}, "
-            f"tenant_id={tenant_id}, job_id={job.job_id}"
-        )
-        return job.job_id
-    finally:
-        await queue.close()
+    tracer = get_tracer("dataing.queue")
+
+    # Create producer span (links API trace to queue)
+    with tracer.start_as_current_span(
+        "investigation.enqueue",
+        kind=SpanKind.PRODUCER,
+        attributes={
+            "investigation.id": investigation_id,
+            "tenant.id": tenant_id,
+            "messaging.system": "redis",
+            "messaging.destination": INVESTIGATIONS_QUEUE,
+        },
+    ):
+        # Serialize current trace context (includes traceparent, tracestate)
+        trace_context = serialize_trace_context()
+        enqueued_at = datetime.now(UTC).isoformat()
+
+        queue = await get_queue()
+        try:
+            job = await queue.enqueue_job(
+                "run_investigation",
+                investigation_id=investigation_id,
+                tenant_id=tenant_id,
+                datasource_id=datasource_id,
+                parent_job_id=parent_job_id,
+                branch_spec=branch_spec,
+                # NEW: Full trace context payload
+                trace_context={
+                    "traceparent": trace_context.get("traceparent"),
+                    "tracestate": trace_context.get("tracestate"),
+                    "correlation_id": correlation_id,
+                    "enqueued_at": enqueued_at,
+                },
+                _queue_name=INVESTIGATIONS_QUEUE,
+            )
+            if job is None:
+                raise RuntimeError("Failed to enqueue investigation job")
+            job_id: str = job.job_id
+            logger.info(
+                f"Investigation enqueued: investigation_id={investigation_id}, "
+                f"tenant_id={tenant_id}, job_id={job_id}, "
+                f"traceparent={trace_context.get('traceparent')}, "
+                f"correlation_id={correlation_id}"
+            )
+            return job_id
+        finally:
+            await queue.close()
 
 
 async def enqueue_branch_jobs(
@@ -115,7 +148,8 @@ async def enqueue_branch_jobs(
     tenant_id: str,
     parent_job_id: str,
     datasource_id: str | None,
-    branch_specs: list[dict],
+    branch_specs: list[dict[str, Any]],
+    correlation_id: str | None = None,
 ) -> list[str]:
     """Enqueue multiple child jobs for branched execution.
 
@@ -128,6 +162,7 @@ async def enqueue_branch_jobs(
         parent_job_id: UUID of the parent job creating the branches.
         datasource_id: Optional datasource ID.
         branch_specs: List of serialized BranchSpec dictionaries.
+        correlation_id: Optional correlation ID for log correlation.
 
     Returns:
         List of Arq job IDs for the created branch jobs.
@@ -140,6 +175,7 @@ async def enqueue_branch_jobs(
             datasource_id=datasource_id,
             parent_job_id=parent_job_id,
             branch_spec=spec,
+            correlation_id=correlation_id,
         )
         job_ids.append(job_id)
     logger.info(

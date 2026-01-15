@@ -20,6 +20,7 @@ dependencies = [
     "opentelemetry-api>=1.22.0",
     "opentelemetry-sdk>=1.22.0",
     "opentelemetry-instrumentation-fastapi>=0.43b0",
+    "opentelemetry-exporter-otlp-proto-http>=1.22.0",
     "asyncpg>=0.29.0",
     "trino>=0.327.0",
     "pyyaml>=6.0.1",

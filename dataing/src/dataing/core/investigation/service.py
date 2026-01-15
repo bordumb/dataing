@@ -127,6 +127,7 @@ class InvestigationService:
         data_adapter: BaseAdapter,
         user_id: UUID | None = None,
         datasource_id: UUID | None = None,
+        correlation_id: str | None = None,
     ) -> tuple[UUID, UUID, str]:
         """Start a new investigation for an alert.
 
@@ -139,6 +140,7 @@ class InvestigationService:
             data_adapter: Connected data source adapter (unused, for interface compat).
             user_id: Optional ID of the user starting the investigation.
             datasource_id: Datasource ID for worker adapter reconstruction.
+            correlation_id: Optional correlation ID for distributed tracing.
 
         Returns:
             Tuple of (investigation_id, main_branch_id, status).
@@ -222,6 +224,7 @@ class InvestigationService:
             investigation_id=str(investigation.id),
             tenant_id=str(tenant_id),
             datasource_id=str(datasource_id) if datasource_id else None,
+            correlation_id=correlation_id,
         )
         logger.info(f"Enqueued investigation {investigation.id} for durable execution")
 

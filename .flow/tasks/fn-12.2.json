@@ -1,0 +1,25 @@
+{
+  "assignee": "bordumbb@gmail.com",
+  "claim_note": "",
+  "claimed_at": "2026-01-15T21:30:26.228788Z",
+  "created_at": "2026-01-15T12:00:00.000000Z",
+  "depends_on": [
+    "fn-12.1"
+  ],
+  "epic": "fn-12",
+  "evidence": {
+    "commits": [
+      "73f7e4bb"
+    ],
+    "tests": [
+      "dataing/tests/unit/telemetry/test_correlation.py",
+      "dataing/tests/unit/telemetry/test_logging.py"
+    ]
+  },
+  "id": "fn-12.2",
+  "priority": 2,
+  "spec_path": ".flow/tasks/fn-12.2.md",
+  "status": "done",
+  "title": "API Instrumentation",
+  "updated_at": "2026-01-15T21:36:11.887699Z"
+}

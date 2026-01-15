@@ -1,0 +1,23 @@
+{
+  "assignee": "bordumbb@gmail.com",
+  "claim_note": "",
+  "claimed_at": "2026-01-15T21:24:39.465697Z",
+  "created_at": "2026-01-15T12:00:00.000000Z",
+  "depends_on": [],
+  "epic": "fn-12",
+  "evidence": {
+    "commits": [
+      "733d35a7a49ca1623c7bb6fd45bf30773f695f6c"
+    ],
+    "prs": [],
+    "tests": [
+      "uv run pytest dataing/tests/unit/telemetry/ -v"
+    ]
+  },
+  "id": "fn-12.1",
+  "priority": 1,
+  "spec_path": ".flow/tasks/fn-12.1.md",
+  "status": "done",
+  "title": "Telemetry Module Foundation",
+  "updated_at": "2026-01-15T21:29:01.139093Z"
+}

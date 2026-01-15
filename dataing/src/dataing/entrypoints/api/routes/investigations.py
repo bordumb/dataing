@@ -273,12 +273,16 @@ async def start_investigation(
             detail=f"Data adapter error: {e}",
         ) from e
 
+    # Extract correlation ID from middleware for distributed tracing
+    correlation_id = getattr(http_request.state, "correlation_id", None)
+
     investigation_id, main_branch_id, status = await service.start_investigation(
         tenant_id=auth.tenant_id,
         alert=alert,
         data_adapter=data_adapter,
         user_id=auth.user_id,
         datasource_id=datasource_id,
+        correlation_id=correlation_id,
     )
 
     return StartInvestigationResponse(

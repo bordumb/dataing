@@ -1,0 +1,16 @@
+{
+  "id": "fn-13.3",
+  "epic": "fn-13",
+  "title": "Database & Redis",
+  "status": "blocked",
+  "priority": 3,
+  "depends_on": ["fn-13.1"],
+  "created_at": "2026-01-15T22:00:00.000000Z",
+  "updated_at": "2026-01-15T22:00:00.000000Z",
+  "spec_path": ".flow/tasks/fn-13.3.md",
+  "evidence": {
+    "commits": [],
+    "tests": [],
+    "prs": []
+  }
+}

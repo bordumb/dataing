@@ -30,6 +30,7 @@ from dataing.agents import AgentClient
 from dataing.core.auth.recovery import PasswordRecoveryAdapter
 from dataing.core.investigation.collaboration import CollaborationService
 from dataing.core.investigation.service import InvestigationService
+from dataing.core.json_utils import to_json_string
 from dataing.services.usage import UsageTracker
 
 if TYPE_CHECKING:
@@ -286,7 +287,7 @@ async def _seed_demo_data(app_db: AppDatabase) -> None:
         DEMO_TENANT_ID,
         "Demo Account",
         "demo",
-        json.dumps({"plan_tier": "enterprise"}),
+        to_json_string({"plan_tier": "enterprise"}),
     )
 
     # Create demo API key
@@ -298,7 +299,7 @@ async def _seed_demo_data(app_db: AppDatabase) -> None:
         DEMO_API_KEY_HASH,
         DEMO_API_KEY_PREFIX,
         "Demo API Key",
-        json.dumps(["read", "write", "admin"]),
+        to_json_string(["read", "write", "admin"]),
         True,
     )
 
@@ -316,7 +317,7 @@ async def _seed_demo_data(app_db: AppDatabase) -> None:
         "read_only": True,
     }
     f = Fernet(encryption_key.encode() if isinstance(encryption_key, str) else encryption_key)
-    encrypted_config = f.encrypt(json.dumps(connection_config).encode()).decode()
+    encrypted_config = f.encrypt(to_json_string(connection_config).encode()).decode()
 
     await app_db.execute(
         """INSERT INTO data_sources

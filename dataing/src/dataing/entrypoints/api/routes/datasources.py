@@ -25,6 +25,7 @@ from dataing.adapters.datasource import (
 )
 from dataing.adapters.db.app_db import AppDatabase
 from dataing.core.entitlements.features import Feature
+from dataing.core.json_utils import to_json_string
 from dataing.entrypoints.api.deps import get_app_db
 from dataing.entrypoints.api.middleware.auth import (
     ApiKeyContext,
@@ -218,7 +219,7 @@ class DatasourceDatasetsResponse(BaseModel):
 def _encrypt_config(config: dict[str, Any], key: bytes) -> str:
     """Encrypt configuration."""
     f = Fernet(key)
-    encrypted = f.encrypt(json.dumps(config).encode())
+    encrypted = f.encrypt(to_json_string(config).encode())
     return encrypted.decode()
 
 

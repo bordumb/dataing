@@ -35,6 +35,7 @@ from dataing.core.investigation.flow import (
     run_with_checkpointing,
 )
 from dataing.core.investigation.values import StepType, VersionId
+from dataing.core.json_utils import to_json_string
 from dataing.core.queue import INVESTIGATIONS_QUEUE, get_redis_settings
 
 logger = logging.getLogger(__name__)
@@ -103,7 +104,7 @@ async def run_investigation(
             SET outcome = $1
             WHERE id = $2
             """,
-            json.dumps({"status": "cancelled", "reason": "User cancelled before execution"}),
+            to_json_string({"status": "cancelled", "reason": "User cancelled before execution"}),
             inv_uuid,
         )
         return {
@@ -280,14 +281,14 @@ async def run_investigation(
             logger.info(f"Investigation cancelled: {investigation_id}")
             await db.mark_job_cancelled(job_id)
             await db.execute(
-                """
-                UPDATE investigations
-                SET outcome = $1
-                WHERE id = $2
-                """,
-                json.dumps({"status": "cancelled", "reason": "User cancelled"}),
-                inv_uuid,
-            )
+                            """
+                            UPDATE investigations
+                            SET outcome = $1
+                            WHERE id = $2
+                            """,
+                            to_json_string({"status": "cancelled", "reason": "User cancelled"}),
+                            inv_uuid,
+                        )
             return {
                 "status": "cancelled",
                 "investigation_id": investigation_id,
@@ -299,14 +300,14 @@ async def run_investigation(
             logger.error(f"Investigation failed: {investigation_id}, error={e.error}")
             await db.update_job_status(job_id, status="failed")
             await db.execute(
-                """
-                UPDATE investigations
-                SET outcome = $1
-                WHERE id = $2
-                """,
-                json.dumps({"status": "failed", "error": e.error}),
-                inv_uuid,
-            )
+                            """
+                            UPDATE investigations
+                            SET outcome = $1
+                            WHERE id = $2
+                            """,
+                            to_json_string({"status": "failed", "error": e.error}),
+                            inv_uuid,
+                        )
             return {
                 "status": "failed",
                 "investigation_id": investigation_id,
@@ -319,14 +320,14 @@ async def run_investigation(
             logger.exception(f"Unexpected error in investigation: {investigation_id}")
             await db.update_job_status(job_id, status="failed")
             await db.execute(
-                """
-                UPDATE investigations
-                SET outcome = $1
-                WHERE id = $2
-                """,
-                json.dumps({"status": "failed", "error": str(e)}),
-                inv_uuid,
-            )
+                            """
+                            UPDATE investigations
+                            SET outcome = $1
+                            WHERE id = $2
+                            """,
+                            to_json_string({"status": "failed", "error": str(e)}),
+                            inv_uuid,
+                        )
             return {
                 "status": "failed",
                 "investigation_id": investigation_id,

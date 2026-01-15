@@ -12,6 +12,8 @@ from uuid import UUID
 import asyncpg
 import structlog
 
+from dataing.core.json_utils import to_json_string
+
 logger = structlog.get_logger()
 
 # Retry configuration for database connection
@@ -141,7 +143,7 @@ class AppDatabase:
                RETURNING *""",
             name,
             slug,
-            json.dumps(settings or {}),
+            to_json_string(settings or {}),
         )
         if result is None:
             raise RuntimeError("Failed to create tenant")
@@ -186,7 +188,7 @@ class AppDatabase:
             key_hash,
             key_prefix,
             name,
-            json.dumps(scopes),
+            to_json_string(scopes),
             expires_at,
         )
         if result is None:
@@ -551,7 +553,7 @@ class AppDatabase:
             deviation_pct,
             anomaly_date,
             severity,
-            json.dumps(metadata or {}),
+            to_json_string(metadata or {}),
         )
         if result is None:
             raise RuntimeError("Failed to create investigation")
@@ -639,12 +641,12 @@ class AppDatabase:
 
         if events is not None:
             updates.append(f"events = ${idx}")
-            args.append(json.dumps(events))
+            args.append(to_json_string(events))
             idx += 1
 
         if finding is not None:
             updates.append(f"finding = ${idx}")
-            args.append(json.dumps(finding))
+            args.append(to_json_string(finding))
             idx += 1
 
         if started_at is not None:
@@ -763,7 +765,7 @@ class AppDatabase:
 
         if checkpoint is not None:
             updates.append(f"checkpoint = ${idx}")
-            args.append(json.dumps(checkpoint))
+            args.append(to_json_string(checkpoint))
             idx += 1
 
         if error is not None:
@@ -833,7 +835,7 @@ class AppDatabase:
             tenant_id,
             datasource_id,
             parent_job_id,
-            json.dumps(branch_spec) if branch_spec else None,
+            to_json_string(branch_spec) if branch_spec else None,
             priority,
         )
         if result is None:
@@ -1067,8 +1069,8 @@ class AppDatabase:
             request_method,
             request_path,
             status_code,
-            json.dumps(changes) if changes else None,
-            json.dumps(metadata) if metadata else None,
+            to_json_string(changes) if changes else None,
+            to_json_string(metadata) if metadata else None,
         )
 
     # Webhook operations
@@ -1105,7 +1107,7 @@ class AppDatabase:
             tenant_id,
             url,
             secret,
-            json.dumps(events),
+            to_json_string(events),
         )
         if result is None:
             raise RuntimeError("Failed to create webhook")
@@ -1141,7 +1143,7 @@ class AppDatabase:
             resource_type,
             quantity,
             unit_cost,
-            json.dumps(metadata or {}),
+            to_json_string(metadata or {}),
         )
 
     async def get_monthly_usage(
@@ -1178,7 +1180,7 @@ class AppDatabase:
             investigation_id,
             tenant_id,
             request_type,
-            json.dumps(context),
+            to_json_string(context),
             requested_by,
         )
         if result is None:
@@ -1217,7 +1219,7 @@ class AppDatabase:
             decision,
             decided_by,
             comment,
-            json.dumps(modifications) if modifications else None,
+            to_json_string(modifications) if modifications else None,
         )
 
     # Dashboard stats

@@ -56,7 +56,7 @@ class PostgresInvestigationRepository:
             RETURNING id, tenant_id, alert, main_branch_id, outcome, created_at, created_by
             """,
             tenant_id,
-            json.dumps(alert),
+            to_json_string(alert),
             created_by,
         )
         if result is None:
@@ -90,7 +90,7 @@ class PostgresInvestigationRepository:
             WHERE id = $1
             """,
             investigation_id,
-            json.dumps(outcome),
+            to_json_string(outcome),
         )
 
     async def set_main_branch(
@@ -249,7 +249,7 @@ class PostgresInvestigationRepository:
             version.patch,
             parent_snapshot_id,
             step.value,
-            json.dumps(step_cursor or {}),
+            to_json_string(step_cursor or {}),
             context.model_dump_json(),
             created_by,
             trigger,

@@ -1,0 +1,23 @@
+{
+  "assignee": "bordumbb@gmail.com",
+  "claim_note": "",
+  "claimed_at": "2026-01-15T02:02:08.879706Z",
+  "created_at": "2026-01-15T01:58:38.230395Z",
+  "depends_on": [],
+  "epic": "fn-11",
+  "evidence": {
+    "commits": [
+      "1d468623"
+    ],
+    "prs": [],
+    "tests": [
+      "dataing/tests/unit/core/test_json_utils.py"
+    ]
+  },
+  "id": "fn-11.1",
+  "priority": null,
+  "spec_path": ".flow/tasks/fn-11.1.md",
+  "status": "done",
+  "title": "Create core json_utils module and tests",
+  "updated_at": "2026-01-15T02:03:21.274503Z"
+}

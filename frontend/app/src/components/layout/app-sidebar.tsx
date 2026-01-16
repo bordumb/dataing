@@ -10,6 +10,7 @@ import {
   ChevronUp,
   LogOut,
   Shield,
+  CircleDot,
 } from 'lucide-react'
 
 import {
@@ -50,6 +51,11 @@ const mainNavItems = [
     title: 'Investigations',
     url: '/investigations',
     icon: Search,
+  },
+  {
+    title: 'Issues',
+    url: '/issues',
+    icon: CircleDot,
   },
   {
     title: 'Data Sources',

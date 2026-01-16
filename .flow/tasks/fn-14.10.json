@@ -1,0 +1,31 @@
+{
+  "assignee": "bordumbb@gmail.com",
+  "claim_note": "",
+  "claimed_at": "2026-01-16T04:34:01.064783Z",
+  "created_at": "2026-01-16T02:27:31.110066Z",
+  "depends_on": [
+    "fn-14.4"
+  ],
+  "epic": "fn-14",
+  "evidence": {
+    "commit": "4f945e24",
+    "files_created": [
+      "dataing/migrations/021_automation_rules.sql",
+      "dataing-ee/src/dataing_ee/models/automation.py",
+      "dataing-ee/src/dataing_ee/core/automation/evaluator.py",
+      "dataing-ee/src/dataing_ee/core/automation/executor.py",
+      "dataing-ee/src/dataing_ee/entrypoints/api/routes/automation.py"
+    ],
+    "test_files": [
+      "dataing-ee/tests/unit/core/automation/test_evaluator.py",
+      "dataing-ee/tests/unit/entrypoints/api/routes/test_automation.py"
+    ],
+    "tests_passed": 45
+  },
+  "id": "fn-14.10",
+  "priority": null,
+  "spec_path": ".flow/tasks/fn-14.10.md",
+  "status": "done",
+  "title": "Automation rules engine (EE)",
+  "updated_at": "2026-01-16T04:40:45.563876Z"
+}

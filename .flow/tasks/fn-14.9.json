@@ -1,0 +1,25 @@
+{
+  "assignee": "bordumbb@gmail.com",
+  "claim_note": "",
+  "claimed_at": "2026-01-16T04:25:17.110605Z",
+  "created_at": "2026-01-16T02:27:29.683419Z",
+  "depends_on": [
+    "fn-14.8"
+  ],
+  "epic": "fn-14",
+  "evidence": {
+    "commits": [
+      "92b16e52"
+    ],
+    "prs": [],
+    "tests": [
+      "uv run pytest dataing-ee/tests/unit/adapters/integrations/test_adapters.py dataing-ee/tests/unit/entrypoints/api/routes/test_integrations.py -v"
+    ]
+  },
+  "id": "fn-14.9",
+  "priority": null,
+  "spec_path": ".flow/tasks/fn-14.9.md",
+  "status": "done",
+  "title": "Jira and external provider webhook adapters (EE)",
+  "updated_at": "2026-01-16T04:33:47.982244Z"
+}

@@ -16,6 +16,7 @@ from dataing.entrypoints.api.routes.investigation_feedback import (
     router as investigation_feedback_router,
 )
 from dataing.entrypoints.api.routes.investigations import router as investigations_router
+from dataing.entrypoints.api.routes.issues import router as issues_router
 from dataing.entrypoints.api.routes.knowledge_comments import (
     router as knowledge_comments_router,
 )
@@ -27,7 +28,9 @@ from dataing.entrypoints.api.routes.permissions import (
 from dataing.entrypoints.api.routes.permissions import (
     router as permissions_router,
 )
+from dataing.entrypoints.api.routes.integrations import router as integrations_router
 from dataing.entrypoints.api.routes.schema_comments import router as schema_comments_router
+from dataing.entrypoints.api.routes.sla_policies import router as sla_policies_router
 from dataing.entrypoints.api.routes.tags import (
     investigation_tags_router,
 )
@@ -44,6 +47,7 @@ api_router = APIRouter()
 # Include all route modules
 api_router.include_router(auth_router, prefix="/auth")  # Auth routes (no API key required)
 api_router.include_router(investigations_router)  # Unified investigation API
+api_router.include_router(issues_router)  # Issues CRUD API
 api_router.include_router(datasources_router)
 api_router.include_router(datasources_v2_router, prefix="/v2")  # New unified adapter API
 api_router.include_router(datasets_router)
@@ -57,6 +61,8 @@ api_router.include_router(investigation_feedback_router)
 api_router.include_router(schema_comments_router)
 api_router.include_router(knowledge_comments_router)
 api_router.include_router(comment_votes_router)
+api_router.include_router(sla_policies_router)  # SLA policy management
+api_router.include_router(integrations_router)  # Webhook integrations
 api_router.include_router(teams_router, prefix="/teams")
 
 # RBAC routes

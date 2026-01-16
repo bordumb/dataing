@@ -1,8 +1,9 @@
-import { useState } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
-import { ArrowLeft, Loader2, X, Plus } from 'lucide-react'
+import { ArrowLeft, Loader2, X, Plus, AlertCircle } from 'lucide-react'
 import { useCreateIssue, useInvalidateIssues } from '@/lib/api/issues'
 import type { IssueCreate as IssueCreateType } from '@/lib/api/issues'
+import { useDataSources, SchemaTable } from '@/lib/api/datasources'
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
@@ -16,13 +17,25 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Badge } from '@/components/ui/Badge'
+import {
+  DatePicker,
+  DatePickerValue,
+  stringToDatePickerValue,
+} from '@/components/ui/DatePicker'
+import { DatasetEntry, SchemaViewer } from '@/features/investigation/components'
+
+interface Dataset {
+  id: string
+  datasourceId: string
+  identifier: string
+}
 
 interface FormData {
   title: string
   description: string
   priority: string
   severity: string
-  dataset_id: string
+  column_name: string
   labels: string[]
 }
 
@@ -31,19 +44,50 @@ export function IssueCreate() {
   const createIssue = useCreateIssue()
   const invalidate = useInvalidateIssues()
   const [labelInput, setLabelInput] = useState('')
+  const [selectedTable, setSelectedTable] = useState<SchemaTable | null>(null)
+
+  const [datasets, setDatasets] = useState<Dataset[]>([
+    { id: crypto.randomUUID(), datasourceId: '', identifier: '' },
+  ])
+
+  const [issueDate, setIssueDate] = useState<DatePickerValue>(() =>
+    stringToDatePickerValue(new Date().toISOString().split('T')[0])
+  )
 
   const [formData, setFormData] = useState<FormData>({
     title: '',
     description: '',
     priority: '',
     severity: '',
-    dataset_id: '',
+    column_name: '',
     labels: [],
   })
 
+  const { data: dataSources, isLoading: isLoadingDataSources, error: dataSourcesError } = useDataSources()
+
+  // Auto-select first datasource
+  useEffect(() => {
+    if (dataSources && dataSources.length > 0 && !datasets[0].datasourceId) {
+      setDatasets((prev) =>
+        prev.map((ds, i) => (i === 0 ? { ...ds, datasourceId: dataSources[0].id } : ds))
+      )
+    }
+  }, [dataSources, datasets])
+
+  const updateDataset = useCallback(
+    (id: string, updates: Partial<{ datasourceId: string; identifier: string }>) => {
+      setDatasets((prev) => prev.map((ds) => (ds.id === id ? { ...ds, ...updates } : ds)))
+      if (updates.identifier === '' || updates.datasourceId) {
+        setSelectedTable(null)
+      }
+    },
+    []
+  )
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!formData.title.trim()) return
+    const primaryDataset = datasets[0]
+    if (!formData.title.trim() || !primaryDataset.identifier.trim()) return
 
     try {
       const payload: IssueCreateType = {
@@ -51,7 +95,7 @@ export function IssueCreate() {
         description: formData.description.trim() || undefined,
         priority: formData.priority || undefined,
         severity: formData.severity || undefined,
-        dataset_id: formData.dataset_id.trim() || undefined,
+        dataset_id: primaryDataset.identifier,
         labels: formData.labels.length > 0 ? formData.labels : undefined,
       }
 
@@ -95,7 +139,16 @@ export function IssueCreate() {
     }
   }
 
-  const isSubmitDisabled = createIssue.isPending || !formData.title.trim()
+  const primaryDataset = datasets[0]
+  const isSubmitDisabled = createIssue.isPending || !formData.title.trim() || !primaryDataset.identifier.trim()
+
+  if (isLoadingDataSources) {
+    return (
+      <div className="flex h-64 items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-6">
@@ -108,6 +161,23 @@ export function IssueCreate() {
         </Link>
         <h1 className="text-3xl font-semibold">Create Issue</h1>
       </div>
+
+      {dataSourcesError && (
+        <div className="flex items-center gap-3 rounded-lg border border-destructive/50 bg-destructive/10 p-4">
+          <AlertCircle className="h-5 w-5 text-destructive" />
+          <div>
+            <p className="font-medium text-destructive">Failed to load data sources</p>
+            <p className="text-sm text-muted-foreground">
+              {dataSourcesError.message}. Please check your settings and try again.
+            </p>
+          </div>
+          <Link to="/settings" className="ml-auto">
+            <Button variant="outline" size="sm">
+              Check Settings
+            </Button>
+          </Link>
+        </div>
+      )}
 
       <div className="grid gap-6 lg:grid-cols-3">
         <div className="lg:col-span-2">
@@ -133,6 +203,51 @@ export function IssueCreate() {
                     disabled={createIssue.isPending}
                     className="mt-1.5"
                   />
+                </div>
+
+                <div className="space-y-3">
+                  <label className="text-sm font-medium">
+                    Dataset <span className="text-destructive">*</span>
+                  </label>
+                  <DatasetEntry
+                    datasourceId={primaryDataset.datasourceId}
+                    datasourceType={dataSources?.find((d) => d.id === primaryDataset.datasourceId)?.type || 'postgresql'}
+                    identifier={primaryDataset.identifier}
+                    onDatasourceChange={(id) => updateDataset(primaryDataset.id, { datasourceId: id })}
+                    onIdentifierChange={(val) => updateDataset(primaryDataset.id, { identifier: val })}
+                    onRemove={() => {}}
+                    canRemove={false}
+                    disabled={createIssue.isPending}
+                    dataSources={dataSources || []}
+                    onTableSelect={setSelectedTable}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Select the dataset affected by this issue. Required for spawning investigations.
+                  </p>
+                </div>
+
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <DatePicker
+                    label="Issue Date"
+                    value={issueDate}
+                    onChange={setIssueDate}
+                    hint="When was the issue first observed?"
+                  />
+                  <div>
+                    <Label htmlFor="column_name">Column Name</Label>
+                    <Input
+                      id="column_name"
+                      name="column_name"
+                      value={formData.column_name}
+                      onChange={handleChange}
+                      placeholder="e.g., user_id"
+                      disabled={createIssue.isPending}
+                      className="mt-1.5"
+                    />
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      The specific column affected (optional)
+                    </p>
+                  </div>
                 </div>
 
                 <div>
@@ -190,22 +305,6 @@ export function IssueCreate() {
                       </SelectContent>
                     </Select>
                   </div>
-                </div>
-
-                <div>
-                  <Label htmlFor="dataset_id">Dataset (optional)</Label>
-                  <Input
-                    id="dataset_id"
-                    name="dataset_id"
-                    value={formData.dataset_id}
-                    onChange={handleChange}
-                    placeholder="e.g., public.orders or catalog.schema.table"
-                    disabled={createIssue.isPending}
-                    className="mt-1.5"
-                  />
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    Link this issue to a specific dataset for context
-                  </p>
                 </div>
 
                 <div>
@@ -277,29 +376,30 @@ export function IssueCreate() {
         </div>
 
         <div className="lg:col-span-1">
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Tips</CardTitle>
-            </CardHeader>
-            <CardContent className="text-sm text-muted-foreground space-y-3">
-              <p>
-                <strong>Title:</strong> Be specific and concise. Good: "NULL values
-                in user_id column since Jan 15"
-              </p>
-              <p>
-                <strong>Priority:</strong> P0/P1 for production-impacting issues,
-                P2/P3 for non-urgent improvements.
-              </p>
-              <p>
-                <strong>Severity:</strong> Based on business impact. Critical for
-                revenue/compliance issues.
-              </p>
-              <p>
-                <strong>Labels:</strong> Use for categorization like "data-pipeline",
-                "schema", "freshness".
-              </p>
-            </CardContent>
-          </Card>
+          <div className="sticky top-6 space-y-4">
+            <h2 className="text-sm font-semibold">Dataset Preview</h2>
+            <SchemaViewer table={selectedTable} isLoading={false} />
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">Tips</CardTitle>
+              </CardHeader>
+              <CardContent className="text-sm text-muted-foreground space-y-3">
+                <p>
+                  <strong>Title:</strong> Be specific and concise. Good: "NULL values
+                  in user_id column since Jan 15"
+                </p>
+                <p>
+                  <strong>Dataset:</strong> Select the table or dataset where the
+                  issue was observed.
+                </p>
+                <p>
+                  <strong>Priority:</strong> P0/P1 for production-impacting issues,
+                  P2/P3 for non-urgent improvements.
+                </p>
+              </CardContent>
+            </Card>
+          </div>
         </div>
       </div>
     </div>

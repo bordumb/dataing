@@ -7,10 +7,17 @@
     "fn-14.1"
   ],
   "epic": "fn-14",
+  "evidence": {
+    "commits": [],
+    "prs": [],
+    "tests": [
+      "uv run pytest dataing/tests/unit/api/test_issues_routes.py -v"
+    ]
+  },
   "id": "fn-14.2",
   "priority": null,
   "spec_path": ".flow/tasks/fn-14.2.md",
-  "status": "in_progress",
+  "status": "done",
   "title": "Issues CRUD API endpoints",
-  "updated_at": "2026-01-16T03:06:11.844225Z"
+  "updated_at": "2026-01-16T03:13:58.784910Z"
 }

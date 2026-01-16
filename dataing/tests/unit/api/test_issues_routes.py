@@ -276,3 +276,52 @@ class TestPydanticSchemas:
         """Test IssueUpdate rejects invalid status."""
         with pytest.raises(ValueError):
             IssueUpdate(status="invalid_status")
+
+
+class TestCommentSchemas:
+    """Test comment Pydantic schemas."""
+
+    def test_issue_comment_create_valid(self) -> None:
+        """Test IssueCommentCreate with valid body."""
+        from dataing.entrypoints.api.routes.issues import IssueCommentCreate
+
+        data = IssueCommentCreate(body="This is a comment")
+        assert data.body == "This is a comment"
+
+    def test_issue_comment_create_empty_body_fails(self) -> None:
+        """Test IssueCommentCreate rejects empty body."""
+        from dataing.entrypoints.api.routes.issues import IssueCommentCreate
+
+        with pytest.raises(ValueError):
+            IssueCommentCreate(body="")
+
+
+class TestWatcherSchemas:
+    """Test watcher Pydantic schemas."""
+
+    def test_watcher_response_fields(self) -> None:
+        """Test WatcherResponse has expected fields."""
+        from datetime import datetime
+
+        from dataing.entrypoints.api.routes.issues import WatcherResponse
+
+        data = WatcherResponse(user_id=uuid4(), created_at=datetime.now(UTC))
+        assert data.user_id is not None
+        assert data.created_at is not None
+
+    def test_watcher_list_response(self) -> None:
+        """Test WatcherListResponse structure."""
+        from datetime import datetime
+
+        from dataing.entrypoints.api.routes.issues import (
+            WatcherListResponse,
+            WatcherResponse,
+        )
+
+        watchers = [
+            WatcherResponse(user_id=uuid4(), created_at=datetime.now(UTC)),
+            WatcherResponse(user_id=uuid4(), created_at=datetime.now(UTC)),
+        ]
+        data = WatcherListResponse(items=watchers, total=2)
+        assert len(data.items) == 2
+        assert data.total == 2

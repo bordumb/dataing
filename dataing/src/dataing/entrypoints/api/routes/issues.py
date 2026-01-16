@@ -716,3 +716,262 @@ async def update_issue(
         updated_at=row["updated_at"],
         closed_at=row["closed_at"],
     )
+
+
+# ============================================================================
+# Comment Schemas
+# ============================================================================
+
+
+class IssueCommentCreate(BaseModel):
+    """Request body for creating an issue comment."""
+
+    body: str = Field(..., min_length=1)
+
+
+class IssueCommentResponse(BaseModel):
+    """Response for an issue comment."""
+
+    id: UUID
+    issue_id: UUID
+    author_user_id: UUID
+    body: str
+    created_at: datetime
+    updated_at: datetime
+
+
+class IssueCommentListResponse(BaseModel):
+    """Paginated comment list response."""
+
+    items: list[IssueCommentResponse]
+    total: int
+
+
+# ============================================================================
+# Watcher Schemas
+# ============================================================================
+
+
+class WatcherResponse(BaseModel):
+    """Response for a watcher."""
+
+    user_id: UUID
+    created_at: datetime
+
+
+class WatcherListResponse(BaseModel):
+    """Watcher list response."""
+
+    items: list[WatcherResponse]
+    total: int
+
+
+# ============================================================================
+# Comment Helper Functions
+# ============================================================================
+
+
+async def _verify_issue_access(
+    db: AppDatabase,
+    issue_id: UUID,
+    tenant_id: UUID,
+) -> dict[str, Any]:
+    """Verify issue exists and belongs to tenant.
+
+    Returns the issue row or raises HTTPException.
+    """
+    row = await db.fetch_one(
+        "SELECT id, tenant_id FROM issues WHERE id = $1 AND tenant_id = $2",
+        issue_id,
+        tenant_id,
+    )
+    if not row:
+        raise HTTPException(status_code=404, detail="Issue not found")
+    result: dict[str, Any] = row
+    return result
+
+
+# ============================================================================
+# Comment API Routes
+# ============================================================================
+
+
+@router.get("/{issue_id}/comments", response_model=IssueCommentListResponse)
+async def list_issue_comments(
+    issue_id: UUID,
+    auth: AuthDep,
+    db: AppDbDep,
+) -> IssueCommentListResponse:
+    """List comments for an issue."""
+    await _verify_issue_access(db, issue_id, auth.tenant_id)
+
+    rows = await db.fetch_all(
+        """
+        SELECT id, issue_id, author_user_id, body, created_at, updated_at
+        FROM issue_comments
+        WHERE issue_id = $1
+        ORDER BY created_at ASC
+        """,
+        issue_id,
+    )
+
+    items = [
+        IssueCommentResponse(
+            id=row["id"],
+            issue_id=row["issue_id"],
+            author_user_id=row["author_user_id"],
+            body=row["body"],
+            created_at=row["created_at"],
+            updated_at=row["updated_at"],
+        )
+        for row in rows
+    ]
+
+    return IssueCommentListResponse(items=items, total=len(items))
+
+
+@router.post("/{issue_id}/comments", response_model=IssueCommentResponse, status_code=201)
+async def create_issue_comment(
+    issue_id: UUID,
+    auth: AuthDep,
+    db: AppDbDep,
+    body: IssueCommentCreate,
+) -> IssueCommentResponse:
+    """Add a comment to an issue.
+
+    Requires user identity (JWT auth or user-scoped API key).
+    """
+    await _verify_issue_access(db, issue_id, auth.tenant_id)
+
+    if auth.user_id is None:
+        raise HTTPException(
+            status_code=403,
+            detail="User identity required to create comments",
+        )
+
+    row = await db.execute_returning(
+        """
+        INSERT INTO issue_comments (issue_id, author_user_id, body)
+        VALUES ($1, $2, $3)
+        RETURNING id, issue_id, author_user_id, body, created_at, updated_at
+        """,
+        issue_id,
+        auth.user_id,
+        body.body,
+    )
+
+    if not row:
+        raise HTTPException(status_code=500, detail="Failed to create comment")
+
+    # Record comment_added event
+    await _record_issue_event(
+        db,
+        issue_id,
+        "comment_added",
+        auth.user_id,
+        {"comment_id": str(row["id"])},
+    )
+
+    # Update issue updated_at timestamp
+    await db.execute(
+        "UPDATE issues SET updated_at = NOW() WHERE id = $1",
+        issue_id,
+    )
+
+    return IssueCommentResponse(
+        id=row["id"],
+        issue_id=row["issue_id"],
+        author_user_id=row["author_user_id"],
+        body=row["body"],
+        created_at=row["created_at"],
+        updated_at=row["updated_at"],
+    )
+
+
+# ============================================================================
+# Watcher API Routes
+# ============================================================================
+
+
+@router.get("/{issue_id}/watchers", response_model=WatcherListResponse)
+async def list_issue_watchers(
+    issue_id: UUID,
+    auth: AuthDep,
+    db: AppDbDep,
+) -> WatcherListResponse:
+    """List watchers for an issue."""
+    await _verify_issue_access(db, issue_id, auth.tenant_id)
+
+    rows = await db.fetch_all(
+        """
+        SELECT user_id, created_at
+        FROM issue_watchers
+        WHERE issue_id = $1
+        ORDER BY created_at ASC
+        """,
+        issue_id,
+    )
+
+    items = [
+        WatcherResponse(user_id=row["user_id"], created_at=row["created_at"])
+        for row in rows
+    ]
+
+    return WatcherListResponse(items=items, total=len(items))
+
+
+@router.post("/{issue_id}/watch", status_code=204)
+async def add_issue_watcher(
+    issue_id: UUID,
+    auth: AuthDep,
+    db: AppDbDep,
+) -> None:
+    """Subscribe the current user as a watcher.
+
+    Idempotent - returns 204 even if already watching.
+    Requires user identity (JWT auth or user-scoped API key).
+    """
+    await _verify_issue_access(db, issue_id, auth.tenant_id)
+
+    if auth.user_id is None:
+        raise HTTPException(
+            status_code=403,
+            detail="User identity required to watch issues",
+        )
+
+    # Upsert watcher (idempotent)
+    await db.execute(
+        """
+        INSERT INTO issue_watchers (issue_id, user_id)
+        VALUES ($1, $2)
+        ON CONFLICT (issue_id, user_id) DO NOTHING
+        """,
+        issue_id,
+        auth.user_id,
+    )
+
+
+@router.delete("/{issue_id}/watch", status_code=204)
+async def remove_issue_watcher(
+    issue_id: UUID,
+    auth: AuthDep,
+    db: AppDbDep,
+) -> None:
+    """Unsubscribe the current user as a watcher.
+
+    Idempotent - returns 204 even if not watching.
+    Requires user identity (JWT auth or user-scoped API key).
+    """
+    await _verify_issue_access(db, issue_id, auth.tenant_id)
+
+    if auth.user_id is None:
+        raise HTTPException(
+            status_code=403,
+            detail="User identity required to unwatch issues",
+        )
+
+    await db.execute(
+        "DELETE FROM issue_watchers WHERE issue_id = $1 AND user_id = $2",
+        issue_id,
+        auth.user_id,
+    )

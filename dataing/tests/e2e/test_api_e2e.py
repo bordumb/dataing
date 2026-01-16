@@ -46,7 +46,7 @@ class TestAPIEndToEnd:
         mock_db.get_api_key_by_hash.return_value = {
             "id": uuid.uuid4(),
             "tenant_id": uuid.uuid4(),
-            "user_id": None,
+            "user_id": uuid.uuid4(),  # Required for investigation routes
             "scopes": ["read", "write"],
             "expires_at": None,
             "tenant_slug": "test-tenant",
@@ -68,7 +68,7 @@ class TestAPIEndToEnd:
             )
         )
 
-        # Mock orchestrator
+        # Mock orchestrator (legacy)
         mock_orchestrator = AsyncMock()
         mock_orchestrator.run_investigation.return_value = Finding(
             investigation_id="inv-001",
@@ -80,10 +80,20 @@ class TestAPIEndToEnd:
             duration_seconds=10.0,
         )
 
+        # Mock investigation service
+        mock_investigation_service = AsyncMock()
+        mock_investigation_service.start_investigation.return_value = (
+            uuid.uuid4(),  # investigation_id
+            uuid.uuid4(),  # main_branch_id
+            "queued",  # status
+        )
+        mock_investigation_service.get_state.side_effect = ValueError("Investigation not found")
+
         # Set up app state
         app.state.db = mock_db
         app.state.app_db = mock_db
         app.state.orchestrator = mock_orchestrator
+        app.state.investigation_service = mock_investigation_service
         app.state.investigations = {}
 
     @pytest.fixture
@@ -133,37 +143,55 @@ class TestAPIEndToEnd:
         client: TestClient,
     ) -> None:
         """Test creating an investigation."""
+        from unittest.mock import patch
+
         payload = {
-            "dataset_id": "public.orders",
-            "metric_name": "row_count",
-            "expected_value": 1000.0,
-            "actual_value": 500.0,
-            "deviation_pct": 50.0,
-            "anomaly_date": "2024-01-15",
-            "severity": "high",
+            "alert": {
+                "dataset_id": "public.orders",
+                "metric_spec": {
+                    "metric_type": "column",
+                    "expression": "row_count",
+                    "display_name": "Row Count",
+                    "columns_referenced": ["row_count"],
+                },
+                "anomaly_type": "row_count",
+                "expected_value": 1000.0,
+                "actual_value": 500.0,
+                "deviation_pct": 50.0,
+                "anomaly_date": "2024-01-15",
+                "severity": "high",
+            }
         }
 
-        response = client.post(
-            "/api/v1/investigations",
-            json=payload,
-            headers={"X-API-Key": "ddr_valid_test_key"},
-        )
+        # Patch the deps functions that the route calls
+        with (
+            patch(
+                "dataing.entrypoints.api.deps.resolve_datasource_id",
+                return_value=uuid.uuid4(),
+            ),
+            patch(
+                "dataing.entrypoints.api.deps.get_tenant_adapter",
+                return_value=AsyncMock(),
+            ),
+        ):
+            response = client.post(
+                "/api/v1/investigations",
+                json=payload,
+                headers={"X-API-Key": "ddr_valid_test_key"},
+            )
 
         assert response.status_code == 200
         data = response.json()
         assert "investigation_id" in data
-        assert data["status"] == "started"
+        assert data["status"] == "queued"
 
     def test_create_investigation_validates_payload(
         self,
         client: TestClient,
     ) -> None:
         """Test that invalid payloads are rejected."""
-        # Missing required fields
-        payload = {
-            "dataset_id": "public.orders",
-            # Missing other required fields
-        }
+        # Missing required 'alert' field
+        payload = {}
 
         response = client.post(
             "/api/v1/investigations",
@@ -178,8 +206,10 @@ class TestAPIEndToEnd:
         client: TestClient,
     ) -> None:
         """Test getting non-existent investigation."""
+        # Use a valid UUID format that doesn't exist
+        nonexistent_id = "00000000-0000-0000-0000-000000000000"
         response = client.get(
-            "/api/v1/investigations/nonexistent-id",
+            f"/api/v1/investigations/{nonexistent_id}",
             headers={"X-API-Key": "ddr_valid_test_key"},
         )
 

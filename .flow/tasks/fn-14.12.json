@@ -7,10 +7,26 @@
     "fn-14.4"
   ],
   "epic": "fn-14",
+  "evidence": {
+    "commit": "557bbd6d",
+    "files_created": [
+      "dataing/migrations/022_runbooks.sql",
+      "dataing-ee/src/dataing_ee/models/runbook.py",
+      "dataing-ee/src/dataing_ee/core/runbook/generator.py",
+      "dataing-ee/src/dataing_ee/core/runbook/similarity.py",
+      "dataing-ee/src/dataing_ee/entrypoints/api/routes/runbooks.py"
+    ],
+    "test_files": [
+      "dataing-ee/tests/unit/core/runbook/test_generator.py",
+      "dataing-ee/tests/unit/core/runbook/test_similarity.py",
+      "dataing-ee/tests/unit/entrypoints/api/routes/test_runbooks.py"
+    ],
+    "tests_passed": 44
+  },
   "id": "fn-14.12",
   "priority": null,
   "spec_path": ".flow/tasks/fn-14.12.md",
-  "status": "in_progress",
+  "status": "done",
   "title": "Runbook model and knowledge base APIs (EE)",
-  "updated_at": "2026-01-16T04:40:56.911859Z"
+  "updated_at": "2026-01-16T04:50:16.782621Z"
 }

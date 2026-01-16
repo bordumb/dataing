@@ -260,6 +260,11 @@ demo: demo-fixtures
     PGPASSWORD=dataing psql -h localhost -U dataing -d dataing_demo -f dataing/migrations/015_sso_states.sql 2>&1 | grep -v "^NOTICE:" || true
     PGPASSWORD=dataing psql -h localhost -U dataing -d dataing_demo -f dataing/migrations/016_investigation_jobs.sql 2>&1 | grep -v "^NOTICE:" || true
     PGPASSWORD=dataing psql -h localhost -U dataing -d dataing_demo -f dataing/migrations/017_add_trace_context.sql 2>&1 | grep -v "^NOTICE:" || true
+    PGPASSWORD=dataing psql -h localhost -U dataing -d dataing_demo -f dataing/migrations/018_issues.sql 2>&1 | grep -v "^NOTICE:" || true
+    PGPASSWORD=dataing psql -h localhost -U dataing -d dataing_demo -f dataing/migrations/019_sla_policies.sql 2>&1 | grep -v "^NOTICE:" || true
+    PGPASSWORD=dataing psql -h localhost -U dataing -d dataing_demo -f dataing/migrations/020_integrations.sql 2>&1 | grep -v "^NOTICE:" || true
+    PGPASSWORD=dataing psql -h localhost -U dataing -d dataing_demo -f dataing/migrations/021_automation_rules.sql 2>&1 | grep -v "^NOTICE:" || true
+    PGPASSWORD=dataing psql -h localhost -U dataing -d dataing_demo -f dataing/migrations/022_runbooks.sql 2>&1 | grep -v "^NOTICE:" || true
 
     trap 'kill 0' EXIT
 

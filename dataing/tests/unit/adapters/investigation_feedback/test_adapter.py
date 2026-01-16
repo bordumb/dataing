@@ -99,8 +99,13 @@ class TestInvestigationFeedbackAdapterProtocol:
 
     def test_adapter_implements_feedback_emitter(self) -> None:
         """InvestigationFeedbackAdapter implements InvestigationFeedbackEmitter protocol."""
+        from unittest.mock import MagicMock
+
         assert isinstance(InvestigationFeedbackAdapter, type)
         # Verify the class has the emit method signature matching InvestigationFeedbackEmitter
         assert hasattr(InvestigationFeedbackAdapter, "emit")
         # Verify InvestigationFeedbackEmitter is a runtime checkable protocol
-        assert hasattr(InvestigationFeedbackEmitter, "__protocol_attrs__")
+        # by testing isinstance on an adapter instance
+        mock_db = MagicMock()
+        adapter = InvestigationFeedbackAdapter(db=mock_db)
+        assert isinstance(adapter, InvestigationFeedbackEmitter)

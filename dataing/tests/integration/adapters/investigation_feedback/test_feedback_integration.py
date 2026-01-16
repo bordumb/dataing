@@ -37,12 +37,24 @@ class TestInvestigationFeedbackIntegration:
         self, adapter: InvestigationFeedbackAdapter, db: AppDatabase
     ) -> None:
         """Events can be emitted and retrieved."""
-        # Get a valid tenant_id from the database
-        tenant = await db.fetch_one("SELECT id FROM tenants LIMIT 1")
-        if not tenant:
-            pytest.skip("No tenant in database")
+        # Create a test tenant for this test
+        from uuid import uuid4
 
-        tenant_id = tenant["id"]
+        tenant_id = uuid4()
+        try:
+            await db.execute(
+                """
+                INSERT INTO tenants (id, name, slug)
+                VALUES ($1, $2, $3)
+                ON CONFLICT (slug) DO UPDATE SET name = EXCLUDED.name
+                RETURNING id
+                """,
+                tenant_id,
+                "Test Tenant",
+                f"test-tenant-{tenant_id.hex[:8]}",
+            )
+        except Exception as e:
+            pytest.skip(f"Database schema not available: {e}")
 
         # Emit an event
         event = await adapter.emit(

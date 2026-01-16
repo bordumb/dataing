@@ -7,10 +7,19 @@
     "fn-14.5"
   ],
   "epic": "fn-14",
+  "evidence": {
+    "commits": [
+      "6962bc05"
+    ],
+    "prs": [],
+    "tests": [
+      "uv run pytest dataing/tests/unit/core/test_sla.py dataing/tests/unit/api/test_sla_policies_routes.py -v"
+    ]
+  },
   "id": "fn-14.11",
   "priority": null,
   "spec_path": ".flow/tasks/fn-14.11.md",
-  "status": "in_progress",
+  "status": "done",
   "title": "SLA tracking and breach notifications",
-  "updated_at": "2026-01-16T04:04:01.478600Z"
+  "updated_at": "2026-01-16T04:15:15.344615Z"
 }

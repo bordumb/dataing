@@ -33,6 +33,7 @@ from dataing.safety.circuit_breaker import CircuitBreaker, CircuitBreakerConfig
 from dataing_ee.adapters.audit import AuditRepository
 from dataing_ee.entrypoints.api.middleware.audit import AuditMiddleware
 from dataing_ee.entrypoints.api.routes.audit import router as audit_router
+from dataing_ee.entrypoints.api.routes.integrations import router as integrations_router
 from dataing_ee.entrypoints.api.routes.scim import router as scim_router
 from dataing_ee.entrypoints.api.routes.settings import router as settings_router
 from dataing_ee.entrypoints.api.routes.sso import router as sso_router
@@ -230,6 +231,7 @@ def create_ee_app() -> FastAPI:
 
     # Include EE routes
     app.include_router(audit_router, prefix="/api/v1")
+    app.include_router(integrations_router, prefix="/api/v1")
     app.include_router(sso_router, prefix="/api/v1")
     app.include_router(scim_router, prefix="/api/v1")
     app.include_router(settings_router, prefix="/api/v1")

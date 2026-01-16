@@ -37,6 +37,7 @@ from dataing_ee.entrypoints.api.routes.integrations import router as integration
 from dataing_ee.entrypoints.api.routes.scim import router as scim_router
 from dataing_ee.entrypoints.api.routes.settings import router as settings_router
 from dataing_ee.entrypoints.api.routes.automation import router as automation_router
+from dataing_ee.entrypoints.api.routes.runbooks import router as runbooks_router
 from dataing_ee.entrypoints.api.routes.sso import router as sso_router
 
 logger = logging.getLogger(__name__)
@@ -237,6 +238,7 @@ def create_ee_app() -> FastAPI:
     app.include_router(scim_router, prefix="/api/v1")
     app.include_router(settings_router, prefix="/api/v1")
     app.include_router(automation_router, prefix="/api/v1")
+    app.include_router(runbooks_router, prefix="/api/v1")
 
     @app.get("/health")
     async def health_check() -> dict[str, str]:

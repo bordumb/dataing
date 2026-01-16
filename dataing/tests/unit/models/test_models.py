@@ -79,18 +79,26 @@ class TestDataSourceModel:
 
 
 class TestAuditLogModel:
-    """Tests for AuditLog model."""
+    """Tests for AuditLog model (EE-only)."""
 
     def test_model_imported(self) -> None:
         """Test that model can be imported."""
-        from dataing.models.audit_log import AuditLog
-
+        try:
+            from dataing.models.audit_log import AuditLog
+        except ModuleNotFoundError:
+            import pytest
+            pytest.skip("AuditLog is EE-only")
+            return
         assert AuditLog.__tablename__ == "audit_logs"
 
     def test_audit_log_has_columns(self) -> None:
         """Test audit_log has required columns."""
-        from dataing.models.audit_log import AuditLog
-
+        try:
+            from dataing.models.audit_log import AuditLog
+        except ModuleNotFoundError:
+            import pytest
+            pytest.skip("AuditLog is EE-only")
+            return
         columns = [c.name for c in AuditLog.__table__.columns]
         assert "id" in columns
         assert "action" in columns

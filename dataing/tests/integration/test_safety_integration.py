@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timezone
 
 import pytest
 
@@ -51,14 +51,14 @@ class TestSafetyIntegration:
             events.append(
                 Event(
                     type="query_submitted",
-                    timestamp=datetime.now(datetime.UTC),
+                    timestamp=datetime.now(timezone.utc),
                     data={"query": query},
                 )
             )
             events.append(
                 Event(
                     type="query_succeeded",
-                    timestamp=datetime.now(datetime.UTC),
+                    timestamp=datetime.now(timezone.utc),
                     data={},
                 )
             )
@@ -70,7 +70,7 @@ class TestSafetyIntegration:
         events.append(
             Event(
                 type="query_submitted",
-                timestamp=datetime.now(datetime.UTC),
+                timestamp=datetime.now(timezone.utc),
                 data={"query": "SELECT 1 LIMIT 1"},
             )
         )
@@ -120,22 +120,22 @@ class TestSafetyIntegration:
         events = [
             Event(
                 type="query_succeeded",
-                timestamp=datetime.now(datetime.UTC),
+                timestamp=datetime.now(timezone.utc),
                 data={},
             ),
             Event(
                 type="query_failed",
-                timestamp=datetime.now(datetime.UTC),
+                timestamp=datetime.now(timezone.utc),
                 data={"error": "Timeout"},
             ),
             Event(
                 type="query_failed",
-                timestamp=datetime.now(datetime.UTC),
+                timestamp=datetime.now(timezone.utc),
                 data={"error": "Connection error"},
             ),
             Event(
                 type="query_failed",
-                timestamp=datetime.now(datetime.UTC),
+                timestamp=datetime.now(timezone.utc),
                 data={"error": "Unknown"},
             ),
         ]
@@ -180,12 +180,12 @@ class TestSafetyIntegration:
         events = [
             Event(
                 type="reflexion_attempted",
-                timestamp=datetime.now(datetime.UTC),
+                timestamp=datetime.now(timezone.utc),
                 data={"hypothesis_id": "h001"},
             ),
             Event(
                 type="reflexion_attempted",
-                timestamp=datetime.now(datetime.UTC),
+                timestamp=datetime.now(timezone.utc),
                 data={"hypothesis_id": "h001"},
             ),
         ]
@@ -204,12 +204,12 @@ class TestSafetyIntegration:
         events = [
             Event(
                 type="query_submitted",
-                timestamp=datetime.now(datetime.UTC),
+                timestamp=datetime.now(timezone.utc),
                 data={"hypothesis_id": "h001", "query": "SELECT 1 LIMIT 10"},
             ),
             Event(
                 type="query_submitted",
-                timestamp=datetime.now(datetime.UTC),
+                timestamp=datetime.now(timezone.utc),
                 data={"hypothesis_id": "h001", "query": "SELECT 1 LIMIT 10"},
             ),
         ]

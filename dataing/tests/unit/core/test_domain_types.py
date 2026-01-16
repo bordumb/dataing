@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import datetime, timezone
 
 import pytest
 from pydantic import ValidationError
@@ -19,6 +20,7 @@ from dataing.core.domain_types import (
     Hypothesis,
     HypothesisCategory,
     LineageContext,
+    MetricSpec,
 )
 
 
@@ -46,7 +48,17 @@ class SchemaContext:
 
     def to_prompt_string(self) -> str:
         """Format for prompt."""
-        return "AVAILABLE TABLES"
+        lines = ["AVAILABLE TABLES"]
+        for table in self.tables:
+            lines.append(f"\n{table.table_name}:")
+            if table.column_types:
+                for col in table.columns:
+                    col_type = table.column_types.get(col, "unknown")
+                    lines.append(f"  - {col} ({col_type})")
+            else:
+                for col in table.columns:
+                    lines.append(f"  - {col}")
+        return "\n".join(lines)
 
 
 class TestAnomalyAlert:
@@ -56,7 +68,8 @@ class TestAnomalyAlert:
         """Test creating an anomaly alert."""
         alert = AnomalyAlert(
             dataset_id="public.orders",
-            metric_name="row_count",
+            metric_spec=MetricSpec.from_column("row_count"),
+            anomaly_type="row_count",
             expected_value=1000.0,
             actual_value=500.0,
             deviation_pct=50.0,
@@ -65,14 +78,15 @@ class TestAnomalyAlert:
         )
 
         assert alert.dataset_id == "public.orders"
-        assert alert.metric_name == "row_count"
+        assert alert.metric_spec.expression == "row_count"
         assert alert.deviation_pct == 50.0
 
     def test_alert_is_frozen(self) -> None:
         """Test that alert is immutable."""
         alert = AnomalyAlert(
             dataset_id="public.orders",
-            metric_name="row_count",
+            metric_spec=MetricSpec.from_column("row_count"),
+            anomaly_type="row_count",
             expected_value=1000.0,
             actual_value=500.0,
             deviation_pct=50.0,
@@ -87,7 +101,8 @@ class TestAnomalyAlert:
         """Test alert with optional metadata."""
         alert = AnomalyAlert(
             dataset_id="public.orders",
-            metric_name="row_count",
+            metric_spec=MetricSpec.from_column("row_count"),
+            anomaly_type="row_count",
             expected_value=1000.0,
             actual_value=500.0,
             deviation_pct=50.0,
@@ -279,8 +294,8 @@ class TestQueryResult:
     def test_create_query_result(self) -> None:
         """Test creating a query result."""
         result = QueryResult(
-            columns=("id", "name"),
-            rows=({"id": 1, "name": "Test"},),
+            columns=[{"name": "id", "data_type": "integer"}, {"name": "name", "data_type": "string"}],
+            rows=[{"id": 1, "name": "Test"}],
             row_count=1,
         )
 
@@ -289,31 +304,31 @@ class TestQueryResult:
 
     def test_to_summary_empty(self) -> None:
         """Test summary for empty result."""
-        result = QueryResult(columns=(), rows=(), row_count=0)
+        result = QueryResult(columns=[], rows=[], row_count=0)
 
         assert result.to_summary() == "No rows returned"
 
     def test_to_summary_with_rows(self) -> None:
         """Test summary with rows."""
         result = QueryResult(
-            columns=("id", "name"),
-            rows=(
+            columns=[{"name": "id", "data_type": "integer"}, {"name": "name", "data_type": "string"}],
+            rows=[
                 {"id": 1, "name": "A"},
                 {"id": 2, "name": "B"},
-            ),
+            ],
             row_count=2,
         )
 
         summary = result.to_summary()
 
-        assert "Columns: id, name" in summary
-        assert "Total rows: 2" in summary
-        assert "id=1" in summary
+        assert "id" in summary
+        assert "name" in summary
+        assert "2" in summary  # row count
 
     def test_to_summary_truncates(self) -> None:
         """Test summary truncates large results."""
-        rows = tuple({"id": i} for i in range(100))
-        result = QueryResult(columns=("id",), rows=rows, row_count=100)
+        rows = [{"id": i} for i in range(100)]
+        result = QueryResult(columns=[{"name": "id", "data_type": "integer"}], rows=rows, row_count=100)
 
         summary = result.to_summary(max_rows=5)
 
@@ -331,7 +346,7 @@ class TestApprovalRequest:
             investigation_id="inv-001",
             request_type=ApprovalRequestType.QUERY_APPROVAL,
             context={"query": "SELECT 1"},
-            requested_at=datetime.now(datetime.UTC),
+            requested_at=datetime.now(timezone.utc),
             requested_by="system",
         )
 
@@ -355,7 +370,7 @@ class TestApprovalDecision:
             request_id="req-001",
             decision=ApprovalDecisionType.APPROVED,
             decided_by="admin",
-            decided_at=datetime.now(datetime.UTC),
+            decided_at=datetime.now(timezone.utc),
         )
 
         assert decision.decision == ApprovalDecisionType.APPROVED

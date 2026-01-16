@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import uuid
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -25,7 +25,8 @@ class TestVerifyApiKey:
     def mock_request(self) -> MagicMock:
         """Return a mock request."""
         request = MagicMock()
-        request.app.state.db = AsyncMock()
+        request.app.state.app_db = AsyncMock()
+        request.query_params = {}
         return request
 
     @pytest.fixture
@@ -50,8 +51,9 @@ class TestVerifyApiKey:
 
     async def test_verify_missing_api_key(self, mock_request: MagicMock) -> None:
         """Test that missing API key raises 401."""
+        mock_request.query_params = {}
         with pytest.raises(HTTPException) as exc_info:
-            await verify_api_key(mock_request, api_key=None)
+            await verify_api_key(mock_request, api_key=None, bearer=None)
 
         assert exc_info.value.status_code == 401
         assert "Missing" in exc_info.value.detail
@@ -61,10 +63,11 @@ class TestVerifyApiKey:
         mock_request: MagicMock,
     ) -> None:
         """Test that invalid API key raises 401."""
-        mock_request.app.state.db.get_api_key_by_hash.return_value = None
+        mock_request.query_params = {}
+        mock_request.app.state.app_db.get_api_key_by_hash.return_value = None
 
         with pytest.raises(HTTPException) as exc_info:
-            await verify_api_key(mock_request, api_key="invalid_key")
+            await verify_api_key(mock_request, api_key="invalid_key", bearer=None)
 
         assert exc_info.value.status_code == 401
         assert "Invalid" in exc_info.value.detail
@@ -76,11 +79,12 @@ class TestVerifyApiKey:
         sample_api_key_record: dict,
     ) -> None:
         """Test that expired API key raises 401."""
-        sample_api_key_record["expires_at"] = datetime.now(datetime.UTC) - timedelta(days=1)
-        mock_request.app.state.db.get_api_key_by_hash.return_value = sample_api_key_record
+        mock_request.query_params = {}
+        sample_api_key_record["expires_at"] = datetime.now(timezone.utc) - timedelta(days=1)
+        mock_request.app.state.app_db.get_api_key_by_hash.return_value = sample_api_key_record
 
         with pytest.raises(HTTPException) as exc_info:
-            await verify_api_key(mock_request, api_key=sample_api_key)
+            await verify_api_key(mock_request, api_key=sample_api_key, bearer=None)
 
         assert exc_info.value.status_code == 401
         assert "expired" in exc_info.value.detail
@@ -92,10 +96,11 @@ class TestVerifyApiKey:
         sample_api_key_record: dict,
     ) -> None:
         """Test that valid API key returns context."""
-        mock_request.app.state.db.get_api_key_by_hash.return_value = sample_api_key_record
-        mock_request.app.state.db.update_api_key_last_used.return_value = None
+        mock_request.query_params = {}
+        mock_request.app.state.app_db.get_api_key_by_hash.return_value = sample_api_key_record
+        mock_request.app.state.app_db.update_api_key_last_used.return_value = None
 
-        result = await verify_api_key(mock_request, api_key=sample_api_key)
+        result = await verify_api_key(mock_request, api_key=sample_api_key, bearer=None)
 
         assert isinstance(result, ApiKeyContext)
         assert result.key_id == sample_api_key_record["id"]
@@ -109,10 +114,11 @@ class TestVerifyApiKey:
         sample_api_key_record: dict,
     ) -> None:
         """Test that context is stored in request state."""
-        mock_request.app.state.db.get_api_key_by_hash.return_value = sample_api_key_record
+        mock_request.query_params = {}
+        mock_request.app.state.app_db.get_api_key_by_hash.return_value = sample_api_key_record
         mock_request.state = MagicMock()
 
-        result = await verify_api_key(mock_request, api_key=sample_api_key)
+        result = await verify_api_key(mock_request, api_key=sample_api_key, bearer=None)
 
         assert mock_request.state.auth_context == result
 
@@ -123,11 +129,12 @@ class TestVerifyApiKey:
         sample_api_key_record: dict,
     ) -> None:
         """Test that last_used_at is updated."""
-        mock_request.app.state.db.get_api_key_by_hash.return_value = sample_api_key_record
+        mock_request.query_params = {}
+        mock_request.app.state.app_db.get_api_key_by_hash.return_value = sample_api_key_record
 
-        await verify_api_key(mock_request, api_key=sample_api_key)
+        await verify_api_key(mock_request, api_key=sample_api_key, bearer=None)
 
-        mock_request.app.state.db.update_api_key_last_used.assert_called_once_with(
+        mock_request.app.state.app_db.update_api_key_last_used.assert_called_once_with(
             sample_api_key_record["id"]
         )
 
@@ -138,11 +145,12 @@ class TestVerifyApiKey:
         sample_api_key_record: dict,
     ) -> None:
         """Test that last_used update failure doesn't fail auth."""
-        mock_request.app.state.db.get_api_key_by_hash.return_value = sample_api_key_record
-        mock_request.app.state.db.update_api_key_last_used.side_effect = Exception("DB error")
+        mock_request.query_params = {}
+        mock_request.app.state.app_db.get_api_key_by_hash.return_value = sample_api_key_record
+        mock_request.app.state.app_db.update_api_key_last_used.side_effect = Exception("DB error")
 
         # Should not raise
-        result = await verify_api_key(mock_request, api_key=sample_api_key)
+        result = await verify_api_key(mock_request, api_key=sample_api_key, bearer=None)
         assert result is not None
 
 
@@ -229,7 +237,8 @@ class TestOptionalApiKey:
     def mock_request(self) -> MagicMock:
         """Return a mock request."""
         request = MagicMock()
-        request.app.state.db = AsyncMock()
+        request.app.state.app_db = AsyncMock()
+        request.query_params = {}
         return request
 
     async def test_returns_none_without_key(
@@ -237,7 +246,7 @@ class TestOptionalApiKey:
         mock_request: MagicMock,
     ) -> None:
         """Test returns None when no API key provided."""
-        result = await optional_api_key(mock_request, api_key=None)
+        result = await optional_api_key(mock_request, api_key=None, bearer=None)
 
         assert result is None
 
@@ -246,9 +255,9 @@ class TestOptionalApiKey:
         mock_request: MagicMock,
     ) -> None:
         """Test returns None when API key is invalid."""
-        mock_request.app.state.db.get_api_key_by_hash.return_value = None
+        mock_request.app.state.app_db.get_api_key_by_hash.return_value = None
 
-        result = await optional_api_key(mock_request, api_key="invalid")
+        result = await optional_api_key(mock_request, api_key="invalid", bearer=None)
 
         assert result is None
 
@@ -258,7 +267,7 @@ class TestOptionalApiKey:
     ) -> None:
         """Test returns context when API key is valid."""
         api_key = "ddr_valid_key"
-        mock_request.app.state.db.get_api_key_by_hash.return_value = {
+        mock_request.app.state.app_db.get_api_key_by_hash.return_value = {
             "id": uuid.uuid4(),
             "tenant_id": uuid.uuid4(),
             "scopes": ["read"],
@@ -266,7 +275,7 @@ class TestOptionalApiKey:
             "tenant_name": "Test",
         }
 
-        result = await optional_api_key(mock_request, api_key=api_key)
+        result = await optional_api_key(mock_request, api_key=api_key, bearer=None)
 
         assert result is not None
         assert isinstance(result, ApiKeyContext)

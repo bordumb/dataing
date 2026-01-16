@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import uuid
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timezone
 from unittest.mock import AsyncMock
 
 import pytest
@@ -229,7 +229,7 @@ class TestAPIAuthenticationFlow:
             "tenant_id": uuid.uuid4(),
             "user_id": None,
             "scopes": ["read", "write"],
-            "expires_at": datetime.now(datetime.UTC) - timedelta(days=1),
+            "expires_at": datetime.now(timezone.utc) - timedelta(days=1),
             "tenant_slug": "test-tenant",
             "tenant_name": "Test Tenant",
         }

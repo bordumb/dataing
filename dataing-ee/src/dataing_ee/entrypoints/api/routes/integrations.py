@@ -38,11 +38,14 @@ AppDbDep = Annotated[AppDatabase, Depends(get_app_db)]
 # ============================================================================
 
 
+VALID_PROVIDERS = "^(jira|linear|pagerduty|opsgenie|monte_carlo|great_expectations|slack|custom)$"
+
+
 class IntegrationCreate(BaseModel):
     """Request to create an integration."""
 
     name: str = Field(..., min_length=1, max_length=100)
-    provider: str = Field(..., pattern="^(jira|linear|pagerduty|opsgenie|custom)$")
+    provider: str = Field(..., pattern=VALID_PROVIDERS)
     config: dict[str, Any] | None = Field(default=None)
     rate_limit_per_minute: int = Field(default=60, ge=1, le=1000)
 
@@ -207,6 +210,9 @@ def _get_signature_header_name(provider: str) -> str:
         IntegrationProvider.LINEAR: "Linear-Signature",
         IntegrationProvider.PAGERDUTY: "X-PagerDuty-Signature",
         IntegrationProvider.OPSGENIE: "X-Webhook-Signature",
+        IntegrationProvider.MONTE_CARLO: "X-MC-Signature",
+        IntegrationProvider.GREAT_EXPECTATIONS: "X-GE-Signature",
+        IntegrationProvider.SLACK: "X-Slack-Signature",
         IntegrationProvider.CUSTOM: "X-Webhook-Signature",
     }
     return header_map.get(provider, "X-Webhook-Signature")
@@ -461,13 +467,7 @@ async def receive_provider_webhook(
     The webhook is verified using the provider-specific signature scheme.
     Idempotency is enforced via the integration_events table.
     """
-    if provider not in [
-        IntegrationProvider.JIRA,
-        IntegrationProvider.LINEAR,
-        IntegrationProvider.PAGERDUTY,
-        IntegrationProvider.OPSGENIE,
-        IntegrationProvider.CUSTOM,
-    ]:
+    if provider not in IntegrationProvider.all():
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Unknown provider: {provider}",

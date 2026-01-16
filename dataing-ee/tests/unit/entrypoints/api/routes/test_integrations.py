@@ -60,7 +60,17 @@ class TestIntegrationCreateSchema:
 
     def test_valid_providers(self) -> None:
         """Test all valid provider values."""
-        for provider in ["jira", "linear", "pagerduty", "opsgenie", "custom"]:
+        valid_providers = [
+            "jira",
+            "linear",
+            "pagerduty",
+            "opsgenie",
+            "monte_carlo",
+            "great_expectations",
+            "slack",
+            "custom",
+        ]
+        for provider in valid_providers:
             payload = IntegrationCreate(name="Test", provider=provider)
             assert payload.provider == provider
 

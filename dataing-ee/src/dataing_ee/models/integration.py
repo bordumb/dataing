@@ -18,7 +18,24 @@ class IntegrationProvider:
     LINEAR = "linear"
     PAGERDUTY = "pagerduty"
     OPSGENIE = "opsgenie"
+    MONTE_CARLO = "monte_carlo"
+    GREAT_EXPECTATIONS = "great_expectations"
+    SLACK = "slack"
     CUSTOM = "custom"
+
+    @classmethod
+    def all(cls) -> list[str]:
+        """Get all provider names."""
+        return [
+            cls.JIRA,
+            cls.LINEAR,
+            cls.PAGERDUTY,
+            cls.OPSGENIE,
+            cls.MONTE_CARLO,
+            cls.GREAT_EXPECTATIONS,
+            cls.SLACK,
+            cls.CUSTOM,
+        ]
 
 
 class IntegrationEventStatus:

@@ -5876,6 +5876,359 @@
         }
       }
     },
+    "/api/v1/sla-policies": {
+      "get": {
+        "tags": [
+          "sla-policies"
+        ],
+        "summary": "List Sla Policies",
+        "description": "List SLA policies for the tenant.",
+        "operationId": "list_sla_policies_api_v1_sla_policies_get",
+        "security": [
+          {
+            "APIKeyHeader": []
+          },
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "include_default",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "description": "Include default policy",
+              "default": true,
+              "title": "Include Default"
+            },
+            "description": "Include default policy"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SLAPolicyListResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "sla-policies"
+        ],
+        "summary": "Create Sla Policy",
+        "description": "Create a new SLA policy.\n\nRequires admin scope. If is_default is true, clears any existing default.",
+        "operationId": "create_sla_policy_api_v1_sla_policies_post",
+        "security": [
+          {
+            "APIKeyHeader": []
+          },
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SLAPolicyCreate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SLAPolicyResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/sla-policies/default": {
+      "get": {
+        "tags": [
+          "sla-policies"
+        ],
+        "summary": "Get Default Sla Policy",
+        "description": "Get the default SLA policy for the tenant.\n\nReturns None if no default policy is configured.",
+        "operationId": "get_default_sla_policy_api_v1_sla_policies_default_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/SLAPolicyResponse"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "title": "Response Get Default Sla Policy Api V1 Sla Policies Default Get"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "APIKeyHeader": []
+          },
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/sla-policies/{policy_id}": {
+      "get": {
+        "tags": [
+          "sla-policies"
+        ],
+        "summary": "Get Sla Policy",
+        "description": "Get an SLA policy by ID.",
+        "operationId": "get_sla_policy_api_v1_sla_policies__policy_id__get",
+        "security": [
+          {
+            "APIKeyHeader": []
+          },
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "policy_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Policy Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SLAPolicyResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "sla-policies"
+        ],
+        "summary": "Update Sla Policy",
+        "description": "Update an SLA policy.\n\nRequires admin scope. If is_default is set to true, clears any existing default.",
+        "operationId": "update_sla_policy_api_v1_sla_policies__policy_id__patch",
+        "security": [
+          {
+            "APIKeyHeader": []
+          },
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "policy_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Policy Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SLAPolicyUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SLAPolicyResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "sla-policies"
+        ],
+        "summary": "Delete Sla Policy",
+        "description": "Delete an SLA policy.\n\nRequires admin scope. Issues using this policy will have sla_policy_id set to NULL.",
+        "operationId": "delete_sla_policy_api_v1_sla_policies__policy_id__delete",
+        "security": [
+          {
+            "APIKeyHeader": []
+          },
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "policy_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Policy Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/integrations/webhook-generic": {
+      "post": {
+        "tags": [
+          "integrations"
+        ],
+        "summary": "Receive Generic Webhook",
+        "description": "Receive a generic webhook to create an issue.\n\nThis endpoint allows external systems to create issues via HTTP webhook.\nRequests must be signed with HMAC-SHA256 using the shared secret.\n\nIdempotency: If source_provider and source_external_id are provided,\nduplicate webhooks will return the existing issue instead of creating\na new one.",
+        "operationId": "receive_generic_webhook_api_v1_integrations_webhook_generic_post",
+        "security": [
+          {
+            "APIKeyHeader": []
+          },
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "x-webhook-signature",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Webhook-Signature"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WebhookIssueResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/teams/teams/": {
       "get": {
         "tags": [
@@ -10531,6 +10884,269 @@
         "title": "RejectRequest",
         "description": "Request to reject an investigation."
       },
+      "SLAPolicyCreate": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 100,
+            "minLength": 1,
+            "title": "Name"
+          },
+          "is_default": {
+            "type": "boolean",
+            "title": "Is Default",
+            "default": false
+          },
+          "time_to_acknowledge": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Time To Acknowledge",
+            "description": "Minutes to acknowledge"
+          },
+          "time_to_progress": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Time To Progress",
+            "description": "Minutes to progress"
+          },
+          "time_to_resolve": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Time To Resolve",
+            "description": "Minutes to resolve"
+          },
+          "severity_overrides": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "$ref": "#/components/schemas/SeverityOverride"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Severity Overrides",
+            "description": "Per-severity overrides (low, medium, high, critical)"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name"
+        ],
+        "title": "SLAPolicyCreate",
+        "description": "Request to create an SLA policy."
+      },
+      "SLAPolicyListResponse": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/SLAPolicyResponse"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "total"
+        ],
+        "title": "SLAPolicyListResponse",
+        "description": "Paginated SLA policy list response."
+      },
+      "SLAPolicyResponse": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "tenant_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Tenant Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "is_default": {
+            "type": "boolean",
+            "title": "Is Default"
+          },
+          "time_to_acknowledge": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Time To Acknowledge"
+          },
+          "time_to_progress": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Time To Progress"
+          },
+          "time_to_resolve": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Time To Resolve"
+          },
+          "severity_overrides": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Severity Overrides"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "tenant_id",
+          "name",
+          "is_default",
+          "time_to_acknowledge",
+          "time_to_progress",
+          "time_to_resolve",
+          "severity_overrides",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "SLAPolicyResponse",
+        "description": "SLA policy response."
+      },
+      "SLAPolicyUpdate": {
+        "properties": {
+          "name": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 100,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "is_default": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Is Default"
+          },
+          "time_to_acknowledge": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Time To Acknowledge"
+          },
+          "time_to_progress": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Time To Progress"
+          },
+          "time_to_resolve": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Time To Resolve"
+          },
+          "severity_overrides": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "$ref": "#/components/schemas/SeverityOverride"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Severity Overrides"
+          }
+        },
+        "type": "object",
+        "title": "SLAPolicyUpdate",
+        "description": "Request to update an SLA policy."
+      },
       "SchemaCommentCreate": {
         "properties": {
           "field_name": {
@@ -10759,6 +11375,49 @@
         ],
         "title": "SendMessageResponse",
         "description": "Response for sending a message."
+      },
+      "SeverityOverride": {
+        "properties": {
+          "time_to_acknowledge": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Time To Acknowledge",
+            "description": "Minutes to acknowledge (OPEN -> TRIAGED)"
+          },
+          "time_to_progress": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Time To Progress",
+            "description": "Minutes to progress (TRIAGED -> IN_PROGRESS)"
+          },
+          "time_to_resolve": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Time To Resolve",
+            "description": "Minutes to resolve (any -> RESOLVED)"
+          }
+        },
+        "type": "object",
+        "title": "SeverityOverride",
+        "description": "Override SLA times for a specific severity."
       },
       "SourceTypeResponse": {
         "properties": {
@@ -11617,6 +12276,36 @@
         ],
         "title": "WatcherResponse",
         "description": "Response for a watcher."
+      },
+      "WebhookIssueResponse": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "number": {
+            "type": "integer",
+            "title": "Number"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "created": {
+            "type": "boolean",
+            "title": "Created"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "number",
+          "status",
+          "created"
+        ],
+        "title": "WebhookIssueResponse",
+        "description": "Response from webhook issue creation."
       }
     },
     "securitySchemes": {

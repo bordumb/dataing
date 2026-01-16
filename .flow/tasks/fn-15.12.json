@@ -1,0 +1,17 @@
+{
+  "assignee": null,
+  "claim_note": "",
+  "claimed_at": null,
+  "created_at": "2026-01-16T17:29:09.932660Z",
+  "depends_on": [
+    "fn-15.10",
+    "fn-15.11"
+  ],
+  "epic": "fn-15",
+  "id": "fn-15.12",
+  "priority": null,
+  "spec_path": ".flow/tasks/fn-15.12.md",
+  "status": "todo",
+  "title": "Update __init__.py exports and deprecate old APIs",
+  "updated_at": "2026-01-16T17:29:33.732695Z"
+}

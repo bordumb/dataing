@@ -1,0 +1,16 @@
+{
+  "assignee": null,
+  "claim_note": "",
+  "claimed_at": null,
+  "created_at": "2026-01-16T17:29:01.746947Z",
+  "depends_on": [
+    "fn-15.6"
+  ],
+  "epic": "fn-15",
+  "id": "fn-15.8",
+  "priority": null,
+  "spec_path": ".flow/tasks/fn-15.8.md",
+  "status": "todo",
+  "title": "Create replay.py with Replayer class",
+  "updated_at": "2026-01-16T17:29:32.848711Z"
+}

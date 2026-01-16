@@ -394,3 +394,85 @@ class TestInvestigationRunSchemas:
         assert data.trigger_type == "human"
         assert data.execution_profile == "standard"
         assert data.approval_status is None
+
+
+class TestIssueEventSchemas:
+    """Test issue event Pydantic schemas."""
+
+    def test_issue_event_response_fields(self) -> None:
+        """Test IssueEventResponse has expected fields."""
+        from datetime import datetime
+
+        from dataing.entrypoints.api.routes.issues import IssueEventResponse
+
+        data = IssueEventResponse(
+            id=uuid4(),
+            issue_id=uuid4(),
+            event_type="status_changed",
+            actor_user_id=uuid4(),
+            payload={"from": "open", "to": "triaged"},
+            created_at=datetime.now(UTC),
+        )
+        assert data.event_type == "status_changed"
+        assert data.payload["from"] == "open"
+        assert data.payload["to"] == "triaged"
+
+    def test_issue_event_response_no_actor(self) -> None:
+        """Test IssueEventResponse with no actor (system event)."""
+        from datetime import datetime
+
+        from dataing.entrypoints.api.routes.issues import IssueEventResponse
+
+        data = IssueEventResponse(
+            id=uuid4(),
+            issue_id=uuid4(),
+            event_type="created",
+            actor_user_id=None,
+            payload={},
+            created_at=datetime.now(UTC),
+        )
+        assert data.actor_user_id is None
+        assert data.event_type == "created"
+
+    def test_issue_event_list_response(self) -> None:
+        """Test IssueEventListResponse structure."""
+        from datetime import datetime
+
+        from dataing.entrypoints.api.routes.issues import (
+            IssueEventListResponse,
+            IssueEventResponse,
+        )
+
+        events = [
+            IssueEventResponse(
+                id=uuid4(),
+                issue_id=uuid4(),
+                event_type="comment_added",
+                actor_user_id=uuid4(),
+                payload={"comment_id": str(uuid4())},
+                created_at=datetime.now(UTC),
+            ),
+            IssueEventResponse(
+                id=uuid4(),
+                issue_id=uuid4(),
+                event_type="assigned",
+                actor_user_id=uuid4(),
+                payload={"assignee_user_id": str(uuid4())},
+                created_at=datetime.now(UTC),
+            ),
+        ]
+        data = IssueEventListResponse(items=events, total=2, next_cursor=None)
+        assert len(data.items) == 2
+        assert data.total == 2
+        assert data.next_cursor is None
+
+    def test_issue_event_list_response_with_cursor(self) -> None:
+        """Test IssueEventListResponse with next_cursor."""
+        from dataing.entrypoints.api.routes.issues import IssueEventListResponse
+
+        data = IssueEventListResponse(
+            items=[],
+            total=100,
+            next_cursor="abc123",
+        )
+        assert data.next_cursor == "abc123"

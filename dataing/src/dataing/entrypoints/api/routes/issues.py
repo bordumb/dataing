@@ -6,16 +6,20 @@ issues with state machine enforcement and cursor-based pagination.
 
 from __future__ import annotations
 
+import asyncio
 import base64
 import logging
+from collections.abc import AsyncIterator
 from datetime import UTC, datetime
 from typing import Annotated, Any
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from pydantic import BaseModel, Field
+from sse_starlette.sse import EventSourceResponse
 
 from dataing.adapters.db.app_db import AppDatabase
+from dataing.core.json_utils import to_json_string
 from dataing.entrypoints.api.deps import get_app_db
 from dataing.entrypoints.api.middleware.auth import ApiKeyContext, verify_api_key
 from dataing.models.issue import IssueStatus
@@ -236,8 +240,6 @@ async def _record_issue_event(
     payload: dict[str, Any] | None = None,
 ) -> None:
     """Record an issue event."""
-    from dataing.core.json_utils import to_json_string
-
     await db.execute(
         """
         INSERT INTO issue_events (issue_id, event_type, actor_user_id, payload)
@@ -748,6 +750,30 @@ class IssueCommentListResponse(BaseModel):
 
 
 # ============================================================================
+# Event Schemas
+# ============================================================================
+
+
+class IssueEventResponse(BaseModel):
+    """Response for an issue event."""
+
+    id: UUID
+    issue_id: UUID
+    event_type: str
+    actor_user_id: UUID | None
+    payload: dict[str, Any]
+    created_at: datetime
+
+
+class IssueEventListResponse(BaseModel):
+    """Paginated event list response."""
+
+    items: list[IssueEventResponse]
+    total: int
+    next_cursor: str | None = None
+
+
+# ============================================================================
 # Watcher Schemas
 # ============================================================================
 
@@ -1137,8 +1163,6 @@ async def spawn_investigation(
     investigation_id = investigation_row["id"]
 
     # Create the issue_investigation_run record
-    from dataing.core.json_utils import to_json_string
-
     trigger_ref = {"user_id": str(auth.user_id), "dataset_id": dataset_id}
 
     row = await db.execute_returning(
@@ -1197,4 +1221,224 @@ async def spawn_investigation(
         synthesis_summary=row["synthesis_summary"],
         created_at=row["created_at"],
         completed_at=row["completed_at"],
+    )
+
+
+# ============================================================================
+# Event Timeline API Routes
+# ============================================================================
+
+
+@router.get("/{issue_id}/events", response_model=IssueEventListResponse)
+async def list_issue_events(
+    issue_id: UUID,
+    auth: AuthDep,
+    db: AppDbDep,
+    limit: Annotated[int, Query(ge=1, le=100)] = 50,  # noqa: B008
+    cursor: str | None = None,  # noqa: B008
+) -> IssueEventListResponse:
+    """List events for an issue (activity timeline).
+
+    Returns events in reverse chronological order (newest first).
+    Supports cursor-based pagination.
+    """
+    await _verify_issue_access(db, issue_id, auth.tenant_id)
+
+    # Decode cursor if provided
+    after_ts: datetime | None = None
+    after_id: UUID | None = None
+    if cursor:
+        decoded = _decode_cursor(cursor)
+        if decoded:
+            after_ts, after_id = decoded
+
+    # Build query with cursor pagination
+    if after_ts and after_id:
+        query = """
+            SELECT id, issue_id, event_type, actor_user_id, payload, created_at
+            FROM issue_events
+            WHERE issue_id = $1
+              AND (created_at, id) < ($2, $3)
+            ORDER BY created_at DESC, id DESC
+            LIMIT $4
+        """
+        rows = await db.fetch_all(query, issue_id, after_ts, after_id, limit + 1)
+    else:
+        query = """
+            SELECT id, issue_id, event_type, actor_user_id, payload, created_at
+            FROM issue_events
+            WHERE issue_id = $1
+            ORDER BY created_at DESC, id DESC
+            LIMIT $2
+        """
+        rows = await db.fetch_all(query, issue_id, limit + 1)
+
+    # Determine if there are more results
+    has_more = len(rows) > limit
+    if has_more:
+        rows = rows[:limit]
+
+    # Build response
+    items = [
+        IssueEventResponse(
+            id=row["id"],
+            issue_id=row["issue_id"],
+            event_type=row["event_type"],
+            actor_user_id=row["actor_user_id"],
+            payload=row["payload"] if isinstance(row["payload"], dict) else {},
+            created_at=row["created_at"],
+        )
+        for row in rows
+    ]
+
+    # Get total count
+    count_row = await db.fetch_one(
+        "SELECT COUNT(*) as cnt FROM issue_events WHERE issue_id = $1",
+        issue_id,
+    )
+    total = count_row["cnt"] if count_row else 0
+
+    # Build next cursor
+    next_cursor = None
+    if has_more and items:
+        last = items[-1]
+        next_cursor = _encode_cursor(last.created_at, last.id)
+
+    return IssueEventListResponse(
+        items=items,
+        total=total,
+        next_cursor=next_cursor,
+    )
+
+
+# ============================================================================
+# SSE Streaming
+# ============================================================================
+
+
+@router.get("/{issue_id}/stream")
+async def stream_issue_events(
+    issue_id: UUID,
+    request: Request,
+    auth: AuthDep,
+    db: AppDbDep,
+    after: str | None = None,  # noqa: B008
+) -> EventSourceResponse:
+    """Stream real-time issue updates via Server-Sent Events.
+
+    Delivers events as they occur:
+    - status_changed, assigned, comment_added, label_added/removed
+    - investigation_spawned, investigation_completed
+
+    The `after` parameter accepts an event ID to resume from.
+    Sends heartbeat every 30 seconds to prevent connection timeout.
+    """
+    await _verify_issue_access(db, issue_id, auth.tenant_id)
+
+    # Parse after parameter to get last event ID
+    last_id: UUID | None = None
+    if after:
+        try:
+            last_id = UUID(after)
+        except ValueError:
+            pass  # Invalid UUID, start from beginning
+
+    async def event_generator() -> AsyncIterator[dict[str, Any]]:
+        """Generate SSE events for issue updates."""
+        nonlocal last_id
+        last_heartbeat = datetime.now(UTC)
+        poll_count = 0
+        max_polls = 3600  # 30 minutes at 0.5s intervals
+
+        try:
+            while poll_count < max_polls:
+                # Check if client disconnected
+                if await request.is_disconnected():
+                    logger.info(f"SSE client disconnected for issue {issue_id}")
+                    break
+
+                # Send heartbeat every 30 seconds
+                now = datetime.now(UTC)
+                if (now - last_heartbeat).total_seconds() >= 30:
+                    yield {
+                        "event": "heartbeat",
+                        "data": to_json_string({"ts": now.isoformat()}),
+                    }
+                    last_heartbeat = now
+
+                # Poll for new events
+                try:
+                    if last_id:
+                        query = """
+                            SELECT id, issue_id, event_type, actor_user_id,
+                                   payload, created_at
+                            FROM issue_events
+                            WHERE issue_id = $1 AND id > $2
+                            ORDER BY created_at ASC, id ASC
+                            LIMIT 50
+                        """
+                        rows = await db.fetch_all(query, issue_id, last_id)
+                    else:
+                        query = """
+                            SELECT id, issue_id, event_type, actor_user_id,
+                                   payload, created_at
+                            FROM issue_events
+                            WHERE issue_id = $1
+                            ORDER BY created_at ASC, id ASC
+                            LIMIT 50
+                        """
+                        rows = await db.fetch_all(query, issue_id)
+
+                    for row in rows:
+                        event_data = {
+                            "id": str(row["id"]),
+                            "issue_id": str(row["issue_id"]),
+                            "event_type": row["event_type"],
+                            "actor_user_id": (
+                                str(row["actor_user_id"])
+                                if row["actor_user_id"]
+                                else None
+                            ),
+                            "payload": (
+                                row["payload"]
+                                if isinstance(row["payload"], dict)
+                                else {}
+                            ),
+                            "created_at": row["created_at"].isoformat(),
+                        }
+                        yield {
+                            "event": row["event_type"],
+                            "id": str(row["id"]),  # For Last-Event-ID
+                            "data": to_json_string(event_data),
+                        }
+                        last_id = row["id"]
+
+                except Exception as e:
+                    logger.error(f"Error polling issue events: {e}")
+                    yield {
+                        "event": "error",
+                        "data": to_json_string({"error": "Failed to fetch events"}),
+                    }
+
+                await asyncio.sleep(0.5)
+                poll_count += 1
+
+            # Stream timeout
+            if poll_count >= max_polls:
+                yield {
+                    "event": "timeout",
+                    "data": to_json_string(
+                        {"message": "Stream timeout, please reconnect"}
+                    ),
+                }
+
+        except asyncio.CancelledError:
+            logger.info(f"SSE stream cancelled for issue {issue_id}")
+
+    return EventSourceResponse(
+        event_generator(),
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+        },
     )

@@ -5,6 +5,7 @@ from unittest.mock import AsyncMock, MagicMock
 from uuid import uuid4
 
 import pytest
+
 from dataing.core.auth.service import AuthError, AuthService
 from dataing.core.auth.types import Organization, OrgRole, User
 

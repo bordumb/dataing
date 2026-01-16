@@ -1,14 +1,13 @@
 """Tests for BaseAdapter abstract base class."""
 
-import pytest
 from datetime import datetime
 from typing import Any
-from unittest.mock import AsyncMock
+
+import pytest
 
 from dataing.adapters.datasource.base import BaseAdapter
 from dataing.adapters.datasource.types import (
     AdapterCapabilities,
-    Column,
     ConnectionTestResult,
     NormalizedType,
     QueryLanguage,

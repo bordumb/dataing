@@ -5,8 +5,8 @@ import pytest
 from dataing.adapters.context import ContextEngine
 from dataing.adapters.lineage import (
     BaseLineageAdapter,
-    DatasetId,
     Dataset,
+    DatasetId,
     DatasetType,
     LineageCapabilities,
     LineageGraph,
@@ -14,7 +14,7 @@ from dataing.adapters.lineage import (
     LineageProviderType,
     get_lineage_registry,
 )
-from dataing.core.domain_types import AnomalyAlert, LineageContext
+from dataing.core.domain_types import LineageContext
 
 
 class MockLineageAdapter(BaseLineageAdapter):

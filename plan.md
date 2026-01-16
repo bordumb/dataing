@@ -1,669 +1,661 @@
-Issues and Investigations Plan
 
-0) Product shape
+Maestro: Event-Sourced State Machine with Engine/Runner Split
 
-Two first-class objects
-	•	Issue = intake + triage + collaboration + workflow + notifications + audit. Created by humans or integrations. Lives as the system of record for “a thing we need to resolve.”
-	•	Investigation = execution artifact. Runs agents, gathers evidence, produces synthesis, can be rerun/branched, has strict guardrails.
+High-level overview
 
-Relationship
-	•	An Issue can spawn 0..N Investigations.
-	•	Spawning can be rules-driven or human-driven:
-	•	Human: “Run investigation” from the Issue page
-	•	Hooks/Rules: automatic triggers based on issue fields, integration payloads, time, SLA, or patterns
+Core idea
 
-Key invariant: Issues never inherit Investigation UI/fields. They link to Investigations as “runs.”
+Turn Maestro into a deterministic state machine driven by an append-only event log.
+	•	Protocol (stable / portable): Step, Signal, StepResult, BranchRequest (+ any “wire” types you commit to).
+	•	Engine (pure / deterministic): a reducer:
+	•	input: (state, event)
+	•	output: (new_state, next_command)
+	•	no async, no side effects
+	•	Runner (effectful): an async loop that:
+	•	asks the Engine for a Command
+	•	executes side effects (running a step, spawning branches, waiting for user input)
+	•	emits an Event back into the Engine
+	•	Event Log (deterministic): record every significant transition (step scheduled/completed, branch spawned/merged, paused/resumed, etc.)
+	•	Replay harness: given definition + initial_state + events[], you should deterministically reconstruct final state and validate invariants.
 
-⸻
-
-1) Information architecture and UX
-
-1.1 Routes
-	•	/issues — Issues list + filters + bulk actions + saved views
-	•	/issues/new — Create issue (+ templates)
-	•	/issues/:issueId — Issue workspace (overview, discussion, timeline, linked runs)
-	•	/investigations — Investigations list
-	•	/investigations/new — Manual start (optional; most start from Issues)
-	•	/investigations/:investigationId — Investigation execution/report UI
-
-Optional but recommended:
-	•	/datasets/:datasetId — Dataset hub (ownership, subscriptions, related issues/investigations)
-	•	/integrations — Manage integrations + routing + secrets
-	•	/rules — Automation rules for issues → investigations + notifications
-	•	/runbooks — Knowledge base generated from resolved issues
+What this buys you
+	•	Debuggability: “why did this run do that?” → read the log.
+	•	Determinism: reproduce bugs by replaying events.
+	•	Rust path later: you rewrite Engine + State + Event/Command enums in Rust, keep Python Runner/Steps.
 
 ⸻
 
-1.2 Issues list (/issues)
+Files: keep / remove / add
 
-Primary jobs
-	•	Triage: what’s new, what’s blocked, what’s urgent
-	•	Work allocation: assign, prioritize, escalate
-	•	De-noise: dedupe and cluster correlated alerts into canonical issues
+Keep (but modify)
 
-Table layout
+maestro/src/maestro/signals.py (keep)
 
-Columns (in order):
-	1.	Open/Closed icon (green dot circle for open; magenta check circle for closed)
-	2.	Title + #number + small source badge (Human / Jira / MonteCarlo / GE / Slack / etc.)
-	3.	Status (lifecycle badge)
-	4.	Priority (P0–P3) and Severity (Low–Critical) as separate fields
-	5.	Dataset
-	6.	Assignee
-	7.	Labels
-	8.	SLA (time-to-ack / time-to-breach indicator)
-	9.	Updated
+Your current Signal enum is fine as a stable protocol.
 
-Tabs
-	•	Open
-	•	Closed
+Small tweak recommended: explicitly separate workflow control vs runner effects. (Not required, but it keeps the Engine honest.)
+	•	Keep Signal as the Step contract.
+	•	Let Engine translate signals into Commands/Events.
 
-Filters
-	•	Search (title, description, #number, external id)
-	•	Status (multi)
-	•	Priority (multi)
-	•	Severity (multi)
-	•	Labels (multi)
-	•	Dataset (typeahead)
-	•	Assignee (me / unassigned / user)
-	•	Source (integration provider / human)
-	•	Time (created/updated range)
-	•	“Has investigations” / “No investigations”
-
-Sorting
-	•	Updated desc (default)
-	•	SLA breach risk
-	•	Priority desc
-	•	Created desc
-
-Bulk actions
-	•	Assign
-	•	Change status
-	•	Add/remove labels
-	•	Set priority/severity
-	•	Merge duplicates
-	•	Trigger investigation (manual bulk run with guardrails)
-	•	Subscribe/unsubscribe watchers
-
-Saved views
-	•	“My open”
-	•	“Team P0/P1”
-	•	“Schema drift last 7 days”
-	•	“SLA at risk”
-	•	Custom saved filters
+No breaking changes needed.
 
 ⸻
 
-1.3 Create issue (/issues/new)
+maestro/src/maestro/result.py (keep, tighten)
 
-Create modes
-	•	Blank issue
-	•	Templates (prefill fields + labels + optional structured sections)
-	•	Data anomaly
-	•	Pipeline failure
-	•	Schema drift
-	•	Business KPI drop
-	•	Customer report
+Keep StepResult, BranchRequest, etc. It’s already close to “protocol locked down”.
 
-Fields
-	•	Title (required)
-	•	Description (markdown; supports links and code blocks)
-	•	Dataset (optional)
-	•	Labels (optional)
-	•	Assignee (optional)
-	•	Priority (optional)
-	•	Severity (optional)
-	•	Due date (optional)
-	•	Watchers (optional; default includes creator)
-	•	Source metadata hidden for humans, set automatically for integrations
+Add validations:
+	•	MERGE shouldn’t be emitted by steps anymore (Engine owns merge).
+	•	AWAIT_USER should carry a token (or await_token) so resumption is deterministic.
 
-⸻
+Minimal change (snippet):
 
-1.4 Issue workspace (/issues/:issueId)
+# maestro/src/maestro/result.py
+@dataclass(frozen=True)
+class StepResult(Generic[ContextT, OutputT]):
+    context: ContextT
+    signal: Signal
+    output: OutputT | None = None
+    error: str | None = None
+    next_step: str | None = None
+    branch_request: BranchRequest | None = None
+    await_token: str | None = None  # NEW
 
-Layout
+    def __post_init__(self) -> None:
+        if self.signal == Signal.BRANCH and self.branch_request is None:
+            raise ValueError("BRANCH signal requires branch_request")
+        if self.signal == Signal.AWAIT_USER and not self.await_token:
+            raise ValueError("AWAIT_USER signal requires await_token")
 
-Header (sticky)
-	•	Title + #number
-	•	Status dropdown
-	•	Priority + Severity dropdowns
-	•	SLA indicator + timers (ack/resolution)
-	•	Primary actions:
-	•	Run investigation
-	•	Escalate (Slack/pager action based on policy)
-	•	Close/Reopen
-	•	Secondary actions:
-	•	Merge / Mark duplicate
-	•	Create runbook (if resolved)
-	•	Export/share link
-
-Main column
-	•	Description (editable)
-	•	Comments / discussion (threaded optional)
-	•	Investigation runs (timeline list)
-	•	Each run shows: status, created time, trigger (human/rule/provider), short “focus prompt,” and link to investigation
-	•	“Re-run” action with modified focus and guardrails
-	•	Activity feed (immutable events)
-	•	status changes, assignment, label changes, merges, rule firings, webhook ingests, investigation spawn/completion, notifications sent
-	•	Related issues (duplicates, blocks, relates-to)
-
-Right rail
-	•	Author (link to user profile or integration)
-	•	Source (provider + external URL)
-	•	Dataset (link to dataset hub)
-	•	Assignee
-	•	Labels
-	•	Watchers/subscriptions
-	•	Linked tickets (Jira key etc.)
-	•	External references (monitor id, check id, alert id)
-	•	Created/updated/closed timestamps
-
-Issue lifecycle states (canonical)
-	•	OPEN → TRIAGED → IN_PROGRESS → BLOCKED → RESOLVED → CLOSED
-
-Rules around state:
-	•	RESOLVED requires either: resolution note OR linked runbook OR linked investigation synthesis selected as “resolution”
-	•	Closing requires: status RESOLVED unless admin override
 
 ⸻
 
-1.5 Investigation spawning UX (from an Issue)
+maestro/src/maestro/step.py (keep)
 
-“Run investigation” modal
-
-Minimal, general-purpose (not anomaly-form shaped):
-	•	Dataset (prefilled if issue has it; editable)
-	•	Time window (optional; date range or “since”)
-	•	Focus prompt (required; defaults to issue title + key excerpt)
-	•	Execution profile (dropdown):
-	•	Safe (read-only, strict limits)
-	•	Standard (read-only, broader context)
-	•	Deep (expensive; requires extra approval)
-	•	Data access request preview (tables, estimated rows, cost)
-	•	Approval requirements (auto-determined by policy):
-	•	none
-	•	requires approver(s)
-	•	requires dataset owner approval
-	•	“Run” button
-
-Human-in-the-loop gates
-	•	If policies require it, show a Context Review step before execution:
-	•	purpose, tables, estimated rows, query preview, data sensitivity flags
-	•	Approve / Reject with reason
-	•	Approve with constraints (row limits/time limits/table allowlist)
+Keep Step.execute(...) as your effect boundary. That’s exactly what you want long-term.
 
 ⸻
 
-1.6 Investigation UI (/investigations/:id)
+maestro/src/maestro/workflow.py (keep, but gut the “brain”)
 
-Investigation stays focused on execution and results.
+Workflow stays as the public façade and definition builder, but:
+	•	remove tick() as “the engine”
+	•	remove orchestration logic from run()
+	•	replace with: build definition → create engine → run runner
 
-Core sections:
-	•	Summary header: status, branch count, cost/time, live indicator, cancel
-	•	Synthesis (root cause, confidence, recommended actions, causal chain)
-	•	Evidence (structured artifacts, query outputs, charts later)
-	•	Steps timeline (agent plan/execution trace)
-	•	Chat/direction input (guidance + follow-up)
-	•	Branching (true branches, not “send message”)
-	•	Share (real permissions + copy link)
-	•	Export (markdown/PDF later)
+Workflow becomes:
+	•	definition construction (steps + ordering + optional routing)
+	•	convenience run() wrapper around Runner
+	•	optional resume() wrapper for AWAIT_USER
 
 ⸻
 
-1.7 Dedupe + correlation UX
+Remove (or radically rewrite)
 
-From Issues list and Issue page:
-	•	“Possible duplicates” panel (similarity + shared dataset/source/time)
-	•	“Merge duplicates” workflow:
-	•	choose canonical
-	•	close duplicates as “Duplicate”
-	•	preserve references and external links
-	•	“Correlation cluster” view:
-	•	shows multiple alerts/issues grouped into one incident-like cluster
-	•	cluster can create a single canonical issue
+maestro/src/maestro/handlers.py (remove statefulness)
 
-⸻
+Right now BranchingSignalHandler holds mutable state (_pending_branches, _expected_counts, _parent_contexts), which is exactly what you said you want to eliminate.
 
-1.8 Knowledge base and runbooks
-	•	Any RESOLVED issue can be converted into a Runbook
-	•	Runbook includes:
-	•	symptoms
-	•	likely causes
-	•	verification queries
-	•	remediation steps
-	•	prevention / monitoring suggestions
-	•	New issues get suggested runbooks (similarity + rules)
-	•	“Prevent recurrence” prompts:
-	•	propose new checks (GE expectations / Monte Carlo monitors) based on resolution patterns
+You have two good options:
+
+Option A (recommended): replace handlers.py with pure strategies
+	•	move merge logic into a pure “merge strategy” module
+	•	all “pending branch tracking” moves into RunState
+
+Option B: keep file name but rewrite it as pure functions
+	•	no internal dictionaries
+	•	only stateless transforms
+
+I’d do Option A and add merge.py.
 
 ⸻
 
-2) Backend architecture
+Add (new files)
 
-2.1 Data model (Postgres)
+1) maestro/src/maestro/state.py (NEW)
 
-Core entities
+Single source of truth for a run’s state, fully serializable.
 
-issues
-	•	id uuid pk
-	•	number bigint unique (sequence)
-	•	title text
-	•	description text null
-	•	status text (enum)
-	•	priority text null (P0..P3)
-	•	severity text null (low..critical)
-	•	due_at timestamptz null
-	•	dataset_id text null (or uuid; match your dataset identity)
-	•	assignee_user_id uuid null
-	•	created_by_user_id uuid null
-	•	author_type text (human|integration)
-	•	author_user_id uuid null
-	•	author_integration_id uuid null
-	•	source_provider text null (e.g. jira, montecarlo)
-	•	source_external_id text null
-	•	source_external_url text null
-	•	source_fingerprint text null (dedupe key)
-	•	created_at timestamptz
-	•	updated_at timestamptz
-	•	closed_at timestamptz null
-	•	indexes: (status), (dataset_id), (assignee_user_id), (updated_at desc), (source_provider, source_external_id), full-text on title/description
+# maestro/src/maestro/state.py
+from __future__ import annotations
+from dataclasses import dataclass, field
+from typing import Any, Generic, Literal, TypeVar
 
-issue_labels
-	•	issue_id uuid
-	•	label text
-	•	primary key (issue_id, label)
-	•	index on (label)
+ContextT = TypeVar("ContextT")
 
-issue_comments
-	•	id uuid pk
-	•	issue_id uuid
-	•	author_user_id uuid
-	•	body text
-	•	created_at timestamptz
-	•	optional: parent_comment_id for threading
+RunStatus = Literal["running", "paused", "completed", "failed"]
 
-issue_events (audit + timeline)
-	•	id uuid pk
-	•	issue_id uuid
-	•	type text (created, status_changed, assigned, label_added, webhook_received, rule_fired, investigation_spawned, investigation_completed, merged, etc.)
-	•	payload jsonb
-	•	created_at timestamptz
-	•	index (issue_id, created_at)
+@dataclass(frozen=True)
+class BranchState:
+    merge_step: str
+    expected: set[str]
+    completed: dict[str, Any] = field(default_factory=dict)  # branch_name -> branch_context
 
-issue_relationships
-	•	id uuid pk
-	•	from_issue_id uuid
-	•	to_issue_id uuid
-	•	type text (duplicates, blocks, relates_to)
-	•	unique constraint to prevent duplicates
+@dataclass(frozen=True)
+class AwaitState:
+    token: str  # deterministic resume key
 
-issue_watchers
-	•	issue_id uuid
-	•	user_id uuid
-	•	primary key (issue_id, user_id)
+@dataclass(frozen=True)
+class RunState(Generic[ContextT]):
+    run_id: str
+    status: RunStatus
+    context: ContextT
 
-Issue → Investigation linkage
+    # what the engine expects next
+    current_step: str | None  # None if terminal/paused
+    pending_branches: BranchState | None = None
+    pending_await: AwaitState | None = None
 
-issue_investigation_runs
-	•	id uuid pk
-	•	issue_id uuid
-	•	investigation_id uuid
-	•	trigger_type text (human|rule|webhook|api|sla_escalation)
-	•	trigger_ref jsonb (user id, rule id, provider event id)
-	•	focus_prompt text
-	•	execution_profile text (safe|standard|deep)
-	•	created_at timestamptz
-	•	index (issue_id, created_at desc)
+    # determinism / ordering
+    seq: int = 0  # monotonically increasing event counter
 
-Integrations + routing
-
-integrations
-	•	id uuid pk
-	•	provider text (jira, slack, montecarlo, great_expectations, webhook_generic, etc.)
-	•	display_name text
-	•	config jsonb (mapping rules, dataset resolver config, etc.)
-	•	signing_secret text null
-	•	is_enabled bool
-	•	created_at timestamptz
-
-integration_events (idempotency + debugging)
-	•	id uuid pk
-	•	integration_id uuid
-	•	provider_event_id text
-	•	received_at timestamptz
-	•	payload jsonb
-	•	unique (integration_id, provider_event_id)
-
-Automation rules engine
-
-automation_rules
-	•	id uuid pk
-	•	name text
-	•	is_enabled bool
-	•	scope text (global/team/dataset/label)
-	•	conditions jsonb (DSL)
-	•	actions jsonb (create investigation, set fields, notify, assign, escalate)
-	•	rate_limits jsonb (max per hour, etc.)
-	•	created_at, updated_at
-
-rule_executions
-	•	id uuid pk
-	•	rule_id uuid
-	•	issue_id uuid
-	•	status text (fired, skipped, throttled, failed)
-	•	reason text null
-	•	created_at timestamptz
-	•	indexes (rule_id, created_at), (issue_id, created_at)
-
-Notifications
-
-notification_subscriptions
-	•	id uuid pk
-	•	user_id uuid
-	•	scope_type text (dataset|label|issue|team)
-	•	scope_id text
-	•	channel text (slack|email|webhook)
-	•	target jsonb (slack channel/user, email)
-	•	created_at timestamptz
-	•	index (scope_type, scope_id)
-
-notification_outbox (reliable delivery)
-	•	id uuid pk
-	•	event_type text
-	•	event_ref jsonb (issue id, comment id, run id)
-	•	recipient_user_id uuid
-	•	channel text
-	•	payload jsonb
-	•	status text (pending, sent, failed)
-	•	attempts int
-	•	next_attempt_at timestamptz
-	•	created_at timestamptz
-
-Knowledge base
-
-runbooks
-	•	id uuid pk
-	•	title text
-	•	body text
-	•	dataset_id text null
-	•	labels text[]
-	•	created_from_issue_id uuid null
-	•	created_at, updated_at
-
-runbook_links
-	•	runbook_id uuid
-	•	issue_id uuid
-	•	score float
-	•	(runbook_id, issue_id) unique
 
 ⸻
 
-2.2 API surface (HTTP)
+2) maestro/src/maestro/commands.py (NEW)
 
-Issues
-	•	GET /api/issues (filters, pagination, saved views)
-	•	POST /api/issues (human/API create)
-	•	GET /api/issues/:id
-	•	PATCH /api/issues/:id (status/priority/severity/dataset/assignee/title/description)
-	•	POST /api/issues/:id/comments
-	•	GET /api/issues/:id/comments
-	•	POST /api/issues/:id/watch / DELETE /api/issues/:id/watch
-	•	POST /api/issues/:id/merge (merge duplicates)
-	•	POST /api/issues/:id/relationships (blocks/relates)
-	•	GET /api/issues/:id/events
+What the Engine tells the Runner to do.
 
-Issue → Investigation spawn
-	•	POST /api/issues/:id/investigation-runs
-	•	body: dataset, time_window, focus_prompt, execution_profile
-	•	returns: run_id, investigation_id
-	•	GET /api/issues/:id/investigation-runs
+# maestro/src/maestro/commands.py
+from __future__ import annotations
+from dataclasses import dataclass
+from typing import Any, Literal
 
-Integrations
-	•	GET /api/integrations
-	•	POST /api/integrations
-	•	PATCH /api/integrations/:id
-	•	POST /api/integrations/:provider/webhook (signed)
-	•	POST /api/integrations/:id/test (verify mapping + rules)
+@dataclass(frozen=True)
+class Command: ...
 
-Rules engine
-	•	GET /api/rules
-	•	POST /api/rules
-	•	PATCH /api/rules/:id
-	•	POST /api/rules/:id/dry-run (simulate on a sample issue or payload)
+@dataclass(frozen=True)
+class ExecuteStep(Command):
+    step_name: str
+    input_data: Any | None = None
 
-Runbooks
-	•	GET /api/runbooks
-	•	POST /api/runbooks
-	•	POST /api/issues/:id/create-runbook
-	•	GET /api/issues/:id/suggested-runbooks
+@dataclass(frozen=True)
+class StartBranches(Command):
+    branch_request: Any  # BranchRequest (imported), kept Any to avoid circulars in snippet
+
+@dataclass(frozen=True)
+class WaitForInput(Command):
+    token: str
+
+@dataclass(frozen=True)
+class Stop(Command):
+    status: Literal["completed", "failed"]
+    final_context: Any | None = None
+    error: str | None = None
+
 
 ⸻
 
-2.3 Eventing and real-time updates
+3) maestro/src/maestro/events.py (NEW)
 
-Server-sent events (SSE) / WebSockets
-	•	Issues need real-time for:
-	•	status changes
-	•	comments
-	•	assignment
-	•	investigation run spawned/completed
-	•	SLA breach warnings
-	•	Provide:
-	•	GET /api/issues/:id/stream (SSE)
-	•	optionally GET /api/issues/stream for list updates by saved view
+Events are facts appended to the log.
 
-Internal events
+# maestro/src/maestro/events.py
+from __future__ import annotations
+from dataclasses import dataclass
+from typing import Any, Literal
 
-Every state change emits a domain event:
-	•	issue.created
-	•	issue.updated
-	•	issue.status_changed
-	•	issue.assigned
-	•	issue.comment_added
-	•	issue.merged
-	•	issue.investigation_spawned
-	•	issue.investigation_completed
-	•	integration.webhook_received
-	•	rule.fired
-	•	notification.enqueued
+@dataclass(frozen=True)
+class Event:
+    seq: int
 
-These feed:
-	•	rules engine
-	•	notifications
-	•	activity feed
-	•	correlation/dedupe pipeline
+@dataclass(frozen=True)
+class RunStarted(Event):
+    start_step: str
 
-⸻
+@dataclass(frozen=True)
+class StepCompleted(Event):
+    step_name: str
+    step_result: Any  # StepResult
 
-2.4 Rules and hooks system (Issue → Investigation upgrade)
+@dataclass(frozen=True)
+class StepFailed(Event):
+    step_name: str
+    error: str
 
-Rule conditions (examples)
-	•	Source provider == MonteCarlo AND severity >= high
-	•	Label contains “freshness” AND dataset tier == “critical”
-	•	Status changes to TRIAGED and no investigation exists
-	•	SLA time-to-ack exceeded
-	•	Similarity cluster size >= N within 30 minutes
+@dataclass(frozen=True)
+class BranchesStarted(Event):
+    merge_step: str
+    branch_names: list[str]
 
-Rule actions (examples)
-	•	Spawn investigation with:
-	•	focus_prompt template referencing issue fields + source payload
-	•	profile = Safe/Standard/Deep
-	•	Update issue fields:
-	•	set status to IN_PROGRESS
-	•	auto-assign team or user
-	•	add labels
-	•	Notify:
-	•	dataset owners
-	•	slack channel
-	•	Escalate:
-	•	create pager event (optional integration)
-	•	Create/attach runbook suggestions
+@dataclass(frozen=True)
+class BranchCompleted(Event):
+    merge_step: str
+    branch_name: str
+    branch_context: Any
 
-Guardrails (must-have)
-	•	Rate limit by dataset and integration (to avoid runaway auto-runs)
-	•	Idempotency: rules should not spawn duplicate investigations for same issue state
-	•	Policy gating: deep runs require approval, sensitive datasets require explicit approval
-	•	Dry-run mode for rule testing
+@dataclass(frozen=True)
+class InputRequested(Event):
+    token: str
+
+@dataclass(frozen=True)
+class InputReceived(Event):
+    token: str
+    data: Any
+
+(You can add RunCompleted / RunFailed, but it’s also fine to derive those from state + last event.)
 
 ⸻
 
-2.5 Permissions and tenancy
+4) maestro/src/maestro/log.py (NEW)
 
-RBAC model
+A deterministic event log (in-memory first), plus a single allocator for seq.
 
-Permissions enforced on:
-	•	issue read/write
-	•	comment
-	•	run investigation
-	•	modify rules/integrations
-	•	view investigation results (separate from issue visibility if needed)
+# maestro/src/maestro/log.py
+from __future__ import annotations
+from dataclasses import dataclass, field
+from typing import Generic, TypeVar
 
-Dataset-level policy (recommended):
-	•	If a user cannot access a dataset, they cannot:
-	•	see issues tied to it (or see a redacted stub, depending on tenant preference)
-	•	receive notifications
-	•	run investigations
+from maestro.events import Event
 
-Auditability:
-	•	every mutation produces an issue_event with actor identity and diff payload
+T = TypeVar("T", bound=Event)
 
-⸻
+@dataclass
+class InMemoryEventLog:
+    _events: list[Event] = field(default_factory=list)
+    _next_seq: int = 1
 
-2.6 Notification system
+    def append(self, event: Event) -> Event:
+        # enforce monotonic seq assignment
+        object.__setattr__(event, "seq", self._next_seq)  # or create new event with seq
+        self._events.append(event)
+        self._next_seq += 1
+        return event
 
-Subscription types
-	•	Dataset owner auto-subscription (opt-out allowed)
-	•	Label subscriptions
-	•	Issue watchers
-	•	Assignee always notified
-	•	Team subscriptions (optional but useful)
+    def events(self) -> list[Event]:
+        return list(self._events)
 
-Notification triggers
-	•	Issue created (esp. integration-created)
-	•	Assignment changes
-	•	Status changes (BLOCKED / RESOLVED / CLOSED)
-	•	New comment
-	•	SLA thresholds (approaching breach, breached)
-	•	Investigation spawned/completed with summary snippet
-	•	Dedupe/merge events
-
-Delivery reliability
-	•	Outbox table + worker retries
-	•	Slack + email connectors as adapters
-	•	Per-tenant rate limiting
+Note: In “real” code, don’t mutate frozen dataclasses; instead create events without seq and stamp them in append() by returning a new event instance. Keep the snippet concise; implement correctly.
 
 ⸻
 
-2.7 Correlation + dedupe pipeline
+5) maestro/src/maestro/merge.py (NEW)
 
-Dedupe keys
-	•	For integrations: (provider, external_id) + provider_event_id
-	•	For generic sources: source_fingerprint computed from:
-	•	dataset id
-	•	monitor/check id
-	•	dimension (freshness/volume/schema)
-	•	time bucket
+Pure merge strategies (what handlers.py wanted to be).
 
-Similarity detection
-	•	Lightweight embedding or TF-IDF on title+description+source payload excerpt
-	•	Candidate duplicates shown in UI (user decides merge)
-	•	Automatic clustering creates a “canonical issue” optionally (configurable)
+# maestro/src/maestro/merge.py
+from __future__ import annotations
+from typing import Any, Protocol
 
-⸻
+class MergeStrategy(Protocol):
+    def merge(self, parent_context: Any, branch_contexts: dict[str, Any]) -> Any: ...
 
-2.8 Knowledge base (runbooks) and prevention loop
+class DefaultMergeStrategy:
+    def merge(self, parent_context: Any, branch_contexts: dict[str, Any]) -> Any:
+        # placeholder: last write wins; you’ll likely domain-specialize this
+        return {**(parent_context if isinstance(parent_context, dict) else {}), **branch_contexts}
 
-Runbook generation
-	•	From resolved issue + investigation synthesis + evidence links
-	•	Structured fields:
-	•	Symptoms
-	•	Root cause
-	•	Verification
-	•	Fix
-	•	Prevention
-
-Prevention suggestions
-	•	Suggest monitors/checks based on resolution patterns
-	•	Link suggested “monitor improvements” back to Jira/GE/MonteCarlo via integration action (optional)
 
 ⸻
 
-3) UI component contracts (frontend architecture)
+6) maestro/src/maestro/engine.py (NEW)
 
-Frontend module boundaries
-	•	pages/issues/* — list, create, detail
-	•	components/issues/* — IssueTable, IssueHeader, IssueSidebar, IssueTimeline, IssueComments, InvestigationRunsPanel, DuplicateCandidates
-	•	lib/api/issues/* — hooks + client
-	•	lib/api/rules/*, lib/api/integrations/*, lib/api/runbooks/*
-	•	pages/investigations/* remains separate
+The deterministic reducer. This replaces Workflow.tick + all handler state.
 
-Shared primitives
-	•	Badge, Card, Button, Table, Popover, Dialog, Tabs, Textarea
-	•	Popovers/menus must use real popover/dialog components (not absolute div hacks)
-	•	All “copied” and “saved” feedback uses toast, not alert()
+Key rule: Engine only changes state by applying Events.
 
-State management
-	•	Data fetching via your existing query layer
-	•	Real-time via SSE hooks:
-	•	useIssueStream(issueId)
-	•	useIssueListStream(savedViewKey)
-	•	Optimistic updates for status/labels/assignment with rollback on failure
+# maestro/src/maestro/engine.py
+from __future__ import annotations
+from dataclasses import replace
+from typing import Any, Generic, TypeVar
+
+from maestro.commands import Command, ExecuteStep, StartBranches, Stop, WaitForInput
+from maestro.events import (
+    BranchCompleted, BranchesStarted, Event, InputReceived, InputRequested,
+    RunStarted, StepCompleted, StepFailed,
+)
+from maestro.result import StepResult
+from maestro.signals import Signal
+from maestro.state import AwaitState, BranchState, RunState
+from maestro.merge import MergeStrategy
+
+ContextT = TypeVar("ContextT")
+
+class Engine(Generic[ContextT]):
+    def __init__(self, step_order: list[str], merge_strategy: MergeStrategy):
+        self._step_order = step_order
+        self._merge = merge_strategy
+
+    def init(self, run_id: str, context: ContextT, start_step: str) -> tuple[RunState[ContextT], Command, Event]:
+        state = RunState(run_id=run_id, status="running", context=context, current_step=start_step, seq=0)
+        ev = RunStarted(seq=0, start_step=start_step)
+        cmd = ExecuteStep(step_name=start_step)
+        return state, cmd, ev
+
+    def apply(self, state: RunState[ContextT], event: Event) -> tuple[RunState[ContextT], Command]:
+        # bump seq deterministically based on the event
+        state = replace(state, seq=event.seq)
+
+        if isinstance(event, RunStarted):
+            return state, ExecuteStep(step_name=event.start_step)
+
+        if isinstance(event, StepCompleted):
+            return self._on_step_completed(state, event.step_name, event.step_result)
+
+        if isinstance(event, StepFailed):
+            failed = replace(state, status="failed", current_step=None)
+            return failed, Stop(status="failed", error=event.error)
+
+        if isinstance(event, BranchesStarted):
+            bs = BranchState(
+                merge_step=event.merge_step,
+                expected=set(event.branch_names),
+                completed={},
+            )
+            return replace(state, pending_branches=bs), StartBranches(branch_request=None)  # runner already has request
+
+        if isinstance(event, BranchCompleted):
+            bs = state.pending_branches
+            if bs is None or bs.merge_step != event.merge_step:
+                return replace(state, status="failed", current_step=None), Stop(status="failed", error="unexpected branch result")
+
+            completed = dict(bs.completed)
+            completed[event.branch_name] = event.branch_context
+            bs2 = replace(bs, completed=completed)
+
+            if set(completed.keys()) == bs2.expected:
+                merged_ctx = self._merge.merge(state.context, completed)
+                # after merge, go to merge_step (or next after merge_step—your call; pick one and lock it down)
+                new_state = replace(state, context=merged_ctx, pending_branches=None, current_step=bs2.merge_step)
+                return new_state, ExecuteStep(step_name=bs2.merge_step)
+
+            return replace(state, pending_branches=bs2), WaitForInput(token="__internal_wait__")  # or a NoOp command
+
+        if isinstance(event, InputRequested):
+            paused = replace(state, status="paused", pending_await=AwaitState(token=event.token), current_step=None)
+            return paused, WaitForInput(token=event.token)
+
+        if isinstance(event, InputReceived):
+            if state.pending_await is None or state.pending_await.token != event.token:
+                return replace(state, status="failed", current_step=None), Stop(status="failed", error="unexpected input token")
+            # resume: decide what step to run next; simplest: store “resume_step” in AwaitState if needed
+            resumed = replace(state, status="running", pending_await=None, current_step=self._step_order[0])
+            return resumed, ExecuteStep(step_name=resumed.current_step)
+
+        return replace(state, status="failed", current_step=None), Stop(status="failed", error="unhandled event")
+
+    def _on_step_completed(self, state: RunState[ContextT], step_name: str, result: StepResult) -> tuple[RunState[ContextT], Command]:
+        # update context first
+        state = replace(state, context=result.context)
+
+        if result.signal == Signal.COMPLETE:
+            done = replace(state, status="completed", current_step=None)
+            return done, Stop(status="completed", final_context=result.context)
+
+        if result.signal == Signal.FAIL:
+            failed = replace(state, status="failed", current_step=None)
+            return failed, Stop(status="failed", error=result.error or "step failed")
+
+        if result.signal == Signal.AWAIT_USER:
+            token = result.await_token  # validated in StepResult
+            return state, WaitForInput(token=token)
+
+        if result.signal == Signal.BRANCH:
+            br = result.branch_request  # validated
+            names = [b.name for b in br.branches]
+            # engine moves into “pending branches”; runner will actually start them
+            bs = BranchState(merge_step=br.merge_step, expected=set(names), completed={})
+            new_state = replace(state, pending_branches=bs, current_step=None)
+            # runner will use the real BranchRequest; command includes it
+            return new_state, StartBranches(branch_request=br)
+
+        # CONTINUE
+        next_step = result.next_step or self._default_next(step_name)
+        if next_step is None:
+            done = replace(state, status="completed", current_step=None)
+            return done, Stop(status="completed", final_context=state.context)
+        return replace(state, current_step=next_step), ExecuteStep(step_name=next_step)
+
+    def _default_next(self, step_name: str) -> str | None:
+        try:
+            i = self._step_order.index(step_name)
+        except ValueError:
+            return None
+        return self._step_order[i + 1] if i + 1 < len(self._step_order) else None
+
+Two important “one-shot” decisions to lock down:
+	1.	When branches complete, does Engine run merge_step next, or “continue after merge_step”?
+Pick one and make it the invariant. (Above: it executes merge_step.)
+	2.	AWAIT_USER resume semantics: what step resumes?
+Either:
+
+	•	store resume_step in AwaitState, or
+	•	treat “input received” as an input into a known step (eg on_user_input)
+Pick one and lock it down.
 
 ⸻
 
-4) Operational concerns (one-shot readiness)
+7) maestro/src/maestro/runner.py (NEW)
 
-Performance
-	•	Pagination and indexed filtering for /issues
-	•	Avoid N+1 by denormalizing small display fields (assignee name, dataset display name) or joining efficiently
-	•	Background jobs for:
-	•	notifications
-	•	rule evaluation
-	•	similarity clustering
-	•	runbook suggestion indexing
+Executes Commands, turns outcomes into Events, appends to log, feeds Engine.
 
-Reliability
-	•	Outbox pattern for notifications and rule-triggered actions
-	•	Idempotency for webhooks and rule actions
-	•	Rate limiting on integration endpoints and auto-investigation spawning
+# maestro/src/maestro/runner.py
+from __future__ import annotations
+import asyncio
+from dataclasses import dataclass
+from typing import Any, Generic, TypeVar
 
-Observability
-	•	Structured logs on:
-	•	webhook ingest
-	•	rule evaluation decisions
-	•	investigation spawn
-	•	notification delivery
-	•	Metrics:
-	•	issues created/day by source
-	•	MTTA/MTTR
-	•	SLA breach counts
-	•	auto-run investigation counts + costs
-	•	rule fire rate + throttles
-	•	Tracing around “webhook → issue → rule → investigation → notification”
+from maestro.commands import Command, ExecuteStep, StartBranches, Stop, WaitForInput
+from maestro.events import (
+    BranchCompleted, InputRequested, StepCompleted, StepFailed,
+)
+from maestro.log import InMemoryEventLog
+from maestro.engine import Engine
+from maestro.result import BranchRequest
+from maestro.step import Step
+from maestro.state import RunState
 
-Security
-	•	Signed webhooks
-	•	API keys scoped by integration / tenant
-	•	Dataset-level access checks enforced before:
-	•	issue view
-	•	investigation spawn
-	•	notification subscription
+ContextT = TypeVar("ContextT")
+
+@dataclass(frozen=True)
+class RunOutcome(Generic[ContextT]):
+    status: str  # "completed" | "failed" | "paused"
+    context: ContextT | None = None
+    error: str | None = None
+    await_token: str | None = None
+    events: list[Any] | None = None
+
+class Runner(Generic[ContextT]):
+    def __init__(self, engine: Engine[ContextT], steps: dict[str, Step], log: InMemoryEventLog | None = None):
+        self.engine = engine
+        self.steps = steps
+        self.log = log or InMemoryEventLog()
+
+    async def run(self, run_id: str, context: ContextT, start_step: str) -> RunOutcome[ContextT]:
+        state, cmd, ev0 = self.engine.init(run_id, context, start_step)
+        # append RunStarted properly in real code
+        # state, cmd = self.engine.apply(state, self.log.append(ev0))
+
+        while True:
+            if isinstance(cmd, ExecuteStep):
+                step = self.steps[cmd.step_name]
+                try:
+                    if hasattr(step, "can_execute") and not await step.can_execute(state.context):
+                        # treat as failure or skip; choose and lock down
+                        raise RuntimeError(f"step cannot execute: {cmd.step_name}")
+                    result = await step.execute(state.context, cmd.input_data)
+                    ev = StepCompleted(seq=0, step_name=cmd.step_name, step_result=result)
+                    ev = self.log.append(ev)
+                    state, cmd = self.engine.apply(state, ev)
+                except Exception as e:
+                    ev = StepFailed(seq=0, step_name=cmd.step_name, error=str(e))
+                    ev = self.log.append(ev)
+                    state, cmd = self.engine.apply(state, ev)
+
+            elif isinstance(cmd, StartBranches):
+                br: BranchRequest = cmd.branch_request
+                # Spawn child runs. Decide: sequential or parallel. Parallel is usually correct.
+                async def run_branch(spec):
+                    # each branch gets a new run_id; you can embed parent
+                    child = Runner(self.engine, self.steps)  # or a child-engine; usually same definition
+                    outcome = await child.run(f"{state.run_id}:{spec.name}", state.context, br.child_start_step or start_step)
+                    if outcome.status != "completed":
+                        raise RuntimeError(f"branch failed: {spec.name} ({outcome.error})")
+                    return spec.name, outcome.context
+
+                results = await asyncio.gather(*(run_branch(spec) for spec in br.branches))
+                for name, ctx in results:
+                    ev = BranchCompleted(seq=0, merge_step=br.merge_step, branch_name=name, branch_context=ctx)
+                    ev = self.log.append(ev)
+                    state, cmd = self.engine.apply(state, ev)
+
+            elif isinstance(cmd, WaitForInput):
+                # Pause and return token to caller (API/UI can resume later)
+                token = cmd.token
+                ev = InputRequested(seq=0, token=token)
+                self.log.append(ev)
+                return RunOutcome(status="paused", await_token=token, events=self.log.events())
+
+            elif isinstance(cmd, Stop):
+                if cmd.status == "failed":
+                    return RunOutcome(status="failed", error=cmd.error, events=self.log.events())
+                return RunOutcome(status="completed", context=cmd.final_context, events=self.log.events())
+
+            else:
+                return RunOutcome(status="failed", error=f"unknown command: {cmd}", events=self.log.events())
+
+(Again: snippets are intentionally compact—implement correctly in real code.)
 
 ⸻
 
-5) “Upgrade to investigation” rules (explicit behavior)
+8) maestro/src/maestro/replay.py (NEW)
 
-Human upgrade
-	•	Always available if user has permission and dataset policies allow it
-	•	Can require context approval based on execution profile or dataset sensitivity
+Deterministically rebuild final state from events.
 
-Automatic upgrade (hooks/rules)
-	•	Rules can auto-run investigations when:
-	•	severity/priority thresholds met
-	•	SLA threatens breach
-	•	specific labels appear
-	•	integration payload matches known patterns
-	•	Auto-run is constrained by:
-	•	per-dataset and per-provider rate limits
-	•	idempotency (one run per issue per state transition unless configured)
-	•	approval gates (deep runs queued awaiting approval)
+# maestro/src/maestro/replay.py
+from __future__ import annotations
+from typing import Any, TypeVar, Generic
+
+from maestro.engine import Engine
+from maestro.state import RunState
+
+ContextT = TypeVar("ContextT")
+
+class Replayer(Generic[ContextT]):
+    def __init__(self, engine: Engine[ContextT]):
+        self.engine = engine
+
+    def replay(self, initial_state: RunState[ContextT], events: list[Any]) -> RunState[ContextT]:
+        state = initial_state
+        cmd = None
+        for ev in events:
+            state, cmd = self.engine.apply(state, ev)
+        return state
+
+Replay test harness invariant: if you run a real workflow and capture events, replay should end in the same terminal state + context.
+
+⸻
+
+What workflow.py becomes (public API preserved)
+
+Your current Workflow is good ergonomically; keep it.
+
+New responsibilities:
+	•	store steps: dict[name, Step]
+	•	store step_order: list[str]
+	•	run() uses Engine+Runner internally
+	•	optionally expose run_until_pause() and resume(await_token, data) later for APIs
+
+Minimal shape:
+
+# maestro/src/maestro/workflow.py
+from __future__ import annotations
+from dataclasses import dataclass
+from typing import Any, Generic, TypeVar
+
+from maestro.engine import Engine
+from maestro.merge import DefaultMergeStrategy
+from maestro.runner import Runner
+from maestro.step import Step
+
+ContextT = TypeVar("ContextT")
+
+@dataclass
+class Workflow(Generic[ContextT]):
+    steps: dict[str, Step]
+    step_order: list[str]
+    start_step: str | None = None
+
+    def add_step(self, name: str, step: Step, is_start: bool = False) -> None:
+        self.steps[name] = step
+        self.step_order.append(name)
+        if is_start or self.start_step is None:
+            self.start_step = name
+
+    async def run(self, context: ContextT) -> ContextT:
+        if not self.start_step:
+            raise ValueError("No start step defined")
+
+        engine = Engine(step_order=self.step_order, merge_strategy=DefaultMergeStrategy())
+        runner = Runner(engine=engine, steps=self.steps)
+        outcome = await runner.run(run_id="run_1", context=context, start_step=self.start_step)
+
+        if outcome.status == "completed":
+            return outcome.context  # type: ignore
+        raise RuntimeError(outcome.error or "workflow failed/paused")
+
+
+⸻
+
+What to do with handlers.py
+
+Remove BranchingSignalHandler entirely
+
+It becomes redundant because:
+	•	“pending branches” is now state, not hidden mutable handler data
+	•	“merge behavior” is now pure (merge.py)
+
+You can keep a thin compatibility layer if you want, but the clean move is:
+	•	delete handlers.py
+	•	replace with merge.py (+ maybe routing.py later if you add rich routing)
+
+⸻
+
+Tests to add (this is where you’ll feel the payoff)
+
+Add these under maestro/tests/:
+
+test_engine_determinism.py
+	•	apply same event sequence twice → identical state
+	•	out-of-order / unexpected events → fail deterministically
+
+test_replay_matches_live_run.py
+	•	run real workflow with deterministic steps
+	•	capture events
+	•	replay events → same terminal context
+
+test_branch_merge.py
+	•	step emits BRANCH with N branches
+	•	branches complete
+	•	merge produces correct context
+	•	merge_step executed next (or whatever invariant you chose)
+
+test_await_user_pause_resume.py
+	•	step emits AWAIT_USER with token
+	•	runner returns paused outcome
+	•	feed InputReceived event → resumes correctly
+
+⸻
+
+Summary of the “one-shot” decisions to lock down now
+
+If you lock these down, you’ll thank yourself later (and it makes Rust rewrite trivial):
+	1.	Branch semantics
+
+	•	BranchRequest defines: branches[], merge_step, optional child_start_step
+	•	Engine tracks completion in RunState.pending_branches
+	•	Merge strategy is pure and deterministic
+	•	Post-merge routing: execute merge_step next (or “continue after merge_step”) — pick one.
+
+	2.	Await-user semantics
+
+	•	AWAIT_USER carries an explicit await_token
+	•	Runner halts and returns paused(await_token=...)
+	•	Resume is implemented as an InputReceived(token, data) event
+	•	Engine uses a deterministic rule to pick the resume step (store resume_step in state, or route to a fixed “on_user_input” step)
+
+	3.	Event log is canonical
+
+	•	State can always be derived by replaying events
+	•	Engine never mutates state without an event

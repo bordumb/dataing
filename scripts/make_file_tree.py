@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
-"""
-Print a recursive file tree for selected top-level directories.
+"""Print a recursive file tree for selected top-level directories.
 
 Usage:
     python scripts/make_file_tree.py
@@ -8,8 +7,8 @@ Usage:
 All configuration is done at the top of this file.
 """
 
+from collections.abc import Iterable
 from pathlib import Path
-from typing import Iterable
 
 # ─────────────────────────────────────────────────────────────
 # CONFIGURATION

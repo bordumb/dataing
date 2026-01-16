@@ -1,11 +1,11 @@
 """Tests for APIAdapter base class."""
 
-import pytest
 from typing import Any
+
+import pytest
 
 from dataing.adapters.datasource.api.base import APIAdapter
 from dataing.adapters.datasource.types import (
-    AdapterCapabilities,
     Column,
     ConnectionTestResult,
     NormalizedType,

@@ -25,6 +25,7 @@ class WorkflowError(Exception):
     Attributes:
         context: The context at the time of failure.
         message: Error description.
+
     """
 
     def __init__(self, message: str, context: Any = None) -> None:
@@ -33,6 +34,7 @@ class WorkflowError(Exception):
         Args:
             message: Error description.
             context: The context at the time of failure.
+
         """
         super().__init__(message)
         self.context = context
@@ -50,6 +52,7 @@ class TickResult(Generic[ContextT]):
         branch_request: Branch specifications (if BRANCH signal).
         output: Any output from the step.
         error: Error message if the tick failed.
+
     """
 
     context: ContextT
@@ -79,6 +82,7 @@ class Workflow(Generic[ContextT]):
             start_step="init",
         )
         ```
+
     """
 
     def __init__(self, fail_on_cannot_execute: bool = True) -> None:
@@ -87,6 +91,7 @@ class Workflow(Generic[ContextT]):
         Args:
             fail_on_cannot_execute: If True, raise an error when can_execute()
                 returns False. If False, skip the step and continue.
+
         """
         self._steps: dict[str, Step[ContextT, Any, Any]] = {}
         self._step_order: list[str] = []
@@ -101,6 +106,7 @@ class Workflow(Generic[ContextT]):
 
         Args:
             handler: The signal handler to use.
+
         """
         self._signal_handler = handler
 
@@ -109,6 +115,7 @@ class Workflow(Generic[ContextT]):
 
         Returns:
             The current signal handler, or None if not set.
+
         """
         return self._signal_handler
 
@@ -123,6 +130,7 @@ class Workflow(Generic[ContextT]):
 
         Raises:
             ValueError: If a step with the same name is already registered.
+
         """
         if step.name in self._steps:
             raise ValueError(f"Step already registered: {step.name}")
@@ -137,6 +145,7 @@ class Workflow(Generic[ContextT]):
 
         Returns:
             The step, or None if not found.
+
         """
         return self._steps.get(name)
 
@@ -155,6 +164,7 @@ class Workflow(Generic[ContextT]):
 
         Returns:
             TickResult with the execution outcome.
+
         """
         step = self._steps.get(step_name)
         if step is None:
@@ -231,6 +241,7 @@ class Workflow(Generic[ContextT]):
         Raises:
             WorkflowError: If the workflow fails or hits max iterations.
             NotImplementedError: If BRANCH or MERGE signals are encountered.
+
         """
         context = initial_context
         current_step = start_step
@@ -276,12 +287,18 @@ class Workflow(Generic[ContextT]):
                     child_start_step = branch_result.next_step
                     merge_step = branch_request.merge_step if branch_request else None
 
+                    if child_start_step is None:
+                        raise WorkflowError(
+                            message="BRANCH signal requires next_step to be set",
+                            context=context,
+                        )
+
                     for branch_ctx in branch_result.branch_contexts:
                         # Execute child workflow from child_start_step
                         # passing branch data as input
                         child_context = branch_ctx.context
-                        child_step = child_start_step
-                        child_input = branch_ctx.data
+                        child_step: str = child_start_step
+                        child_input: Any = branch_ctx.data
 
                         # Run child branch until MERGE, COMPLETE, or FAIL
                         for _ in range(max_iterations):
@@ -307,11 +324,12 @@ class Workflow(Generic[ContextT]):
 
                             if child_tick.signal == Signal.CONTINUE:
                                 child_context = child_tick.context
-                                child_step = child_tick.next_step
+                                next_child_step = child_tick.next_step
                                 child_input = None
-                                if child_step is None or child_step == merge_step:
+                                if next_child_step is None or next_child_step == merge_step:
                                     # Reached merge step or end
                                     break
+                                child_step = next_child_step
 
                         # Register branch completion with handler
                         from maestro.handlers import BranchContext as HandlerBranchContext
@@ -327,7 +345,11 @@ class Workflow(Generic[ContextT]):
                             )
 
                     # After all branches complete, call handle_merge to get merged context
-                    if merge_step and hasattr(self._signal_handler, "handle_merge"):
+                    if (
+                        merge_step is not None
+                        and self._signal_handler is not None
+                        and hasattr(self._signal_handler, "handle_merge")
+                    ):
                         merge_result = await self._signal_handler.handle_merge(
                             context,
                             StepResult(
@@ -342,12 +364,20 @@ class Workflow(Generic[ContextT]):
                         current_input = None
                         continue
 
-                current_step = branch_result.next_step or self._get_next_step(current_step)
-                if current_step is None:
+                next_step = branch_result.next_step or self._get_next_step(current_step)
+                if next_step is None:
                     return context
+                current_step = next_step
                 continue
 
             if tick_result.signal == Signal.MERGE:
+                # Require signal handler for MERGE signal
+                if self._signal_handler is None:
+                    raise WorkflowError(
+                        message="MERGE signal requires a signal handler. "
+                        "Use set_signal_handler() to configure one.",
+                        context=tick_result.context,
+                    )
                 # Delegate to signal handler
                 merge_result = await self._signal_handler.handle_merge(
                     context,
@@ -360,9 +390,10 @@ class Workflow(Generic[ContextT]):
                 context = merge_result.context
                 if not merge_result.should_continue:
                     return context
-                current_step = merge_result.next_step or self._get_next_step(current_step)
-                if current_step is None:
+                merge_next = merge_result.next_step or self._get_next_step(current_step)
+                if merge_next is None:
                     return context
+                current_step = merge_next
                 continue
 
             if tick_result.signal == Signal.CONTINUE:
@@ -386,6 +417,7 @@ class Workflow(Generic[ContextT]):
 
         Returns:
             Name of the next step, or None if no more steps.
+
         """
         try:
             idx = self._step_order.index(current_step)

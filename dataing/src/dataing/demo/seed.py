@@ -203,7 +203,7 @@ if __name__ == "__main__":
         # Get database URL from env
         db_url = os.getenv(
             "DATADR_DB_URL",
-            "postgresql+asyncpg://dataing:dataing@localhost:5432/dataing_demo",  # pragma: allowlist secret
+            "postgresql+asyncpg://dataing:dataing@localhost:5432/dataing_demo",  # noqa: E501 pragma: allowlist secret
         )
 
         engine = create_async_engine(db_url)

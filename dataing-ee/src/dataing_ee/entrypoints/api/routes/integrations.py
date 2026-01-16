@@ -279,10 +279,7 @@ async def create_integration(
         )
 
     logger.info(
-        "integration_created",
-        integration_id=str(row["id"]),
-        provider=body.provider,
-        tenant_id=str(auth.tenant_id),
+        f"Integration created: id={row['id']}, provider={body.provider}, tenant={auth.tenant_id}"
     )
 
     return IntegrationSecretResponse(
@@ -403,11 +400,7 @@ async def delete_integration(
 
     await db.execute("DELETE FROM integrations WHERE id = $1", integration_id)
 
-    logger.info(
-        "integration_deleted",
-        integration_id=str(integration_id),
-        tenant_id=str(auth.tenant_id),
-    )
+    logger.info(f"Integration deleted: id={integration_id}, tenant={auth.tenant_id}")
 
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
@@ -438,11 +431,7 @@ async def regenerate_signing_secret(
         integration_id,
     )
 
-    logger.info(
-        "integration_secret_regenerated",
-        integration_id=str(integration_id),
-        tenant_id=str(auth.tenant_id),
-    )
+    logger.info(f"Integration secret regenerated: id={integration_id}, tenant={auth.tenant_id}")
 
     return IntegrationSecretResponse(
         id=integration_id,
@@ -509,9 +498,7 @@ async def receive_provider_webhook(
             body, signature, integration["signing_secret"], provider
         ):
             logger.warning(
-                "webhook_signature_invalid",
-                integration_id=str(integration_id),
-                provider=provider,
+                f"Webhook signature invalid: integration={integration_id}, provider={provider}"
             )
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
@@ -547,9 +534,7 @@ async def receive_provider_webhook(
 
     if existing_event:
         logger.info(
-            "webhook_deduplicated",
-            integration_id=str(integration_id),
-            idempotency_key=idempotency_key,
+            f"Webhook deduplicated: integration={integration_id}, key={idempotency_key}"
         )
         return {
             "status": "deduplicated",
@@ -572,6 +557,11 @@ async def receive_provider_webhook(
         IntegrationEventStatus.PENDING,
     )
 
+    if not event_row:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to create integration event",
+        )
     event_id = event_row["id"]
 
     # Get field mappings
@@ -632,6 +622,11 @@ async def receive_provider_webhook(
         idempotency_key,
     )
 
+    if not issue_row:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to create issue from webhook",
+        )
     issue_id = issue_row["id"]
 
     # Add labels if present
@@ -681,12 +676,8 @@ async def receive_provider_webhook(
     )
 
     logger.info(
-        "webhook_processed",
-        integration_id=str(integration_id),
-        event_id=str(event_id),
-        issue_id=str(issue_id),
-        issue_number=issue_number,
-        provider=provider,
+        f"Webhook processed: integration={integration_id}, event={event_id}, "
+        f"issue={issue_id}, number={issue_number}, provider={provider}"
     )
 
     return {
@@ -729,14 +720,18 @@ def _extract_idempotency_key(payload: dict[str, Any], provider: str, request: Re
 def _extract_event_type(payload: dict[str, Any], provider: str) -> str:
     """Extract event type from provider payload."""
     if provider == IntegrationProvider.JIRA:
-        return payload.get("webhookEvent", "unknown")
+        event_type: str = payload.get("webhookEvent", "unknown")
+        return event_type
     elif provider == IntegrationProvider.LINEAR:
-        return payload.get("action", "unknown")
+        action: str = payload.get("action", "unknown")
+        return action
     elif provider == IntegrationProvider.PAGERDUTY:
         messages = payload.get("messages", [])
         if messages:
-            return messages[0].get("event", "unknown")
-    return payload.get("type", payload.get("event_type", "unknown"))
+            event: str = messages[0].get("event", "unknown")
+            return event
+    fallback: str = payload.get("type", payload.get("event_type", "unknown"))
+    return fallback
 
 
 def _map_payload_to_issue(
@@ -801,33 +796,39 @@ def _apply_transform(value: Any, transform: str) -> Any:
 
 def _get_default_title(payload: dict[str, Any], provider: str) -> str | None:
     """Get default title from provider payload."""
+    result: str | None = None
     if provider == IntegrationProvider.JIRA:
         issue = payload.get("issue", {})
         fields = issue.get("fields", {})
-        return fields.get("summary")
+        result = fields.get("summary")
     elif provider == IntegrationProvider.LINEAR:
         data = payload.get("data", {})
-        return data.get("title")
+        result = data.get("title")
     elif provider == IntegrationProvider.PAGERDUTY:
         messages = payload.get("messages", [])
         if messages:
             incident = messages[0].get("incident", {})
-            return incident.get("title")
-    return payload.get("title", payload.get("summary", payload.get("name")))
+            result = incident.get("title")
+    else:
+        result = payload.get("title", payload.get("summary", payload.get("name")))
+    return result
 
 
 def _get_default_description(payload: dict[str, Any], provider: str) -> str | None:
     """Get default description from provider payload."""
+    result: str | None = None
     if provider == IntegrationProvider.JIRA:
         issue = payload.get("issue", {})
         fields = issue.get("fields", {})
-        return fields.get("description")
+        result = fields.get("description")
     elif provider == IntegrationProvider.LINEAR:
         data = payload.get("data", {})
-        return data.get("description")
+        result = data.get("description")
     elif provider == IntegrationProvider.PAGERDUTY:
         messages = payload.get("messages", [])
         if messages:
             incident = messages[0].get("incident", {})
-            return incident.get("description")
-    return payload.get("description", payload.get("body"))
+            result = incident.get("description")
+    else:
+        result = payload.get("description", payload.get("body"))
+    return result

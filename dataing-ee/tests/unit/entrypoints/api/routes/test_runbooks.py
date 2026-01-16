@@ -1,13 +1,12 @@
 """Unit tests for Runbooks API routes (EE)."""
 
-import pytest
-from uuid import uuid4
 
+import pytest
 from dataing_ee.entrypoints.api.routes.runbooks import (
-    RunbookCreate,
-    RunbookUpdate,
     GenerateRunbookRequest,
     LinkFeedbackRequest,
+    RunbookCreate,
+    RunbookUpdate,
 )
 
 

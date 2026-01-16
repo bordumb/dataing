@@ -22,6 +22,7 @@ class BranchSpec:
     Attributes:
         name: Unique identifier for this branch within the parent.
         data: Arbitrary data to pass to the child workflow.
+
     """
 
     name: str
@@ -42,6 +43,7 @@ class BranchRequest:
             If None, children start at the workflow's default start step.
         branch_type: Optional string categorizing the type of branch.
             Domains can use this for tracking/routing (e.g., "hypothesis", "user").
+
     """
 
     branches: list[BranchSpec]
@@ -70,6 +72,7 @@ class StepResult(Generic[ContextT, OutputT]):
         next_step: Explicit next step name (when signal=CONTINUE).
             If None, the workflow uses its default routing.
         branch_request: Branch specifications (required when signal=BRANCH).
+
     """
 
     context: ContextT

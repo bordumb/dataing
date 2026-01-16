@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import datetime
 
 import pytest
 
@@ -116,7 +116,9 @@ def sample_hypothesis() -> Hypothesis:
         title="Upstream data source failure",
         category=HypothesisCategory.UPSTREAM_DEPENDENCY,
         reasoning="The row count drop may be caused by a failure in the upstream ETL.",
-        suggested_query="SELECT COUNT(*) FROM public.orders WHERE created_at >= '2024-01-15' LIMIT 100",
+        suggested_query=(
+            "SELECT COUNT(*) FROM public.orders WHERE created_at >= '2024-01-15' LIMIT 100"
+        ),
     )
 
 

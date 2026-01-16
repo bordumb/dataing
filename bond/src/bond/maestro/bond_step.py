@@ -9,9 +9,8 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from typing import Any, Generic, TypeVar
 
-from maestro import Signal, StepResult
-
 from bond.agent import BondAgent, StreamHandlers
+from maestro import Signal, StepResult
 
 ContextT = TypeVar("ContextT")
 InputT = TypeVar("InputT")
@@ -31,7 +30,9 @@ class BondStep(ABC, Generic[ContextT, InputT, OutputT, ResponseT]):
     satisfy the maestro.Step protocol.
 
     Example:
-        class GenerateHypothesesBondStep(BondStep[InvestigationContext, None, list[Hypothesis], str]):
+        class GenerateHypothesesBondStep(
+            BondStep[InvestigationContext, None, list[Hypothesis], str]
+        ):
             step_type = StepType.GENERATE_HYPOTHESES
 
             def create_agent(self, context):
@@ -164,7 +165,7 @@ class BondStep(ABC, Generic[ContextT, InputT, OutputT, ResponseT]):
         try:
             response = await agent.ask(prompt, handlers=self._handlers)
             return self.map_response(response, context)
-        except Exception as e:
+        except Exception:
             # Return FAIL signal on agent errors
             return StepResult(
                 context=context,

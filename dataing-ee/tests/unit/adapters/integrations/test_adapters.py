@@ -6,7 +6,6 @@ import json
 import time
 
 import pytest
-
 from dataing_ee.adapters.integrations import (
     AdapterRegistry,
     GreatExpectationsAdapter,

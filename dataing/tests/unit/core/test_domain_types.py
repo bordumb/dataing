@@ -2,9 +2,51 @@
 
 from __future__ import annotations
 
-import pytest
+from dataclasses import dataclass
 
-from dataing.core.domain_types import Finding
+import pytest
+from pydantic import ValidationError
+
+from dataing.adapters.datasource.types import QueryResult
+from dataing.core.domain_types import (
+    AnomalyAlert,
+    ApprovalDecision,
+    ApprovalDecisionType,
+    ApprovalRequest,
+    ApprovalRequestType,
+    Evidence,
+    Finding,
+    Hypothesis,
+    HypothesisCategory,
+    LineageContext,
+)
+
+
+@dataclass(frozen=True)
+class TableSchema:
+    """Legacy TableSchema for compatibility."""
+
+    table_name: str
+    columns: tuple[str, ...]
+    column_types: dict[str, str] = None
+
+
+@dataclass(frozen=True)
+class SchemaContext:
+    """Legacy SchemaContext for compatibility."""
+
+    tables: tuple[TableSchema, ...]
+
+    def get_table(self, name: str) -> TableSchema | None:
+        """Get table by name."""
+        for t in self.tables:
+            if t.table_name.lower() == name.lower():
+                return t
+        return None
+
+    def to_prompt_string(self) -> str:
+        """Format for prompt."""
+        return "AVAILABLE TABLES"
 
 
 class TestAnomalyAlert:
@@ -38,7 +80,7 @@ class TestAnomalyAlert:
             severity="high",
         )
 
-        with pytest.raises(Exception):  # Pydantic raises ValidationError
+        with pytest.raises(ValidationError):  # Pydantic raises ValidationError
             alert.dataset_id = "modified"
 
     def test_alert_with_metadata(self) -> None:
@@ -144,7 +186,7 @@ class TestTableSchema:
             columns=("id",),
         )
 
-        with pytest.raises(Exception):
+        with pytest.raises(AttributeError):
             schema.table_name = "modified"
 
 
@@ -283,7 +325,7 @@ class TestApprovalRequest:
 
     def test_create_approval_request(self) -> None:
         """Test creating an approval request."""
-        from datetime import datetime, timezone
+        from datetime import datetime
 
         request = ApprovalRequest(
             investigation_id="inv-001",
@@ -307,7 +349,7 @@ class TestApprovalDecision:
 
     def test_create_approval_decision(self) -> None:
         """Test creating an approval decision."""
-        from datetime import datetime, timezone
+        from datetime import datetime
 
         decision = ApprovalDecision(
             request_id="req-001",

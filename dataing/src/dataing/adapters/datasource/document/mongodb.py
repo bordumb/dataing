@@ -44,7 +44,7 @@ MONGODB_CONFIG_SCHEMA = ConfigSchema(
             type="secret",
             required=True,
             group="connection",
-            placeholder="mongodb+srv://user:pass@cluster.mongodb.net/db",  # pragma: allowlist secret
+            placeholder="mongodb+srv://user:pass@cluster.mongodb.net/db",  # noqa: E501 pragma: allowlist secret
             description="Full MongoDB connection URI",
         ),
         ConfigField(

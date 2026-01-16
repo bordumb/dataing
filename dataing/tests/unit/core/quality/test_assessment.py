@@ -1,6 +1,7 @@
 """Tests for quality assessment types."""
 
 import pytest
+
 from dataing.core.quality.assessment import (
     HypothesisSetAssessment,
     QualityAssessment,

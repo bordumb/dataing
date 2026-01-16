@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import datetime
 
 import pytest
+from pydantic import ValidationError
 
 from dataing.core.exceptions import CircuitBreakerTripped
 from dataing.core.state import Event
@@ -38,7 +39,7 @@ class TestCircuitBreakerConfig:
         """Test that config is immutable."""
         config = CircuitBreakerConfig()
 
-        with pytest.raises(Exception):
+        with pytest.raises(ValidationError):
             config.max_total_queries = 100
 
 

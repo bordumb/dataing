@@ -3,7 +3,6 @@
 from dataclasses import FrozenInstanceError
 
 import pytest
-from maestro import Signal
 
 from dataing.core.investigation.entities import InvestigationContext
 from dataing.core.investigation.steps.protocol import BranchRequest, BranchSpec, StepResult
@@ -11,6 +10,7 @@ from dataing.core.investigation.values import (
     BranchType,
     StepType,
 )
+from maestro import Signal
 
 
 @pytest.fixture

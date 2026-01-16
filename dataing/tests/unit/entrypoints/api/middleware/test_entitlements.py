@@ -4,13 +4,14 @@ from unittest.mock import AsyncMock, MagicMock
 from uuid import UUID
 
 import pytest
+from fastapi import HTTPException, Request
+
 from dataing.core.entitlements import Feature
 from dataing.entrypoints.api.middleware.auth import ApiKeyContext
 from dataing.entrypoints.api.middleware.entitlements import (
     require_feature,
     require_under_limit,
 )
-from fastapi import HTTPException, Request
 
 
 def create_mock_request(adapter: AsyncMock) -> MagicMock:

@@ -5,8 +5,6 @@ from __future__ import annotations
 import os
 from unittest.mock import AsyncMock, MagicMock, patch
 
-import pytest
-
 from dataing.core.queue import (
     INVESTIGATIONS_QUEUE,
     enqueue_investigation,
@@ -69,13 +67,6 @@ class TestGetRedisSettings:
 
     def test_default_values(self) -> None:
         """Test default Redis settings when no env vars set."""
-        env = {
-            "REDIS_URL": "",
-            "REDIS_HOST": "",
-            "REDIS_PORT": "",
-            "REDIS_PASSWORD": "",
-            "REDIS_DB": "",
-        }
         # Clear Redis-related env vars
         with patch.dict(os.environ, {}, clear=False):
             # Remove any existing Redis env vars

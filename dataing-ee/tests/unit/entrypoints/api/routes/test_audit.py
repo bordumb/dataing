@@ -6,10 +6,11 @@ from uuid import uuid4
 
 import pytest
 from dataing_ee.adapters.audit.types import AuditLogEntry
-from dataing.entrypoints.api.middleware.auth import ApiKeyContext
 from dataing_ee.entrypoints.api.routes.audit import get_audit_repo, router
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
+
+from dataing.entrypoints.api.middleware.auth import ApiKeyContext
 
 
 @pytest.fixture

@@ -3,7 +3,6 @@
 from unittest.mock import AsyncMock
 
 import pytest
-from maestro import Signal
 
 from dataing.core.investigation.entities import InvestigationContext
 from dataing.core.investigation.steps.classify_intent import (
@@ -11,6 +10,7 @@ from dataing.core.investigation.steps.classify_intent import (
     RefinementIntent,
 )
 from dataing.core.investigation.values import StepType
+from maestro import Signal
 
 
 @pytest.fixture
@@ -231,7 +231,7 @@ class TestClassifyIntentStepErrorHandling:
         """Execute handles empty message gracefully."""
         step = ClassifyIntentStep(llm=mock_llm)
 
-        result = await step.execute(sample_context, {"user_message": ""})
+        await step.execute(sample_context, {"user_message": ""})
 
         # Should still call LLM with empty message
         mock_llm.classify_intent.assert_called_once()
@@ -245,7 +245,7 @@ class TestClassifyIntentStepErrorHandling:
         """Execute handles missing user_message in input_data."""
         step = ClassifyIntentStep(llm=mock_llm)
 
-        result = await step.execute(sample_context, {})
+        await step.execute(sample_context, {})
 
         # Should still call LLM with empty message
         mock_llm.classify_intent.assert_called_once()
@@ -261,7 +261,7 @@ class TestClassifyIntentStepErrorHandling:
         """Execute handles None input_data."""
         step = ClassifyIntentStep(llm=mock_llm)
 
-        result = await step.execute(sample_context, None)
+        await step.execute(sample_context, None)
 
         # Should still call LLM with empty message
         mock_llm.classify_intent.assert_called_once()
@@ -314,7 +314,7 @@ class TestClassifyIntentStepClarifyResponse:
         )
         step = ClassifyIntentStep(llm=mock_llm)
 
-        result = await step.execute(sample_context, {"user_message": "What does that mean?"})
+        await step.execute(sample_context, {"user_message": "What does that mean?"})
 
         # Should generate clarification
         mock_llm.generate_clarification.assert_called_once()

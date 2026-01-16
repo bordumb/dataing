@@ -1,9 +1,7 @@
 """Unit tests for automation rule evaluator."""
 
 import pytest
-
 from dataing_ee.core.automation.evaluator import RuleEvaluator
-from dataing_ee.models.automation import ConditionOperator
 
 
 class TestRuleEvaluator:

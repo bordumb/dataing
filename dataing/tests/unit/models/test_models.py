@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from dataing.models.base import BaseModel
-
 
 class TestTenantModel:
     """Tests for Tenant model."""

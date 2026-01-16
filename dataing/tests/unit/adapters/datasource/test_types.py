@@ -1,6 +1,5 @@
 """Tests for data source type definitions."""
 
-import pytest
 from dataing.adapters.datasource.types import (
     AdapterCapabilities,
     Catalog,
@@ -14,11 +13,9 @@ from dataing.adapters.datasource.types import (
     QueryLanguage,
     QueryResult,
     Schema,
-    SchemaFilter,
     SchemaResponse,
     SourceCategory,
     SourceType,
-    SourceTypeDefinition,
     Table,
 )
 

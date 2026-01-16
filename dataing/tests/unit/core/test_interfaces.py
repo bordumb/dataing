@@ -2,15 +2,13 @@
 
 from __future__ import annotations
 
-from typing import Protocol, runtime_checkable
-
-import pytest
+from typing import Protocol
 
 from dataing.core.interfaces import (
     ContextEngine,
     DatabaseAdapter,
-    LLMClient,
     LineageClient,
+    LLMClient,
 )
 
 

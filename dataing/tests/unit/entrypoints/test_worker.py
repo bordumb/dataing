@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import asyncio
-import signal
 from unittest.mock import AsyncMock, MagicMock, patch
 from uuid import uuid4
 

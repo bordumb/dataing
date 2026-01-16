@@ -5,6 +5,7 @@ from unittest.mock import AsyncMock, MagicMock
 from uuid import uuid4
 
 import pytest
+
 from dataing.adapters.auth.postgres import PostgresAuthRepository
 from dataing.core.auth import AuthRepository, OrgRole
 

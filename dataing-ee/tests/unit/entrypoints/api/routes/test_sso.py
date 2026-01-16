@@ -5,10 +5,6 @@ from unittest.mock import AsyncMock, MagicMock, patch
 from uuid import uuid4
 
 import pytest
-from fastapi import FastAPI
-from fastapi.testclient import TestClient
-
-from dataing.core.auth.types import OrgRole, User
 from dataing_ee.adapters.sso import (
     InvalidSignatureError,
     OIDCTokens,
@@ -32,6 +28,10 @@ from dataing_ee.entrypoints.api.routes.sso import (
     get_sso_state_repository,
     router,
 )
+from fastapi import FastAPI
+from fastapi.testclient import TestClient
+
+from dataing.core.auth.types import OrgRole, User
 
 
 @pytest.fixture

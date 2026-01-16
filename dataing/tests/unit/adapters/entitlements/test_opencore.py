@@ -1,6 +1,7 @@
 """Tests for OpenCore entitlements adapter."""
 
 import pytest
+
 from dataing.adapters.entitlements.opencore import OpenCoreAdapter
 from dataing.core.entitlements import EntitlementsAdapter, Feature, Plan
 

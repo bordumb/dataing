@@ -6,7 +6,7 @@ transform context and produce signals for workflow control flow.
 
 from __future__ import annotations
 
-from typing import Generic, Protocol, TypeVar, runtime_checkable
+from typing import Protocol, TypeVar, runtime_checkable
 
 from maestro.result import StepResult
 
@@ -60,6 +60,7 @@ class Step(Protocol[ContextT, InputT, OutputT]):
         step: Step[MyContext, None, int] = DoubleStep()
         assert isinstance(step, Step)  # True at runtime
         ```
+
     """
 
     @property
@@ -93,6 +94,7 @@ class Step(Protocol[ContextT, InputT, OutputT]):
             - Signal indicating what the workflow should do next
             - Optional step output
             - Optional routing hints
+
         """
         ...
 
@@ -107,5 +109,6 @@ class Step(Protocol[ContextT, InputT, OutputT]):
 
         Returns:
             True if the step can execute, False otherwise.
+
         """
         ...

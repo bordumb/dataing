@@ -41,7 +41,8 @@ def get_encryption_key(*, allow_generation: bool = False) -> bytes:
         else:
             raise ValueError(
                 "ENCRYPTION_KEY or DATADR_ENCRYPTION_KEY environment variable must be set. "
-                "Generate one with: python -c 'from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())'"
+                "Generate one with: python -c 'from cryptography.fernet import Fernet; "
+                "print(Fernet.generate_key().decode())'"
             )
 
     return key.encode() if isinstance(key, str) else key

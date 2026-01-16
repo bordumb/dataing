@@ -2,16 +2,30 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from unittest.mock import AsyncMock
 
 import pytest
 
 from dataing.adapters.context.engine import DefaultContextEngine
-from dataing.core.domain_types import (
-    InvestigationContext,
-)
-
+from dataing.core.domain_types import AnomalyAlert, LineageContext
 from dataing.core.exceptions import SchemaDiscoveryError
+
+
+@dataclass(frozen=True)
+class TableSchema:
+    """Legacy TableSchema for compatibility."""
+
+    table_name: str
+    columns: tuple[str, ...]
+    column_types: dict[str, str] = None
+
+
+@dataclass(frozen=True)
+class SchemaContext:
+    """Legacy SchemaContext for compatibility."""
+
+    tables: tuple[TableSchema, ...]
 
 
 class TestDefaultContextEngine:

@@ -34,6 +34,7 @@ class BranchContext(Generic[ContextT]):
         name: Unique name for this branch.
         context: The context for this branch.
         data: Additional data passed from BranchSpec.
+
     """
 
     name: str
@@ -51,6 +52,7 @@ class SignalResult(Generic[ContextT]):
         next_step: Next step name (for CONTINUE).
         branch_contexts: Child branch contexts (for BRANCH).
         error: Error message (for FAIL).
+
     """
 
     context: ContextT
@@ -81,6 +83,7 @@ class MergeStrategy(Protocol[ContextT]):
 
         Returns:
             Merged context to continue with.
+
         """
         ...
 
@@ -112,6 +115,7 @@ class SignalHandler(ABC, Generic[ContextT]):
 
         Returns:
             SignalResult indicating how to proceed.
+
         """
         if signal == Signal.CONTINUE:
             return await self.handle_continue(context, result, workflow)
@@ -144,6 +148,7 @@ class SignalHandler(ABC, Generic[ContextT]):
 
         Returns:
             SignalResult with next_step set.
+
         """
         ...
 
@@ -163,6 +168,7 @@ class SignalHandler(ABC, Generic[ContextT]):
 
         Returns:
             SignalResult with should_continue=False.
+
         """
         ...
 
@@ -182,6 +188,7 @@ class SignalHandler(ABC, Generic[ContextT]):
 
         Returns:
             SignalResult with should_continue=False and error set.
+
         """
         ...
 
@@ -201,6 +208,7 @@ class SignalHandler(ABC, Generic[ContextT]):
 
         Returns:
             SignalResult with branch_contexts set.
+
         """
         ...
 
@@ -220,6 +228,7 @@ class SignalHandler(ABC, Generic[ContextT]):
 
         Returns:
             SignalResult with merged context.
+
         """
         ...
 
@@ -241,6 +250,7 @@ class SignalHandler(ABC, Generic[ContextT]):
 
         Returns:
             SignalResult with should_continue=False (workflow pauses).
+
         """
         ...
 
@@ -341,6 +351,7 @@ class BranchingSignalHandler(DefaultSignalHandler[ContextT]):
     Attributes:
         merge_strategy: Strategy for merging branch contexts.
         pending_branches: Branches awaiting completion for merge.
+
     """
 
     def __init__(self, merge_strategy: MergeStrategy[ContextT]) -> None:
@@ -348,6 +359,7 @@ class BranchingSignalHandler(DefaultSignalHandler[ContextT]):
 
         Args:
             merge_strategy: Strategy for merging branch contexts.
+
         """
         self._merge_strategy = merge_strategy
         self._pending_branches: dict[str, list[BranchContext[ContextT]]] = {}
@@ -408,6 +420,7 @@ class BranchingSignalHandler(DefaultSignalHandler[ContextT]):
 
         Returns:
             True if all branches are complete and ready for merge.
+
         """
         if merge_step not in self._pending_branches:
             self._pending_branches[merge_step] = []

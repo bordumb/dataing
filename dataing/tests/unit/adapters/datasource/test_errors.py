@@ -1,27 +1,26 @@
 """Tests for adapter error classes."""
 
-import pytest
 from dataing.adapters.datasource.errors import (
-    ErrorCode,
+    AccessDeniedError,
     AdapterError,
+    AuthenticationFailedError,
+    ColumnNotFoundError,
     ConnectionFailedError,
     ConnectionTimeoutError,
-    AuthenticationFailedError,
-    SSLError,
-    AccessDeniedError,
+    ErrorCode,
     InsufficientPermissionsError,
-    QuerySyntaxError,
-    QueryTimeoutError,
-    QueryCancelledError,
-    ResourceExhaustedError,
-    RateLimitedError,
-    TableNotFoundError,
-    ColumnNotFoundError,
-    SchemaFetchFailedError,
+    InternalError,
     InvalidConfigError,
     MissingRequiredFieldError,
     NotImplementedError,
-    InternalError,
+    QueryCancelledError,
+    QuerySyntaxError,
+    QueryTimeoutError,
+    RateLimitedError,
+    ResourceExhaustedError,
+    SchemaFetchFailedError,
+    SSLError,
+    TableNotFoundError,
 )
 
 

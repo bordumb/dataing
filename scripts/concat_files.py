@@ -1,13 +1,12 @@
 #!/usr/bin/env python3
-"""
-Generate a high-signal file tree and concatenate selected source/config files.
+"""Generate a high-signal file tree and concatenate selected source/config files.
 
 Run:
     python scripts/make_file_tree.py
 """
 
+from collections.abc import Iterable
 from pathlib import Path
-from typing import Iterable
 
 # ─────────────────────────────────────────────────────────────
 # CONFIGURATION
@@ -16,9 +15,9 @@ from typing import Iterable
 ROOT_DIR = Path(".")
 
 SEARCH_PREFIXES = [
-    "dataing",
+    # "dataing",
     # "frontend",
-    "bond",
+    # "bond",
     "maestro",
     # "docs/feedback",
 ]

@@ -12,9 +12,8 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from typing import Generic, TypeVar
 
-from maestro import BranchRequest, BranchSpec, Signal, StepResult
-
 from dataing.core.investigation.entities import InvestigationContext
+from maestro import BranchRequest, BranchSpec, Signal, StepResult
 
 # Re-export maestro types for backward compatibility
 __all__ = [

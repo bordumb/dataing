@@ -1,6 +1,5 @@
 """Tests for the SQL lineage parser."""
 
-import pytest
 
 from dataing.adapters.lineage.parsers.sql_parser import SQLLineageParser
 

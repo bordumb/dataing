@@ -114,7 +114,7 @@ def create_step_registry(
 
     # Build registry with all steps
     registry = StepRegistry()
-    registry.register(GatherContextStep(context_adapter))
+    registry.register(GatherContextStep(context_adapter, data_adapter))  # type: ignore[arg-type]
     registry.register(CheckPatternsStep(pattern_repository))
     registry.register(GenerateHypothesesStep(hypothesis_llm))
     registry.register(GenerateQueryStep(query_llm))

@@ -64,7 +64,10 @@ class NotificationRead(BaseModel):
     read_at: Mapped[datetime] = mapped_column(default=datetime.utcnow)
 
     # Override timestamps from BaseModel - not needed for this join table
-    created_at: Mapped[datetime | None] = mapped_column(default=None)
+    # (type ignore needed because BaseModel defines non-nullable timestamps)
+    created_at: Mapped[datetime | None] = mapped_column(  # type: ignore[assignment]
+        default=None
+    )
     updated_at: Mapped[datetime | None] = mapped_column(default=None)
 
     # Relationships

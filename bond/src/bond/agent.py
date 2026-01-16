@@ -3,7 +3,7 @@
 import json
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any, Generic, TypeVar
+from typing import Any, Generic, TypeVar
 
 from pydantic_ai import Agent
 from pydantic_ai.messages import (
@@ -108,7 +108,8 @@ class BondAgent(Generic[T, DepsT]):
     model: str | Model
     toolsets: Sequence[Sequence[Tool[DepsT]]] = field(default_factory=list)
     deps: DepsT | None = None
-    output_type: type[T] = str  # type: ignore[assignment]
+    # output_type can be a type, PromptedOutput, or other pydantic_ai output specs
+    output_type: type[T] | Any = str
     max_retries: int = 3
 
     _agent: Agent[DepsT, T] | None = field(default=None, init=False, repr=False)
@@ -132,8 +133,10 @@ class BondAgent(Generic[T, DepsT]):
             "tools": all_tools,
             "output_type": self.output_type,
             "retries": self.max_retries,
-            "deps_type": type(self.deps) if self.deps else None,
         }
+        # Only set deps_type when deps is provided
+        if self.deps is not None:
+            agent_kwargs["deps_type"] = type(self.deps)
         if self.instructions:
             agent_kwargs["system_prompt"] = self.instructions
 
@@ -161,24 +164,27 @@ class BondAgent(Generic[T, DepsT]):
 
         active_agent = self._agent
         if dynamic_instructions and dynamic_instructions != self.instructions:
-            active_agent = Agent(
-                model=self.model,
-                system_prompt=dynamic_instructions,
-                tools=self._tools,
-                output_type=self.output_type,
-                retries=self.max_retries,
-                deps_type=type(self.deps) if self.deps else None,
-            )
+            dynamic_kwargs: dict[str, Any] = {
+                "model": self.model,
+                "system_prompt": dynamic_instructions,
+                "tools": self._tools,
+                "output_type": self.output_type,
+                "retries": self.max_retries,
+            }
+            if self.deps is not None:
+                dynamic_kwargs["deps_type"] = type(self.deps)
+            active_agent = Agent(**dynamic_kwargs)
 
         if handlers:
             # Track tool call IDs to names for result lookup
             tool_id_to_name: dict[str, str] = {}
 
-            async with active_agent.run_stream(
-                prompt,
-                deps=self.deps,
-                message_history=self._history,
-            ) as result:
+            # Build run_stream kwargs - only include deps if provided
+            stream_kwargs: dict[str, Any] = {"message_history": self._history}
+            if self.deps is not None:
+                stream_kwargs["deps"] = self.deps
+
+            async with active_agent.run_stream(prompt, **stream_kwargs) as result:
                 async for event in result.stream():
                     # --- 1. BLOCK LIFECYCLE (Open/Close) ---
                     if isinstance(event, PartStartEvent):
@@ -240,21 +246,23 @@ class BondAgent(Generic[T, DepsT]):
                 # Stream finished
                 self._history = list(result.all_messages())
 
+                # Get output - use get_output() which is the awaitable method
+                output: T = await result.get_output()
+
                 if handlers.on_complete:
-                    handlers.on_complete(result.output)
+                    handlers.on_complete(output)
 
-                data: T = result.output
-                return data
+                return output
 
-        # Non-streaming fallback
-        result = await active_agent.run(
-            prompt,
-            deps=self.deps,
-            message_history=self._history,
-        )
-        self._history = list(result.all_messages())
-        non_stream_data: T = result.output
-        return non_stream_data
+        # Non-streaming fallback - build kwargs similarly
+        run_kwargs: dict[str, Any] = {"message_history": self._history}
+        if self.deps is not None:
+            run_kwargs["deps"] = self.deps
+
+        run_result = await active_agent.run(prompt, **run_kwargs)
+        self._history = list(run_result.all_messages())
+        result_output: T = run_result.output
+        return result_output
 
     def get_message_history(self) -> list[ModelMessage]:
         """Get current conversation history."""

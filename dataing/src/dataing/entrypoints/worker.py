@@ -219,11 +219,21 @@ async def run_investigation(
             "error": "Snapshot not found",
         }
 
-    # Build the workflow
+    # Build the workflow - adapter must be available for query execution
+    if adapter is None:
+        logger.error("No adapter available for investigation workflow")
+        await db.update_job_status(job_id, status="failed")
+        return {
+            "status": "failed",
+            "investigation_id": investigation_id,
+            "worker_id": WORKER_ID,
+            "error": "No data source adapter configured",
+        }
+
     workflow = build_investigation_workflow(
         context_engine=context_engine,
         llm=agent_client,
-        database=adapter,
+        database=adapter,  # type: ignore[arg-type]
         pattern_repository=pattern_repository,
     )
 

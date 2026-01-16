@@ -2,8 +2,6 @@
 
 from datetime import UTC, datetime, timedelta
 
-import pytest
-
 from dataing.core.sla import (
     IssueSLAContext,
     SLAStatus,

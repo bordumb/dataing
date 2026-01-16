@@ -2,12 +2,9 @@
 
 from __future__ import annotations
 
-import json
-import uuid
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
-
 from dataing_ee.entrypoints.api.middleware.audit import AuditMiddleware
 
 
@@ -174,7 +171,7 @@ class TestAuditMiddleware:
         response = MagicMock()
         call_next = AsyncMock(return_value=response)
 
-        result = await middleware.dispatch(request, call_next)
+        await middleware.dispatch(request, call_next)
 
         # Should not set request_id for health checks
         call_next.assert_called_once()
@@ -191,7 +188,7 @@ class TestAuditMiddleware:
         response = MagicMock()
         call_next = AsyncMock(return_value=response)
 
-        result = await middleware.dispatch(request, call_next)
+        await middleware.dispatch(request, call_next)
 
         call_next.assert_called_once()
 
@@ -207,7 +204,7 @@ class TestAuditMiddleware:
         response.headers = {}
         call_next = AsyncMock(return_value=response)
 
-        result = await middleware.dispatch(request, call_next)
+        await middleware.dispatch(request, call_next)
 
         call_next.assert_called_once()
 
@@ -227,6 +224,6 @@ class TestAuditMiddleware:
         response.status_code = 200
         call_next = AsyncMock(return_value=response)
 
-        result = await middleware.dispatch(request, call_next)
+        await middleware.dispatch(request, call_next)
 
         request.body.assert_called_once()

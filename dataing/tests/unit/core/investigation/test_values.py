@@ -1,7 +1,6 @@
 """Tests for investigation value objects."""
 
 import pytest
-from maestro import Signal
 from pydantic import ValidationError
 
 from dataing.core.investigation.values import (
@@ -10,6 +9,7 @@ from dataing.core.investigation.values import (
     StepType,
     VersionId,
 )
+from maestro import Signal
 
 
 class TestVersionId:

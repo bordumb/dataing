@@ -1,11 +1,11 @@
 """Tests for DocumentAdapter base class."""
 
-import pytest
 from typing import Any
+
+import pytest
 
 from dataing.adapters.datasource.document.base import DocumentAdapter
 from dataing.adapters.datasource.types import (
-    AdapterCapabilities,
     ConnectionTestResult,
     QueryLanguage,
     QueryResult,

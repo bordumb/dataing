@@ -1,6 +1,5 @@
 """Tests for lineage types."""
 
-import pytest
 
 from dataing.adapters.lineage.types import (
     Dataset,

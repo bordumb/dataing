@@ -15,6 +15,11 @@ from dataing.adapters.datasource.document.dynamodb import DynamoDBAdapter
 
 # Document/NoSQL adapters
 from dataing.adapters.datasource.document.mongodb import MongoDBAdapter
+from dataing.adapters.datasource.encryption import (
+    decrypt_config,
+    encrypt_config,
+    get_encryption_key,
+)
 from dataing.adapters.datasource.errors import (
     AccessDeniedError,
     AdapterError,
@@ -27,11 +32,6 @@ from dataing.adapters.datasource.errors import (
     RateLimitedError,
     SchemaFetchFailedError,
     TableNotFoundError,
-)
-from dataing.adapters.datasource.encryption import (
-    decrypt_config,
-    encrypt_config,
-    get_encryption_key,
 )
 from dataing.adapters.datasource.factory import create_adapter_for_datasource
 from dataing.adapters.datasource.filesystem.gcs import GCSAdapter

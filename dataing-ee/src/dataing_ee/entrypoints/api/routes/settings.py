@@ -393,7 +393,8 @@ async def revoke_api_key(
 
 def get_app_db_from_request(request: Request) -> AppDatabase:
     """Get AppDatabase from app state."""
-    return request.app.state.app_db
+    app_db: AppDatabase = request.app.state.app_db
+    return app_db
 
 
 @asynccontextmanager

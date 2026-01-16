@@ -7,18 +7,32 @@ request/response flow.
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timezone
-from unittest.mock import AsyncMock, MagicMock, patch
+from dataclasses import dataclass
+from datetime import datetime
+from unittest.mock import AsyncMock
 
 import pytest
 from fastapi.testclient import TestClient
 
 from dataing.adapters.datasource.types import QueryResult
 from dataing.core.domain_types import Finding
-
-# SchemaContext and TableSchema also seem missing from domain_types.
-# Let's check where they are.
 from dataing.entrypoints.api.app import app
+
+
+@dataclass(frozen=True)
+class TableSchema:
+    """Legacy TableSchema for compatibility."""
+
+    table_name: str
+    columns: tuple[str, ...]
+    column_types: dict[str, str] = None
+
+
+@dataclass(frozen=True)
+class SchemaContext:
+    """Legacy SchemaContext for compatibility."""
+
+    tables: tuple[TableSchema, ...]
 
 
 class TestAPIEndToEnd:

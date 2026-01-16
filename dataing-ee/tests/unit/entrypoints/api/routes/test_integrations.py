@@ -6,13 +6,10 @@ from datetime import UTC, datetime
 from uuid import uuid4
 
 import pytest
-
 from dataing_ee.entrypoints.api.routes.integrations import (
     FieldMappingCreate,
     IntegrationCreate,
-    IntegrationListResponse,
     IntegrationResponse,
-    IntegrationSecretResponse,
     IntegrationUpdate,
     _apply_transform,
     _extract_event_type,
@@ -329,7 +326,10 @@ class TestGetDefaultDescription:
     def test_jira_description(self) -> None:
         """Test Jira description extraction."""
         payload = {"issue": {"fields": {"description": "Detailed bug description"}}}
-        assert _get_default_description(payload, IntegrationProvider.JIRA) == "Detailed bug description"
+        assert (
+            _get_default_description(payload, IntegrationProvider.JIRA)
+            == "Detailed bug description"
+        )
 
     def test_linear_description(self) -> None:
         """Test Linear description extraction."""
@@ -339,4 +339,6 @@ class TestGetDefaultDescription:
     def test_generic_description(self) -> None:
         """Test generic description extraction."""
         payload = {"description": "Generic description"}
-        assert _get_default_description(payload, IntegrationProvider.CUSTOM) == "Generic description"
+        assert (
+            _get_default_description(payload, IntegrationProvider.CUSTOM) == "Generic description"
+        )

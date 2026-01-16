@@ -6,9 +6,9 @@ from unittest.mock import patch
 import pytest
 from cryptography.fernet import Fernet
 from dataing_ee.core.sso.encryption import (
+    SSO_SECRET_KEY_ENV,
     EncryptionError,
     MissingEncryptionKeyError,
-    SSO_SECRET_KEY_ENV,
     clear_key_cache,
     decrypt_secret,
     encrypt_secret,
@@ -168,7 +168,7 @@ class TestCaching:
     def test_cache_clear_reloads_key(self, test_key: str) -> None:
         """Clearing cache reloads the key."""
         with patch.dict(os.environ, {SSO_SECRET_KEY_ENV: test_key}):
-            encrypted = encrypt_secret("test")
+            encrypt_secret("test")
 
             # Clear cache and set invalid key
             clear_key_cache()

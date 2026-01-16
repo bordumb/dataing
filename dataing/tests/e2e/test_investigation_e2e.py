@@ -13,6 +13,7 @@ from __future__ import annotations
 import asyncio
 import os
 from collections.abc import AsyncGenerator
+from typing import Any
 
 import pytest
 
@@ -281,7 +282,11 @@ class TestFullInvestigationFlow:
 
         checkpoints: list[tuple[str, str]] = []
 
-        async def on_checkpoint(ctx: InvestigationContext, next_step: str | None, step_cursor: dict[str, Any] | None = None) -> None:
+        async def on_checkpoint(
+            ctx: InvestigationContext,
+            next_step: str | None,
+            step_cursor: dict[str, Any] | None = None,
+        ) -> None:
             step_name = next_step or "COMPLETE"
             checkpoints.append((step_name, str(len(ctx.evidence))))
             print(f"  Checkpoint: step={step_name}, evidence_count={len(ctx.evidence)}")
@@ -330,7 +335,11 @@ class TestFullInvestigationFlow:
 
         steps_sequence: list[str] = []
 
-        async def on_checkpoint(ctx: InvestigationContext, next_step: str | None, step_cursor: dict[str, Any] | None = None) -> None:
+        async def on_checkpoint(
+            ctx: InvestigationContext,
+            next_step: str | None,
+            step_cursor: dict[str, Any] | None = None,
+        ) -> None:
             step_name = next_step or "complete"
             steps_sequence.append(step_name)
 
@@ -352,14 +361,19 @@ class TestFullInvestigationFlow:
         assert StepType.CHECK_PATTERNS.value in steps_sequence
         assert StepType.GENERATE_HYPOTHESES.value in steps_sequence
 
-        # Verify loop behavior: it should go to generate_query multiple times if there are multiple hypotheses
+        # Verify loop behavior: it should go to generate_query multiple times
+        # if there are multiple hypotheses
         gen_query_count = steps_sequence.count(StepType.GENERATE_QUERY.value)
         assert gen_query_count > 0
 
         # Critical check: synthesize should only appear once at the end (or near end)
         # It should NOT appear between hypothesis loops.
-        synthesize_indices = [i for i, s in enumerate(steps_sequence) if s == StepType.SYNTHESIZE.value]
-        assert len(synthesize_indices) == 1, f"Synthesize should only appear once, got: {steps_sequence}"
+        synthesize_indices = [
+            i for i, s in enumerate(steps_sequence) if s == StepType.SYNTHESIZE.value
+        ]
+        assert len(synthesize_indices) == 1, (
+            f"Synthesize should only appear once, got: {steps_sequence}"
+        )
 
         # Ensure 'complete' is the last step
         assert steps_sequence[-1] == "complete"
@@ -450,7 +464,11 @@ class TestShutdownAndCancellation:
 
         checkpoints: list[str] = []
 
-        async def on_checkpoint(ctx: InvestigationContext, next_step: str | None, step_cursor: dict[str, Any] | None = None) -> None:
+        async def on_checkpoint(
+            ctx: InvestigationContext,
+            next_step: str | None,
+            step_cursor: dict[str, Any] | None = None,
+        ) -> None:
             checkpoints.append(next_step or "COMPLETE")
 
         # Set shutdown signal BEFORE starting
@@ -481,7 +499,8 @@ class TestDatabaseIntegration:
         """Test that DuckDB executes queries correctly."""
         # Test NULL count query (what the investigation would run)
         result = await duckdb_adapter.execute_query(
-            "SELECT COUNT(*) as total, COUNT(*) FILTER (WHERE user_id IS NULL) as null_count FROM events"
+            "SELECT COUNT(*) as total, COUNT(*) FILTER (WHERE user_id IS NULL) "
+            "as null_count FROM events"
         )
 
         assert len(result.rows) == 1

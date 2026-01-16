@@ -1,12 +1,11 @@
 """Tests for SQLAdapter base class."""
 
-import pytest
 from typing import Any
-from unittest.mock import AsyncMock, patch, MagicMock
+
+import pytest
 
 from dataing.adapters.datasource.sql.base import SQLAdapter
 from dataing.adapters.datasource.types import (
-    AdapterCapabilities,
     ConnectionTestResult,
     QueryLanguage,
     QueryResult,
@@ -210,7 +209,6 @@ class TestSQLAdapterCountRows:
         await adapter.connect()
 
         captured_sql = []
-        original_execute = adapter.execute_query
 
         async def capture_execute(sql, **kwargs):
             captured_sql.append(sql)
@@ -354,7 +352,6 @@ class TestSQLAdapterGetColumnStats:
         await adapter.connect()
 
         captured_sql = []
-        original_execute = adapter.execute_query
 
         async def capture_execute(sql, **kwargs):
             captured_sql.append(sql)

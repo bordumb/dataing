@@ -2,8 +2,10 @@
 
 import os
 import tempfile
+
 import pytest
-from dataing.adapters.datasource import DuckDBAdapter, SourceType, NormalizedType
+
+from dataing.adapters.datasource import DuckDBAdapter, SourceType
 
 
 @pytest.fixture

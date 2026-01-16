@@ -1,6 +1,7 @@
 """Tests for password recovery adapters."""
 
 import pytest
+
 from dataing.adapters.auth.recovery_admin import AdminContactRecoveryAdapter
 from dataing.adapters.auth.recovery_console import ConsoleRecoveryAdapter
 from dataing.core.auth.recovery import PasswordRecoveryAdapter

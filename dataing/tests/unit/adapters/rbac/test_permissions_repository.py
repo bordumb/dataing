@@ -5,6 +5,7 @@ from unittest.mock import AsyncMock, MagicMock
 from uuid import UUID, uuid4
 
 import pytest
+
 from dataing.adapters.rbac import PermissionsRepository
 from dataing.core.rbac import Permission
 

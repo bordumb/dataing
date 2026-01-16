@@ -54,6 +54,3 @@ target-version = "py311"
 [tool.ruff.lint]
 select = ["E", "F", "I", "D", "UP", "B"]
 ignore = ["D100", "D104"]
-
-[tool.ruff.lint.pydocstring-convention]
-convention = "google"

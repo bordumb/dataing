@@ -1,7 +1,7 @@
 {
-  "assignee": null,
+  "assignee": "bordumbb@gmail.com",
   "claim_note": "",
-  "claimed_at": null,
+  "claimed_at": "2026-01-16T04:34:01.064783Z",
   "created_at": "2026-01-16T02:27:31.110066Z",
   "depends_on": [
     "fn-14.4"
@@ -10,7 +10,7 @@
   "id": "fn-14.10",
   "priority": null,
   "spec_path": ".flow/tasks/fn-14.10.md",
-  "status": "todo",
+  "status": "in_progress",
   "title": "Automation rules engine (EE)",
-  "updated_at": "2026-01-16T02:29:59.079150Z"
+  "updated_at": "2026-01-16T04:34:01.064997Z"
 }

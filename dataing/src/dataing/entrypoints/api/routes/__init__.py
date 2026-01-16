@@ -16,6 +16,7 @@ from dataing.entrypoints.api.routes.investigation_feedback import (
     router as investigation_feedback_router,
 )
 from dataing.entrypoints.api.routes.investigations import router as investigations_router
+from dataing.entrypoints.api.routes.issues import router as issues_router
 from dataing.entrypoints.api.routes.knowledge_comments import (
     router as knowledge_comments_router,
 )
@@ -44,6 +45,7 @@ api_router = APIRouter()
 # Include all route modules
 api_router.include_router(auth_router, prefix="/auth")  # Auth routes (no API key required)
 api_router.include_router(investigations_router)  # Unified investigation API
+api_router.include_router(issues_router)  # Issues CRUD API
 api_router.include_router(datasources_router)
 api_router.include_router(datasources_v2_router, prefix="/v2")  # New unified adapter API
 api_router.include_router(datasets_router)

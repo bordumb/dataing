@@ -3,11 +3,16 @@
 This module provides a simpler, in-memory workflow engine for running
 investigations. It uses maestro.Workflow for step orchestration without
 the persistence complexity of the legacy orchestrator.
+
+Note: This module is being migrated to the new event-sourced maestro Engine/Runner
+architecture. Some components (InvestigationSignalHandler, _run_branches_sequentially)
+are deprecated and will be removed once the Engine supports BRANCH signals natively.
 """
 
 from __future__ import annotations
 
 import asyncio
+import warnings
 from collections.abc import Awaitable, Callable
 from typing import TYPE_CHECKING, Any
 
@@ -138,10 +143,21 @@ class InvestigationSignalHandler(BranchingSignalHandler[InvestigationContext]):
     """Signal handler for investigation workflows.
 
     Extends BranchingSignalHandler with investigation-specific behavior.
+
+    .. deprecated::
+        Signal handlers are deprecated in the new event-sourced Engine/Runner
+        architecture. The Engine handles signals internally. This class is kept
+        for backward compatibility with tick()-based execution.
     """
 
     def __init__(self) -> None:
         """Initialize with investigation merge strategy."""
+        warnings.warn(
+            "InvestigationSignalHandler is deprecated. "
+            "The Engine handles signals internally in the new architecture.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         super().__init__(InvestigationMergeStrategy())
 
     async def handle_await_user(
@@ -173,8 +189,12 @@ def build_investigation_workflow(
 ) -> Workflow[InvestigationContext]:
     """Build a complete investigation workflow.
 
-    Creates a maestro.Workflow configured with all investigation steps
-    and appropriate signal handlers for branching/merging.
+    Creates a maestro.Workflow configured with all investigation steps.
+    The new event-sourced Engine handles signals internally.
+
+    Note: BRANCH signals are not yet fully supported in the new architecture.
+    For workflows that use branching, use run_with_checkpointing() which
+    handles branches via tick() for backward compatibility.
 
     Args:
         context_engine: Engine for gathering schema/lineage context.
@@ -187,6 +207,9 @@ def build_investigation_workflow(
     Returns:
         Configured Workflow ready for execution.
     """
+    # Note: merge_strategy is not passed here because the current Engine
+    # doesn't support BRANCH signals. The legacy tick()-based execution
+    # in run_with_checkpointing handles branching with InvestigationMergeStrategy.
     workflow: Workflow[InvestigationContext] = Workflow()
 
     # Create LLM adapters that wrap AgentClient with step-compatible interfaces
@@ -206,8 +229,10 @@ def build_investigation_workflow(
     workflow.add_step(SynthesizeStep(synthesis_llm, confidence_threshold))
     workflow.add_step(CounterAnalyzeStep())
 
-    # Configure signal handler for branching and merging
-    workflow.set_signal_handler(InvestigationSignalHandler())
+    # Note: Signal handlers are deprecated in the new architecture.
+    # The Engine handles signals internally. BRANCH support via
+    # run_with_checkpointing() uses tick() which still works with
+    # the legacy signal handler approach.
 
     return workflow
 
@@ -232,7 +257,7 @@ async def run_investigation(
         WorkflowError: If workflow fails or times out.
     """
     return await workflow.run(
-        initial_context=initial_context,
+        context=initial_context,
         start_step=StepType.GATHER_CONTEXT.value,
         max_iterations=max_iterations,
     )
@@ -359,6 +384,11 @@ async def _run_branches_sequentially(
     This is a simplified implementation that runs branches one at a time
     rather than in parallel. For production, consider parallel execution.
 
+    .. deprecated::
+        This function is deprecated and will be removed once the maestro
+        Engine/Runner architecture supports BRANCH signals natively.
+        The Runner will handle parallel branch execution internally.
+
     Args:
         workflow: The workflow to use for branch execution.
         parent_context: Context before branching.
@@ -370,6 +400,12 @@ async def _run_branches_sequentially(
     Returns:
         Merged context with evidence from all branches.
     """
+    warnings.warn(
+        "_run_branches_sequentially is deprecated and will be removed "
+        "once the Engine supports BRANCH signals natively.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
     merged_evidence: list[dict[str, Any]] = list(parent_context.evidence)
     total_queries = parent_context.total_queries_executed
     child_start = branch_request.child_start_step

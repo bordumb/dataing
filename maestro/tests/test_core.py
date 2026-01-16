@@ -135,6 +135,26 @@ class TestStepResult:
         with pytest.raises(ValueError, match="BRANCH signal requires branch_request"):
             StepResult(context=ctx, signal=Signal.BRANCH)
 
+    def test_step_result_with_await_token(self) -> None:
+        """StepResult can include await_token for AWAIT_USER signal."""
+        ctx = self.DummyContext(value=1)
+        result: StepResult[TestStepResult.DummyContext, str] = StepResult(
+            context=ctx,
+            signal=Signal.AWAIT_USER,
+            output="Please provide input",
+            await_token="user_clarification",
+        )
+        assert result.await_token == "user_clarification"
+        assert result.signal == Signal.AWAIT_USER
+
+    def test_step_result_await_token_default_none(self) -> None:
+        """StepResult await_token defaults to None."""
+        ctx = self.DummyContext(value=1)
+        result: StepResult[TestStepResult.DummyContext, None] = StepResult(
+            context=ctx, signal=Signal.CONTINUE
+        )
+        assert result.await_token is None
+
     def test_step_result_is_frozen(self) -> None:
         """StepResult is immutable."""
         ctx = self.DummyContext(value=1)

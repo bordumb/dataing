@@ -8,10 +8,24 @@
     "fn-15.11"
   ],
   "epic": "fn-15",
+  "evidence": {
+    "checks": [
+      "uv run ruff check maestro/src/maestro/__init__.py - passed",
+      "uv run mypy maestro/src/maestro/__init__.py --strict - passed"
+    ],
+    "commits": [
+      "ba66e6da feat(maestro): update __init__.py exports with new event-sourced architecture"
+    ],
+    "tests": [
+      "uv run pytest maestro/tests/ - 68 tests passed",
+      "All new imports verified working",
+      "Legacy imports still work for backward compatibility"
+    ]
+  },
   "id": "fn-15.12",
   "priority": null,
   "spec_path": ".flow/tasks/fn-15.12.md",
-  "status": "in_progress",
+  "status": "done",
   "title": "Update __init__.py exports and deprecate old APIs",
-  "updated_at": "2026-01-16T18:25:09.186426Z"
+  "updated_at": "2026-01-16T18:27:23.773610Z"
 }

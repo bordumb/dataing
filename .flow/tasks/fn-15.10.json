@@ -8,10 +8,22 @@
     "fn-15.7"
   ],
   "epic": "fn-15",
+  "evidence": {
+    "checks": [
+      "uv run ruff check maestro/src/maestro/ - passed",
+      "uv run mypy maestro/src/maestro/ --strict - passed"
+    ],
+    "commits": [
+      "99dde836 feat(maestro): refactor workflow.py as facade over Engine+Runner"
+    ],
+    "tests": [
+      "uv run pytest maestro/tests/ - 68 tests passed"
+    ]
+  },
   "id": "fn-15.10",
   "priority": null,
   "spec_path": ".flow/tasks/fn-15.10.md",
-  "status": "in_progress",
+  "status": "done",
   "title": "Refactor workflow.py as facade over Engine+Runner",
-  "updated_at": "2026-01-16T17:55:51.748499Z"
+  "updated_at": "2026-01-16T18:18:44.358565Z"
 }

@@ -1,7 +1,7 @@
 {
-  "assignee": null,
+  "assignee": "bordumbb@gmail.com",
   "claim_note": "",
-  "claimed_at": null,
+  "claimed_at": "2026-01-16T18:27:49.133092Z",
   "created_at": "2026-01-16T17:29:10.099752Z",
   "depends_on": [
     "fn-15.6",
@@ -9,10 +9,23 @@
     "fn-15.8"
   ],
   "epic": "fn-15",
+  "evidence": {
+    "checks": [
+      "uv run ruff check maestro/tests/test_*.py - passed",
+      "uv run pytest maestro/tests/ - 111 tests passed"
+    ],
+    "commits": [],
+    "tests": [
+      "test_engine_determinism.py - 9 tests passing",
+      "test_replay_matches_live_run.py - 7 tests passing",
+      "test_branch_merge.py - 14 tests passing",
+      "test_await_user_pause_resume.py - 13 tests passing"
+    ]
+  },
   "id": "fn-15.13",
   "priority": null,
   "spec_path": ".flow/tasks/fn-15.13.md",
-  "status": "todo",
+  "status": "done",
   "title": "Add determinism and replay tests",
-  "updated_at": "2026-01-16T17:29:34.315901Z"
+  "updated_at": "2026-01-16T18:35:29.992800Z"
 }

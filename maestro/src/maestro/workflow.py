@@ -1,15 +1,22 @@
-"""Workflow engine for step-based execution.
+"""Workflow facade over Engine+Runner for step-based execution.
 
-The Workflow class orchestrates step execution in a tick loop,
-handling signals to determine the next action.
+The Workflow class provides a high-level API for running workflows,
+delegating to the Engine and Runner for actual execution.
 """
 
 from __future__ import annotations
 
+import uuid
+import warnings
+from collections.abc import AsyncGenerator
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Generic, TypeVar
 
+from maestro.engine import Engine
+from maestro.events import Event
+from maestro.merge import DefaultMergeStrategy, MergeStrategy
 from maestro.result import BranchRequest, StepResult
+from maestro.runner import Runner, RunOutcome
 from maestro.signals import Signal
 from maestro.step import Step
 
@@ -45,6 +52,9 @@ class WorkflowError(Exception):
 class TickResult(Generic[ContextT]):
     """Result of a single tick (step execution).
 
+    .. deprecated::
+        Use run() or run_with_events() instead of tick().
+
     Attributes:
         context: The (possibly updated) context after the step.
         signal: The signal returned by the step.
@@ -64,54 +74,90 @@ class TickResult(Generic[ContextT]):
 
 
 class Workflow(Generic[ContextT]):
-    """Generic workflow engine.
+    """High-level workflow facade over Engine+Runner.
 
-    Executes steps in a tick loop, handling signals to determine
-    the next action. Steps are registered by name and can be
-    routed explicitly via StepResult.next_step.
+    The Workflow class provides a simple API for building and running
+    workflows. It delegates to Engine for state transitions and Runner
+    for step execution.
 
     Example:
         ```python
         workflow = Workflow[MyContext]()
-        workflow.add_step(InitStep())
+        workflow.add_step(InitStep(), is_start=True)
         workflow.add_step(ProcessStep())
         workflow.add_step(FinalizeStep())
 
-        result = await workflow.run(
-            initial_context=MyContext(...),
-            start_step="init",
-        )
+        # Run to completion
+        result = await workflow.run(MyContext(...))
+
+        # Or with events
+        outcome, events = await workflow.run_with_events(MyContext(...))
+
+        # Or streaming
+        async for event in workflow.run_streaming(MyContext(...)):
+            print(event)
         ```
 
     """
 
-    def __init__(self, fail_on_cannot_execute: bool = True) -> None:
+    def __init__(
+        self,
+        fail_on_cannot_execute: bool = True,
+        merge_strategy: MergeStrategy | None = None,
+    ) -> None:
         """Initialize workflow.
 
         Args:
             fail_on_cannot_execute: If True, raise an error when can_execute()
                 returns False. If False, skip the step and continue.
+            merge_strategy: Strategy for merging branch contexts.
+                Defaults to DefaultMergeStrategy.
 
         """
         self._steps: dict[str, Step[ContextT, Any, Any]] = {}
         self._step_order: list[str] = []
+        self._start_step: str | None = None
         self._fail_on_cannot_execute = fail_on_cannot_execute
+        self._merge_strategy: MergeStrategy = merge_strategy or DefaultMergeStrategy()
         self._signal_handler: SignalHandler[ContextT] | None = None
+
+    @property
+    def steps(self) -> dict[str, Step[ContextT, Any, Any]]:
+        """Get the registered steps."""
+        return self._steps
+
+    @property
+    def step_order(self) -> list[str]:
+        """Get the step execution order."""
+        return self._step_order
+
+    @property
+    def start_step(self) -> str | None:
+        """Get the configured start step."""
+        return self._start_step
 
     def set_signal_handler(self, handler: SignalHandler[ContextT]) -> None:
         """Set a custom signal handler.
 
-        The signal handler processes signals returned by steps
-        to determine how the workflow should proceed.
+        .. deprecated::
+            Signal handlers are deprecated. The Engine handles signals internally.
 
         Args:
             handler: The signal handler to use.
 
         """
+        warnings.warn(
+            "Signal handlers are deprecated. The Engine handles signals internally.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         self._signal_handler = handler
 
     def get_signal_handler(self) -> SignalHandler[ContextT] | None:
         """Get the current signal handler.
+
+        .. deprecated::
+            Signal handlers are deprecated.
 
         Returns:
             The current signal handler, or None if not set.
@@ -119,7 +165,9 @@ class Workflow(Generic[ContextT]):
         """
         return self._signal_handler
 
-    def add_step(self, step: Step[ContextT, Any, Any]) -> None:
+    def add_step(
+        self, step: Step[ContextT, Any, Any], is_start: bool = False
+    ) -> None:
         """Register a step with the workflow.
 
         Steps are executed in the order they are added unless
@@ -127,6 +175,7 @@ class Workflow(Generic[ContextT]):
 
         Args:
             step: The step to register.
+            is_start: If True, mark this as the default start step.
 
         Raises:
             ValueError: If a step with the same name is already registered.
@@ -136,6 +185,8 @@ class Workflow(Generic[ContextT]):
             raise ValueError(f"Step already registered: {step.name}")
         self._steps[step.name] = step
         self._step_order.append(step.name)
+        if is_start or self._start_step is None:
+            self._start_step = step.name
 
     def get_step(self, name: str) -> Step[ContextT, Any, Any] | None:
         """Get a step by name.
@@ -149,6 +200,148 @@ class Workflow(Generic[ContextT]):
         """
         return self._steps.get(name)
 
+    async def run(
+        self,
+        context: ContextT,
+        start_step: str | None = None,
+        *,
+        initial_context: ContextT | None = None,
+        input_data: Any = None,
+        max_iterations: int = 1000,
+    ) -> ContextT:
+        """Execute the workflow until completion or failure.
+
+        This method is backward compatible with the original API.
+        It delegates to run_with_events() internally.
+
+        Args:
+            context: The initial workflow context (preferred).
+            start_step: Name of the first step to execute.
+            initial_context: Alias for context (deprecated).
+            input_data: Optional input data for the first step.
+            max_iterations: Maximum number of iterations before failing.
+
+        Returns:
+            The final context after COMPLETE signal.
+
+        Raises:
+            WorkflowError: If the workflow fails or pauses.
+
+        """
+        # Handle legacy parameter name
+        ctx = initial_context if initial_context is not None else context
+        start = start_step or self._start_step
+
+        if start is None:
+            raise WorkflowError("No start step configured", context=ctx)
+
+        outcome, _ = await self.run_with_events(
+            ctx, start, input_data=input_data, max_iterations=max_iterations
+        )
+
+        if outcome.status == "completed":
+            if outcome.context is not None:
+                return outcome.context
+            return ctx
+
+        if outcome.status == "failed":
+            raise WorkflowError(
+                message=outcome.error or "Workflow failed",
+                context=outcome.context or ctx,
+            )
+
+        # Paused
+        raise WorkflowError(
+            message=f"Workflow paused on await_token: {outcome.await_token}",
+            context=outcome.context or ctx,
+        )
+
+    async def run_with_events(
+        self,
+        context: ContextT,
+        start_step: str | None = None,
+        *,
+        input_data: Any = None,
+        max_iterations: int = 1000,
+    ) -> tuple[RunOutcome[ContextT], list[Event]]:
+        """Run workflow and return outcome with events.
+
+        This is the new API for accessing workflow events.
+
+        Args:
+            context: Initial workflow context.
+            start_step: Name of the first step to execute.
+            input_data: Optional input data for the first step.
+            max_iterations: Maximum number of iterations before failing.
+
+        Returns:
+            Tuple of (RunOutcome, list of events).
+
+        """
+        start = start_step or self._start_step
+        if start is None:
+            raise WorkflowError("No start step configured", context=context)
+
+        engine: Engine[ContextT] = Engine(
+            step_order=self._step_order,
+            merge_strategy=self._merge_strategy,
+        )
+        runner: Runner[ContextT] = Runner(
+            engine=engine,
+            steps=self._steps,
+        )
+
+        outcome = await runner.run(
+            run_id=self._generate_run_id(),
+            context=context,
+            start_step=start,
+            input_data=input_data,
+            max_iterations=max_iterations,
+        )
+        return outcome, outcome.events
+
+    async def run_streaming(
+        self,
+        context: ContextT,
+        start_step: str | None = None,
+        *,
+        input_data: Any = None,
+    ) -> AsyncGenerator[Event, None]:
+        """Yield events as they occur during workflow execution.
+
+        This is the new streaming API for real-time event consumption.
+        Callers can checkpoint at any event boundary.
+
+        Args:
+            context: Initial workflow context.
+            start_step: Name of the first step to execute.
+            input_data: Optional input data for the first step.
+
+        Yields:
+            Events as they occur during execution.
+
+        """
+        start = start_step or self._start_step
+        if start is None:
+            raise WorkflowError("No start step configured", context=context)
+
+        engine: Engine[ContextT] = Engine(
+            step_order=self._step_order,
+            merge_strategy=self._merge_strategy,
+        )
+        runner: Runner[ContextT] = Runner(
+            engine=engine,
+            steps=self._steps,
+        )
+
+        async for event in runner.run_streaming(
+            run_id=self._generate_run_id(),
+            context=context,
+            start_step=start,
+            input_data=input_data,
+        ):
+            yield event
+
     async def tick(
         self,
         context: ContextT,
@@ -156,6 +349,9 @@ class Workflow(Generic[ContextT]):
         input_data: Any = None,
     ) -> TickResult[ContextT]:
         """Execute a single step.
+
+        .. deprecated::
+            Use run() or run_with_events() instead.
 
         Args:
             context: Current workflow context.
@@ -166,6 +362,12 @@ class Workflow(Generic[ContextT]):
             TickResult with the execution outcome.
 
         """
+        warnings.warn(
+            "tick() is deprecated. Use run() or run_with_events() instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+
         step = self._steps.get(step_name)
         if step is None:
             return TickResult(
@@ -220,195 +422,6 @@ class Workflow(Generic[ContextT]):
             error=result.error,
         )
 
-    async def run(
-        self,
-        initial_context: ContextT,
-        start_step: str,
-        input_data: Any = None,
-        max_iterations: int = 1000,
-    ) -> ContextT:
-        """Execute the workflow until completion or failure.
-
-        Args:
-            initial_context: The initial workflow context.
-            start_step: Name of the first step to execute.
-            input_data: Optional input data for the first step.
-            max_iterations: Maximum number of steps to execute.
-
-        Returns:
-            The final context after COMPLETE signal.
-
-        Raises:
-            WorkflowError: If the workflow fails or hits max iterations.
-            NotImplementedError: If BRANCH or MERGE signals are encountered.
-
-        """
-        context = initial_context
-        current_step = start_step
-        current_input = input_data
-
-        for _ in range(max_iterations):
-            tick_result = await self.tick(context, current_step, current_input)
-
-            if tick_result.signal == Signal.COMPLETE:
-                return tick_result.context
-
-            if tick_result.signal == Signal.FAIL:
-                raise WorkflowError(
-                    message=tick_result.error or "Workflow failed",
-                    context=tick_result.context,
-                )
-
-            if tick_result.signal == Signal.BRANCH:
-                # Require signal handler for BRANCH signal
-                if self._signal_handler is None:
-                    raise WorkflowError(
-                        message="BRANCH signal requires a signal handler. "
-                        "Use set_signal_handler() to configure one.",
-                        context=tick_result.context,
-                    )
-                # Delegate to signal handler to get branch contexts
-                branch_result = await self._signal_handler.handle_branch(
-                    context,
-                    StepResult(
-                        context=tick_result.context,
-                        signal=tick_result.signal,
-                        branch_request=tick_result.branch_request,
-                    ),
-                    self,
-                )
-                context = branch_result.context
-                if not branch_result.should_continue:
-                    return context
-
-                # Execute each branch context
-                if branch_result.branch_contexts:
-                    branch_request = tick_result.branch_request
-                    child_start_step = branch_result.next_step
-                    merge_step = branch_request.merge_step if branch_request else None
-
-                    if child_start_step is None:
-                        raise WorkflowError(
-                            message="BRANCH signal requires next_step to be set",
-                            context=context,
-                        )
-
-                    for branch_ctx in branch_result.branch_contexts:
-                        # Execute child workflow from child_start_step
-                        # passing branch data as input
-                        child_context = branch_ctx.context
-                        child_step: str = child_start_step
-                        child_input: Any = branch_ctx.data
-
-                        # Run child branch until MERGE, COMPLETE, or FAIL
-                        for _ in range(max_iterations):
-                            child_tick = await self.tick(
-                                child_context, child_step, child_input
-                            )
-
-                            if child_tick.signal == Signal.FAIL:
-                                raise WorkflowError(
-                                    message=child_tick.error or "Branch failed",
-                                    context=child_tick.context,
-                                )
-
-                            if child_tick.signal == Signal.COMPLETE:
-                                # Branch completed early
-                                child_context = child_tick.context
-                                break
-
-                            if child_tick.signal == Signal.MERGE:
-                                # Branch reached merge point
-                                child_context = child_tick.context
-                                break
-
-                            if child_tick.signal == Signal.CONTINUE:
-                                child_context = child_tick.context
-                                next_child_step = child_tick.next_step
-                                child_input = None
-                                if next_child_step is None or next_child_step == merge_step:
-                                    # Reached merge step or end
-                                    break
-                                child_step = next_child_step
-
-                        # Register branch completion with handler
-                        from maestro.handlers import BranchContext as HandlerBranchContext
-
-                        if hasattr(self._signal_handler, "register_branch_completion"):
-                            self._signal_handler.register_branch_completion(
-                                merge_step or "",
-                                HandlerBranchContext(
-                                    name=branch_ctx.name,
-                                    context=child_context,
-                                    data=branch_ctx.data,
-                                ),
-                            )
-
-                    # After all branches complete, call handle_merge to get merged context
-                    if (
-                        merge_step is not None
-                        and self._signal_handler is not None
-                        and hasattr(self._signal_handler, "handle_merge")
-                    ):
-                        merge_result = await self._signal_handler.handle_merge(
-                            context,
-                            StepResult(
-                                context=context,
-                                signal=Signal.MERGE,
-                                next_step=merge_step,
-                            ),
-                            self,
-                        )
-                        context = merge_result.context
-                        current_step = merge_step
-                        current_input = None
-                        continue
-
-                next_step = branch_result.next_step or self._get_next_step(current_step)
-                if next_step is None:
-                    return context
-                current_step = next_step
-                continue
-
-            if tick_result.signal == Signal.MERGE:
-                # Require signal handler for MERGE signal
-                if self._signal_handler is None:
-                    raise WorkflowError(
-                        message="MERGE signal requires a signal handler. "
-                        "Use set_signal_handler() to configure one.",
-                        context=tick_result.context,
-                    )
-                # Delegate to signal handler
-                merge_result = await self._signal_handler.handle_merge(
-                    context,
-                    StepResult(
-                        context=tick_result.context,
-                        signal=tick_result.signal,
-                    ),
-                    self,
-                )
-                context = merge_result.context
-                if not merge_result.should_continue:
-                    return context
-                merge_next = merge_result.next_step or self._get_next_step(current_step)
-                if merge_next is None:
-                    return context
-                current_step = merge_next
-                continue
-
-            if tick_result.signal == Signal.CONTINUE:
-                if tick_result.next_step is None:
-                    # No more steps, complete
-                    return tick_result.context
-                context = tick_result.context
-                current_step = tick_result.next_step
-                current_input = None  # Only first step gets input_data
-
-        raise WorkflowError(
-            message=f"Workflow exceeded max iterations: {max_iterations}",
-            context=context,
-        )
-
     def _get_next_step(self, current_step: str) -> str | None:
         """Get the next step in sequence.
 
@@ -426,3 +439,12 @@ class Workflow(Generic[ContextT]):
         except ValueError:
             pass
         return None
+
+    def _generate_run_id(self) -> str:
+        """Generate a unique run ID.
+
+        Returns:
+            UUID string for the run.
+
+        """
+        return str(uuid.uuid4())

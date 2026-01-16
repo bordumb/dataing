@@ -95,53 +95,127 @@ class Runner(Generic[ContextT]):
         self._log: EventLog = log if log is not None else InMemoryEventLog()
 
     async def run(
-        self, run_id: str, context: ContextT, start_step: str
+        self,
+        run_id: str,
+        context: ContextT,
+        start_step: str,
+        input_data: Any | None = None,
+        max_iterations: int = 1000,
     ) -> RunOutcome[ContextT]:
         """Run workflow to completion, failure, or pause.
 
-        Collects all events and returns a RunOutcome.
+        Collects all events and returns a RunOutcome with the properly-typed
+        context from the final state.
 
         Args:
             run_id: Unique identifier for this workflow run.
             context: Initial workflow context.
             start_step: Name of the step to begin execution.
+            input_data: Optional input data for the first step.
+            max_iterations: Maximum number of iterations before failing.
 
         Returns:
             RunOutcome with final status, context, and all events.
 
         """
         events: list[Event] = []
-        async for event in self.run_streaming(run_id, context, start_step):
-            events.append(event)
+        iteration_count = 0
 
-        # Determine final outcome from events
-        final_event = events[-1] if events else None
+        # Initialize run
+        state, cmd, run_started = self._engine.init(
+            run_id, context, start_step, input_data
+        )
+        logged_event = self._log.append(run_started)
+        events.append(logged_event)
 
-        if isinstance(final_event, RunCompleted):
-            return RunOutcome(
-                status="completed",
-                context=final_event.final_context,  # type: ignore[arg-type]
-                events=events,
-            )
-        if isinstance(final_event, RunFailed):
-            return RunOutcome(
-                status="failed",
-                error=final_event.error,
-                events=events,
-            )
-        if isinstance(final_event, InputRequested):
-            # Extract context from the last state
-            return RunOutcome(
-                status="paused",
-                await_token=final_event.token,
-                events=events,
-            )
+        # Main execution loop
+        while True:
+            # Check iteration limit
+            iteration_count += 1
+            if iteration_count > max_iterations:
+                error_event = RunFailed(error="Exceeded max iterations")
+                logged_error = self._log.append(error_event)
+                events.append(logged_error)
+                return RunOutcome(
+                    status="failed",
+                    context=state.context,
+                    error="Exceeded max iterations",
+                    events=events,
+                )
+            if isinstance(cmd, ExecuteStep):
+                async for event in self._execute_step(state, cmd):
+                    logged_event = self._log.append(event)
+                    events.append(logged_event)
+                    state, cmd = self._engine.apply(state, logged_event)
 
-        # Default to failed if we can't determine status
-        return RunOutcome(status="failed", error="Unexpected end of workflow", events=events)
+                    if isinstance(cmd, Stop):
+                        terminal_event = self._create_terminal_event(cmd, state)
+                        logged_terminal = self._log.append(terminal_event)
+                        events.append(logged_terminal)
+
+                        if cmd.status == "completed":
+                            return RunOutcome(
+                                status="completed",
+                                context=state.context,
+                                events=events,
+                            )
+                        return RunOutcome(
+                            status="failed",
+                            context=state.context,
+                            error=cmd.error,
+                            events=events,
+                        )
+
+                    if isinstance(cmd, WaitForInput):
+                        return RunOutcome(
+                            status="paused",
+                            context=state.context,
+                            await_token=cmd.token,
+                            events=events,
+                        )
+
+            elif isinstance(cmd, StartBranches):
+                async for event in self._execute_branches(state, cmd.branch_request):
+                    logged_event = self._log.append(event)
+                    events.append(logged_event)
+                    state, cmd = self._engine.apply(state, logged_event)
+
+                    if isinstance(cmd, Stop):
+                        terminal_event = self._create_terminal_event(cmd, state)
+                        logged_terminal = self._log.append(terminal_event)
+                        events.append(logged_terminal)
+                        return RunOutcome(
+                            status="completed" if cmd.status == "completed" else "failed",
+                            context=state.context,
+                            error=cmd.error if cmd.status == "failed" else None,
+                            events=events,
+                        )
+
+            elif isinstance(cmd, WaitForInput):
+                return RunOutcome(
+                    status="paused",
+                    context=state.context,
+                    await_token=cmd.token,
+                    events=events,
+                )
+
+            elif isinstance(cmd, Stop):
+                terminal_event = self._create_terminal_event(cmd, state)
+                logged_terminal = self._log.append(terminal_event)
+                events.append(logged_terminal)
+                return RunOutcome(
+                    status="completed" if cmd.status == "completed" else "failed",
+                    context=state.context,
+                    error=cmd.error if cmd.status == "failed" else None,
+                    events=events,
+                )
 
     async def run_streaming(
-        self, run_id: str, context: ContextT, start_step: str
+        self,
+        run_id: str,
+        context: ContextT,
+        start_step: str,
+        input_data: Any | None = None,
     ) -> AsyncGenerator[Event, None]:
         """Yield events as they occur during workflow execution.
 
@@ -152,13 +226,16 @@ class Runner(Generic[ContextT]):
             run_id: Unique identifier for this workflow run.
             context: Initial workflow context.
             start_step: Name of the step to begin execution.
+            input_data: Optional input data for the first step.
 
         Yields:
             Events as they occur during execution.
 
         """
         # Initialize run
-        state, cmd, run_started = self._engine.init(run_id, context, start_step)
+        state, cmd, run_started = self._engine.init(
+            run_id, context, start_step, input_data
+        )
         logged_event = self._log.append(run_started)
         yield logged_event
 
@@ -236,10 +313,14 @@ class Runner(Generic[ContextT]):
             if result.context_update is not None:
                 context_update = result.context_update
             elif isinstance(result.context, dict) and isinstance(state.context, dict):
-                # Compute delta if not provided
+                # Compute delta if not provided for dict contexts
                 context_update = {
                     k: v for k, v in result.context.items() if state.context.get(k) != v
                 }
+            elif not isinstance(result.context, dict):
+                # For non-dict contexts (like dataclasses), store full context
+                # using a special key that the Engine recognizes
+                context_update = {"_full_context": result.context}
 
             # Handle AWAIT_USER signal
             if result.signal == Signal.AWAIT_USER:
@@ -247,6 +328,7 @@ class Runner(Generic[ContextT]):
                     step_name=step_name,
                     context_update=context_update,
                     signal=result.signal,
+                    next_step=result.next_step,
                 )
                 if result.await_token:
                     yield InputRequested(token=result.await_token)
@@ -256,6 +338,7 @@ class Runner(Generic[ContextT]):
                 step_name=step_name,
                 context_update=context_update,
                 signal=result.signal,
+                next_step=result.next_step,
             )
 
         except Exception as e:

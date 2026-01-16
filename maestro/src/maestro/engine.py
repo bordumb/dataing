@@ -63,7 +63,11 @@ class Engine(Generic[ContextT]):
         self._merge = merge_strategy
 
     def init(
-        self, run_id: str, context: ContextT, start_step: str
+        self,
+        run_id: str,
+        context: ContextT,
+        start_step: str,
+        input_data: Any | None = None,
     ) -> tuple[RunState[ContextT], Command, Event]:
         """Initialize a new workflow run.
 
@@ -74,6 +78,7 @@ class Engine(Generic[ContextT]):
             run_id: Unique identifier for this workflow run.
             context: Initial workflow context.
             start_step: Name of the step to begin execution.
+            input_data: Optional input data for the first step.
 
         Returns:
             Tuple of (initial_state, first_command, RunStarted_event).
@@ -86,7 +91,7 @@ class Engine(Generic[ContextT]):
             current_step=start_step,
             seq=0,
         )
-        command: Command = ExecuteStep(step_name=start_step)
+        command: Command = ExecuteStep(step_name=start_step, input_data=input_data)
         event: Event = RunStarted(run_id=run_id, start_step=start_step)
         return initial_state, command, event
 
@@ -177,7 +182,8 @@ class Engine(Generic[ContextT]):
             return failed_state, Stop(status="failed")
 
         if signal == Signal.CONTINUE:
-            next_step = self._default_next(event.step_name)
+            # Respect explicit routing via next_step, otherwise use default
+            next_step = event.next_step or self._default_next(event.step_name)
             if next_step is None:
                 # No more steps - workflow is complete
                 final_state = replace(new_state, status="completed", current_step=None)
@@ -185,8 +191,26 @@ class Engine(Generic[ContextT]):
             continued_state = replace(new_state, current_step=next_step)
             return continued_state, ExecuteStep(step_name=next_step)
 
-        # BRANCH, MERGE, AWAIT_USER are handled via their own events
-        # For now, just continue to next step
+        if signal == Signal.BRANCH:
+            # BRANCH signal requires a signal handler in the Workflow
+            # This is not yet fully supported in the event-sourced architecture
+            failed_state = replace(new_state, status="failed", current_step=None)
+            return failed_state, Stop(
+                status="failed",
+                error="BRANCH signal requires a signal handler (not yet supported)",
+            )
+
+        if signal == Signal.MERGE:
+            # MERGE signal is handled internally via branch completion
+            # Reaching here means no pending branches - treat as error
+            failed_state = replace(new_state, status="failed", current_step=None)
+            return failed_state, Stop(
+                status="failed",
+                error="MERGE signal without pending branches",
+            )
+
+        # AWAIT_USER is handled via InputRequested event
+        # For any other signal, just continue to next step
         next_step = self._default_next(event.step_name)
         if next_step is None:
             final_state = replace(new_state, status="completed", current_step=None)
@@ -348,9 +372,13 @@ class Engine(Generic[ContextT]):
     ) -> ContextT:
         """Apply a context update delta to the current context.
 
+        For dict contexts, merges the update as a delta.
+        For non-dict contexts (like dataclasses), checks for a special
+        "_full_context" key that contains the full updated context.
+
         Args:
             context: Current context.
-            update: Delta to apply.
+            update: Delta to apply, or dict with "_full_context" key.
 
         Returns:
             Updated context.
@@ -358,5 +386,8 @@ class Engine(Generic[ContextT]):
         """
         if isinstance(context, dict):
             return {**context, **update}  # type: ignore[return-value]
-        # For non-dict contexts, return update if context can't be merged
+        # For non-dict contexts, check for full context in update
+        if "_full_context" in update:
+            full_ctx: ContextT = update["_full_context"]
+            return full_ctx
         return context

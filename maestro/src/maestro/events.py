@@ -68,12 +68,14 @@ class StepCompleted(Event):
         step_name: Name of the step that completed.
         context_update: Delta to apply to context (not full context).
         signal: The control signal returned by the step.
+        next_step: Explicit next step name for routing (if provided).
 
     """
 
     step_name: str = ""
     context_update: dict[str, Any] = field(default_factory=dict)
     signal: Signal = Signal.CONTINUE
+    next_step: str | None = None
 
 
 @dataclass(frozen=True)

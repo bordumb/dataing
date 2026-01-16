@@ -1,16 +1,24 @@
 {
-  "assignee": null,
+  "assignee": "bordumbb@gmail.com",
   "claim_note": "",
-  "claimed_at": null,
+  "claimed_at": "2026-01-16T03:37:49.404059Z",
   "created_at": "2026-01-16T02:27:26.444693Z",
   "depends_on": [
     "fn-14.6"
   ],
   "epic": "fn-14",
+  "evidence": {
+    "commits": [],
+    "prs": [],
+    "tests": [
+      "pnpm tsc --noEmit",
+      "pnpm lint"
+    ]
+  },
   "id": "fn-14.7",
   "priority": null,
   "spec_path": ".flow/tasks/fn-14.7.md",
-  "status": "todo",
+  "status": "done",
   "title": "IssueCreate and IssueWorkspace frontend pages",
-  "updated_at": "2026-01-16T02:29:26.295814Z"
+  "updated_at": "2026-01-16T03:41:43.396984Z"
 }

@@ -202,20 +202,25 @@ class QdrantMemoryStore:
                 query_filter=filters,
             )
 
-            return [
-                SearchResult(
-                    memory=Memory(
-                        id=UUID(r.payload["id"]),
-                        content=r.payload["content"],
-                        created_at=datetime.fromisoformat(r.payload["created_at"]),
-                        agent_id=r.payload["agent_id"],
-                        conversation_id=r.payload.get("conversation_id"),
-                        tags=r.payload.get("tags", []),
-                    ),
-                    score=r.score,
+            results: list[SearchResult] = []
+            for r in response.points:
+                payload = r.payload
+                if payload is None:
+                    continue
+                results.append(
+                    SearchResult(
+                        memory=Memory(
+                            id=UUID(payload["id"]),
+                            content=payload["content"],
+                            created_at=datetime.fromisoformat(payload["created_at"]),
+                            agent_id=payload["agent_id"],
+                            conversation_id=payload.get("conversation_id"),
+                            tags=payload.get("tags", []),
+                        ),
+                        score=r.score,
+                    )
                 )
-                for r in response.points
-            ]
+            return results
         except Exception as e:
             return Error(description=f"Failed to search memories: {e}")
 
@@ -252,6 +257,8 @@ class QdrantMemoryStore:
             )
             if results:
                 payload = results[0].payload
+                if payload is None:
+                    return None
                 # Verify tenant ownership
                 if payload.get("tenant_id") != str(tenant_id):
                     return None

@@ -29,6 +29,7 @@ from dataing.entrypoints.api.routes.permissions import (
     router as permissions_router,
 )
 from dataing.entrypoints.api.routes.schema_comments import router as schema_comments_router
+from dataing.entrypoints.api.routes.sla_policies import router as sla_policies_router
 from dataing.entrypoints.api.routes.tags import (
     investigation_tags_router,
 )
@@ -59,6 +60,7 @@ api_router.include_router(investigation_feedback_router)
 api_router.include_router(schema_comments_router)
 api_router.include_router(knowledge_comments_router)
 api_router.include_router(comment_votes_router)
+api_router.include_router(sla_policies_router)  # SLA policy management
 api_router.include_router(teams_router, prefix="/teams")
 
 # RBAC routes

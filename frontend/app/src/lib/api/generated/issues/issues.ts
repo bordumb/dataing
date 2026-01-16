@@ -24,10 +24,13 @@ import type {
   IssueCommentListResponse,
   IssueCommentResponse,
   IssueCreate,
+  IssueEventListResponse,
   IssueListResponse,
   IssueResponse,
   IssueUpdate,
+  ListIssueEventsApiV1IssuesIssueIdEventsGetParams,
   ListIssuesApiV1IssuesGetParams,
+  StreamIssueEventsApiV1IssuesIssueIdStreamGetParams,
   WatcherListResponse,
 } from "../../model";
 import { customInstance } from "../../client";
@@ -1067,4 +1070,240 @@ export const useSpawnInvestigationApiV1IssuesIssueIdInvestigationRunsPost = <
     );
 
   return useMutation(mutationOptions);
+};
+/**
+ * List events for an issue (activity timeline).
+
+Returns events in reverse chronological order (newest first).
+Supports cursor-based pagination.
+ * @summary List Issue Events
+ */
+export const listIssueEventsApiV1IssuesIssueIdEventsGet = (
+  issueId: string,
+  params?: ListIssueEventsApiV1IssuesIssueIdEventsGetParams,
+  signal?: AbortSignal,
+) => {
+  return customInstance<IssueEventListResponse>({
+    url: `/api/v1/issues/${issueId}/events`,
+    method: "GET",
+    params,
+    signal,
+  });
+};
+
+export const getListIssueEventsApiV1IssuesIssueIdEventsGetQueryKey = (
+  issueId: string,
+  params?: ListIssueEventsApiV1IssuesIssueIdEventsGetParams,
+) => {
+  return [
+    `/api/v1/issues/${issueId}/events`,
+    ...(params ? [params] : []),
+  ] as const;
+};
+
+export const getListIssueEventsApiV1IssuesIssueIdEventsGetQueryOptions = <
+  TData = Awaited<
+    ReturnType<typeof listIssueEventsApiV1IssuesIssueIdEventsGet>
+  >,
+  TError = HTTPValidationError,
+>(
+  issueId: string,
+  params?: ListIssueEventsApiV1IssuesIssueIdEventsGetParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof listIssueEventsApiV1IssuesIssueIdEventsGet>>,
+        TError,
+        TData
+      >
+    >;
+  },
+) => {
+  const { query: queryOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ??
+    getListIssueEventsApiV1IssuesIssueIdEventsGetQueryKey(issueId, params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof listIssueEventsApiV1IssuesIssueIdEventsGet>>
+  > = ({ signal }) =>
+    listIssueEventsApiV1IssuesIssueIdEventsGet(issueId, params, signal);
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!issueId,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof listIssueEventsApiV1IssuesIssueIdEventsGet>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type ListIssueEventsApiV1IssuesIssueIdEventsGetQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listIssueEventsApiV1IssuesIssueIdEventsGet>>
+>;
+export type ListIssueEventsApiV1IssuesIssueIdEventsGetQueryError =
+  HTTPValidationError;
+
+/**
+ * @summary List Issue Events
+ */
+export const useListIssueEventsApiV1IssuesIssueIdEventsGet = <
+  TData = Awaited<
+    ReturnType<typeof listIssueEventsApiV1IssuesIssueIdEventsGet>
+  >,
+  TError = HTTPValidationError,
+>(
+  issueId: string,
+  params?: ListIssueEventsApiV1IssuesIssueIdEventsGetParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof listIssueEventsApiV1IssuesIssueIdEventsGet>>,
+        TError,
+        TData
+      >
+    >;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } => {
+  const queryOptions =
+    getListIssueEventsApiV1IssuesIssueIdEventsGetQueryOptions(
+      issueId,
+      params,
+      options,
+    );
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  query.queryKey = queryOptions.queryKey;
+
+  return query;
+};
+
+/**
+ * Stream real-time issue updates via Server-Sent Events.
+
+Delivers events as they occur:
+- status_changed, assigned, comment_added, label_added/removed
+- investigation_spawned, investigation_completed
+
+The `after` parameter accepts an event ID to resume from.
+Sends heartbeat every 30 seconds to prevent connection timeout.
+ * @summary Stream Issue Events
+ */
+export const streamIssueEventsApiV1IssuesIssueIdStreamGet = (
+  issueId: string,
+  params?: StreamIssueEventsApiV1IssuesIssueIdStreamGetParams,
+  signal?: AbortSignal,
+) => {
+  return customInstance<unknown>({
+    url: `/api/v1/issues/${issueId}/stream`,
+    method: "GET",
+    params,
+    signal,
+  });
+};
+
+export const getStreamIssueEventsApiV1IssuesIssueIdStreamGetQueryKey = (
+  issueId: string,
+  params?: StreamIssueEventsApiV1IssuesIssueIdStreamGetParams,
+) => {
+  return [
+    `/api/v1/issues/${issueId}/stream`,
+    ...(params ? [params] : []),
+  ] as const;
+};
+
+export const getStreamIssueEventsApiV1IssuesIssueIdStreamGetQueryOptions = <
+  TData = Awaited<
+    ReturnType<typeof streamIssueEventsApiV1IssuesIssueIdStreamGet>
+  >,
+  TError = HTTPValidationError,
+>(
+  issueId: string,
+  params?: StreamIssueEventsApiV1IssuesIssueIdStreamGetParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<
+          ReturnType<typeof streamIssueEventsApiV1IssuesIssueIdStreamGet>
+        >,
+        TError,
+        TData
+      >
+    >;
+  },
+) => {
+  const { query: queryOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ??
+    getStreamIssueEventsApiV1IssuesIssueIdStreamGetQueryKey(issueId, params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof streamIssueEventsApiV1IssuesIssueIdStreamGet>>
+  > = ({ signal }) =>
+    streamIssueEventsApiV1IssuesIssueIdStreamGet(issueId, params, signal);
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!issueId,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof streamIssueEventsApiV1IssuesIssueIdStreamGet>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type StreamIssueEventsApiV1IssuesIssueIdStreamGetQueryResult =
+  NonNullable<
+    Awaited<ReturnType<typeof streamIssueEventsApiV1IssuesIssueIdStreamGet>>
+  >;
+export type StreamIssueEventsApiV1IssuesIssueIdStreamGetQueryError =
+  HTTPValidationError;
+
+/**
+ * @summary Stream Issue Events
+ */
+export const useStreamIssueEventsApiV1IssuesIssueIdStreamGet = <
+  TData = Awaited<
+    ReturnType<typeof streamIssueEventsApiV1IssuesIssueIdStreamGet>
+  >,
+  TError = HTTPValidationError,
+>(
+  issueId: string,
+  params?: StreamIssueEventsApiV1IssuesIssueIdStreamGetParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<
+          ReturnType<typeof streamIssueEventsApiV1IssuesIssueIdStreamGet>
+        >,
+        TError,
+        TData
+      >
+    >;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } => {
+  const queryOptions =
+    getStreamIssueEventsApiV1IssuesIssueIdStreamGetQueryOptions(
+      issueId,
+      params,
+      options,
+    );
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  query.queryKey = queryOptions.queryKey;
+
+  return query;
 };

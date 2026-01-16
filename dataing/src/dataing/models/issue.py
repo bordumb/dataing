@@ -5,7 +5,7 @@ from datetime import datetime
 from typing import TYPE_CHECKING, Any
 from uuid import UUID
 
-from sqlalchemy import BigInteger, Float, ForeignKey, String, Text
+from sqlalchemy import BigInteger, Boolean, Float, ForeignKey, Integer, String, Text
 from sqlalchemy.dialects.postgresql import JSONB, TSVECTOR
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -89,7 +89,9 @@ class Issue(BaseModel):
     source_fingerprint: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     # SLA and resolution
-    sla_policy_id: Mapped[UUID | None] = mapped_column(nullable=True)
+    sla_policy_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("sla_policies.id"), nullable=True
+    )
     resolution_note: Mapped[str | None] = mapped_column(Text, nullable=True)
     closed_at: Mapped[datetime | None] = mapped_column(nullable=True)
 
@@ -119,6 +121,7 @@ class Issue(BaseModel):
     investigation_runs: Mapped[list["IssueInvestigationRun"]] = relationship(
         "IssueInvestigationRun", back_populates="issue", cascade="all, delete-orphan"
     )
+    sla_policy: Mapped["SLAPolicy | None"] = relationship("SLAPolicy", back_populates="issues")
 
 
 class IssueComment(BaseModel):
@@ -267,3 +270,47 @@ class IssueInvestigationRun(BaseModel):
 
 # Label is handled as a simple join table, not a full model
 # since it uses composite PK without an id column
+
+
+class SLAType(str, enum.Enum):
+    """Types of SLA timers."""
+
+    ACKNOWLEDGE = "acknowledge"  # OPEN -> TRIAGED
+    PROGRESS = "progress"  # TRIAGED -> IN_PROGRESS
+    RESOLVE = "resolve"  # any -> RESOLVED
+
+
+class SLAPolicy(BaseModel):
+    """SLA policy defining time limits for issue resolution."""
+
+    __tablename__ = "sla_policies"
+
+    tenant_id: Mapped[UUID] = mapped_column(ForeignKey("tenants.id"), nullable=False)
+    name: Mapped[str] = mapped_column(Text, nullable=False)
+    is_default: Mapped[bool] = mapped_column(Boolean, default=False)
+
+    # Time limits in minutes (null = not tracked)
+    time_to_acknowledge: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    time_to_progress: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    time_to_resolve: Mapped[int | None] = mapped_column(Integer, nullable=True)
+
+    # Per severity overrides (e.g., {"critical": {"time_to_acknowledge": 15}})
+    severity_overrides: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict)
+
+    # Relationships
+    tenant: Mapped["Tenant"] = relationship("Tenant")
+    issues: Mapped[list["Issue"]] = relationship("Issue", back_populates="sla_policy")
+
+
+class SLABreachNotification(BaseModel):
+    """Tracks when SLA breach notifications were sent to avoid duplicates."""
+
+    __tablename__ = "sla_breach_notifications"
+
+    issue_id: Mapped[UUID] = mapped_column(ForeignKey("issues.id"), nullable=False)
+    sla_type: Mapped[str] = mapped_column(String(20), nullable=False)
+    threshold: Mapped[int] = mapped_column(Integer, nullable=False)  # 50, 75, 90, 100
+    notified_at: Mapped[datetime] = mapped_column(nullable=False)
+
+    # Relationships
+    issue: Mapped["Issue"] = relationship("Issue")

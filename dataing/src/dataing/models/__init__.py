@@ -20,6 +20,9 @@ from dataing.models.issue import (
     IssueStatus,
     IssueTriggerType,
     IssueWatcher,
+    SLABreachNotification,
+    SLAPolicy,
+    SLAType,
 )
 from dataing.models.notification import Notification, NotificationRead, NotificationSeverity
 from dataing.models.tenant import Tenant
@@ -50,6 +53,9 @@ __all__ = [
     "IssueStatus",
     "IssueTriggerType",
     "IssueWatcher",
+    "SLABreachNotification",
+    "SLAPolicy",
+    "SLAType",
     "Webhook",
     "Notification",
     "NotificationRead",

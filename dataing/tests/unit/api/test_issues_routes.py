@@ -325,3 +325,72 @@ class TestWatcherSchemas:
         data = WatcherListResponse(items=watchers, total=2)
         assert len(data.items) == 2
         assert data.total == 2
+
+
+class TestInvestigationRunSchemas:
+    """Test investigation run Pydantic schemas."""
+
+    def test_investigation_run_create_valid(self) -> None:
+        """Test InvestigationRunCreate with valid data."""
+        from dataing.entrypoints.api.routes.issues import InvestigationRunCreate
+
+        data = InvestigationRunCreate(
+            focus_prompt="Investigate the data quality issue",
+            execution_profile="standard",
+        )
+        assert data.focus_prompt == "Investigate the data quality issue"
+        assert data.execution_profile == "standard"
+        assert data.dataset_id is None
+
+    def test_investigation_run_create_with_dataset(self) -> None:
+        """Test InvestigationRunCreate with dataset_id."""
+        from dataing.entrypoints.api.routes.issues import InvestigationRunCreate
+
+        data = InvestigationRunCreate(
+            focus_prompt="Check the orders table",
+            dataset_id="public.orders",
+            execution_profile="deep",
+        )
+        assert data.dataset_id == "public.orders"
+        assert data.execution_profile == "deep"
+
+    def test_investigation_run_create_invalid_profile(self) -> None:
+        """Test InvestigationRunCreate rejects invalid execution_profile."""
+        from dataing.entrypoints.api.routes.issues import InvestigationRunCreate
+
+        with pytest.raises(ValueError):
+            InvestigationRunCreate(
+                focus_prompt="Test",
+                execution_profile="invalid",
+            )
+
+    def test_investigation_run_create_empty_prompt_fails(self) -> None:
+        """Test InvestigationRunCreate rejects empty focus_prompt."""
+        from dataing.entrypoints.api.routes.issues import InvestigationRunCreate
+
+        with pytest.raises(ValueError):
+            InvestigationRunCreate(focus_prompt="")
+
+    def test_investigation_run_response_fields(self) -> None:
+        """Test InvestigationRunResponse has expected fields."""
+        from datetime import datetime
+
+        from dataing.entrypoints.api.routes.issues import InvestigationRunResponse
+
+        data = InvestigationRunResponse(
+            id=uuid4(),
+            issue_id=uuid4(),
+            investigation_id=uuid4(),
+            trigger_type="human",
+            focus_prompt="Test prompt",
+            execution_profile="standard",
+            approval_status=None,
+            confidence=None,
+            root_cause_tag=None,
+            synthesis_summary=None,
+            created_at=datetime.now(UTC),
+            completed_at=None,
+        )
+        assert data.trigger_type == "human"
+        assert data.execution_profile == "standard"
+        assert data.approval_status is None

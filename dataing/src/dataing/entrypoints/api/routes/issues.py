@@ -975,3 +975,226 @@ async def remove_issue_watcher(
         issue_id,
         auth.user_id,
     )
+
+
+# ============================================================================
+# Investigation Run Schemas
+# ============================================================================
+
+
+class InvestigationRunCreate(BaseModel):
+    """Request body for spawning an investigation from an issue."""
+
+    focus_prompt: str = Field(..., min_length=1)
+    dataset_id: str | None = None  # Inherits from issue if not provided
+    execution_profile: str = Field(
+        default="standard",
+        pattern="^(safe|standard|deep)$",
+    )
+
+
+class InvestigationRunResponse(BaseModel):
+    """Response for an investigation run."""
+
+    id: UUID
+    issue_id: UUID
+    investigation_id: UUID
+    trigger_type: str
+    focus_prompt: str | None
+    execution_profile: str
+    approval_status: str | None
+    confidence: float | None
+    root_cause_tag: str | None
+    synthesis_summary: str | None
+    created_at: datetime
+    completed_at: datetime | None
+
+
+class InvestigationRunListResponse(BaseModel):
+    """Paginated investigation run list response."""
+
+    items: list[InvestigationRunResponse]
+    total: int
+
+
+# ============================================================================
+# Investigation Run API Routes
+# ============================================================================
+
+
+@router.get("/{issue_id}/investigation-runs", response_model=InvestigationRunListResponse)
+async def list_investigation_runs(
+    issue_id: UUID,
+    auth: AuthDep,
+    db: AppDbDep,
+) -> InvestigationRunListResponse:
+    """List investigation runs for an issue."""
+    await _verify_issue_access(db, issue_id, auth.tenant_id)
+
+    rows = await db.fetch_all(
+        """
+        SELECT id, issue_id, investigation_id, trigger_type, focus_prompt,
+               execution_profile, approval_status, confidence, root_cause_tag,
+               synthesis_summary, created_at, completed_at
+        FROM issue_investigation_runs
+        WHERE issue_id = $1
+        ORDER BY created_at DESC
+        """,
+        issue_id,
+    )
+
+    items = [
+        InvestigationRunResponse(
+            id=row["id"],
+            issue_id=row["issue_id"],
+            investigation_id=row["investigation_id"],
+            trigger_type=row["trigger_type"],
+            focus_prompt=row["focus_prompt"],
+            execution_profile=row["execution_profile"],
+            approval_status=row["approval_status"],
+            confidence=row["confidence"],
+            root_cause_tag=row["root_cause_tag"],
+            synthesis_summary=row["synthesis_summary"],
+            created_at=row["created_at"],
+            completed_at=row["completed_at"],
+        )
+        for row in rows
+    ]
+
+    return InvestigationRunListResponse(items=items, total=len(items))
+
+
+@router.post(
+    "/{issue_id}/investigation-runs",
+    response_model=InvestigationRunResponse,
+    status_code=201,
+)
+async def spawn_investigation(
+    issue_id: UUID,
+    auth: AuthDep,
+    db: AppDbDep,
+    body: InvestigationRunCreate,
+) -> InvestigationRunResponse:
+    """Spawn an investigation from an issue.
+
+    Creates a new investigation linked to this issue. The focus_prompt
+    guides the investigation direction.
+
+    Requires user identity (JWT auth or user-scoped API key).
+    Deep profile may require approval depending on tenant settings.
+    """
+    # Verify issue exists and get its data
+    issue = await db.fetch_one(
+        """
+        SELECT id, tenant_id, dataset_id
+        FROM issues
+        WHERE id = $1 AND tenant_id = $2
+        """,
+        issue_id,
+        auth.tenant_id,
+    )
+
+    if not issue:
+        raise HTTPException(status_code=404, detail="Issue not found")
+
+    if auth.user_id is None:
+        raise HTTPException(
+            status_code=403,
+            detail="User identity required to spawn investigations",
+        )
+
+    # Use dataset_id from request or inherit from issue
+    dataset_id = body.dataset_id or issue["dataset_id"]
+
+    if not dataset_id:
+        raise HTTPException(
+            status_code=400,
+            detail="dataset_id required - not set on issue and not provided in request",
+        )
+
+    # Determine approval_status based on execution_profile
+    # Deep profile may require approval - for now we approve immediately
+    approval_status = None
+    if body.execution_profile == "deep":
+        approval_status = "approved"  # Could be "queued" based on tenant settings
+
+    # Create a placeholder investigation record
+    # In a real implementation, this would call the InvestigationService
+    investigation_row = await db.execute_returning(
+        """
+        INSERT INTO investigations (tenant_id, alert, created_by_user_id)
+        VALUES ($1, $2, $3)
+        RETURNING id
+        """,
+        auth.tenant_id,
+        '{"dataset_id": "' + dataset_id + '", "source": "issue_spawn"}',
+        auth.user_id,
+    )
+
+    if not investigation_row:
+        raise HTTPException(status_code=500, detail="Failed to create investigation")
+
+    investigation_id = investigation_row["id"]
+
+    # Create the issue_investigation_run record
+    from dataing.core.json_utils import to_json_string
+
+    trigger_ref = {"user_id": str(auth.user_id), "dataset_id": dataset_id}
+
+    row = await db.execute_returning(
+        """
+        INSERT INTO issue_investigation_runs (
+            issue_id, investigation_id, trigger_type, trigger_ref,
+            focus_prompt, execution_profile, approval_status
+        )
+        VALUES ($1, $2, $3, $4, $5, $6, $7)
+        RETURNING id, issue_id, investigation_id, trigger_type, focus_prompt,
+                  execution_profile, approval_status, confidence, root_cause_tag,
+                  synthesis_summary, created_at, completed_at
+        """,
+        issue_id,
+        investigation_id,
+        "human",
+        to_json_string(trigger_ref),
+        body.focus_prompt,
+        body.execution_profile,
+        approval_status,
+    )
+
+    if not row:
+        raise HTTPException(status_code=500, detail="Failed to create investigation run")
+
+    # Record investigation_spawned event
+    await _record_issue_event(
+        db,
+        issue_id,
+        "investigation_spawned",
+        auth.user_id,
+        {
+            "investigation_id": str(investigation_id),
+            "run_id": str(row["id"]),
+            "focus_prompt": body.focus_prompt,
+            "execution_profile": body.execution_profile,
+        },
+    )
+
+    # Update issue updated_at timestamp
+    await db.execute(
+        "UPDATE issues SET updated_at = NOW() WHERE id = $1",
+        issue_id,
+    )
+
+    return InvestigationRunResponse(
+        id=row["id"],
+        issue_id=row["issue_id"],
+        investigation_id=row["investigation_id"],
+        trigger_type=row["trigger_type"],
+        focus_prompt=row["focus_prompt"],
+        execution_profile=row["execution_profile"],
+        approval_status=row["approval_status"],
+        confidence=row["confidence"],
+        root_cause_tag=row["root_cause_tag"],
+        synthesis_summary=row["synthesis_summary"],
+        created_at=row["created_at"],
+        completed_at=row["completed_at"],
+    )

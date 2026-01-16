@@ -7,10 +7,19 @@
     "fn-14.2"
   ],
   "epic": "fn-14",
+  "evidence": {
+    "commits": [
+      "c0165d84"
+    ],
+    "prs": [],
+    "tests": [
+      "uv run pytest dataing/tests/unit/api/test_issues_routes.py -v"
+    ]
+  },
   "id": "fn-14.3",
   "priority": null,
   "spec_path": ".flow/tasks/fn-14.3.md",
-  "status": "in_progress",
+  "status": "done",
   "title": "Issue comments and watchers API",
-  "updated_at": "2026-01-16T03:14:13.531730Z"
+  "updated_at": "2026-01-16T03:17:37.160255Z"
 }

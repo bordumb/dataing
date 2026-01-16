@@ -8,7 +8,6 @@ import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { Textarea } from '@/components/ui/textarea'
-import { Label } from '@/components/ui/label'
 import {
   Select,
   SelectContent,
@@ -191,9 +190,9 @@ export function IssueCreate() {
             <CardContent>
               <form onSubmit={handleSubmit} className="space-y-5">
                 <div>
-                  <Label htmlFor="title">
+                  <label className="mb-1.5 block text-sm font-medium">
                     Title <span className="text-destructive">*</span>
-                  </Label>
+                  </label>
                   <Input
                     id="title"
                     name="title"
@@ -201,7 +200,6 @@ export function IssueCreate() {
                     onChange={handleChange}
                     placeholder="Brief description of the issue"
                     disabled={createIssue.isPending}
-                    className="mt-1.5"
                   />
                 </div>
 
@@ -227,14 +225,22 @@ export function IssueCreate() {
                 </div>
 
                 <div className="grid gap-4 sm:grid-cols-2">
-                  <DatePicker
-                    label="Issue Date"
-                    value={issueDate}
-                    onChange={setIssueDate}
-                    hint="When was the issue first observed?"
-                  />
                   <div>
-                    <Label htmlFor="column_name">Column Name</Label>
+                    <label className="mb-1.5 block text-sm font-medium">
+                      Issue Date
+                    </label>
+                    <DatePicker
+                      value={issueDate}
+                      onChange={setIssueDate}
+                    />
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      When was the issue first observed?
+                    </p>
+                  </div>
+                  <div>
+                    <label className="mb-1.5 block text-sm font-medium">
+                      Column Name
+                    </label>
                     <Input
                       id="column_name"
                       name="column_name"
@@ -242,7 +248,6 @@ export function IssueCreate() {
                       onChange={handleChange}
                       placeholder="e.g., user_id"
                       disabled={createIssue.isPending}
-                      className="mt-1.5"
                     />
                     <p className="mt-1 text-xs text-muted-foreground">
                       The specific column affected (optional)
@@ -251,7 +256,9 @@ export function IssueCreate() {
                 </div>
 
                 <div>
-                  <Label htmlFor="description">Description</Label>
+                  <label className="mb-1.5 block text-sm font-medium">
+                    Description
+                  </label>
                   <Textarea
                     id="description"
                     name="description"
@@ -260,19 +267,20 @@ export function IssueCreate() {
                     placeholder="Detailed description, context, and any relevant information..."
                     disabled={createIssue.isPending}
                     rows={4}
-                    className="mt-1.5"
                   />
                 </div>
 
                 <div className="grid gap-4 sm:grid-cols-2">
                   <div>
-                    <Label>Priority</Label>
+                    <label className="mb-1.5 block text-sm font-medium">
+                      Priority
+                    </label>
                     <Select
                       value={formData.priority || 'none'}
                       onValueChange={(v) => handleSelectChange('priority', v)}
                       disabled={createIssue.isPending}
                     >
-                      <SelectTrigger className="mt-1.5">
+                      <SelectTrigger>
                         <SelectValue placeholder="Select priority" />
                       </SelectTrigger>
                       <SelectContent>
@@ -287,13 +295,15 @@ export function IssueCreate() {
                   </div>
 
                   <div>
-                    <Label>Severity</Label>
+                    <label className="mb-1.5 block text-sm font-medium">
+                      Severity
+                    </label>
                     <Select
                       value={formData.severity || 'none'}
                       onValueChange={(v) => handleSelectChange('severity', v)}
                       disabled={createIssue.isPending}
                     >
-                      <SelectTrigger className="mt-1.5">
+                      <SelectTrigger>
                         <SelectValue placeholder="Select severity" />
                       </SelectTrigger>
                       <SelectContent>
@@ -308,8 +318,10 @@ export function IssueCreate() {
                 </div>
 
                 <div>
-                  <Label>Labels</Label>
-                  <div className="flex items-center gap-2 mt-1.5">
+                  <label className="mb-1.5 block text-sm font-medium">
+                    Labels
+                  </label>
+                  <div className="flex items-center gap-2">
                     <Input
                       value={labelInput}
                       onChange={(e) => setLabelInput(e.target.value)}

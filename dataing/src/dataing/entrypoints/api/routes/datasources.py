@@ -6,14 +6,11 @@ pluggable adapter architecture defined in the data_context specification.
 
 from __future__ import annotations
 
-import json
-import os
 from datetime import datetime
 from typing import Annotated, Any
 from uuid import UUID
 
 import structlog
-from cryptography.fernet import Fernet
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
 from pydantic import BaseModel, Field
 
@@ -23,9 +20,13 @@ from dataing.adapters.datasource import (
     SourceType,
     get_registry,
 )
+from dataing.adapters.datasource.encryption import (
+    decrypt_config,
+    encrypt_config,
+    get_encryption_key,
+)
 from dataing.adapters.db.app_db import AppDatabase
 from dataing.core.entitlements.features import Feature
-from dataing.core.json_utils import to_json_string
 from dataing.entrypoints.api.deps import get_app_db
 from dataing.entrypoints.api.middleware.auth import (
     ApiKeyContext,
@@ -42,18 +43,6 @@ router = APIRouter(prefix="/datasources", tags=["datasources"])
 AppDbDep = Annotated[AppDatabase, Depends(get_app_db)]
 AuthDep = Annotated[ApiKeyContext, Depends(verify_api_key)]
 WriteScopeDep = Annotated[ApiKeyContext, Depends(require_scope("write"))]
-
-
-def get_encryption_key() -> bytes:
-    """Get the encryption key for data source configs.
-
-    Checks DATADR_ENCRYPTION_KEY first (used by demo), then ENCRYPTION_KEY.
-    """
-    key = os.getenv("DATADR_ENCRYPTION_KEY") or os.getenv("ENCRYPTION_KEY")
-    if not key:
-        key = Fernet.generate_key().decode()
-        os.environ["ENCRYPTION_KEY"] = key
-    return key.encode() if isinstance(key, str) else key
 
 
 # Request/Response Models
@@ -216,21 +205,6 @@ class DatasourceDatasetsResponse(BaseModel):
     total: int
 
 
-def _encrypt_config(config: dict[str, Any], key: bytes) -> str:
-    """Encrypt configuration."""
-    f = Fernet(key)
-    encrypted = f.encrypt(to_json_string(config).encode())
-    return encrypted.decode()
-
-
-def _decrypt_config(encrypted: str, key: bytes) -> dict[str, Any]:
-    """Decrypt configuration."""
-    f = Fernet(key)
-    decrypted = f.decrypt(encrypted.encode())
-    result: dict[str, Any] = json.loads(decrypted.decode())
-    return result
-
-
 @router.get("/types", response_model=SourceTypesResponse)
 async def list_source_types() -> SourceTypesResponse:
     """List all supported data source types.
@@ -349,7 +323,7 @@ async def create_datasource(
 
     # Encrypt config
     encryption_key = get_encryption_key()
-    encrypted_config = _encrypt_config(body.config, encryption_key)
+    encrypted_config = encrypt_config(body.config, encryption_key)
 
     # Save to database
     db_result = await app_db.create_data_source(
@@ -553,7 +527,7 @@ async def test_datasource_connection(
     # Decrypt config
     encryption_key = get_encryption_key()
     try:
-        config = _decrypt_config(ds["connection_config_encrypted"], encryption_key)
+        config = decrypt_config(ds["connection_config_encrypted"], encryption_key)
     except Exception as e:
         return TestConnectionResponse(
             success=False,
@@ -621,7 +595,7 @@ async def get_datasource_schema(
     # Decrypt config
     encryption_key = get_encryption_key()
     try:
-        config = _decrypt_config(ds["connection_config_encrypted"], encryption_key)
+        config = decrypt_config(ds["connection_config_encrypted"], encryption_key)
     except Exception as e:
         raise HTTPException(
             status_code=500,
@@ -691,7 +665,7 @@ async def execute_query(
     # Decrypt config
     encryption_key = get_encryption_key()
     try:
-        config = _decrypt_config(ds["connection_config_encrypted"], encryption_key)
+        config = decrypt_config(ds["connection_config_encrypted"], encryption_key)
     except Exception as e:
         raise HTTPException(
             status_code=500,
@@ -765,7 +739,7 @@ async def get_column_stats(
     # Decrypt config
     encryption_key = get_encryption_key()
     try:
-        config = _decrypt_config(ds["connection_config_encrypted"], encryption_key)
+        config = decrypt_config(ds["connection_config_encrypted"], encryption_key)
     except Exception as e:
         raise HTTPException(
             status_code=500,
@@ -842,7 +816,7 @@ async def sync_datasource_schema(
     # Decrypt config
     encryption_key = get_encryption_key()
     try:
-        config = _decrypt_config(ds["connection_config_encrypted"], encryption_key)
+        config = decrypt_config(ds["connection_config_encrypted"], encryption_key)
     except Exception as e:
         raise HTTPException(
             status_code=500,

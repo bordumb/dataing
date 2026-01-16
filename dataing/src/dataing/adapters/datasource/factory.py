@@ -6,47 +6,17 @@ from encrypted datasource configurations stored in the database.
 
 from __future__ import annotations
 
-import json
-import os
 from typing import TYPE_CHECKING
 from uuid import UUID
 
-from cryptography.fernet import Fernet
-
 from dataing.adapters.datasource.base import BaseAdapter
+from dataing.adapters.datasource.encryption import decrypt_config, get_encryption_key
 from dataing.adapters.datasource.errors import DatasourceNotFoundError
 from dataing.adapters.datasource.registry import get_registry
 from dataing.adapters.datasource.types import SourceType
 
 if TYPE_CHECKING:
     from dataing.adapters.db.app_db import AppDatabase
-
-
-def get_encryption_key() -> bytes:
-    """Get the encryption key for data source configs.
-
-    Checks DATADR_ENCRYPTION_KEY first (used by demo), then ENCRYPTION_KEY.
-    """
-    key = os.getenv("DATADR_ENCRYPTION_KEY") or os.getenv("ENCRYPTION_KEY")
-    if not key:
-        raise ValueError("ENCRYPTION_KEY or DATADR_ENCRYPTION_KEY environment variable must be set")
-    return key.encode() if isinstance(key, str) else key
-
-
-def decrypt_config(encrypted: str, key: bytes) -> dict:
-    """Decrypt datasource configuration.
-
-    Args:
-        encrypted: The encrypted configuration string.
-        key: The Fernet encryption key.
-
-    Returns:
-        Decrypted configuration dictionary.
-    """
-    f = Fernet(key)
-    decrypted = f.decrypt(encrypted.encode())
-    result: dict = json.loads(decrypted.decode())
-    return result
 
 
 async def create_adapter_for_datasource(

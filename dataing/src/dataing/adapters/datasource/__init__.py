@@ -28,6 +28,11 @@ from dataing.adapters.datasource.errors import (
     SchemaFetchFailedError,
     TableNotFoundError,
 )
+from dataing.adapters.datasource.encryption import (
+    decrypt_config,
+    encrypt_config,
+    get_encryption_key,
+)
 from dataing.adapters.datasource.factory import create_adapter_for_datasource
 from dataing.adapters.datasource.filesystem.gcs import GCSAdapter
 from dataing.adapters.datasource.filesystem.hdfs import HDFSAdapter
@@ -112,6 +117,9 @@ __all__ = [
     # Functions
     "normalize_type",
     "create_adapter_for_datasource",
+    "get_encryption_key",
+    "encrypt_config",
+    "decrypt_config",
     # Errors
     "AdapterError",
     "ConnectionFailedError",

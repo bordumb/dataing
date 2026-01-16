@@ -72,6 +72,7 @@ EXCLUDE = {
     "storybook-static",
     "site",
     "output",
+    "tests",
 }
 
 ENCODING = "utf-8"

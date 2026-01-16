@@ -11,6 +11,7 @@ from dataing.models.base import BaseModel
 if TYPE_CHECKING:
     from dataing.models.api_key import ApiKey
     from dataing.models.investigation import Investigation
+    from dataing.models.issue import Issue
     from dataing.models.notification import NotificationRead
     from dataing.models.tenant import Tenant
 
@@ -36,6 +37,12 @@ class User(BaseModel):
     )
     notification_reads: Mapped[list["NotificationRead"]] = relationship(
         "NotificationRead", back_populates="user", cascade="all, delete-orphan"
+    )
+    assigned_issues: Mapped[list["Issue"]] = relationship(
+        "Issue", foreign_keys="Issue.assignee_user_id", back_populates="assignee"
+    )
+    created_issues: Mapped[list["Issue"]] = relationship(
+        "Issue", foreign_keys="Issue.created_by_user_id", back_populates="created_by_user"
     )
 
     __table_args__ = (

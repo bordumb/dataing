@@ -65,7 +65,8 @@ class SSOTokenResponse(BaseModel):
 
 def get_app_db(request: Request) -> AppDatabase:
     """Get AppDatabase from app state."""
-    return request.app.state.app_db
+    app_db: AppDatabase = request.app.state.app_db
+    return app_db
 
 
 @asynccontextmanager

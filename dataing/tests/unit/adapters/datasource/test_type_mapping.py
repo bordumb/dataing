@@ -1,13 +1,10 @@
 """Tests for type normalization mappings."""
 
-import pytest
 from dataing.adapters.datasource.type_mapping import (
-    normalize_type,
-    get_type_map,
-    POSTGRESQL_TYPE_MAP,
     MYSQL_TYPE_MAP,
-    SNOWFLAKE_TYPE_MAP,
-    MONGODB_TYPE_MAP,
+    POSTGRESQL_TYPE_MAP,
+    get_type_map,
+    normalize_type,
 )
 from dataing.adapters.datasource.types import NormalizedType, SourceType
 

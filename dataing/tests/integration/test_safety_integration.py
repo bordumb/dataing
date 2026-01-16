@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import datetime
 
 import pytest
 
@@ -81,7 +81,7 @@ class TestSafetyIntegration:
 
     def test_unsafe_query_rejected_before_circuit_breaker(self) -> None:
         """Test that unsafe queries are rejected before reaching circuit breaker."""
-        breaker = CircuitBreaker(CircuitBreakerConfig())
+        CircuitBreaker(CircuitBreakerConfig())
 
         unsafe_queries = [
             "DROP TABLE users",

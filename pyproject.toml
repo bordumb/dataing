@@ -71,7 +71,10 @@ packages = ["dataing/src/dataing"]
 
 [tool.mypy]
 python_version = "3.11"
+mypy_path = ["maestro/src", "bond/src", "dataing/src", "dataing-ee/src"]
 files = ["maestro/src/maestro", "bond/src/bond", "dataing/src/dataing", "dataing-ee/src/dataing_ee"]
+namespace_packages = true
+explicit_package_bases = true
 # Strict mode flags (equivalent to --strict but with SQLAlchemy-compatible settings)
 warn_unused_configs = true
 disallow_untyped_calls = true
@@ -135,6 +138,11 @@ select = [
     "D",    # pydocstyle
 ]
 ignore = ["D100", "D104"]
+
+[tool.ruff.lint.per-file-ignores]
+"**/tests/*" = ["D101", "D102", "D103", "D107"]
+"scripts/*" = ["D103"]
+".flow/bin/*" = ["D103"]
 
 [tool.ruff.lint.pydocstyle]
 convention = "google"

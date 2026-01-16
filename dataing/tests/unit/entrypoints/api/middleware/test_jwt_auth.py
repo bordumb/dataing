@@ -3,13 +3,14 @@
 from unittest.mock import MagicMock
 
 import pytest
+from fastapi import HTTPException
+
 from dataing.core.auth.types import OrgRole
 from dataing.entrypoints.api.middleware.jwt_auth import (
     JwtContext,
     require_role,
     verify_jwt,
 )
-from fastapi import HTTPException
 
 
 class TestVerifyJwt:
@@ -18,8 +19,9 @@ class TestVerifyJwt:
     @pytest.mark.asyncio
     async def test_valid_token(self) -> None:
         """Should return JwtContext for valid token."""
-        from dataing.core.auth.jwt import create_access_token
         from fastapi.security import HTTPAuthorizationCredentials
+
+        from dataing.core.auth.jwt import create_access_token
 
         token = create_access_token(
             user_id="user-123",

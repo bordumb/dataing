@@ -11,10 +11,6 @@ from uuid import UUID, uuid4
 import jwt
 import pytest
 from cryptography.hazmat.primitives.asymmetric import rsa
-from fastapi import FastAPI
-from fastapi.testclient import TestClient
-
-from dataing.core.auth.types import User
 from dataing_ee.adapters.sso import (
     OIDCTokens,
     SSORepository,
@@ -32,6 +28,10 @@ from dataing_ee.entrypoints.api.routes.sso import (
     get_sso_state_repository,
     router,
 )
+from fastapi import FastAPI
+from fastapi.testclient import TestClient
+
+from dataing.core.auth.types import User
 
 
 @pytest.fixture

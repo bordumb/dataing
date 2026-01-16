@@ -33,6 +33,7 @@ Example:
         def can_execute(self, context: MyContext) -> bool:
             return True
     ```
+
 """
 
 from maestro.handlers import (

@@ -11,16 +11,6 @@ import asyncio
 from collections.abc import Awaitable, Callable
 from typing import TYPE_CHECKING, Any
 
-from maestro import (
-    BranchContext,
-    BranchingSignalHandler,
-    MergeStrategy,
-    Signal,
-    SignalResult,
-    StepResult,
-    Workflow,
-)
-
 from dataing.adapters.investigation.llm_adapter import (
     HypothesisLLMAdapter,
     InterpretEvidenceLLMAdapter,
@@ -39,12 +29,21 @@ from dataing.core.investigation.steps import (
     SynthesizeStep,
 )
 from dataing.core.investigation.values import StepType
+from maestro import (
+    BranchContext,
+    BranchingSignalHandler,
+    MergeStrategy,
+    Signal,
+    SignalResult,
+    StepResult,
+    Workflow,
+)
 
 if TYPE_CHECKING:
     from dataing.agents.client import AgentClient
-    from dataing.core.investigation.steps.gather_context import ContextEngineProtocol
-    from dataing.core.investigation.steps.execute_query import DatabaseProtocol
     from dataing.core.investigation.pattern_extraction import PatternRepositoryProtocol
+    from dataing.core.investigation.steps.execute_query import DatabaseProtocol
+    from dataing.core.investigation.steps.gather_context import ContextEngineProtocol
 
 
 class WorkerShutdownError(Exception):
@@ -197,7 +196,8 @@ def build_investigation_workflow(
     synthesis_llm = SynthesisLLMAdapter(llm)
 
     # Add steps in logical order (actual routing controlled by signals)
-    workflow.add_step(GatherContextStep(context_engine, database))
+    # Note: database is passed as BaseAdapter for context gathering
+    workflow.add_step(GatherContextStep(context_engine, database))  # type: ignore[arg-type]
     workflow.add_step(CheckPatternsStep(pattern_repository))
     workflow.add_step(GenerateHypothesesStep(hypothesis_llm, max_hypotheses))
     workflow.add_step(GenerateQueryStep(query_llm))
@@ -243,7 +243,9 @@ async def run_with_checkpointing(
     workflow: Workflow[InvestigationContext],
     context: InvestigationContext,
     start_step: str,
-    on_step_complete: Callable[[InvestigationContext, str | None, dict[str, Any] | None], Awaitable[None]],
+    on_step_complete: Callable[
+        [InvestigationContext, str | None, dict[str, Any] | None], Awaitable[None]
+    ],
     shutdown_signal: asyncio.Event,
     start_cursor: dict[str, Any] | None = None,
     max_iterations: int = 100,
@@ -346,7 +348,9 @@ async def _run_branches_sequentially(
     workflow: Workflow[InvestigationContext],
     parent_context: InvestigationContext,
     branch_request: Any,
-    on_step_complete: Callable[[InvestigationContext, str | None, dict[str, Any] | None], Awaitable[None]],
+    on_step_complete: Callable[
+        [InvestigationContext, str | None, dict[str, Any] | None], Awaitable[None]
+    ],
     shutdown_signal: asyncio.Event,
     max_iterations: int,
 ) -> InvestigationContext:
@@ -402,10 +406,12 @@ async def _run_branches_sequentially(
                 raise WorkerShutdownError("Worker shutting down during branch")
 
             # Pass hypothesis in cursor for every step in the branch
-            result = await workflow.tick(child_context, current_step, input_data={"hypothesis": hypothesis})
+            result = await workflow.tick(
+                child_context, current_step, input_data={"hypothesis": hypothesis}
+            )
 
             checkpoint_step = result.next_step
-            checkpoint_cursor = {"hypothesis": hypothesis}
+            checkpoint_cursor: dict[str, Any] | None = {"hypothesis": hypothesis}
 
             if result.signal in (Signal.COMPLETE, Signal.FAIL):
                 # Only move to merge step if this is the last branch

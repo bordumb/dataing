@@ -2,9 +2,9 @@
 
 import os
 from collections.abc import AsyncGenerator
-from uuid import UUID
 
 import pytest
+
 from dataing.adapters.db.app_db import AppDatabase
 from dataing.adapters.investigation_feedback.adapter import (
     InvestigationFeedbackAdapter,

@@ -43,7 +43,7 @@ class GenericWebhookPayload(BaseModel):
     severity: str | None = Field(default=None, pattern="^(low|medium|high|critical)$")
     priority: str | None = Field(default=None, pattern="^P[0-3]$")
     dataset_id: str | None = Field(default=None, max_length=200)
-    labels: list[str] | None = Field(default=None, max_items=20)
+    labels: list[str] | None = Field(default=None)
     source_provider: str | None = Field(default=None, max_length=100)
     source_external_id: str | None = Field(default=None, max_length=500)
     source_external_url: str | None = Field(default=None, max_length=2000)
@@ -138,10 +138,7 @@ async def receive_generic_webhook(
     body = await request.body()
 
     if not verify_webhook_signature(body, x_webhook_signature, secret):
-        logger.warning(
-            "webhook_signature_invalid",
-            tenant_id=str(auth.tenant_id),
-        )
+        logger.warning(f"Webhook signature invalid for tenant={auth.tenant_id}")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid webhook signature",
@@ -154,10 +151,7 @@ async def receive_generic_webhook(
         payload_dict = json.loads(body)
         payload = GenericWebhookPayload(**payload_dict)
     except Exception as e:
-        logger.warning(
-            "webhook_payload_invalid",
-            error=str(e),
-        )
+        logger.warning(f"Webhook payload invalid: {e}")
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Invalid payload: {e}",
@@ -179,10 +173,8 @@ async def receive_generic_webhook(
         )
         if existing:
             logger.info(
-                "webhook_deduplicated",
-                issue_id=str(existing["id"]),
-                source_provider=payload.source_provider,
-                source_external_id=payload.source_external_id,
+                f"Webhook deduplicated: issue={existing['id']}, "
+                f"provider={payload.source_provider}, external_id={payload.source_external_id}"
             )
             return WebhookIssueResponse(
                 id=existing["id"],
@@ -252,11 +244,8 @@ async def receive_generic_webhook(
     )
 
     logger.info(
-        "webhook_issue_created",
-        issue_id=str(issue_id),
-        issue_number=issue_number,
-        source_provider=payload.source_provider,
-        tenant_id=str(auth.tenant_id),
+        f"Webhook issue created: id={issue_id}, number={issue_number}, "
+        f"provider={payload.source_provider}, tenant={auth.tenant_id}"
     )
 
     return WebhookIssueResponse(

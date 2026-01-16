@@ -61,7 +61,7 @@ class TestConfigureLogging:
         configure_logging(log_level="WARNING", json_output=True)
 
         # Verify stdlib logging level was set
-        root_logger = logging.getLogger()
+        logging.getLogger()
         # Note: configure_logging uses basicConfig which sets root level
         # The level should be WARNING (30)
         assert logging.WARNING == 30

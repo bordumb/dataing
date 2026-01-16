@@ -12,6 +12,7 @@ from dataing.entrypoints.api.routes.dashboard import router as dashboard_router
 from dataing.entrypoints.api.routes.datasets import router as datasets_router
 from dataing.entrypoints.api.routes.datasources import router as datasources_router
 from dataing.entrypoints.api.routes.datasources import router as datasources_v2_router
+from dataing.entrypoints.api.routes.integrations import router as integrations_router
 from dataing.entrypoints.api.routes.investigation_feedback import (
     router as investigation_feedback_router,
 )
@@ -28,7 +29,6 @@ from dataing.entrypoints.api.routes.permissions import (
 from dataing.entrypoints.api.routes.permissions import (
     router as permissions_router,
 )
-from dataing.entrypoints.api.routes.integrations import router as integrations_router
 from dataing.entrypoints.api.routes.schema_comments import router as schema_comments_router
 from dataing.entrypoints.api.routes.sla_policies import router as sla_policies_router
 from dataing.entrypoints.api.routes.tags import (

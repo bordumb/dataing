@@ -65,8 +65,13 @@ class EmailPasswordRecoveryAdapter:
         return sent
 
 
-# Verify we implement the protocol
-_adapter: PasswordRecoveryAdapter = EmailPasswordRecoveryAdapter(
-    email_notifier=None,
-    frontend_url="",
-)
+# Verify we implement the protocol at type-check time
+def _verify_protocol(adapter: PasswordRecoveryAdapter) -> None:
+    pass
+
+
+if False:  # Only for type checking, never executed
+    _verify_protocol(EmailPasswordRecoveryAdapter(
+        email_notifier=None,
+        frontend_url="",
+    ))

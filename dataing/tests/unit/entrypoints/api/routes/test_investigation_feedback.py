@@ -4,11 +4,12 @@ from datetime import UTC, datetime
 from uuid import uuid4
 
 import pytest
+from pydantic import ValidationError
+
 from dataing.entrypoints.api.routes.investigation_feedback import (
     FeedbackCreate,
     FeedbackResponse,
 )
-from pydantic import ValidationError
 
 
 class TestFeedbackSchemas:
@@ -72,11 +73,12 @@ class TestFeedbackEndpoint:
         """POST /investigation-feedback creates feedback event."""
         from unittest.mock import AsyncMock, MagicMock
 
+        from fastapi import FastAPI
+        from fastapi.testclient import TestClient
+
         from dataing.entrypoints.api.deps import get_feedback_adapter
         from dataing.entrypoints.api.middleware.auth import verify_api_key
         from dataing.entrypoints.api.routes.investigation_feedback import router
-        from fastapi import FastAPI
-        from fastapi.testclient import TestClient
 
         app = FastAPI()
         app.include_router(router, prefix="/api/v1")
@@ -124,11 +126,12 @@ class TestGetFeedbackEndpoint:
         """GET /investigation-feedback/investigations/:id returns user's feedback."""
         from unittest.mock import AsyncMock, MagicMock
 
+        from fastapi import FastAPI
+        from fastapi.testclient import TestClient
+
         from dataing.entrypoints.api.deps import get_app_db, get_feedback_adapter
         from dataing.entrypoints.api.middleware.auth import verify_api_key
         from dataing.entrypoints.api.routes.investigation_feedback import router
-        from fastapi import FastAPI
-        from fastapi.testclient import TestClient
 
         app = FastAPI()
         app.include_router(router, prefix="/api/v1")
@@ -179,11 +182,12 @@ class TestGetFeedbackEndpoint:
         """GET /investigation-feedback/investigations/:id filters to current user."""
         from unittest.mock import AsyncMock, MagicMock
 
+        from fastapi import FastAPI
+        from fastapi.testclient import TestClient
+
         from dataing.entrypoints.api.deps import get_app_db, get_feedback_adapter
         from dataing.entrypoints.api.middleware.auth import verify_api_key
         from dataing.entrypoints.api.routes.investigation_feedback import router
-        from fastapi import FastAPI
-        from fastapi.testclient import TestClient
 
         app = FastAPI()
         app.include_router(router, prefix="/api/v1")
@@ -236,11 +240,12 @@ class TestGetFeedbackEndpoint:
         """GET /investigation-feedback/investigations/:id returns empty list."""
         from unittest.mock import AsyncMock, MagicMock
 
+        from fastapi import FastAPI
+        from fastapi.testclient import TestClient
+
         from dataing.entrypoints.api.deps import get_app_db, get_feedback_adapter
         from dataing.entrypoints.api.middleware.auth import verify_api_key
         from dataing.entrypoints.api.routes.investigation_feedback import router
-        from fastapi import FastAPI
-        from fastapi.testclient import TestClient
 
         app = FastAPI()
         app.include_router(router, prefix="/api/v1")

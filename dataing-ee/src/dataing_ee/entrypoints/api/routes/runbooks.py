@@ -380,6 +380,8 @@ async def update_runbook(
             "SELECT * FROM runbooks WHERE id = $1",
             runbook_id,
         )
+        if not row:
+            raise HTTPException(status_code=404, detail="Runbook not found")
         return _row_to_response(row)
 
     # Add updated_by
@@ -399,6 +401,12 @@ async def update_runbook(
         """,
         *params,
     )
+
+    if not row:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to update runbook",
+        )
 
     logger.info(f"runbook_updated: {runbook_id}")
 

@@ -1,28 +1,19 @@
 """Tests for PostgresAdapter."""
 
-import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
-from typing import Any
 
-from dataing.adapters.datasource.sql.postgres import (
-    PostgresAdapter,
-    POSTGRES_CONFIG_SCHEMA,
-    POSTGRES_CAPABILITIES,
-)
+import pytest
+
 from dataing.adapters.datasource.errors import (
-    AuthenticationFailedError,
     ConnectionFailedError,
-    ConnectionTimeoutError,
-    QuerySyntaxError,
-    QueryTimeoutError,
-    AccessDeniedError,
-    SchemaFetchFailedError,
+)
+from dataing.adapters.datasource.sql.postgres import (
+    POSTGRES_CAPABILITIES,
+    POSTGRES_CONFIG_SCHEMA,
+    PostgresAdapter,
 )
 from dataing.adapters.datasource.types import (
-    NormalizedType,
     QueryLanguage,
-    SchemaFilter,
-    SourceCategory,
     SourceType,
 )
 

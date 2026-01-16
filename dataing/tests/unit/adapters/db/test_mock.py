@@ -2,11 +2,28 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass
+
 import pytest
 
-from dataing.adapters.db.mock import MockDatabaseAdapter
 from dataing.adapters.datasource.types import QueryResult
-# from dataing.core.domain_types import SchemaContext, TableSchema # These seem to be legacy
+from dataing.adapters.db.mock import MockDatabaseAdapter
+
+
+@dataclass(frozen=True)
+class TableSchema:
+    """Legacy TableSchema for compatibility."""
+
+    table_name: str
+    columns: tuple[str, ...]
+    column_types: dict[str, str] = None
+
+
+@dataclass(frozen=True)
+class SchemaContext:
+    """Legacy SchemaContext for compatibility."""
+
+    tables: tuple[TableSchema, ...]
 
 
 class TestMockDatabaseAdapter:

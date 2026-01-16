@@ -8,10 +8,9 @@ from __future__ import annotations
 
 from typing import Any
 
-from maestro import Step
-
 from dataing.core.investigation.entities import InvestigationContext
 from dataing.core.investigation.values import StepType
+from maestro import Step
 
 # Type alias for investigation steps
 InvestigationStep = Step[InvestigationContext, Any, Any]

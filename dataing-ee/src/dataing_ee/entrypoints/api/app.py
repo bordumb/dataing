@@ -12,6 +12,7 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from typing import Any
 
+from dataing.core.orchestrator import InvestigationOrchestrator, OrchestratorConfig
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -26,18 +27,17 @@ from dataing.adapters.investigation_feedback import InvestigationFeedbackAdapter
 from dataing.adapters.notifications.email import EmailConfig, EmailNotifier
 from dataing.agents import AgentClient
 from dataing.core.auth.recovery import PasswordRecoveryAdapter
-from dataing.core.orchestrator import InvestigationOrchestrator, OrchestratorConfig
 from dataing.entrypoints.api.deps import _seed_demo_data, settings
 from dataing.entrypoints.api.routes import api_router as ce_api_router
 from dataing.safety.circuit_breaker import CircuitBreaker, CircuitBreakerConfig
 from dataing_ee.adapters.audit import AuditRepository
 from dataing_ee.entrypoints.api.middleware.audit import AuditMiddleware
 from dataing_ee.entrypoints.api.routes.audit import router as audit_router
+from dataing_ee.entrypoints.api.routes.automation import router as automation_router
 from dataing_ee.entrypoints.api.routes.integrations import router as integrations_router
+from dataing_ee.entrypoints.api.routes.runbooks import router as runbooks_router
 from dataing_ee.entrypoints.api.routes.scim import router as scim_router
 from dataing_ee.entrypoints.api.routes.settings import router as settings_router
-from dataing_ee.entrypoints.api.routes.automation import router as automation_router
-from dataing_ee.entrypoints.api.routes.runbooks import router as runbooks_router
 from dataing_ee.entrypoints.api.routes.sso import router as sso_router
 
 logger = logging.getLogger(__name__)

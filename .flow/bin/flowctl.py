@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
-"""
-flowctl - CLI for managing .flow/ task tracking system.
+"""flowctl - CLI for managing .flow/ task tracking system.
 
 All task/epic state lives in JSON files. Markdown specs hold narrative content.
 Agents must use flowctl for all writes - never edit .flow/* directly.
@@ -10,15 +9,14 @@ import argparse
 import json
 import os
 import re
-import subprocess
 import shlex
 import shutil
+import subprocess
 import sys
 import tempfile
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Optional
-
+from typing import Any
 
 # --- Constants ---
 
@@ -203,7 +201,7 @@ def parse_windows(raw: str) -> list[dict[str, Any]]:
     error_exit("windows JSON has unexpected shape", use_json=False, code=2)
 
 
-def extract_window_id(win: dict[str, Any]) -> Optional[int]:
+def extract_window_id(win: dict[str, Any]) -> int | None:
     for key in ("windowID", "windowId", "id"):
         if key in win:
             try:
@@ -231,7 +229,7 @@ def parse_builder_tab(output: str) -> str:
     return match.group(1)
 
 
-def parse_chat_id(output: str) -> Optional[str]:
+def parse_chat_id(output: str) -> str | None:
     match = re.search(r"Chat\s*:\s*`([^`]+)`", output)
     if match:
         return match.group(1)
@@ -245,8 +243,8 @@ def build_chat_payload(
     message: str,
     mode: str,
     new_chat: bool = False,
-    chat_name: Optional[str] = None,
-    selected_paths: Optional[list[str]] = None,
+    chat_name: str | None = None,
+    selected_paths: list[str] | None = None,
 ) -> str:
     payload: dict[str, Any] = {
         "message": message,
@@ -318,7 +316,7 @@ def read_text_or_exit(path: Path, what: str, use_json: bool = True) -> str:
         error_exit(f"{what} unreadable: {path} ({e})", use_json=use_json)
 
 
-def parse_id(id_str: str) -> tuple[Optional[int], Optional[int]]:
+def parse_id(id_str: str) -> tuple[int | None, int | None]:
     """Parse ID into (epic_num, task_num). Returns (epic, None) for epic IDs."""
     match = re.match(r"^fn-(\d+)(?:\.(\d+))?$", id_str)
     if not match:
@@ -621,7 +619,7 @@ def require_codex() -> str:
     return codex
 
 
-def get_codex_version() -> Optional[str]:
+def get_codex_version() -> str | None:
     """Get codex version, or None if not available."""
     codex = shutil.which("codex")
     if not codex:
@@ -643,10 +641,10 @@ def get_codex_version() -> Optional[str]:
 
 def run_codex_exec(
     prompt: str,
-    session_id: Optional[str] = None,
+    session_id: str | None = None,
     sandbox: str = "read-only",
-    model: Optional[str] = None,
-) -> tuple[str, Optional[str]]:
+    model: str | None = None,
+) -> tuple[str, str | None]:
     """Run codex exec and return (output, thread_id).
 
     If session_id provided, tries to resume. Falls back to new session if resume fails.
@@ -705,7 +703,7 @@ def run_codex_exec(
         error_exit(f"codex exec failed: {msg}", use_json=False, code=2)
 
 
-def parse_codex_thread_id(output: str) -> Optional[str]:
+def parse_codex_thread_id(output: str) -> str | None:
     """Extract thread_id from codex --json output.
 
     Looks for: {"type":"thread.started","thread_id":"019baa19-..."}
@@ -722,7 +720,7 @@ def parse_codex_thread_id(output: str) -> Optional[str]:
     return None
 
 
-def parse_codex_verdict(output: str) -> Optional[str]:
+def parse_codex_verdict(output: str) -> str | None:
     """Extract verdict from codex output.
 
     Looks for <verdict>SHIP</verdict> or <verdict>NEEDS_WORK</verdict>
@@ -947,7 +945,7 @@ TBD
 """
 
 
-def create_task_spec(id_str: str, title: str, acceptance: Optional[str] = None) -> str:
+def create_task_spec(id_str: str, title: str, acceptance: str | None = None) -> str:
     """Create task spec markdown content."""
     acceptance_content = acceptance if acceptance else "- [ ] TBD"
     return f"""# {id_str} {title}
@@ -986,7 +984,7 @@ def patch_task_section(content: str, section: str, new_content: str) -> str:
     in_target_section = False
     section_found = False
 
-    for i, line in enumerate(lines):
+    for _i, line in enumerate(lines):
         if line.startswith("## "):
             if line.strip() == section:
                 in_target_section = True
@@ -2195,7 +2193,7 @@ def cmd_ready(args: argparse.Namespace) -> None:
     in_progress = []
     blocked = []
 
-    for task_id, task in tasks.items():
+    for _task_id, task in tasks.items():
         # MU-2: Track in_progress tasks separately
         if task["status"] == "in_progress":
             in_progress.append(task)
@@ -3137,7 +3135,7 @@ def cmd_rp_setup_review(args: argparse.Namespace) -> None:
     result = run_rp_cli(["--raw-json", "-e", "windows"])
     windows = parse_windows(result.stdout or "")
 
-    win_id: Optional[int] = None
+    win_id: int | None = None
 
     # Single window with no root paths - use it
     if len(windows) == 1 and not extract_root_paths(windows[0]):

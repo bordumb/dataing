@@ -9,9 +9,9 @@ from pathlib import Path
 import pytest
 
 from dataing.adapters.datasource.sql.sqlite import (
-    SQLiteAdapter,
-    SQLITE_CONFIG_SCHEMA,
     SQLITE_CAPABILITIES,
+    SQLITE_CONFIG_SCHEMA,
+    SQLiteAdapter,
 )
 from dataing.adapters.datasource.types import (
     NormalizedType,
@@ -276,7 +276,7 @@ class TestSQLiteAdapter:
             result = await adapter.execute_query("SELECT * FROM users")
             assert result.row_count == 3
 
-            with pytest.raises(Exception):
+            with pytest.raises(sqlite3.Error):
                 await adapter.execute_query("INSERT INTO users (name) VALUES ('Test')")
 
     async def test_context_manager(self, sample_db: str) -> None:

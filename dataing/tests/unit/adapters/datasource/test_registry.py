@@ -1,10 +1,11 @@
 """Tests for the adapter registry."""
 
 import pytest
+
 from dataing.adapters.datasource import (
     AdapterRegistry,
-    get_registry,
     SourceType,
+    get_registry,
 )
 
 
@@ -26,7 +27,6 @@ class TestAdapterRegistry:
     def test_registered_types(self):
         """Verify adapters are registered."""
         registry = get_registry()
-        registered = registry.registered_types
 
         # Should have at least the core adapters
         expected_types = [
@@ -110,7 +110,7 @@ class TestAdapterRegistry:
         """Verify get_adapter_class returns correct class."""
         registry = get_registry()
 
-        from dataing.adapters.datasource import PostgresAdapter, DuckDBAdapter
+        from dataing.adapters.datasource import DuckDBAdapter, PostgresAdapter
 
         assert registry.get_adapter_class(SourceType.POSTGRESQL) == PostgresAdapter
         assert registry.get_adapter_class(SourceType.DUCKDB) == DuckDBAdapter

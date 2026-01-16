@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
-"""
-Dataing Demo Fixtures Generator.
+"""Dataing Demo Fixtures Generator.
 
 Generates realistic e-commerce data with pre-baked anomalies for demos.
 Run with: uv run python demo/generate.py
@@ -269,7 +268,10 @@ def generate_products(categories: list[Category]) -> list[Product]:
             datetime.min.time().replace(hour=random.randint(0, 23), minute=random.randint(0, 59)),
         )
 
-        name = f"{random.choice(product_adjectives)} {fake.word().title()} {random.choice(product_nouns)}"
+        name = (
+            f"{random.choice(product_adjectives)} {fake.word().title()} "
+            f"{random.choice(product_nouns)}"
+        )
 
         products.append(
             Product(
@@ -796,8 +798,7 @@ def inject_null_spike(
     end_day: int = 5,
     null_rate: float = 0.95,  # High rate for v2.3.1 bug - almost all affected
 ) -> tuple[list[Order], list[str]]:
-    """
-    Inject NULL values into orders.user_id for mobile app v2.3.1 only.
+    """Inject NULL values into orders.user_id for mobile app v2.3.1 only.
 
     Scenario: Mobile app v2.3.1 has a bug where the checkout API call
     doesn't include the user authentication token, causing NULL user_ids.
@@ -848,8 +849,7 @@ def inject_volume_drop(
     day: int = 5,
     drop_rate: float = 0.80,
 ) -> list[Event]:
-    """
-    Remove events to simulate tracking failure for EU users.
+    """Remove events to simulate tracking failure for EU users.
 
     Scenario: CDN misconfiguration blocked tracking pixel for EU users.
     """
@@ -870,8 +870,7 @@ def inject_volume_drop_two_days(
     end_day: int = 6,
     drop_rate: float = 0.80,
 ) -> list[Event]:
-    """
-    Remove events for multiple days (days 5-6).
+    """Remove events for multiple days (days 5-6).
 
     Scenario: CDN misconfiguration blocked tracking pixel for EU users.
     """
@@ -891,8 +890,7 @@ def inject_duplicates(
     day: int = 6,
     duplicate_rate: float = 0.15,
 ) -> tuple[list[OrderItem], list[str]]:
-    """
-    Duplicate order_items to simulate retry bug.
+    """Duplicate order_items to simulate retry bug.
 
     Scenario: Retry logic doesn't check idempotency, network timeout caused duplicates.
     """
@@ -924,8 +922,7 @@ def inject_late_arriving(
     arrival_day: int = 5,
     late_rate: float = 0.03,
 ) -> list[Event]:
-    """
-    Mark some events as late-arriving.
+    """Mark some events as late-arriving.
 
     Scenario: Mobile app queues events offline, batch uploaded after reconnect.
     """
@@ -982,8 +979,7 @@ def inject_orphaned_records(
     day: int = 4,
     orphan_rate: float = 0.08,
 ) -> tuple[list[Order], list[User], list[str]]:
-    """
-    Create orders referencing deleted users.
+    """Create orders referencing deleted users.
 
     Scenario: User deletion job ran before order archival job.
     """
@@ -1007,8 +1003,7 @@ def inject_orphaned_records(
 
 
 def inject_schema_drift(products: list[Product], drift_rate: float = 0.28) -> list[dict[str, Any]]:
-    """
-    Simulate schema drift by returning products with mixed price types.
+    """Simulate schema drift by returning products with mixed price types.
 
     ~28% of products have price as string with currency (simulating new import job).
     This returns a list of dicts to allow mixed types.

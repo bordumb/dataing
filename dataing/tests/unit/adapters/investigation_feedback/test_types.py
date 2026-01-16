@@ -3,6 +3,7 @@
 from uuid import uuid4
 
 import pytest
+
 from dataing.adapters.investigation_feedback.types import EventType, FeedbackEvent
 
 

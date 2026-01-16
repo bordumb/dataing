@@ -1,11 +1,11 @@
 """Tests for FileSystemAdapter base class."""
 
-import pytest
 from typing import Any
 
-from dataing.adapters.datasource.filesystem.base import FileSystemAdapter, FileInfo
+import pytest
+
+from dataing.adapters.datasource.filesystem.base import FileInfo, FileSystemAdapter
 from dataing.adapters.datasource.types import (
-    AdapterCapabilities,
     Column,
     ConnectionTestResult,
     NormalizedType,

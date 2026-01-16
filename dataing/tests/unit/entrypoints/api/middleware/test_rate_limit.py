@@ -226,7 +226,7 @@ class TestRateLimitMiddleware:
         response = MagicMock()
         call_next = AsyncMock(return_value=response)
 
-        result = await middleware.dispatch(request, call_next)
+        await middleware.dispatch(request, call_next)
 
         call_next.assert_called_once()
 
@@ -242,7 +242,7 @@ class TestRateLimitMiddleware:
         response = MagicMock()
         call_next = AsyncMock(return_value=response)
 
-        result = await middleware.dispatch(request, call_next)
+        await middleware.dispatch(request, call_next)
 
         call_next.assert_called_once()
 

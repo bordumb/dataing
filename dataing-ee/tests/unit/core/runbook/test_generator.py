@@ -1,7 +1,6 @@
 """Unit tests for runbook generator."""
 
 import pytest
-
 from dataing_ee.core.runbook.generator import RunbookGenerator
 
 

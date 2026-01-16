@@ -5,6 +5,7 @@ from collections.abc import AsyncGenerator
 from uuid import UUID, uuid4
 
 import pytest
+
 from dataing.adapters.db.app_db import AppDatabase
 
 

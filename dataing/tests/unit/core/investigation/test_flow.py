@@ -3,10 +3,10 @@
 from __future__ import annotations
 
 import asyncio
+from typing import Any
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
-from maestro import Signal, Workflow
 
 from dataing.core.investigation.entities import InvestigationContext
 from dataing.core.investigation.flow import (
@@ -15,6 +15,7 @@ from dataing.core.investigation.flow import (
     WorkerShutdownError,
     run_with_checkpointing,
 )
+from maestro import Signal, Workflow
 
 
 def create_test_context() -> InvestigationContext:
@@ -31,7 +32,11 @@ class TestRunWithCheckpointing:
         context = create_test_context()
         checkpoints: list[tuple[InvestigationContext, str | None]] = []
 
-        async def on_checkpoint(ctx: InvestigationContext, next_step: str | None, cursor: dict[str, Any] | None = None) -> None:
+        async def on_checkpoint(
+            ctx: InvestigationContext,
+            next_step: str | None,
+            cursor: dict[str, Any] | None = None,
+        ) -> None:
             checkpoints.append((ctx, next_step))
 
         # Mock workflow that runs 3 steps then completes
@@ -45,7 +50,7 @@ class TestRunWithCheckpointing:
 
         shutdown = asyncio.Event()
 
-        result = await run_with_checkpointing(
+        await run_with_checkpointing(
             workflow=workflow,
             context=context,
             start_step="step1",
@@ -65,7 +70,11 @@ class TestRunWithCheckpointing:
         context = create_test_context()
         checkpoints: list[tuple[InvestigationContext, str | None]] = []
 
-        async def on_checkpoint(ctx: InvestigationContext, next_step: str | None, cursor: dict[str, Any] | None = None) -> None:
+        async def on_checkpoint(
+            ctx: InvestigationContext,
+            next_step: str | None,
+            cursor: dict[str, Any] | None = None,
+        ) -> None:
             checkpoints.append((ctx, next_step))
 
         workflow = MagicMock(spec=Workflow)
@@ -92,7 +101,11 @@ class TestRunWithCheckpointing:
         context = create_test_context()
         checkpoints: list[tuple[InvestigationContext, str | None]] = []
 
-        async def on_checkpoint(ctx: InvestigationContext, next_step: str | None, cursor: dict[str, Any] | None = None) -> None:
+        async def on_checkpoint(
+            ctx: InvestigationContext,
+            next_step: str | None,
+            cursor: dict[str, Any] | None = None,
+        ) -> None:
             checkpoints.append((ctx, next_step))
 
         workflow = MagicMock(spec=Workflow)
@@ -125,7 +138,11 @@ class TestRunWithCheckpointing:
         context = create_test_context()
         checkpoints: list[tuple[InvestigationContext, str | None]] = []
 
-        async def on_checkpoint(ctx: InvestigationContext, next_step: str | None, cursor: dict[str, Any] | None = None) -> None:
+        async def on_checkpoint(
+            ctx: InvestigationContext,
+            next_step: str | None,
+            cursor: dict[str, Any] | None = None,
+        ) -> None:
             checkpoints.append((ctx, next_step))
 
         workflow = MagicMock(spec=Workflow)
@@ -158,7 +175,11 @@ class TestRunWithCheckpointing:
         """Test that exceeding max iterations raises RuntimeError."""
         context = create_test_context()
 
-        async def on_checkpoint(ctx: InvestigationContext, next_step: str | None, cursor: dict[str, Any] | None = None) -> None:
+        async def on_checkpoint(
+            ctx: InvestigationContext,
+            next_step: str | None,
+            cursor: dict[str, Any] | None = None,
+        ) -> None:
             pass
 
         workflow = MagicMock(spec=Workflow)

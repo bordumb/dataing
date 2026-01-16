@@ -4,33 +4,27 @@ These tests verify that all adapters produce consistent output
 conforming to the unified schema specification.
 """
 
+
 import pytest
-from typing import Any
-from unittest.mock import AsyncMock
 
 from dataing.adapters.datasource import (
-    AdapterRegistry,
-    get_registry,
-    BaseAdapter,
     AdapterCapabilities,
-    SchemaResponse,
     ConnectionTestResult,
-    QueryResult,
     NormalizedType,
-    SourceType,
+    QueryResult,
+    SchemaResponse,
     SourceCategory,
+    SourceType,
+    get_registry,
 )
 from dataing.adapters.datasource.types import (
     Catalog,
-    Schema,
-    Table,
     Column,
-    ColumnStats,
     ConfigSchema,
-    ConfigField,
-    FieldGroup,
-    SourceTypeDefinition,
     QueryLanguage,
+    Schema,
+    SourceTypeDefinition,
+    Table,
 )
 
 

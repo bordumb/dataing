@@ -260,9 +260,9 @@ class InvestigationService:
                 return
 
             # Extract alert summary for notification title
-            alert_info = investigation.alert or {}
-            dataset_id = alert_info.get("dataset_id", "Unknown dataset")
-            metric_name = alert_info.get("metric_name", "")
+            alert = investigation.alert
+            dataset_id = alert.dataset_id if alert else "Unknown dataset"
+            metric_name = alert.metric_spec.display_name if alert and alert.metric_spec else ""
             alert_summary = f"{dataset_id}"
             if metric_name:
                 alert_summary += f" - {metric_name}"

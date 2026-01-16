@@ -1,11 +1,10 @@
 """Tests for StepRegistry."""
 
-from maestro import Signal
-
 from dataing.core.investigation.entities import InvestigationContext
 from dataing.core.investigation.registry import StepRegistry
 from dataing.core.investigation.steps.protocol import Step, StepResult
 from dataing.core.investigation.values import StepType
+from maestro import Signal
 
 
 class MockStep(Step[None, str]):

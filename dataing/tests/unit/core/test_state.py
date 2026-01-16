@@ -2,13 +2,28 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from dataclasses import dataclass
+from datetime import datetime
 
 import pytest
 
-from dataing.adapters.datasource.types import SchemaResponse
-from dataing.core.domain_types import InvestigationContext, LineageContext
+from dataing.core.domain_types import AnomalyAlert, LineageContext
 from dataing.core.state import Event, InvestigationState
+
+
+@dataclass(frozen=True)
+class TableSchema:
+    """Legacy TableSchema for compatibility."""
+
+    table_name: str
+    columns: tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class SchemaContext:
+    """Legacy SchemaContext for compatibility."""
+
+    tables: tuple[TableSchema, ...]
 
 
 class TestEvent:
@@ -33,7 +48,7 @@ class TestEvent:
             data={},
         )
 
-        with pytest.raises(Exception):
+        with pytest.raises(AttributeError):
             event.type = "modified"
 
 

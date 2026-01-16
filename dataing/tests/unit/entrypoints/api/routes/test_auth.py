@@ -3,10 +3,11 @@
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
-from dataing.core.auth.service import AuthError
-from dataing.entrypoints.api.routes.auth import get_auth_service, router
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
+
+from dataing.core.auth.service import AuthError
+from dataing.entrypoints.api.routes.auth import get_auth_service, router
 
 
 @pytest.fixture

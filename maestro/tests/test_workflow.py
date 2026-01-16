@@ -39,7 +39,7 @@ class IncrementStep:
         return StepResult(context=new_ctx, signal=Signal.CONTINUE, output=new_ctx.count)
 
     def can_execute(self, context: CounterContext) -> bool:
-        """Always can execute."""
+        """Return True if the step can be executed."""
         return True
 
 
@@ -59,7 +59,7 @@ class DoubleStep:
         return StepResult(context=new_ctx, signal=Signal.CONTINUE, output=new_ctx.count)
 
     def can_execute(self, context: CounterContext) -> bool:
-        """Always can execute."""
+        """Return True if the step can be executed."""
         return True
 
 
@@ -78,7 +78,7 @@ class CompleteStep:
         return StepResult(context=context, signal=Signal.COMPLETE, output="done")
 
     def can_execute(self, context: CounterContext) -> bool:
-        """Always can execute."""
+        """Return True if the step can be executed."""
         return True
 
 
@@ -97,7 +97,7 @@ class FailStep:
         return StepResult(context=context, signal=Signal.FAIL)
 
     def can_execute(self, context: CounterContext) -> bool:
-        """Always can execute."""
+        """Return True if the step can be executed."""
         return True
 
 
@@ -140,7 +140,7 @@ class BranchingStep:
         )
 
     def can_execute(self, context: CounterContext) -> bool:
-        """Always can execute."""
+        """Return True if the step can be executed."""
         return True
 
 
@@ -165,7 +165,7 @@ class RoutingStep:
         )
 
     def can_execute(self, context: CounterContext) -> bool:
-        """Always can execute."""
+        """Return True if the step can be executed."""
         return True
 
 

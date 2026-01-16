@@ -7,15 +7,14 @@ from uuid import UUID, uuid4
 
 import httpx
 import pytest
-from fastapi import FastAPI
-from fastapi.testclient import TestClient
-
 from dataing_ee.adapters.sso import SSORepository
 from dataing_ee.core.sso import SSOConfig, SSOProviderType
 from dataing_ee.entrypoints.api.routes.settings import (
     get_sso_repository,
     router,
 )
+from fastapi import FastAPI
+from fastapi.testclient import TestClient
 
 
 @dataclass

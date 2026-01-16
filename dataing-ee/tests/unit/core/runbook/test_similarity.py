@@ -1,7 +1,6 @@
 """Unit tests for runbook similarity scoring."""
 
 import pytest
-
 from dataing_ee.core.runbook.similarity import SimilarityScorer
 
 

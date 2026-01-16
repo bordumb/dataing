@@ -9,6 +9,12 @@ Core concepts:
 - StepResult: The result of executing a step
 - Signal: Control flow instructions (CONTINUE, COMPLETE, FAIL, etc.)
 
+New Event-Sourced Architecture (v2):
+- Engine: Pure reducer for state transitions (state, event) -> (state, command)
+- Runner: Async executor that runs commands and emits events
+- Events: Immutable records of what happened during execution
+- Replay: Deterministic state reconstruction from event logs
+
 Example:
     ```python
     from dataclasses import dataclass
@@ -36,6 +42,29 @@ Example:
 
 """
 
+import warnings
+from typing import Any
+
+# New event-sourced architecture
+from maestro.commands import Command, ExecuteStep, StartBranches, Stop, WaitForInput
+from maestro.engine import Engine
+from maestro.events import (
+    BranchCompleted,
+    BranchStarted,
+    Event,
+    InputReceived,
+    InputRequested,
+    RunCompleted,
+    RunFailed,
+    RunPaused,
+    RunResumed,
+    RunStarted,
+    StepCompleted,
+    StepFailed,
+    StepStarted,
+)
+
+# Legacy handlers (deprecated, but still available for backward compatibility)
 from maestro.handlers import (
     BranchContext,
     BranchingSignalHandler,
@@ -45,27 +74,90 @@ from maestro.handlers import (
     SignalHandlerError,
     SignalResult,
 )
+from maestro.log import EventLog, InMemoryEventLog
+from maestro.merge import DefaultMergeStrategy
+from maestro.merge import MergeStrategy as NewMergeStrategy
+from maestro.replay import Replayer
+
+# Core types (always available)
 from maestro.result import BranchRequest, BranchSpec, StepResult
+from maestro.runner import Runner, RunOutcome
 from maestro.signals import Signal
+from maestro.state import AwaitState, BranchState, RunState
 from maestro.step import Step
 from maestro.workflow import TickResult, Workflow, WorkflowError
 
 __all__ = [
-    "BranchContext",
-    "BranchingSignalHandler",
+    # Core types
     "BranchRequest",
     "BranchSpec",
-    "DefaultSignalHandler",
-    "MergeStrategy",
     "Signal",
-    "SignalHandler",
-    "SignalHandlerError",
-    "SignalResult",
     "Step",
     "StepResult",
     "TickResult",
     "Workflow",
     "WorkflowError",
+    # New event-sourced architecture
+    "AwaitState",
+    "BranchCompleted",
+    "BranchStarted",
+    "BranchState",
+    "Command",
+    "DefaultMergeStrategy",
+    "Engine",
+    "Event",
+    "EventLog",
+    "ExecuteStep",
+    "InMemoryEventLog",
+    "InputReceived",
+    "InputRequested",
+    "NewMergeStrategy",
+    "Replayer",
+    "RunCompleted",
+    "RunFailed",
+    "RunOutcome",
+    "RunPaused",
+    "RunResumed",
+    "Runner",
+    "RunStarted",
+    "RunState",
+    "StartBranches",
+    "StepCompleted",
+    "StepFailed",
+    "StepStarted",
+    "Stop",
+    "WaitForInput",
+    # Legacy (deprecated but available for backward compat)
+    "BranchContext",
+    "BranchingSignalHandler",
+    "DefaultSignalHandler",
+    "MergeStrategy",
+    "SignalHandler",
+    "SignalHandlerError",
+    "SignalResult",
 ]
 
 __version__ = "0.1.0"
+
+# Deprecation warnings for legacy APIs
+_DEPRECATED_APIS: dict[str, str] = {
+    "BranchingSignalHandler": "Use Engine for signal handling instead.",
+    "DefaultSignalHandler": "Use Engine for signal handling instead.",
+    "SignalHandler": "Use Engine for signal handling instead.",
+    "SignalResult": "Use Event types for workflow state communication.",
+}
+
+
+def __getattr__(name: str) -> Any:
+    """Handle deprecated attribute access with warnings."""
+    if name in _DEPRECATED_APIS:
+        warnings.warn(
+            f"{name} is deprecated. {_DEPRECATED_APIS[name]}",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        # Return from handlers module for backward compatibility
+        from maestro import handlers
+
+        return getattr(handlers, name)
+    raise AttributeError(f"module 'maestro' has no attribute '{name}'")

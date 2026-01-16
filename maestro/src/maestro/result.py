@@ -63,6 +63,11 @@ class StepResult(Generic[ContextT, OutputT]):
     - Optional step-specific output
     - Routing hints for CONTINUE signal
     - Branching specs for BRANCH signal
+    - Pause token for AWAIT_USER signal
+
+    Key design principle: Steps report facts, Engine decides routing.
+    For AWAIT_USER, steps provide the await_token but NOT the resume_step.
+    The Engine computes resume_step internally.
 
     Attributes:
         context: The (possibly updated) workflow context.
@@ -72,6 +77,9 @@ class StepResult(Generic[ContextT, OutputT]):
         next_step: Explicit next step name (when signal=CONTINUE).
             If None, the workflow uses its default routing.
         branch_request: Branch specifications (required when signal=BRANCH).
+        await_token: Pause point identifier (required when signal=AWAIT_USER).
+        context_update: Delta to apply to context for event storage.
+            If provided, events will store this delta instead of computing it.
 
     """
 
@@ -81,8 +89,12 @@ class StepResult(Generic[ContextT, OutputT]):
     error: str | None = None
     next_step: str | None = None
     branch_request: BranchRequest | None = None
+    await_token: str | None = None
+    context_update: dict[str, Any] | None = None
 
     def __post_init__(self) -> None:
         """Validate result consistency."""
         if self.signal == Signal.BRANCH and self.branch_request is None:
             raise ValueError("BRANCH signal requires branch_request")
+        if self.signal == Signal.AWAIT_USER and not self.await_token:
+            raise ValueError("AWAIT_USER signal requires await_token")

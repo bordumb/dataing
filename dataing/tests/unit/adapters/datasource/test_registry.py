@@ -28,7 +28,8 @@ class TestAdapterRegistry:
         """Verify adapters are registered."""
         registry = get_registry()
 
-        # Should have at least the core adapters
+        # Should have at least the core CE adapters
+        # Note: Salesforce, HubSpot, Stripe are EE-only
         expected_types = [
             SourceType.POSTGRESQL,
             SourceType.DUCKDB,
@@ -37,7 +38,6 @@ class TestAdapterRegistry:
             SourceType.SNOWFLAKE,
             SourceType.BIGQUERY,
             SourceType.MONGODB,
-            SourceType.SALESFORCE,
             SourceType.S3,
         ]
 

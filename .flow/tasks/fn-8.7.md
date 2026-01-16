@@ -2,7 +2,7 @@
 
 ## Description
 
-Create the concepts section explaining how investigations work, the Maestro FSM, and safety guardrails.
+Create the concepts section explaining how investigations work, the Maistro FSM, and safety guardrails.
 
 ### Create Files
 
@@ -33,7 +33,7 @@ Create the concepts section explaining how investigations work, the Maestro FSM,
 
 ### agent-workflows.md Content
 
-1. **The State Machine (Maestro):**
+1. **The State Machine (Maistro):**
    - Explain FSM prevents open-loop hallucination
    - Steps define deterministic actions
    - Signals control flow (CONTINUE, COMPLETE, SUSPEND)
@@ -45,7 +45,7 @@ Create the concepts section explaining how investigations work, the Maestro FSM,
 3. **Step Protocol:**
    - `execute()` method contract
    - Input/Output typing
-   - Reference: `/maestro/src/maestro/step.py`
+   - Reference: `/maistro/src/maistro/step.py`
 
 ### guardrails.md Content
 
@@ -68,11 +68,11 @@ Create the concepts section explaining how investigations work, the Maestro FSM,
 ### Source Code References
 
 - `/dataing/src/dataing/core/investigation/steps/`
-- `/maestro/src/maestro/`
+- `/maistro/src/maistro/`
 - `/dataing/src/dataing/safety/`
 ## Acceptance
 - [ ] `concepts/investigations.md` explains the loop
-- [ ] `concepts/agent-workflows.md` explains Maestro FSM
+- [ ] `concepts/agent-workflows.md` explains Maistro FSM
 - [ ] `concepts/guardrails.md` documents safety features
 - [ ] Mermaid diagrams where appropriate
 - [ ] Code references accurate (validator.py, circuit_breaker.py)
@@ -83,7 +83,7 @@ Create the concepts section explaining how investigations work, the Maestro FSM,
 - Created comprehensive concepts section with 3 documentation pages
 - investigations.md: Investigation loop, context gathering, hypothesis testing, synthesis
   - 4 mermaid diagrams (flow, query safety, parallel branches, lifecycle)
-- agent-workflows.md: Maestro FSM, Steps, Signals, branching/merging
+- agent-workflows.md: Maistro FSM, Steps, Signals, branching/merging
   - 2 mermaid diagrams (bounded vs unbounded, execution sequence)
 - guardrails.md: SQL validator, circuit breaker, PII redactor
   - 2 mermaid diagrams (safety layer flow, PII flow)

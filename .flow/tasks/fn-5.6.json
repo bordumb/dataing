@@ -13,7 +13,7 @@
     "tests": [
       "uv run mypy dataing/src/dataing/core/investigation/flow.py --strict",
       "uv run mypy dataing/src/dataing/core/investigation/service.py --strict",
-      "uv run pytest maestro/tests/ -v (68 passed)",
+      "uv run pytest maistro/tests/ -v (68 passed)",
       "python -c 'from dataing.core.investigation.flow import *'"
     ]
   },

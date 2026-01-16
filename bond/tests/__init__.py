@@ -1,1 +1,1 @@
-"""Bond test suite."""
+"""Bond test package."""

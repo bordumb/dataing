@@ -11,7 +11,7 @@
     "commits": [],
     "prs": [],
     "tests": [
-      "uv run pytest maestro/tests/ -v (68 passed)",
+      "uv run pytest maistro/tests/ -v (68 passed)",
       "Service feature flag verified in service.py"
     ]
   },

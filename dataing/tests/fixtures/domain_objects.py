@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timezone
 
 import pytest
 
@@ -24,6 +24,7 @@ from dataing.core.domain_types import (
     Hypothesis,
     HypothesisCategory,
     LineageContext,
+    MetricSpec,
 )
 from dataing.core.state import Event, InvestigationState
 
@@ -33,7 +34,8 @@ def sample_anomaly_alert() -> AnomalyAlert:
     """Return a sample anomaly alert."""
     return AnomalyAlert(
         dataset_id="public.orders",
-        metric_name="row_count",
+        metric_spec=MetricSpec.from_column("row_count"),
+        anomaly_type="row_count",
         expected_value=1000.0,
         actual_value=500.0,
         deviation_pct=50.0,
@@ -178,7 +180,7 @@ def sample_event() -> Event:
     """Return a sample event."""
     return Event(
         type="investigation_started",
-        timestamp=datetime.now(datetime.UTC),
+        timestamp=datetime.now(timezone.utc),
         data={"dataset_id": "public.orders"},
     )
 
@@ -190,7 +192,7 @@ def sample_approval_request() -> ApprovalRequest:
         investigation_id="inv-001",
         request_type=ApprovalRequestType.QUERY_APPROVAL,
         context={"query": "SELECT * FROM users LIMIT 10"},
-        requested_at=datetime.now(datetime.UTC),
+        requested_at=datetime.now(timezone.utc),
         requested_by="system",
     )
 
@@ -202,6 +204,6 @@ def sample_approval_decision() -> ApprovalDecision:
         request_id="req-001",
         decision=ApprovalDecisionType.APPROVED,
         decided_by="admin",
-        decided_at=datetime.now(datetime.UTC),
+        decided_at=datetime.now(timezone.utc),
         comment="Approved for testing",
     )

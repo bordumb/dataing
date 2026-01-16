@@ -1,0 +1,26 @@
+{
+  "assignee": "bordumbb@gmail.com",
+  "claim_note": "",
+  "claimed_at": "2026-01-16T17:49:45.912691Z",
+  "created_at": "2026-01-16T17:29:02.023136Z",
+  "depends_on": [],
+  "epic": "fn-15",
+  "evidence": {
+    "checks": [
+      "uv run ruff check maistro/src/maistro/result.py - passed",
+      "uv run mypy maistro/src/maistro/result.py --strict - passed"
+    ],
+    "commits": [
+      "8af3dc5a feat(maistro): add await_token and context_update to StepResult"
+    ],
+    "tests": [
+      "uv run pytest maistro/tests/test_core.py - 22 passed"
+    ]
+  },
+  "id": "fn-15.9",
+  "priority": null,
+  "spec_path": ".flow/tasks/fn-15.9.md",
+  "status": "done",
+  "title": "Modify result.py to add await_token field",
+  "updated_at": "2026-01-16T17:50:40.539680Z"
+}

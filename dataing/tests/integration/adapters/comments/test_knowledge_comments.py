@@ -27,22 +27,42 @@ class TestKnowledgeCommentsIntegration:
 
     @pytest.fixture
     async def tenant_id(self, db: AppDatabase) -> UUID:
-        """Get a valid tenant ID from the database."""
-        tenant = await db.fetch_one("SELECT id FROM tenants LIMIT 1")
-        if not tenant:
-            pytest.skip("No tenant in database")
-        return tenant["id"]
+        """Create a test tenant for integration tests."""
+        tenant_id = uuid4()
+        try:
+            await db.execute(
+                """
+                INSERT INTO tenants (id, name, slug)
+                VALUES ($1, $2, $3)
+                ON CONFLICT (slug) DO UPDATE SET name = EXCLUDED.name
+                """,
+                tenant_id,
+                "Test Tenant",
+                f"test-tenant-{tenant_id.hex[:8]}",
+            )
+        except Exception as e:
+            pytest.skip(f"Database schema not available: {e}")
+        return tenant_id
 
     @pytest.fixture
     async def dataset_id(self, db: AppDatabase, tenant_id: UUID) -> UUID:
-        """Get a valid dataset ID from the database."""
-        dataset = await db.fetch_one(
-            "SELECT id FROM datasets WHERE tenant_id = $1 LIMIT 1",
-            tenant_id,
-        )
-        if not dataset:
-            pytest.skip("No dataset in database")
-        return dataset["id"]
+        """Create a test dataset for integration tests."""
+        dataset_id = uuid4()
+        try:
+            await db.execute(
+                """
+                INSERT INTO datasets (id, tenant_id, name, fully_qualified_name)
+                VALUES ($1, $2, $3, $4)
+                ON CONFLICT (tenant_id, fully_qualified_name) DO UPDATE SET name = EXCLUDED.name
+                """,
+                dataset_id,
+                tenant_id,
+                "Test Dataset",
+                f"test.dataset_{dataset_id.hex[:8]}",
+            )
+        except Exception as e:
+            pytest.skip(f"Database schema not available: {e}")
+        return dataset_id
 
     async def test_create_knowledge_comment(
         self,
@@ -264,22 +284,42 @@ class TestKnowledgeCommentVotingIntegration:
 
     @pytest.fixture
     async def tenant_id(self, db: AppDatabase) -> UUID:
-        """Get a valid tenant ID from the database."""
-        tenant = await db.fetch_one("SELECT id FROM tenants LIMIT 1")
-        if not tenant:
-            pytest.skip("No tenant in database")
-        return tenant["id"]
+        """Create a test tenant for integration tests."""
+        tenant_id = uuid4()
+        try:
+            await db.execute(
+                """
+                INSERT INTO tenants (id, name, slug)
+                VALUES ($1, $2, $3)
+                ON CONFLICT (slug) DO UPDATE SET name = EXCLUDED.name
+                """,
+                tenant_id,
+                "Test Tenant",
+                f"test-tenant-{tenant_id.hex[:8]}",
+            )
+        except Exception as e:
+            pytest.skip(f"Database schema not available: {e}")
+        return tenant_id
 
     @pytest.fixture
     async def dataset_id(self, db: AppDatabase, tenant_id: UUID) -> UUID:
-        """Get a valid dataset ID from the database."""
-        dataset = await db.fetch_one(
-            "SELECT id FROM datasets WHERE tenant_id = $1 LIMIT 1",
-            tenant_id,
-        )
-        if not dataset:
-            pytest.skip("No dataset in database")
-        return dataset["id"]
+        """Create a test dataset for integration tests."""
+        dataset_id = uuid4()
+        try:
+            await db.execute(
+                """
+                INSERT INTO datasets (id, tenant_id, name, fully_qualified_name)
+                VALUES ($1, $2, $3, $4)
+                ON CONFLICT (tenant_id, fully_qualified_name) DO UPDATE SET name = EXCLUDED.name
+                """,
+                dataset_id,
+                tenant_id,
+                "Test Dataset",
+                f"test.dataset_{dataset_id.hex[:8]}",
+            )
+        except Exception as e:
+            pytest.skip(f"Database schema not available: {e}")
+        return dataset_id
 
     async def test_upvote_knowledge_comment(
         self,

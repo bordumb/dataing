@@ -13,13 +13,13 @@
     ],
     "prs": [],
     "tests": [
-      "cd maestro && uv run pytest tests/ -v"
+      "cd maistro && uv run pytest tests/ -v"
     ]
   },
   "id": "fn-5.3",
   "priority": null,
   "spec_path": ".flow/tasks/fn-5.3.md",
   "status": "done",
-  "title": "Port Signal Handling to Maestro",
+  "title": "Port Signal Handling to Maistro",
   "updated_at": "2026-01-13T02:06:52.556625Z"
 }

@@ -13,7 +13,7 @@ nav:
   - Architecture: architecture.md
   - Concepts:
       - "How Investigations Work": concepts/investigations.md
-      - "The Agent Engine (Maestro)": concepts/agent-workflows.md
+      - "The Agent Engine (Maistro)": concepts/agent-workflows.md
       - "Safety & Guardrails": concepts/guardrails.md
   - Integrations:
       - Warehouses:

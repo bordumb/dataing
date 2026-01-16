@@ -1,7 +1,7 @@
-# fn-5.3 Port Signal Handling to Maestro
+# fn-5.3 Port Signal Handling to Maistro
 
 ## Description
-Port signal handling logic to maestro as an extensible plugin system.
+Port signal handling logic to maistro as an extensible plugin system.
 
 ## Implementation
 
@@ -34,7 +34,7 @@ Port signal handling logic to maestro as an extensible plugin system.
    - `merge(parent_context, child_contexts) -> ContextT`
 
 ## Key Files
-- New: `maestro/src/maestro/handlers.py`
+- New: `maistro/src/maistro/handlers.py`
 - Reference: `dataing/src/dataing/core/investigation/orchestrator/signal_handlers.py:20-294`
 - Reference: `dataing/src/dataing/core/investigation/orchestrator/merge.py:15-75`
 ## Acceptance
@@ -63,5 +63,5 @@ Verification:
 - mypy --strict passes
 ## Evidence
 - Commits: c48c334b624a22720d83c05ca4dd5e5b6cb3cdd7
-- Tests: cd maestro && uv run pytest tests/ -v
+- Tests: cd maistro && uv run pytest tests/ -v
 - PRs:

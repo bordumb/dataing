@@ -52,8 +52,8 @@ Refactor AI-powered steps to use the BondStep pattern.
 - [ ] Integration test: Full flow with BondStep-based steps works
 - [ ] AgentClient usage is minimal or removed
 ## Done summary
-- BondStep infrastructure created in fn-5.7 (bond/src/bond/maestro/)
-- Existing steps already work with maestro protocol (fn-5.5)
+- BondStep infrastructure created in fn-5.7 (bond/src/bond/maistro/)
+- Existing steps already work with maistro protocol (fn-5.5)
 - Full BondStep refactoring deferred to incremental follow-up work
 
 Why deferred:
@@ -70,9 +70,9 @@ Migration path documented:
 
 Verification:
 - BondStep tests pass (8 tests from fn-5.7)
-- Current steps work with maestro (fn-5.5 verified)
+- Current steps work with maistro (fn-5.5 verified)
 - build_investigation_workflow() uses current steps (fn-5.6)
 ## Evidence
 - Commits:
-- Tests: uv run pytest bond/tests/unit/maestro -v (8 passed from fn-5.7), uv run pytest maestro/tests/ -v (68 passed)
+- Tests: uv run pytest bond/tests/unit/maistro -v (8 passed from fn-5.7), uv run pytest maistro/tests/ -v (68 passed)
 - PRs:

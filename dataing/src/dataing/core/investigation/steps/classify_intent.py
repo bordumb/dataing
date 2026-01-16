@@ -177,6 +177,7 @@ class ClassifyIntentStep(Step[dict[str, Any] | None, RefinementIntent]):
                 signal=Signal.AWAIT_USER,
                 output=intent,
                 next_step=StepType.AWAIT_USER.value,
+                await_token="clarify_user_input",
             )
 
         # Handle ACKNOWLEDGE intent - complete the branch

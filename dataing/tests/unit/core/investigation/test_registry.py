@@ -4,7 +4,7 @@ from dataing.core.investigation.entities import InvestigationContext
 from dataing.core.investigation.registry import StepRegistry
 from dataing.core.investigation.steps.protocol import Step, StepResult
 from dataing.core.investigation.values import StepType
-from maestro import Signal
+from maistro import Signal
 
 
 class MockStep(Step[None, str]):

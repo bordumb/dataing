@@ -8,7 +8,7 @@ from dataing.core.domain_types import AnomalyAlert, MetricSpec
 from dataing.core.investigation.entities import InvestigationContext
 from dataing.core.investigation.steps.gather_context import GatherContextStep
 from dataing.core.investigation.values import StepType
-from maestro import Signal
+from maistro import Signal
 
 
 @pytest.fixture

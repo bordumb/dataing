@@ -270,7 +270,7 @@ function DocsSection() {
     },
     {
       title: 'Architecture',
-      description: 'Understanding the maestro workflow engine and bond agent runtime',
+      description: 'Understanding the maistro workflow engine and bond agent runtime',
       href: 'https://docs.dataing.io/architecture',
       icon: <GitBranch />,
     },

@@ -1,4 +1,4 @@
-"""End-to-end tests for investigation flow using maestro.
+"""End-to-end tests for investigation flow using maistro.
 
 These tests use REAL implementations - no mocks, no stubs.
 They verify the complete investigation workflow from start to finish.
@@ -206,7 +206,7 @@ class TestGatherContextStep:
         pattern_repository: InMemoryPatternRepository,
     ) -> None:
         """Test that gather_context discovers the real DuckDB schema."""
-        from maestro import Signal
+        from maistro import Signal
 
         workflow = build_investigation_workflow(
             context_engine=context_engine,
@@ -391,7 +391,7 @@ class TestStepByStepExecution:
         pattern_repository: InMemoryPatternRepository,
     ) -> None:
         """Execute workflow step by step with detailed logging."""
-        from maestro import Signal
+        from maistro import Signal
 
         workflow = build_investigation_workflow(
             context_engine=context_engine,

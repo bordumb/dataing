@@ -2,7 +2,7 @@
 
 ## Overview
 
-Create a production-ready, enterprise-grade documentation site for dataing using MkDocs with Material theme. The documentation should be 90% focused on `dataing` (the B2B platform), with a "How it Works" section explaining `maestro` and `bond` to prove engineering robustness.
+Create a production-ready, enterprise-grade documentation site for dataing using MkDocs with Material theme. The documentation should be 90% focused on `dataing` (the B2B platform), with a "How it Works" section explaining `maistro` and `bond` to prove engineering robustness.
 
 ## Scope
 
@@ -13,7 +13,7 @@ Create a production-ready, enterprise-grade documentation site for dataing using
   - `index.md` - Landing page (Value Prop)
   - `quickstart.md` - 5-minute DuckDB guide
   - `architecture.md` - High-level Core vs Adapters diagram
-  - `concepts/` - Investigations, Agent Workflows (Maestro), Guardrails
+  - `concepts/` - Investigations, Agent Workflows (Maistro), Guardrails
   - `integrations/` - Warehouses, Lineage, Notifications
   - `security/` - Data Privacy, RBAC, Compliance
 
@@ -32,7 +32,7 @@ docs/docs/
 ├── architecture.md              # High-level diagram of Core vs Adapters
 ├── concepts/
 │   ├── investigations.md        # Gather -> Hypothesize -> Verify loop
-│   ├── agent-workflows.md       # Maestro (Steps, Signals, FSM)
+│   ├── agent-workflows.md       # Maistro (Steps, Signals, FSM)
 │   └── guardrails.md            # Safety (Validators, Circuit Breakers)
 ├── integrations/
 │   ├── warehouses/              # dataing/adapters/datasource/sql/
@@ -82,7 +82,7 @@ nav:
   - Architecture: architecture.md
   - Concepts:
       - "How Investigations Work": concepts/investigations.md
-      - "The Agent Engine (Maestro)": concepts/agent-workflows.md
+      - "The Agent Engine (Maistro)": concepts/agent-workflows.md
       - "Safety & Guardrails": concepts/guardrails.md
   - Integrations:
       - Warehouses:
@@ -138,10 +138,10 @@ cd docs && mkdocs build --strict
 - `/dataing/src/dataing/safety/circuit_breaker.py` - Rate limiting
 - `/dataing/src/dataing/safety/pii.py` - PII detection
 
-**Maestro Workflow Engine:**
-- `/maestro/src/maestro/workflow.py` - Workflow executor
-- `/maestro/src/maestro/step.py` - Step protocol
-- `/maestro/src/maestro/signals.py` - Signal enum (CONTINUE, COMPLETE, SUSPEND)
+**Maistro Workflow Engine:**
+- `/maistro/src/maistro/workflow.py` - Workflow executor
+- `/maistro/src/maistro/step.py` - Step protocol
+- `/maistro/src/maistro/signals.py` - Signal enum (CONTINUE, COMPLETE, SUSPEND)
 
 **Adapters:**
 - `/dataing/src/dataing/adapters/datasource/sql/` - Warehouse adapters

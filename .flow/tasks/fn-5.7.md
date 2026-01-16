@@ -1,17 +1,17 @@
-# fn-5.7 Create Bond-Maestro Bridge
+# fn-5.7 Create Bond-Maistro Bridge
 
 ## Description
 Create the BondStep base class for AI-powered steps.
 
 ## Implementation
 
-1. Create `bond/src/bond/maestro/` module.
+1. Create `bond/src/bond/maistro/` module.
 
 2. Define `BondStep` abstract base class:
    ```python
-   # bond/src/bond/maestro/bond_step.py
+   # bond/src/bond/maistro/bond_step.py
    from abc import ABC, abstractmethod
-   from maestro import Step, StepResult
+   from maistro import Step, StepResult
    from bond import BondAgent, StreamHandlers
 
    class BondStep(ABC, Step[ContextT, InputT, OutputT]):
@@ -45,43 +45,43 @@ Create the BondStep base class for AI-powered steps.
 3. Export from bond package:
    ```python
    # bond/src/bond/__init__.py
-   from bond.maestro.bond_step import BondStep
+   from bond.maistro.bond_step import BondStep
    ```
 
 ## Key Files
-- New: `bond/src/bond/maestro/__init__.py`
-- New: `bond/src/bond/maestro/bond_step.py`
+- New: `bond/src/bond/maistro/__init__.py`
+- New: `bond/src/bond/maistro/bond_step.py`
 - Modify: `bond/src/bond/__init__.py`
 - Reference: `bond/src/bond/agent.py:76-291`
 ## Acceptance
-- [ ] `bond.maestro` module exists
+- [ ] `bond.maistro` module exists
 - [ ] `BondStep` is an abstract base class
-- [ ] `BondStep` satisfies `maestro.Step` protocol
+- [ ] `BondStep` satisfies `maistro.Step` protocol
 - [ ] `create_agent()`, `build_prompt()`, `map_response()` are abstract
 - [ ] `execute()` orchestrates agent call
 - [ ] `StreamHandlers` can be passed to BondStep
 - [ ] `from bond import BondStep` works
 - [ ] Unit test: Mock BondStep implementation executes correctly
-- [ ] No circular dependency between bond and maestro
+- [ ] No circular dependency between bond and maistro
 ## Done summary
-- Created bond/src/bond/maestro/ module with BondStep base class
+- Created bond/src/bond/maistro/ module with BondStep base class
 - BondStep is ABC with abstract methods: create_agent(), build_prompt(), map_response()
 - execute() orchestrates agent call using template method pattern
-- BondStep satisfies maestro.Step protocol via name property and execute()
+- BondStep satisfies maistro.Step protocol via name property and execute()
 - StreamHandlers can be passed to BondStep for real-time callbacks
 - Exported from bond package: `from bond import BondStep`
 - Added 8 unit tests verifying protocol compliance and execution
 
 Why:
-- BondStep provides clean bridge between BondAgent and maestro.Workflow
+- BondStep provides clean bridge between BondAgent and maistro.Workflow
 - Template method pattern separates concerns (agent creation, prompting, response mapping)
 - Handles agent errors gracefully with FAIL signal
 
 Verification:
-- mypy passes on bond/src/bond/maestro --strict
+- mypy passes on bond/src/bond/maistro --strict
 - 8 unit tests pass (test_bond_step.py)
 - Import test: `from bond import BondStep` works
 ## Evidence
 - Commits:
-- Tests: uv run mypy bond/src/bond/maestro --strict, uv run pytest bond/tests/unit/maestro -v (8 passed), uv run python -c 'from bond import BondStep'
+- Tests: uv run mypy bond/src/bond/maistro --strict, uv run pytest bond/tests/unit/maistro -v (8 passed), uv run python -c 'from bond import BondStep'
 - PRs:

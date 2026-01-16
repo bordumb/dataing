@@ -20,7 +20,7 @@ Create a high-level architecture overview page with a Mermaid diagram showing Co
        end
        subgraph Core["Core Domain"]
            INV[Investigation Engine]
-           AGT[Agent Runtime<br/>Bond + Maestro]
+           AGT[Agent Runtime<br/>Bond + Maistro]
            SFT[Safety Layer]
        end
        DW --> INV
@@ -38,7 +38,7 @@ Create a high-level architecture overview page with a Mermaid diagram showing Co
 3. **Key Components:**
    - **Investigation Engine**: Orchestrates the investigation workflow
    - **Bond**: Agent runtime (PydanticAI wrapper)
-   - **Maestro**: Workflow FSM (Steps, Signals, Branching)
+   - **Maistro**: Workflow FSM (Steps, Signals, Branching)
    - **Safety Layer**: Query validation, rate limiting, PII masking
 
 4. **Data Flow:**
@@ -50,13 +50,13 @@ Create a high-level architecture overview page with a Mermaid diagram showing Co
 
 - `/dataing/src/dataing/core/` - Core domain
 - `/dataing/src/dataing/adapters/` - Adapter implementations
-- `/maestro/src/maestro/` - Workflow engine
+- `/maistro/src/maistro/` - Workflow engine
 - `/bond/src/bond/` - Agent runtime
 ## Acceptance
 - [ ] File exists at `docs/docs/architecture.md`
 - [ ] Mermaid diagram renders correctly
 - [ ] Hexagonal architecture explained
-- [ ] Bond and Maestro mentioned
+- [ ] Bond and Maistro mentioned
 - [ ] Safety layer described
 - [ ] Data flow visualized or described
 - [ ] Links to deeper concept pages
@@ -64,8 +64,8 @@ Create a high-level architecture overview page with a Mermaid diagram showing Co
 - Created comprehensive architecture overview at docs/docs/architecture.md
 - Added high-level mermaid flowchart showing Core, Adapters, External Services
 - Explained hexagonal architecture with ports and adapters pattern
-- Documented package dependency order (maestro → bond → dataing)
-- Described Maestro workflow engine: Steps protocol, Signals, Branching
+- Documented package dependency order (maistro → bond → dataing)
+- Described Maistro workflow engine: Steps protocol, Signals, Branching
 - Described Bond agent runtime with BondStep template pattern
 - Added safety layer overview (validator, PII, circuit breaker)
 - Included sequence diagram showing investigation data flow

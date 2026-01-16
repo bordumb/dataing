@@ -18,7 +18,7 @@ SEARCH_PREFIXES = [
     # "dataing",
     # "frontend",
     # "bond",
-    "maestro",
+    "maistro",
     # "docs/feedback",
 ]
 

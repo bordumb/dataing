@@ -13,7 +13,7 @@
     ],
     "prs": [],
     "tests": [
-      "cd maestro && uv run pytest tests/ -v"
+      "cd maistro && uv run pytest tests/ -v"
     ]
   },
   "id": "fn-5.2",

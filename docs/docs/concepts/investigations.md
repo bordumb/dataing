@@ -285,7 +285,7 @@ stateDiagram-v2
 
 <div class="grid cards" markdown>
 
--   :material-state-machine: **[Agent Workflows (Maestro)](agent-workflows.md)**
+-   :material-state-machine: **[Agent Workflows (Maistro)](agent-workflows.md)**
 
     ---
 

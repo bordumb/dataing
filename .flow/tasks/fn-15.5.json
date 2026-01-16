@@ -1,0 +1,24 @@
+{
+  "assignee": "bordumbb@gmail.com",
+  "claim_note": "",
+  "claimed_at": "2026-01-16T17:48:51.189648Z",
+  "created_at": "2026-01-16T17:28:54.104397Z",
+  "depends_on": [],
+  "epic": "fn-15",
+  "evidence": {
+    "checks": [
+      "uv run ruff check maistro/src/maistro/merge.py - passed",
+      "uv run mypy maistro/src/maistro/merge.py --strict - passed"
+    ],
+    "commits": [
+      "38235e6c feat(maistro): add merge.py with MergeStrategy protocol"
+    ],
+    "tests": []
+  },
+  "id": "fn-15.5",
+  "priority": null,
+  "spec_path": ".flow/tasks/fn-15.5.md",
+  "status": "done",
+  "title": "Create merge.py with MergeStrategy protocol",
+  "updated_at": "2026-01-16T17:49:34.245336Z"
+}

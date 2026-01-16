@@ -1,0 +1,29 @@
+{
+  "assignee": "bordumbb@gmail.com",
+  "claim_note": "",
+  "claimed_at": "2026-01-16T17:55:51.748331Z",
+  "created_at": "2026-01-16T17:29:02.224165Z",
+  "depends_on": [
+    "fn-15.6",
+    "fn-15.7"
+  ],
+  "epic": "fn-15",
+  "evidence": {
+    "checks": [
+      "uv run ruff check maistro/src/maistro/ - passed",
+      "uv run mypy maistro/src/maistro/ --strict - passed"
+    ],
+    "commits": [
+      "99dde836 feat(maistro): refactor workflow.py as facade over Engine+Runner"
+    ],
+    "tests": [
+      "uv run pytest maistro/tests/ - 68 tests passed"
+    ]
+  },
+  "id": "fn-15.10",
+  "priority": null,
+  "spec_path": ".flow/tasks/fn-15.10.md",
+  "status": "done",
+  "title": "Refactor workflow.py as facade over Engine+Runner",
+  "updated_at": "2026-01-16T18:18:44.358565Z"
+}

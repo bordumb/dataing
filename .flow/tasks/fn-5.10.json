@@ -11,9 +11,9 @@
     "commits": [],
     "prs": [],
     "tests": [
-      "uv run pytest maestro/tests/ -v (68 passed)",
-      "uv run pytest bond/tests/unit/maestro -v (8 passed)",
-      "uv run mypy src/maestro --strict (success)"
+      "uv run pytest maistro/tests/ -v (68 passed)",
+      "uv run pytest bond/tests/unit/maistro -v (8 passed)",
+      "uv run mypy src/maistro --strict (success)"
     ]
   },
   "id": "fn-5.10",

@@ -1,14 +1,14 @@
-# fn-5.1 Define Maestro Core Protocols
+# fn-5.1 Define Maistro Core Protocols
 
 ## Description
-Create the maestro package with core protocols for generic step-based workflows.
+Create the maistro package with core protocols for generic step-based workflows.
 
 ## Implementation
 
-1. Create `maestro/` package structure:
+1. Create `maistro/` package structure:
    ```
-   maestro/
-     src/maestro/
+   maistro/
+     src/maistro/
        __init__.py
        step.py
        result.py
@@ -39,23 +39,23 @@ Create the maestro package with core protocols for generic step-based workflows.
 5. Use `typing.Protocol` with `@runtime_checkable` for structural subtyping.
 
 ## Key Files
-- New: `maestro/src/maestro/step.py`
-- New: `maestro/src/maestro/result.py`
-- New: `maestro/src/maestro/signals.py`
+- New: `maistro/src/maistro/step.py`
+- New: `maistro/src/maistro/result.py`
+- New: `maistro/src/maistro/signals.py`
 - Reference: `dataing/src/dataing/core/investigation/steps/protocol.py:20-94`
 - Reference: `dataing/src/dataing/core/investigation/values.py:91-101`
 ## Acceptance
-- [ ] `maestro/` package exists with `pyproject.toml`
-- [ ] `pip install -e ./maestro` works
+- [ ] `maistro/` package exists with `pyproject.toml`
+- [ ] `pip install -e ./maistro` works
 - [ ] `Signal` enum has 5 values: CONTINUE, COMPLETE, FAIL, BRANCH, MERGE
 - [ ] `StepResult` is a frozen dataclass with generic type parameters
 - [ ] `Step` is a `typing.Protocol` (not ABC)
 - [ ] `Step` is `@runtime_checkable`
-- [ ] `mypy maestro/src/maestro/ --strict` passes
+- [ ] `mypy maistro/src/maistro/ --strict` passes
 - [ ] Unit tests cover StepResult creation and Signal usage
 - [ ] No dependencies on pydantic-ai, openai, or anthropic
 ## Done summary
-- Created maestro package with core protocols for generic workflows
+- Created maistro package with core protocols for generic workflows
 - Defined Signal enum (CONTINUE, COMPLETE, FAIL, BRANCH, MERGE)
 - Defined StepResult[ContextT, OutputT] frozen dataclass with validation
 - Defined Step protocol with @runtime_checkable for structural subtyping
@@ -67,9 +67,9 @@ Why:
 Verification:
 - 21 unit tests passing
 - mypy --strict passes
-- pip install -e ./maestro works
+- pip install -e ./maistro works
 - No LLM dependencies (pydantic-ai, openai, anthropic)
 ## Evidence
 - Commits: 5e7555a7747628947063c2eff1567def6c92a7da
-- Tests: cd maestro && uv run pytest tests/ -v
+- Tests: cd maistro && uv run pytest tests/ -v
 - PRs:

@@ -26,7 +26,7 @@ Create a compelling hero landing page that positions dataing as "The AI Data Rel
 
 4. **Architecture Highlights:**
    - Hexagonal Architecture (Ports/Adapters)
-   - Agentic Workflows (Maestro + Bond)
+   - Agentic Workflows (Maistro + Bond)
    - FSM Safety (Circuit breaker, query limits)
 
 5. **Integrations:**

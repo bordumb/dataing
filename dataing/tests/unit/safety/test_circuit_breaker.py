@@ -2,10 +2,10 @@
 
 from __future__ import annotations
 
-from datetime import datetime
+from dataclasses import FrozenInstanceError
+from datetime import datetime, timezone
 
 import pytest
-from pydantic import ValidationError
 
 from dataing.core.exceptions import CircuitBreakerTripped
 from dataing.core.state import Event
@@ -39,7 +39,7 @@ class TestCircuitBreakerConfig:
         """Test that config is immutable."""
         config = CircuitBreakerConfig()
 
-        with pytest.raises(ValidationError):
+        with pytest.raises(FrozenInstanceError):
             config.max_total_queries = 100
 
 
@@ -80,7 +80,7 @@ class TestCircuitBreaker:
         events = [
             Event(
                 type="query_submitted",
-                timestamp=datetime.now(datetime.UTC),
+                timestamp=datetime.now(timezone.utc),
                 data={"hypothesis_id": f"h{i:03d}", "query": f"SELECT {i}"},
             )
             for i in range(3)
@@ -99,7 +99,7 @@ class TestCircuitBreaker:
         events = [
             Event(
                 type="query_submitted",
-                timestamp=datetime.now(datetime.UTC),
+                timestamp=datetime.now(timezone.utc),
                 data={"hypothesis_id": "h001", "query": f"SELECT {i}"},
             )
             for i in range(2)
@@ -118,7 +118,7 @@ class TestCircuitBreaker:
         events = [
             Event(
                 type="reflexion_attempted",
-                timestamp=datetime.now(datetime.UTC),
+                timestamp=datetime.now(timezone.utc),
                 data={"hypothesis_id": "h001"},
             )
         ]
@@ -136,7 +136,7 @@ class TestCircuitBreaker:
         events = [
             Event(
                 type="query_failed",
-                timestamp=datetime.now(datetime.UTC),
+                timestamp=datetime.now(timezone.utc),
                 data={},
             )
             for _ in range(2)
@@ -155,17 +155,17 @@ class TestCircuitBreaker:
         events = [
             Event(
                 type="query_failed",
-                timestamp=datetime.now(datetime.UTC),
+                timestamp=datetime.now(timezone.utc),
                 data={},
             ),
             Event(
                 type="query_succeeded",
-                timestamp=datetime.now(datetime.UTC),
+                timestamp=datetime.now(timezone.utc),
                 data={},
             ),
             Event(
                 type="query_failed",
-                timestamp=datetime.now(datetime.UTC),
+                timestamp=datetime.now(timezone.utc),
                 data={},
             ),
         ]
@@ -178,12 +178,12 @@ class TestCircuitBreaker:
         events = [
             Event(
                 type="query_submitted",
-                timestamp=datetime.now(datetime.UTC),
+                timestamp=datetime.now(timezone.utc),
                 data={"hypothesis_id": "h001", "query": "SELECT 1"},
             ),
             Event(
                 type="query_submitted",
-                timestamp=datetime.now(datetime.UTC),
+                timestamp=datetime.now(timezone.utc),
                 data={"hypothesis_id": "h001", "query": "SELECT 1"},
             ),
         ]
@@ -198,12 +198,12 @@ class TestCircuitBreaker:
         events = [
             Event(
                 type="query_submitted",
-                timestamp=datetime.now(datetime.UTC),
+                timestamp=datetime.now(timezone.utc),
                 data={"hypothesis_id": "h001", "query": "SELECT 1"},
             ),
             Event(
                 type="query_submitted",
-                timestamp=datetime.now(datetime.UTC),
+                timestamp=datetime.now(timezone.utc),
                 data={"hypothesis_id": "h001", "query": "SELECT 2"},
             ),
         ]
@@ -218,12 +218,12 @@ class TestCircuitBreaker:
         events = [
             Event(
                 type="query_submitted",
-                timestamp=datetime.now(datetime.UTC),
+                timestamp=datetime.now(timezone.utc),
                 data={"hypothesis_id": "h001", "query": "SELECT 1"},
             ),
             Event(
                 type="query_submitted",
-                timestamp=datetime.now(datetime.UTC),
+                timestamp=datetime.now(timezone.utc),
                 data={"hypothesis_id": "h001", "query": "SELECT 2"},
             ),
         ]
@@ -236,7 +236,7 @@ class TestCircuitBreaker:
         events = [
             Event(
                 type="query_failed",
-                timestamp=datetime.now(datetime.UTC),
+                timestamp=datetime.now(timezone.utc),
                 data={},
             ),
         ]

@@ -1,7 +1,7 @@
-"""Type aliases for maestro integration.
+"""Type aliases for maistro integration.
 
 These aliases provide convenient typing for investigation steps
-that use the maestro workflow engine.
+that use the maistro workflow engine.
 """
 
 from __future__ import annotations
@@ -9,7 +9,7 @@ from __future__ import annotations
 from typing import Any
 
 from dataing.core.investigation.entities import InvestigationContext
-from maestro import Step, StepResult
+from maistro import Step, StepResult
 
 # Step type for investigation workflows
 InvestigationStep = Step[InvestigationContext, Any, Any]

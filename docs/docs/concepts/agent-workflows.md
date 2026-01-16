@@ -1,6 +1,6 @@
-# The Agent Engine (Maestro)
+# The Agent Engine (Maistro)
 
-Maestro is dataing's workflow engine - a finite state machine that provides deterministic execution with human-in-the-loop gates.
+Maistro is dataing's workflow engine - a finite state machine that provides deterministic execution with human-in-the-loop gates.
 
 ---
 
@@ -13,13 +13,13 @@ LLMs are powerful but unpredictable. Without structure, they can:
 - **Drift off-topic** - Explore tangential hypotheses
 - **Act without permission** - Execute queries without review
 
-Maestro solves these problems with **bounded, deterministic workflows**:
+Maistro solves these problems with **bounded, deterministic workflows**:
 
 <div class="grid" markdown>
 
 <div markdown>
 
-**Without Maestro**
+**Without Maistro**
 
 ```mermaid
 flowchart LR
@@ -33,7 +33,7 @@ flowchart LR
 
 <div markdown>
 
-**With Maestro**
+**With Maistro**
 
 ```mermaid
 flowchart LR
@@ -49,9 +49,9 @@ flowchart LR
 
 </div>
 
-!!! success "Why Maestro Wins"
+!!! success "Why Maistro Wins"
 
-    | | Without Maestro | With Maestro |
+    | | Without Maistro | With Maistro |
     |---|---|---|
     | **Termination** | May loop forever | Guaranteed to complete or fail |
     | **Cost Control** | Unbounded token spend | Circuit breaker limits |
@@ -62,7 +62,7 @@ flowchart LR
 
     **The unbounded approach** treats the LLM as an autonomous agent that can take any action at any time. This leads to runaway costs, infinite loops, and decisions made without human review.
 
-    **Maestro's FSM approach** constrains the LLM to well-defined steps with explicit transitions. The workflow always terminates, costs are bounded, and humans can gate critical decisions.
+    **Maistro's FSM approach** constrains the LLM to well-defined steps with explicit transitions. The workflow always terminates, costs are bounded, and humans can gate critical decisions.
 
 ---
 
@@ -143,7 +143,7 @@ class StepResult(Generic[ContextT, OutputT]):
 
 ## Branching & Merging
 
-Maestro's killer feature is **parallel hypothesis testing** via branching:
+Maistro's killer feature is **parallel hypothesis testing** via branching:
 
 ### Branch Request
 

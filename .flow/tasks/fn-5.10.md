@@ -11,12 +11,12 @@ Final cleanup, validation, and documentation.
    - Deprecated type definitions
 
 2. Verify package structure:
-   - maestro: Zero LLM dependencies
-   - bond: Has maestro in deps, no dataing
-   - dataing: Has both maestro and bond in deps
+   - maistro: Zero LLM dependencies
+   - bond: Has maistro in deps, no dataing
+   - dataing: Has both maistro and bond in deps
 
 3. Run full test suite:
-   - maestro unit tests
+   - maistro unit tests
    - bond unit tests
    - dataing unit + integration tests
 
@@ -36,9 +36,9 @@ Final cleanup, validation, and documentation.
 - Update: CLAUDE.md
 - Update: Package READMEs
 ## Acceptance
-- [ ] Three packages: maestro, bond, dataing
+- [ ] Three packages: maistro, bond, dataing
 - [ ] No circular dependencies (verified via import test)
-- [ ] maestro has zero LLM dependencies
+- [ ] maistro has zero LLM dependencies
 - [ ] All tests pass (unit + integration)
 - [ ] dataing codebase reduced by ~20%
 - [ ] CLAUDE.md updated with new architecture
@@ -49,24 +49,24 @@ Final cleanup, validation, and documentation.
 Final Cleanup and Validation completed:
 
 Package verification:
-- maestro: Zero dependencies, passes mypy --strict
-- bond: Has maestro-flow dependency, 8 BondStep tests passing
-- dataing: Has both maestro-flow and bond dependencies
+- maistro: Zero dependencies, passes mypy --strict
+- bond: Has maistro-flow dependency, 8 BondStep tests passing
+- dataing: Has both maistro-flow and bond dependencies
 
 Dependency chain:
-- maestro (zero deps) → bond (maestro + pydantic-ai) → dataing (bond + maestro)
+- maistro (zero deps) → bond (maistro + pydantic-ai) → dataing (bond + maistro)
 
 Test results:
-- Maestro: 68 tests passing
-- Bond maestro module: 8 tests passing
+- Maistro: 68 tests passing
+- Bond maistro module: 8 tests passing
 - No circular dependencies detected
 
 mypy fixes:
-- Fixed ContextT variance in maestro/step.py (changed from contravariant to invariant)
-- All maestro files pass mypy --strict
+- Fixed ContextT variance in maistro/step.py (changed from contravariant to invariant)
+- All maistro files pass mypy --strict
 
 CLAUDE.md updated with:
-- Maestro workflow engine documentation
+- Maistro workflow engine documentation
 - Bond agent runtime documentation
 - Package dependency order
 - Feature flag documentation (INVESTIGATION_ENGINE=v2)
@@ -75,5 +75,5 @@ Pre-existing issues (not from this refactor):
 - bond/src/bond/agent.py has 7 mypy errors related to pydantic-ai types
 ## Evidence
 - Commits:
-- Tests: uv run pytest maestro/tests/ -v (68 passed), uv run pytest bond/tests/unit/maestro -v (8 passed), uv run mypy src/maestro --strict (success)
+- Tests: uv run pytest maistro/tests/ -v (68 passed), uv run pytest bond/tests/unit/maistro -v (8 passed), uv run mypy src/maistro --strict (success)
 - PRs:

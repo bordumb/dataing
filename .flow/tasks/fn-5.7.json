@@ -11,8 +11,8 @@
     "commits": [],
     "prs": [],
     "tests": [
-      "uv run mypy bond/src/bond/maestro --strict",
-      "uv run pytest bond/tests/unit/maestro -v (8 passed)",
+      "uv run mypy bond/src/bond/maistro --strict",
+      "uv run pytest bond/tests/unit/maistro -v (8 passed)",
       "uv run python -c 'from bond import BondStep'"
     ]
   },
@@ -20,6 +20,6 @@
   "priority": null,
   "spec_path": ".flow/tasks/fn-5.7.md",
   "status": "done",
-  "title": "Create Bond-Maestro Bridge",
+  "title": "Create Bond-Maistro Bridge",
   "updated_at": "2026-01-13T02:34:21.387086Z"
 }

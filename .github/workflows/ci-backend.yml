@@ -5,7 +5,7 @@ on:
     branches: [main]
     paths:
       - 'bond/**'
-      - 'maestro/**'
+      - 'maistro/**'
       - 'dataing/**'
       - 'dataing-ee/**'
       - 'pyproject.toml'
@@ -15,7 +15,7 @@ on:
     branches: [main]
     paths:
       - 'bond/**'
-      - 'maestro/**'
+      - 'maistro/**'
       - 'dataing/**'
       - 'dataing-ee/**'
       - 'pyproject.toml'
@@ -58,13 +58,28 @@ jobs:
         run: uv sync --all-extras
 
       - name: Run Ruff
-        run: uv run ruff check bond/ maestro/ dataing/ dataing-ee/
+        run: uv run ruff check bond/src maistro/src dataing/src dataing-ee/src
 
       - name: Run mypy
-        run: uv run mypy
+        run: uv run mypy bond/src maistro/src dataing/src dataing-ee/src
 
+      # Run database migrations for integration tests
+      - name: Run migrations
+        run: |
+          for f in dataing/migrations/*.sql; do
+            echo "Running $f..."
+            psql -h localhost -U test -d test -f "$f" 2>&1 | grep -v "^NOTICE:" || true
+          done
+        env:
+          PGPASSWORD: test
+
+      # Run tests per-package to avoid conftest.py module conflicts
       - name: Run tests
-        run: uv run pytest maestro/tests bond/tests dataing/tests dataing-ee/tests --cov=maestro/src/maestro --cov-report=xml
+        run: |
+          uv run pytest maistro/tests --cov=maistro/src/maistro --cov-report=xml
+          uv run pytest bond/tests --cov=bond/src/bond --cov-report=xml --cov-append
+          uv run pytest dataing/tests --cov=dataing/src/dataing --cov-report=xml --cov-append
+          uv run pytest dataing-ee/tests --cov=dataing-ee/src/dataing_ee --cov-report=xml --cov-append
         env:
           DATABASE_URL: postgresql://test:test@localhost:5432/test
 

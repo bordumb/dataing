@@ -7,8 +7,8 @@ DO NOT WORRY ABOUT LEGACY CODE.
 
 ## Repository Map (Monorepo)
 
-- maestro/ - Generic workflow engine (zero deps, protocol-based steps)
-- bond/ - Agent runtime (PydanticAI wrapper, streaming, BondStep bridge to maestro)
+- maistro/ - Generic workflow engine (zero deps, protocol-based steps)
+- bond/ - Agent runtime (PydanticAI wrapper, streaming, BondStep bridge to maistro)
 - dataing/ - Community Edition (CE) backend package, migrations, scripts
 - dataing-ee/ - Enterprise Edition (EE) extension package
 - frontend/ - React + Vite + TypeScript + Tailwind + shadcn/ui
@@ -18,7 +18,7 @@ DO NOT WORRY ABOUT LEGACY CODE.
 ### Package Dependency Order
 
 ```
-maestro (zero deps) → bond (maestro + pydantic-ai) → dataing (bond + maestro)
+maistro (zero deps) → bond (maistro + pydantic-ai) → dataing (bond + maistro)
 ```
 
 ## Development Commands
@@ -78,9 +78,9 @@ The repo is open-core:
 - EE lives in `dataing-ee/` and extends CE with enterprise-only features
 - `bond/` provides the agent runtime and memory tools used by the backend
 
-## Maestro Workflow Engine
+## Maistro Workflow Engine
 
-`maestro/src/maestro/` is a standalone generic workflow engine with zero dependencies:
+`maistro/src/maistro/` is a standalone generic workflow engine with zero dependencies:
 - `step.py` - `Step[ContextT, InputT, OutputT]` protocol for workflow steps
 - `result.py` - `StepResult`, `BranchRequest`, `BranchSpec` immutable result types
 - `signals.py` - `Signal` enum (CONTINUE, COMPLETE, FAIL, BRANCH, MERGE, AWAIT_USER)
@@ -94,7 +94,7 @@ Key design: Protocol-based structural subtyping. Any class with `name`, `execute
 
 `bond/src/bond/` wraps PydanticAI for LLM interactions:
 - `agent.py` - `BondAgent` with streaming and structured output
-- `maestro/bond_step.py` - `BondStep` template method pattern bridging `BondAgent` + `maestro.Step`
+- `maistro/bond_step.py` - `BondStep` template method pattern bridging `BondAgent` + `maistro.Step`
 
 `BondStep` provides: `create_agent()`, `build_prompt()`, `map_response()` hooks with automatic
 `execute()` orchestration.
@@ -103,13 +103,13 @@ Key design: Protocol-based structural subtyping. Any class with `name`, `execute
 
 Core domain: `dataing/src/dataing/core/`
 - `investigation/` - Workflow steps, flow builder, registry, repository
-- `investigation/flow.py` - `build_investigation_workflow()` using maestro
-- `investigation/steps/protocol.py` - `DataingStep` ABC satisfying maestro.Step
+- `investigation/flow.py` - `build_investigation_workflow()` using maistro
+- `investigation/steps/protocol.py` - `DataingStep` ABC satisfying maistro.Step
 - `auth/`, `rbac/`, `entitlements/` - Identity and feature gating
 - `quality/` - LLM-as-judge quality validation
 - `state.py`, `domain_types.py`, `interfaces.py` - Event-sourced state + protocols
 
-Investigation workflow: Use `INVESTIGATION_ENGINE=v2` to enable maestro-based workflow (default
+Investigation workflow: Use `INVESTIGATION_ENGINE=v2` to enable maistro-based workflow (default
 is v1 legacy orchestrator).
 
 Adapters: `dataing/src/dataing/adapters/`

@@ -8,7 +8,7 @@ import pytest
 from dataing.core.investigation.entities import InvestigationContext
 from dataing.core.investigation.steps.generate_query import GenerateQueryStep
 from dataing.core.investigation.values import StepType
-from maestro import Signal
+from maistro import Signal
 
 
 @pytest.fixture

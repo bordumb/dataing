@@ -1,14 +1,24 @@
 {
-  "assignee": null,
+  "assignee": "bordumbb@gmail.com",
   "claim_note": "",
-  "claimed_at": null,
+  "claimed_at": "2026-01-16T17:47:08.635475Z",
   "created_at": "2026-01-16T17:28:53.728261Z",
   "depends_on": [],
   "epic": "fn-15",
+  "evidence": {
+    "checks": [
+      "uv run ruff check maestro/src/maestro/events.py - passed",
+      "uv run mypy maestro/src/maestro/events.py --strict - passed"
+    ],
+    "commits": [
+      "6ec478db feat(maestro): add events.py with complete event catalog"
+    ],
+    "tests": []
+  },
   "id": "fn-15.3",
   "priority": null,
   "spec_path": ".flow/tasks/fn-15.3.md",
-  "status": "todo",
+  "status": "done",
   "title": "Create events.py with Event types",
-  "updated_at": "2026-01-16T17:28:53.728490Z"
+  "updated_at": "2026-01-16T17:47:53.483913Z"
 }

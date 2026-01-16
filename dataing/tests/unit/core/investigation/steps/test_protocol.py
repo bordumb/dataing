@@ -10,7 +10,7 @@ from dataing.core.investigation.values import (
     BranchType,
     StepType,
 )
-from maestro import Signal
+from maistro import Signal
 
 
 @pytest.fixture

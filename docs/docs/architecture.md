@@ -18,7 +18,7 @@ flowchart TB
     subgraph Core["Core Domain"]
         direction TB
         INV[Investigation Engine]
-        AGT[Agent Runtime<br/>Bond + Maestro]
+        AGT[Agent Runtime<br/>Bond + Maistro]
         SFT[Safety Layer<br/>Validator, PII, Breaker]
     end
 
@@ -129,27 +129,27 @@ class SnowflakeAdapter:
 dataing is organized as a monorepo with a clear dependency hierarchy:
 
 ```
-maestro (zero deps)
+maistro (zero deps)
     ↓
-  bond (maestro + pydantic-ai)
+  bond (maistro + pydantic-ai)
     ↓
-dataing (bond + maestro + adapters)
+dataing (bond + maistro + adapters)
 ```
 
 | Package | Purpose | Dependencies |
 |---------|---------|--------------|
-| **maestro** | Workflow FSM engine | None (stdlib only) |
-| **bond** | Agent runtime | maestro, pydantic-ai |
-| **dataing** | Investigation platform | bond, maestro, adapters |
+| **maistro** | Workflow FSM engine | None (stdlib only) |
+| **bond** | Agent runtime | maistro, pydantic-ai |
+| **dataing** | Investigation platform | bond, maistro, adapters |
 
 ---
 
-## Maestro: Workflow Engine
+## Maistro: Workflow Engine
 
-Maestro is a generic workflow engine with **zero external dependencies**:
+Maistro is a generic workflow engine with **zero external dependencies**:
 
 ```
-maestro/src/maestro/
+maistro/src/maistro/
 ├── step.py       # Step protocol
 ├── signals.py    # Control flow signals
 ├── result.py     # StepResult, BranchRequest
@@ -189,7 +189,7 @@ Signals control workflow execution:
 
 ### Branching
 
-Maestro supports **parallel hypothesis testing**:
+Maistro supports **parallel hypothesis testing**:
 
 ```python
 # Generate hypotheses step returns BRANCH signal
@@ -216,14 +216,14 @@ Bond wraps PydanticAI for LLM interactions with structured outputs:
 ```
 bond/src/bond/
 ├── agent.py              # BondAgent
-├── maestro/
+├── maistro/
 │   └── bond_step.py      # BondStep template
 └── memory/               # Agent memory tools
 ```
 
 ### BondStep Template
 
-BondStep bridges BondAgent with maestro.Step using a template method pattern:
+BondStep bridges BondAgent with maistro.Step using a template method pattern:
 
 ```python
 class GenerateHypothesesStep(BondStep[Context, None, list[Hypothesis], str]):
@@ -316,7 +316,7 @@ sequenceDiagram
 
     Deep dive into the investigation workflow
 
--   :material-state-machine: **[Agent Workflows (Maestro)](concepts/agent-workflows.md)**
+-   :material-state-machine: **[Agent Workflows (Maistro)](concepts/agent-workflows.md)**
 
     ---
 

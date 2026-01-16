@@ -9,11 +9,11 @@
   "epic": "fn-15",
   "evidence": {
     "checks": [
-      "uv run ruff check maestro/src/maestro/runner.py - passed",
-      "uv run mypy maestro/src/maestro/runner.py --strict - passed"
+      "uv run ruff check maistro/src/maistro/runner.py - passed",
+      "uv run mypy maistro/src/maistro/runner.py --strict - passed"
     ],
     "commits": [
-      "0539549f feat(maestro): add runner.py with async Runner class"
+      "0539549f feat(maistro): add runner.py with async Runner class"
     ],
     "tests": []
   },

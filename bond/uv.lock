@@ -296,7 +296,7 @@ version = "0.0.1"
 source = { editable = "." }
 dependencies = [
     { name = "asyncpg" },
-    { name = "maestro-flow" },
+    { name = "maistro-flow" },
     { name = "pydantic" },
     { name = "pydantic-ai" },
     { name = "qdrant-client" },
@@ -313,7 +313,7 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "asyncpg", specifier = ">=0.29.0" },
-    { name = "maestro-flow", editable = "../maestro" },
+    { name = "maistro-flow", editable = "../maistro" },
     { name = "pydantic", specifier = ">=2.5.0" },
     { name = "pydantic-ai", specifier = ">=0.0.14" },
     { name = "pytest", marker = "extra == 'dev'", specifier = ">=8.0.0" },
@@ -1662,9 +1662,9 @@ wheels = [
 ]
 
 [[package]]
-name = "maestro-flow"
+name = "maistro-flow"
 version = "0.1.0"
-source = { editable = "../maestro" }
+source = { editable = "../maistro" }
 
 [package.metadata]
 requires-dist = [

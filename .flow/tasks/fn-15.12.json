@@ -10,14 +10,14 @@
   "epic": "fn-15",
   "evidence": {
     "checks": [
-      "uv run ruff check maestro/src/maestro/__init__.py - passed",
-      "uv run mypy maestro/src/maestro/__init__.py --strict - passed"
+      "uv run ruff check maistro/src/maistro/__init__.py - passed",
+      "uv run mypy maistro/src/maistro/__init__.py --strict - passed"
     ],
     "commits": [
-      "ba66e6da feat(maestro): update __init__.py exports with new event-sourced architecture"
+      "ba66e6da feat(maistro): update __init__.py exports with new event-sourced architecture"
     ],
     "tests": [
-      "uv run pytest maestro/tests/ - 68 tests passed",
+      "uv run pytest maistro/tests/ - 68 tests passed",
       "All new imports verified working",
       "Legacy imports still work for backward compatibility"
     ]

@@ -13,7 +13,7 @@
       "uv run mypy dataing/src/dataing/core/investigation/flow.py - passed"
     ],
     "commits": [
-      "917c0e60 feat(dataing): migrate flow.py to new maestro Engine/Runner architecture"
+      "917c0e60 feat(dataing): migrate flow.py to new maistro Engine/Runner architecture"
     ],
     "tests": [
       "uv run pytest dataing/tests/unit/core/investigation/ - 172 tests passed"

@@ -7,11 +7,11 @@
   "epic": "fn-15",
   "evidence": {
     "checks": [
-      "uv run ruff check maestro/src/maestro/state.py - passed",
-      "uv run mypy maestro/src/maestro/state.py --strict - passed"
+      "uv run ruff check maistro/src/maistro/state.py - passed",
+      "uv run mypy maistro/src/maistro/state.py --strict - passed"
     ],
     "commits": [
-      "7aab947f feat(maestro): add state.py with RunState, BranchState, AwaitState"
+      "7aab947f feat(maistro): add state.py with RunState, BranchState, AwaitState"
     ],
     "tests": []
   },

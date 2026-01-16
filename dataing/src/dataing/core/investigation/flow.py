@@ -1,10 +1,10 @@
-"""Investigation workflow using maestro engine.
+"""Investigation workflow using maistro engine.
 
 This module provides a simpler, in-memory workflow engine for running
-investigations. It uses maestro.Workflow for step orchestration without
+investigations. It uses maistro.Workflow for step orchestration without
 the persistence complexity of the legacy orchestrator.
 
-Note: This module is being migrated to the new event-sourced maestro Engine/Runner
+Note: This module is being migrated to the new event-sourced maistro Engine/Runner
 architecture. Some components (InvestigationSignalHandler, _run_branches_sequentially)
 are deprecated and will be removed once the Engine supports BRANCH signals natively.
 """
@@ -34,7 +34,7 @@ from dataing.core.investigation.steps import (
     SynthesizeStep,
 )
 from dataing.core.investigation.values import StepType
-from maestro import (
+from maistro import (
     BranchContext,
     BranchingSignalHandler,
     MergeStrategy,
@@ -189,7 +189,7 @@ def build_investigation_workflow(
 ) -> Workflow[InvestigationContext]:
     """Build a complete investigation workflow.
 
-    Creates a maestro.Workflow configured with all investigation steps.
+    Creates a maistro.Workflow configured with all investigation steps.
     The new event-sourced Engine handles signals internally.
 
     Note: BRANCH signals are not yet fully supported in the new architecture.
@@ -314,7 +314,7 @@ async def run_with_checkpointing(
             await on_step_complete(context, current_step, current_cursor)
             raise WorkerShutdownError("Worker shutting down, checkpointed")
 
-        # Execute step via maestro
+        # Execute step via maistro
         result = await workflow.tick(context, current_step, input_data=current_cursor)
 
         checkpoint_step = result.next_step
@@ -385,7 +385,7 @@ async def _run_branches_sequentially(
     rather than in parallel. For production, consider parallel execution.
 
     .. deprecated::
-        This function is deprecated and will be removed once the maestro
+        This function is deprecated and will be removed once the maistro
         Engine/Runner architecture supports BRANCH signals natively.
         The Runner will handle parallel branch execution internally.
 

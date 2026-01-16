@@ -7,11 +7,11 @@
   "epic": "fn-15",
   "evidence": {
     "checks": [
-      "uv run ruff check maestro/src/maestro/commands.py - passed",
-      "uv run mypy maestro/src/maestro/commands.py --strict - passed"
+      "uv run ruff check maistro/src/maistro/commands.py - passed",
+      "uv run mypy maistro/src/maistro/commands.py --strict - passed"
     ],
     "commits": [
-      "2b7ae96d feat(maestro): add commands.py with Command types"
+      "2b7ae96d feat(maistro): add commands.py with Command types"
     ],
     "tests": []
   },

@@ -30,7 +30,7 @@ Implement the Workflow engine that executes steps in a tick loop.
 5. BRANCH and MERGE signals should raise NotImplementedError (handled in fn-5.3).
 
 ## Key Files
-- New: `maestro/src/maestro/workflow.py`
+- New: `maistro/src/maistro/workflow.py`
 - Reference: `dataing/src/dataing/core/investigation/orchestrator/base.py:22-176`
 - Reference: `dataing/src/dataing/core/investigation/orchestrator/types.py:12-21`
 ## Acceptance
@@ -59,5 +59,5 @@ Verification:
 - mypy --strict passes
 ## Evidence
 - Commits: 175c0fb1fe94b31a27eb0dacbb72d70f290914ae
-- Tests: cd maestro && uv run pytest tests/ -v
+- Tests: cd maistro && uv run pytest tests/ -v
 - PRs:

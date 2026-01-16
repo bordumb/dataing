@@ -11,8 +11,8 @@
     "commits": [],
     "prs": [],
     "tests": [
-      "uv run pytest bond/tests/unit/maestro -v (8 passed from fn-5.7)",
-      "uv run pytest maestro/tests/ -v (68 passed)"
+      "uv run pytest bond/tests/unit/maistro -v (8 passed from fn-5.7)",
+      "uv run pytest maistro/tests/ -v (68 passed)"
     ]
   },
   "id": "fn-5.8",

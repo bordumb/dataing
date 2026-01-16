@@ -11,8 +11,8 @@
   "epic": "fn-15",
   "evidence": {
     "checks": [
-      "uv run ruff check maestro/tests/test_*.py - passed",
-      "uv run pytest maestro/tests/ - 111 tests passed"
+      "uv run ruff check maistro/tests/test_*.py - passed",
+      "uv run pytest maistro/tests/ - 111 tests passed"
     ],
     "commits": [],
     "tests": [

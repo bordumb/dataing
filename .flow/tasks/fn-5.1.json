@@ -11,13 +11,13 @@
     ],
     "prs": [],
     "tests": [
-      "cd maestro && uv run pytest tests/ -v"
+      "cd maistro && uv run pytest tests/ -v"
     ]
   },
   "id": "fn-5.1",
   "priority": null,
   "spec_path": ".flow/tasks/fn-5.1.md",
   "status": "done",
-  "title": "Define Maestro Core Protocols",
+  "title": "Define Maistro Core Protocols",
   "updated_at": "2026-01-13T01:55:27.793862Z"
 }

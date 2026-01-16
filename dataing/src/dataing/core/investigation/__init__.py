@@ -3,10 +3,10 @@
 This module contains the core domain model for the investigation system,
 including entities, value objects, and the step abstraction.
 
-Uses maestro.Workflow for workflow execution.
+Uses maistro.Workflow for workflow execution.
 """
 
-from maestro import Signal, Workflow
+from maistro import Signal, Workflow
 
 from .entities import Branch, Investigation, InvestigationContext, Snapshot
 from .flow import build_investigation_workflow, run_investigation
@@ -40,7 +40,7 @@ __all__ = [
     "ExecutionLock",
     # Registry
     "StepRegistry",
-    # Workflow (maestro)
+    # Workflow (maistro)
     "Workflow",
     "build_investigation_workflow",
     "run_investigation",

@@ -1,13 +1,13 @@
-# Sandwich Refactor (Maestro Extraction)
+# Sandwich Refactor (Maistro Extraction)
 
 ## Overview
 
-Decouple the deterministic workflow engine from business logic by extracting a new library, **maestro**. Refactor dataing to become a "thin" application layer that orchestrates maestro flows using bond agents for intelligence.
+Decouple the deterministic workflow engine from business logic by extracting a new library, **maistro**. Refactor dataing to become a "thin" application layer that orchestrates maistro flows using bond agents for intelligence.
 
 ### Business Value
 
-- **Separation of Concerns**: "How a workflow runs" (Maestro) vs "What the workflow does" (Dataing)
-- **Reusability**: maestro and bond become generic assets usable for other projects
+- **Separation of Concerns**: "How a workflow runs" (Maistro) vs "What the workflow does" (Dataing)
+- **Reusability**: maistro and bond become generic assets usable for other projects
 - **Stability**: Core state machine logic can be tested 100% deterministically
 - **Testability**: Clear boundaries enable isolated unit testing
 
@@ -15,7 +15,7 @@ Decouple the deterministic workflow engine from business logic by extracting a n
 
 | Layer | Library | Responsibility | Key Objects |
 |-------|---------|---------------|-------------|
-| Flow (Bottom) | maestro | Deterministic state machine | Workflow, Step, StepResult |
+| Flow (Bottom) | maistro | Deterministic state machine | Workflow, Step, StepResult |
 | Brains (Side) | bond | Agent interface, LLM loops | BondAgent, StreamHandlers |
 | Logic (Top) | dataing | Business domain | InvestigationContext, domain steps |
 
@@ -23,8 +23,8 @@ Decouple the deterministic workflow engine from business logic by extracting a n
 
 ### In Scope
 
-- Phase 1: Create maestro library with generic protocols
-- Phase 2: Refactor dataing to use maestro
+- Phase 1: Create maistro library with generic protocols
+- Phase 2: Refactor dataing to use maistro
 - Phase 3: Create BondStep bridge for AI-powered steps
 - Phase 4: Delete legacy orchestrator code
 
@@ -40,8 +40,8 @@ Decouple the deterministic workflow engine from business logic by extracting a n
 ### Package Structure
 
 ```
-maestro/                    # New package - generic workflow
-  src/maestro/
+maistro/                    # New package - generic workflow
+  src/maistro/
     ├── __init__.py
     ├── step.py             # Step[ContextT, InputT, OutputT] protocol
     ├── result.py           # StepResult[ContextT, OutputT]
@@ -52,14 +52,14 @@ maestro/                    # New package - generic workflow
 bond/                       # Existing - generic agent
   src/bond/
     ├── agent.py            # BondAgent (existing)
-    └── maestro/            # NEW: Bridge module
+    └── maistro/            # NEW: Bridge module
         └── bond_step.py    # BondStep base class
 
 dataing/                    # Existing - domain
   src/dataing/
     ├── core/investigation/
-    │   ├── context.py      # InvestigationContext (satisfies maestro protocol)
-    │   ├── steps/          # Steps implement maestro.Step[InvestigationContext]
+    │   ├── context.py      # InvestigationContext (satisfies maistro protocol)
+    │   ├── steps/          # Steps implement maistro.Step[InvestigationContext]
     │   ├── flow.py         # NEW: build_investigation_flow()
     │   └── signal_handlers.py  # Domain-specific signal handling
     └── agents/             # Domain agents using bond.BondAgent
@@ -68,7 +68,7 @@ dataing/                    # Existing - domain
 ### Key Interfaces
 
 ```python
-# maestro/step.py
+# maistro/step.py
 from typing import Protocol, TypeVar, Generic
 
 ContextT = TypeVar("ContextT")
@@ -96,47 +96,47 @@ class Step(Protocol[ContextT, InputT, OutputT]):
 
 ### Design Decisions
 
-1. **Protocol-based Step interface**: Use `typing.Protocol` for structural subtyping. Steps don't need to inherit from maestro base classes - they just need to satisfy the protocol.
+1. **Protocol-based Step interface**: Use `typing.Protocol` for structural subtyping. Steps don't need to inherit from maistro base classes - they just need to satisfy the protocol.
 
 2. **Generic Context**: `ContextT` is a type parameter. `InvestigationContext` satisfies it by being a frozen Pydantic model with immutable update pattern via `model_copy()`.
 
-3. **Signal subset**: maestro defines core signals (CONTINUE, COMPLETE, FAIL, BRANCH, MERGE). Domain-specific signals like AWAIT_USER become domain signal handlers that produce core signals.
+3. **Signal subset**: maistro defines core signals (CONTINUE, COMPLETE, FAIL, BRANCH, MERGE). Domain-specific signals like AWAIT_USER become domain signal handlers that produce core signals.
 
-4. **Repository Protocol**: maestro defines `WorkflowRepository[ContextT]` protocol. `InvestigationRepository` implements it by adapting domain methods.
+4. **Repository Protocol**: maistro defines `WorkflowRepository[ContextT]` protocol. `InvestigationRepository` implements it by adapting domain methods.
 
-5. **BondStep in bond package**: The bridge between maestro.Step and BondAgent lives in `bond/maestro/` to avoid circular dependencies.
+5. **BondStep in bond package**: The bridge between maistro.Step and BondAgent lives in `bond/maistro/` to avoid circular dependencies.
 
-6. **Pluggable merge strategy**: maestro accepts `MergeStrategy[ContextT]` for branch convergence. Dataing provides `InvestigationMergeStrategy`.
+6. **Pluggable merge strategy**: maistro accepts `MergeStrategy[ContextT]` for branch convergence. Dataing provides `InvestigationMergeStrategy`.
 
 ## Approach
 
-### Phase 1: Create maestro Library
+### Phase 1: Create maistro Library
 
 Create a standalone package with zero dependencies on pydantic-ai or dataing.
 
 **Key Files:**
-- `maestro/src/maestro/step.py` - Step protocol and StepResult
-- `maestro/src/maestro/signals.py` - Signal enum
-- `maestro/src/maestro/workflow.py` - Workflow engine with tick loop
-- `maestro/src/maestro/repository.py` - WorkflowRepository protocol
-- `maestro/pyproject.toml` - Package definition
+- `maistro/src/maistro/step.py` - Step protocol and StepResult
+- `maistro/src/maistro/signals.py` - Signal enum
+- `maistro/src/maistro/workflow.py` - Workflow engine with tick loop
+- `maistro/src/maistro/repository.py` - WorkflowRepository protocol
+- `maistro/pyproject.toml` - Package definition
 
-### Phase 2: Refactor dataing to use maestro
+### Phase 2: Refactor dataing to use maistro
 
-Update dataing to depend on maestro, migrate steps to new protocol.
+Update dataing to depend on maistro, migrate steps to new protocol.
 
 **Key Changes:**
-- `dataing/src/dataing/core/investigation/steps/protocol.py` - Import from maestro
-- All step implementations - Update signatures to use maestro.StepResult
-- `dataing/src/dataing/core/investigation/flow.py` - New entry point using maestro.Workflow
-- Signal handlers - Adapt to work with maestro's signal system
+- `dataing/src/dataing/core/investigation/steps/protocol.py` - Import from maistro
+- All step implementations - Update signatures to use maistro.StepResult
+- `dataing/src/dataing/core/investigation/flow.py` - New entry point using maistro.Workflow
+- Signal handlers - Adapt to work with maistro's signal system
 
 ### Phase 3: Integrate bond for Intelligence
 
 Create the BondStep bridge for AI-powered steps.
 
 **Key Changes:**
-- `bond/src/bond/maestro/bond_step.py` - Abstract base class
+- `bond/src/bond/maistro/bond_step.py` - Abstract base class
 - Update RecursiveAnalysisStep to use BondStep pattern
 - Verify StreamHandlers integration works
 
@@ -145,22 +145,22 @@ Create the BondStep bridge for AI-powered steps.
 Delete legacy code now handled by libraries.
 
 **Deleted Files:**
-- `dataing/core/investigation/orchestrator/base.py` (replaced by maestro.Workflow)
-- `dataing/core/investigation/orchestrator/protocol.py` (replaced by maestro.Step)
+- `dataing/core/investigation/orchestrator/base.py` (replaced by maistro.Workflow)
+- `dataing/core/investigation/orchestrator/protocol.py` (replaced by maistro.Step)
 - Any custom LLM loop code (bond handles this)
 
 ## Quick Commands
 
 ```bash
-# Test maestro in isolation
-cd maestro && uv run pytest tests/ -v
+# Test maistro in isolation
+cd maistro && uv run pytest tests/ -v
 
-# Test dataing with maestro integration
+# Test dataing with maistro integration
 cd dataing && uv run pytest tests/unit/core/investigation/ -v
 
 # Smoke test: Run a simple workflow
-cd maestro && uv run python -c "
-from maestro import Workflow, Step, StepResult, Signal
+cd maistro && uv run python -c "
+from maistro import Workflow, Step, StepResult, Signal
 
 class DummyStep:
     name = 'dummy'
@@ -175,24 +175,24 @@ result = asyncio.run(flow.run({'start': True}, 'dummy'))
 print('Workflow completed:', result)
 "
 
-# Type check maestro
-cd maestro && uv run mypy src/maestro/ --strict
+# Type check maistro
+cd maistro && uv run mypy src/maistro/ --strict
 ```
 
 ## Technical DoD
 
-- [ ] Three packages: maestro (new), bond (existing), dataing (refactored)
-- [ ] No circular dependencies: maestro and bond must not import dataing
-- [ ] `pip install maestro-flow` works (local editable install)
-- [ ] maestro has zero LLM dependencies (no pydantic-ai, openai, anthropic)
+- [ ] Three packages: maistro (new), bond (existing), dataing (refactored)
+- [ ] No circular dependencies: maistro and bond must not import dataing
+- [ ] `pip install maistro-flow` works (local editable install)
+- [ ] maistro has zero LLM dependencies (no pydantic-ai, openai, anthropic)
 - [ ] Existing dataing integration tests pass
 - [ ] dataing codebase reduced by ~20% (excluding new libraries)
-- [ ] All Step implementations satisfy maestro.Step protocol (mypy passes)
+- [ ] All Step implementations satisfy maistro.Step protocol (mypy passes)
 
 ## Migration Strategy
 
 1. **Incremental**: Phase 2 can wrap legacy steps before full migration
-2. **Feature Flag**: `INVESTIGATION_ENGINE=v2` env var to test maestro path
+2. **Feature Flag**: `INVESTIGATION_ENGINE=v2` env var to test maistro path
 3. **Parallel Run**: Both engines can run in staging for comparison
 4. **Rollback**: Feature flag off reverts to legacy orchestrator
 
@@ -208,9 +208,9 @@ cd maestro && uv run mypy src/maestro/ --strict
 
 ## Open Questions
 
-1. Should maestro have built-in retry policies per step, or delegate to steps?
-2. Where does branching strategy live - maestro plugin or domain handler?
-3. Should maestro's Signal enum be extensible (IntEnum with domain additions)?
+1. Should maistro have built-in retry policies per step, or delegate to steps?
+2. Where does branching strategy live - maistro plugin or domain handler?
+3. Should maistro's Signal enum be extensible (IntEnum with domain additions)?
 
 ## References
 

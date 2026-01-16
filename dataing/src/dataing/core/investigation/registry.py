@@ -10,7 +10,7 @@ from typing import Any
 
 from dataing.core.investigation.entities import InvestigationContext
 from dataing.core.investigation.values import StepType
-from maestro import Step
+from maistro import Step
 
 # Type alias for investigation steps
 InvestigationStep = Step[InvestigationContext, Any, Any]

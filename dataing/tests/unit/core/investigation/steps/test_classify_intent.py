@@ -10,7 +10,7 @@ from dataing.core.investigation.steps.classify_intent import (
     RefinementIntent,
 )
 from dataing.core.investigation.values import StepType
-from maestro import Signal
+from maistro import Signal
 
 
 @pytest.fixture

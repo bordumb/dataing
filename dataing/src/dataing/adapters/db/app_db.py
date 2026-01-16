@@ -817,7 +817,7 @@ class AppDatabase:
             investigation_id: The investigation ID.
             tenant_id: The tenant ID.
             datasource_id: Optional datasource ID.
-            branch_spec: Serialized BranchSpec from maestro.
+            branch_spec: Serialized BranchSpec from maistro.
             priority: Job priority.
 
         Returns:

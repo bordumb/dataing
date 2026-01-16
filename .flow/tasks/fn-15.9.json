@@ -7,14 +7,14 @@
   "epic": "fn-15",
   "evidence": {
     "checks": [
-      "uv run ruff check maestro/src/maestro/result.py - passed",
-      "uv run mypy maestro/src/maestro/result.py --strict - passed"
+      "uv run ruff check maistro/src/maistro/result.py - passed",
+      "uv run mypy maistro/src/maistro/result.py --strict - passed"
     ],
     "commits": [
-      "8af3dc5a feat(maestro): add await_token and context_update to StepResult"
+      "8af3dc5a feat(maistro): add await_token and context_update to StepResult"
     ],
     "tests": [
-      "uv run pytest maestro/tests/test_core.py - 22 passed"
+      "uv run pytest maistro/tests/test_core.py - 22 passed"
     ]
   },
   "id": "fn-15.9",

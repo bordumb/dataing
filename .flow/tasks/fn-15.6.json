@@ -13,11 +13,11 @@
   "epic": "fn-15",
   "evidence": {
     "checks": [
-      "uv run ruff check maestro/src/maestro/engine.py - passed",
-      "uv run mypy maestro/src/maestro/engine.py --strict - passed"
+      "uv run ruff check maistro/src/maistro/engine.py - passed",
+      "uv run mypy maistro/src/maistro/engine.py --strict - passed"
     ],
     "commits": [
-      "2369d167 feat(maestro): add engine.py with pure reducer Engine class"
+      "2369d167 feat(maistro): add engine.py with pure reducer Engine class"
     ],
     "tests": []
   },

@@ -10,14 +10,14 @@
   "epic": "fn-15",
   "evidence": {
     "checks": [
-      "uv run ruff check maestro/src/maestro/ - passed",
-      "uv run mypy maestro/src/maestro/ --strict - passed"
+      "uv run ruff check maistro/src/maistro/ - passed",
+      "uv run mypy maistro/src/maistro/ --strict - passed"
     ],
     "commits": [
-      "99dde836 feat(maestro): refactor workflow.py as facade over Engine+Runner"
+      "99dde836 feat(maistro): refactor workflow.py as facade over Engine+Runner"
     ],
     "tests": [
-      "uv run pytest maestro/tests/ - 68 tests passed"
+      "uv run pytest maistro/tests/ - 68 tests passed"
     ]
   },
   "id": "fn-15.10",

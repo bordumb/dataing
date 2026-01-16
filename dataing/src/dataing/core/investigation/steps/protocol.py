@@ -1,7 +1,7 @@
 """Step protocol and result types.
 
-This module re-exports types from maestro for backward compatibility.
-New code should import directly from maestro.
+This module re-exports types from maistro for backward compatibility.
+New code should import directly from maistro.
 
 Steps are pure functions: (Context, Input) -> StepResult
 They don't know about persistence, locking, or orchestration.
@@ -13,9 +13,9 @@ from abc import ABC, abstractmethod
 from typing import Generic, TypeVar
 
 from dataing.core.investigation.entities import InvestigationContext
-from maestro import BranchRequest, BranchSpec, Signal, StepResult
+from maistro import BranchRequest, BranchSpec, Signal, StepResult
 
-# Re-export maestro types for backward compatibility
+# Re-export maistro types for backward compatibility
 __all__ = [
     "BranchRequest",
     "BranchSpec",
@@ -36,7 +36,7 @@ class DataingStep(ABC, Generic[InputT, OutputT]):
     - Pure: Same input -> same output (modulo LLM stochasticity)
     - Composable: Can be chained, branched, merged
 
-    This class satisfies the maestro.Step protocol by providing
+    This class satisfies the maistro.Step protocol by providing
     a name property derived from step_type.
     """
 
@@ -44,7 +44,7 @@ class DataingStep(ABC, Generic[InputT, OutputT]):
 
     @property
     def name(self) -> str:
-        """Return step name for maestro protocol compatibility."""
+        """Return step name for maistro protocol compatibility."""
         # Handle both StepType enum and string values
         step_type = self.step_type
         if hasattr(step_type, "value"):

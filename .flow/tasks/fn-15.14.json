@@ -9,11 +9,11 @@
   "epic": "fn-15",
   "evidence": {
     "checks": [
-      "uv run ruff check maestro/tests/ - passed",
-      "uv run pytest maestro/tests/ - 113 tests passed, 8 deprecation warnings"
+      "uv run ruff check maistro/tests/ - passed",
+      "uv run pytest maistro/tests/ - 113 tests passed, 8 deprecation warnings"
     ],
     "commits": [
-      "bc602cdf feat(maestro): add determinism and replay tests for event-sourced architecture"
+      "bc602cdf feat(maistro): add determinism and replay tests for event-sourced architecture"
     ],
     "tests": [
       "test_engine_determinism.py - 9 tests",
@@ -29,6 +29,6 @@
   "priority": null,
   "spec_path": ".flow/tasks/fn-15.14.md",
   "status": "done",
-  "title": "Update existing maestro tests for new architecture",
+  "title": "Update existing maistro tests for new architecture",
   "updated_at": "2026-01-16T18:37:58.484307Z"
 }

@@ -8,7 +8,7 @@ from dataing.core.domain_types import Hypothesis, HypothesisCategory
 from dataing.core.investigation.entities import InvestigationContext
 from dataing.core.investigation.steps.generate_hypotheses import GenerateHypothesesStep
 from dataing.core.investigation.values import BranchType, StepType
-from maestro import Signal
+from maistro import Signal
 
 
 @pytest.fixture

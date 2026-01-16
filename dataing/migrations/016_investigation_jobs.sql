@@ -15,7 +15,7 @@ CREATE TABLE investigation_jobs (
 
     -- Branching support for parallel execution
     parent_job_id UUID REFERENCES investigation_jobs(id) ON DELETE CASCADE,
-    branch_spec JSONB,  -- Serialized BranchSpec from maestro
+    branch_spec JSONB,  -- Serialized BranchSpec from maistro
 
     -- Execution tracking
     worker_id TEXT,

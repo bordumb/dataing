@@ -1,11 +1,11 @@
-# fn-5.4 Update InvestigationContext for Maestro
+# fn-5.4 Update InvestigationContext for Maistro
 
 ## Description
-Make InvestigationContext compatible with maestro's generic context requirements.
+Make InvestigationContext compatible with maistro's generic context requirements.
 
 ## Implementation
 
-1. Verify InvestigationContext satisfies maestro requirements:
+1. Verify InvestigationContext satisfies maistro requirements:
    - Is a frozen Pydantic model (immutable)
    - Has `model_copy(update={...})` for updates
    - Is JSON serializable via `model_dump(mode="json")`
@@ -13,7 +13,7 @@ Make InvestigationContext compatible with maestro's generic context requirements
 2. Create `ContextProtocol` type alias in dataing if needed:
    ```python
    # dataing/src/dataing/core/investigation/types.py
-   from maestro import Step, StepResult
+   from maistro import Step, StepResult
 
    InvestigationStep = Step[InvestigationContext, Any, Any]
    InvestigationResult = StepResult[InvestigationContext, Any]
@@ -21,26 +21,26 @@ Make InvestigationContext compatible with maestro's generic context requirements
 
 3. Remove any hard-coded `next_step` logic from context itself - this belongs in step results.
 
-4. Add any missing fields for maestro integration (if needed).
+4. Add any missing fields for maistro integration (if needed).
 
 ## Key Files
 - Modify: `dataing/src/dataing/core/investigation/entities.py:20-64`
 - New: `dataing/src/dataing/core/investigation/types.py` (optional)
-- Reference: `maestro/src/maestro/step.py`
+- Reference: `maistro/src/maistro/step.py`
 ## Acceptance
-- [ ] InvestigationContext is compatible with maestro `ContextT`
-- [ ] `model_copy(update={...})` pattern works with maestro steps
+- [ ] InvestigationContext is compatible with maistro `ContextT`
+- [ ] `model_copy(update={...})` pattern works with maistro steps
 - [ ] `model_dump(mode="json")` serializes correctly
 - [ ] Type aliases created for step typing convenience
-- [ ] No circular imports between dataing and maestro
-- [ ] `mypy` passes with maestro types used in dataing
+- [ ] No circular imports between dataing and maistro
+- [ ] `mypy` passes with maistro types used in dataing
 ## Done summary
 - Created InvestigationStep and InvestigationResult type aliases
-- Added maestro-flow as workspace dependency with path source
-- Updated mypy configuration to include maestro
+- Added maistro-flow as workspace dependency with path source
+- Updated mypy configuration to include maistro
 
 Why:
-- InvestigationContext already satisfies maestro requirements (frozen Pydantic model)
+- InvestigationContext already satisfies maistro requirements (frozen Pydantic model)
 - Type aliases provide convenient typing for dataing steps
 
 Verification:

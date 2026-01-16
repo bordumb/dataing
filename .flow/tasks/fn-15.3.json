@@ -7,11 +7,11 @@
   "epic": "fn-15",
   "evidence": {
     "checks": [
-      "uv run ruff check maestro/src/maestro/events.py - passed",
-      "uv run mypy maestro/src/maestro/events.py --strict - passed"
+      "uv run ruff check maistro/src/maistro/events.py - passed",
+      "uv run mypy maistro/src/maistro/events.py --strict - passed"
     ],
     "commits": [
-      "6ec478db feat(maestro): add events.py with complete event catalog"
+      "6ec478db feat(maistro): add events.py with complete event catalog"
     ],
     "tests": []
   },

@@ -8,7 +8,7 @@ license = { text = "MIT" }
 authors = [{ name = "dataing team" }]
 dependencies = [
     "bond",
-    "maestro-flow",
+    "maistro-flow",
     "fastapi[standard]>=0.109.0",
     "uvicorn[standard]>=0.27.0",
     "pydantic[email]>=2.5.0",
@@ -71,8 +71,8 @@ packages = ["dataing/src/dataing"]
 
 [tool.mypy]
 python_version = "3.11"
-mypy_path = ["maestro/src", "bond/src", "dataing/src", "dataing-ee/src"]
-files = ["maestro/src/maestro", "bond/src/bond", "dataing/src/dataing", "dataing-ee/src/dataing_ee"]
+mypy_path = ["maistro/src", "bond/src", "dataing/src", "dataing-ee/src"]
+files = ["maistro/src/maistro", "bond/src/bond", "dataing/src/dataing", "dataing-ee/src/dataing_ee"]
 namespace_packages = true
 explicit_package_bases = true
 # Strict mode flags (equivalent to --strict but with SQLAlchemy-compatible settings)
@@ -124,7 +124,7 @@ disallow_any_generics = false
 [tool.ruff]
 target-version = "py311"
 line-length = 100
-src = ["bond/src", "dataing/src", "dataing-ee", "maestro/src"]
+src = ["bond/src", "dataing/src", "dataing-ee", "maistro/src"]
 
 [tool.ruff.lint]
 select = [
@@ -149,9 +149,9 @@ convention = "google"
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
-pythonpath = [".", "maestro/src", "bond/src", "dataing/src", "dataing-ee/src", "dataing/tests", "dataing-ee/tests"]
-testpaths = ["maestro/tests", "bond/tests", "dataing/tests", "dataing-ee/tests"]
-addopts = "-v --import-mode=importlib --cov=maestro/src/maestro --cov=bond/src/bond --cov=dataing/src/dataing --cov=dataing-ee/src/dataing_ee --cov-report=term-missing"
+pythonpath = [".", "maistro/src", "bond/src", "dataing/src", "dataing-ee/src", "dataing/tests", "dataing-ee/tests"]
+testpaths = ["maistro/tests", "bond/tests", "dataing/tests", "dataing-ee/tests"]
+addopts = "-v --import-mode=importlib --cov=maistro/src/maistro --cov=bond/src/bond --cov=dataing/src/dataing --cov=dataing-ee/src/dataing_ee --cov-report=term-missing"
 
 [dependency-groups]
 dev = [
@@ -161,4 +161,4 @@ dev = [
 
 [tool.uv.sources]
 bond = { path = "bond", editable = true }
-maestro-flow = { path = "maestro", editable = true }
+maistro-flow = { path = "maistro", editable = true }

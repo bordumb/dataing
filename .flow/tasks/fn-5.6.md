@@ -1,13 +1,13 @@
 # fn-5.6 Wire the Investigation Workflow
 
 ## Description
-Create the new workflow entry point using maestro.Workflow.
+Create the new workflow entry point using maistro.Workflow.
 
 ## Implementation
 
 1. Create `build_investigation_flow()` in `dataing/src/dataing/core/investigation/flow.py`:
    ```python
-   from maestro import Workflow
+   from maistro import Workflow
    from dataing.core.investigation.steps import (
        GatherContext, GenerateHypotheses, CheckPatterns,
        GenerateQuery, ExecuteQuery, InterpretResults, Synthesize
@@ -44,7 +44,7 @@ Create the new workflow entry point using maestro.Workflow.
 - New: `dataing/src/dataing/core/investigation/signal_handlers.py`
 - Modify: `dataing/src/dataing/core/investigation/service.py`
 ## Acceptance
-- [ ] `build_investigation_flow()` creates maestro.Workflow
+- [ ] `build_investigation_flow()` creates maistro.Workflow
 - [ ] `InvestigationSignalHandler` handles domain signals
 - [ ] `InvestigationMergeStrategy` merges branch results
 - [ ] `InvestigationService` uses new flow entry point
@@ -52,24 +52,24 @@ Create the new workflow entry point using maestro.Workflow.
 - [ ] Full investigation integration test passes with new flow
 - [ ] Existing API contract unchanged
 ## Done summary
-- Created flow.py with build_investigation_workflow() using maestro.Workflow
+- Created flow.py with build_investigation_workflow() using maistro.Workflow
 - Created InvestigationMergeStrategy for merging evidence from child branches
 - Created InvestigationSignalHandler extending BranchingSignalHandler
 - Added run_investigation() convenience function for workflow execution
 - Updated InvestigationService with INVESTIGATION_ENGINE feature flag
-- Added _run_investigation_v2() method for maestro-based execution
+- Added _run_investigation_v2() method for maistro-based execution
 
 Why:
-- New flow.py provides cleaner workflow orchestration via maestro
+- New flow.py provides cleaner workflow orchestration via maistro
 - InvestigationMergeStrategy handles hypothesis branch convergence
-- Feature flag allows gradual rollout (v1=legacy, v2=maestro)
+- Feature flag allows gradual rollout (v1=legacy, v2=maistro)
 
 Verification:
 - mypy passes on flow.py and service.py (--strict)
-- All 68 maestro tests pass
+- All 68 maistro tests pass
 - Import test confirms flow module loads correctly
 - INVESTIGATION_ENGINE=v2 enables new path
 ## Evidence
 - Commits:
-- Tests: uv run mypy dataing/src/dataing/core/investigation/flow.py --strict, uv run mypy dataing/src/dataing/core/investigation/service.py --strict, uv run pytest maestro/tests/ -v (68 passed), python -c 'from dataing.core.investigation.flow import *'
+- Tests: uv run mypy dataing/src/dataing/core/investigation/flow.py --strict, uv run mypy dataing/src/dataing/core/investigation/service.py --strict, uv run pytest maistro/tests/ -v (68 passed), python -c 'from dataing.core.investigation.flow import *'
 - PRs:

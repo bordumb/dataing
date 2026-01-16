@@ -7,11 +7,11 @@
   "epic": "fn-15",
   "evidence": {
     "checks": [
-      "uv run ruff check maestro/src/maestro/log.py - passed",
-      "uv run mypy maestro/src/maestro/log.py --strict - passed"
+      "uv run ruff check maistro/src/maistro/log.py - passed",
+      "uv run mypy maistro/src/maistro/log.py --strict - passed"
     ],
     "commits": [
-      "e3a2d8cb feat(maestro): add log.py with EventLog protocol and InMemoryEventLog"
+      "e3a2d8cb feat(maistro): add log.py with EventLog protocol and InMemoryEventLog"
     ],
     "tests": []
   },

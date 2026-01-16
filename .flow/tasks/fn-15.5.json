@@ -7,11 +7,11 @@
   "epic": "fn-15",
   "evidence": {
     "checks": [
-      "uv run ruff check maestro/src/maestro/merge.py - passed",
-      "uv run mypy maestro/src/maestro/merge.py --strict - passed"
+      "uv run ruff check maistro/src/maistro/merge.py - passed",
+      "uv run mypy maistro/src/maistro/merge.py --strict - passed"
     ],
     "commits": [
-      "38235e6c feat(maestro): add merge.py with MergeStrategy protocol"
+      "38235e6c feat(maistro): add merge.py with MergeStrategy protocol"
     ],
     "tests": []
   },

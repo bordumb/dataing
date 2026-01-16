@@ -15,7 +15,7 @@ from dataing.core.investigation.flow import (
     WorkerShutdownError,
     run_with_checkpointing,
 )
-from maestro import Signal, Workflow
+from maistro import Signal, Workflow
 
 
 def create_test_context() -> InvestigationContext:

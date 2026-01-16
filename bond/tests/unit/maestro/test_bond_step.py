@@ -7,7 +7,7 @@ from unittest.mock import AsyncMock, Mock
 import pytest
 
 from bond import BondAgent, BondStep, StreamHandlers
-from maestro import Signal, Step, StepResult
+from maistro import Signal, Step, StepResult
 
 
 @dataclass(frozen=True)
@@ -153,7 +153,7 @@ class TestBondStep:
 
 
 class TestBondStepProtocol:
-    """Tests for BondStep satisfying maestro.Step protocol."""
+    """Tests for BondStep satisfying maistro.Step protocol."""
 
     def test_bond_step_satisfies_step_protocol(self) -> None:
         """BondStep instances satisfy Step protocol."""

@@ -149,8 +149,9 @@ convention = "google"
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
-testpaths = ["bond/tests", "dataing/tests", "dataing-ee/tests"]
-addopts = "-v --cov=bond/src/bond --cov=dataing/src/dataing --cov=dataing-ee/src/dataing_ee --cov-report=term-missing"
+pythonpath = [".", "maestro/src", "bond/src", "dataing/src", "dataing-ee/src", "dataing/tests", "dataing-ee/tests"]
+testpaths = ["maestro/tests", "bond/tests", "dataing/tests", "dataing-ee/tests"]
+addopts = "-v --import-mode=importlib --cov=maestro/src/maestro --cov=bond/src/bond --cov=dataing/src/dataing --cov=dataing-ee/src/dataing_ee --cov-report=term-missing"
 
 [dependency-groups]
 dev = [

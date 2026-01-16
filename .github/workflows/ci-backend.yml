@@ -63,8 +63,13 @@ jobs:
       - name: Run mypy
         run: uv run mypy bond/src maestro/src dataing/src dataing-ee/src
 
+      # Run tests per-package to avoid conftest.py module conflicts
       - name: Run tests
-        run: uv run pytest maestro/tests bond/tests dataing/tests dataing-ee/tests --cov=maestro/src/maestro --cov-report=xml
+        run: |
+          uv run pytest maestro/tests --cov=maestro/src/maestro --cov-report=xml
+          uv run pytest bond/tests --cov=bond/src/bond --cov-report=xml --cov-append
+          uv run pytest dataing/tests --cov=dataing/src/dataing --cov-report=xml --cov-append
+          uv run pytest dataing-ee/tests --cov=dataing-ee/src/dataing_ee --cov-report=xml --cov-append
         env:
           DATABASE_URL: postgresql://test:test@localhost:5432/test
 

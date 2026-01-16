@@ -1,1 +1,1 @@
-"""Tests for maestro package."""
+"""Maestro test package."""

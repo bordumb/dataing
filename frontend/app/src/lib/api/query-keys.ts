@@ -104,6 +104,23 @@ export const queryKeys = {
       ['notifications', 'list', filters] as const,
     unreadCount: ['notifications', 'unreadCount'] as const,
   },
+
+  // Issues
+  issues: {
+    all: ['/api/v1/issues'] as const,
+    list: (filters?: {
+      status?: string
+      priority?: string
+      severity?: string
+      assignee?: string
+      search?: string
+      cursor?: string
+    }) => ['/api/v1/issues', filters] as const,
+    detail: (id: string) => [`/api/v1/issues/${id}`] as const,
+    comments: (id: string) => [`/api/v1/issues/${id}/comments`] as const,
+    watchers: (id: string) => [`/api/v1/issues/${id}/watchers`] as const,
+    investigationRuns: (id: string) => [`/api/v1/issues/${id}/investigation-runs`] as const,
+  },
 } as const
 
 // Type helper for getting query key types

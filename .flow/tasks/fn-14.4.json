@@ -7,10 +7,19 @@
     "fn-14.2"
   ],
   "epic": "fn-14",
+  "evidence": {
+    "commits": [
+      "cb701d88"
+    ],
+    "prs": [],
+    "tests": [
+      "uv run pytest dataing/tests/unit/api/test_issues_routes.py -v"
+    ]
+  },
   "id": "fn-14.4",
   "priority": null,
   "spec_path": ".flow/tasks/fn-14.4.md",
-  "status": "in_progress",
+  "status": "done",
   "title": "Investigation spawn from Issue API",
-  "updated_at": "2026-01-16T03:17:58.486282Z"
+  "updated_at": "2026-01-16T03:20:32.783427Z"
 }

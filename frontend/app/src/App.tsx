@@ -23,6 +23,7 @@ import { SettingsPage } from '@/features/settings/settings-page'
 import { UsagePage } from '@/features/usage/usage-page'
 import { NotificationsPage } from '@/features/notifications'
 import { AdminPage } from '@/features/admin'
+import { IssueList } from '@/features/issues'
 import { JwtLoginPage } from '@/features/auth/jwt-login-page'
 import { SSOLoginPage } from '@/features/auth/sso-login-page'
 import { SSOCallbackPage } from '@/features/auth/sso-callback-page'
@@ -138,6 +139,14 @@ function AppWithEntitlements() {
                     element={
                       <FeatureErrorBoundary feature="investigation details">
                         <InvestigationDetail />
+                      </FeatureErrorBoundary>
+                    }
+                  />
+                  <Route
+                    path="issues"
+                    element={
+                      <FeatureErrorBoundary feature="issues">
+                        <IssueList />
                       </FeatureErrorBoundary>
                     }
                   />

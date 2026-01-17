@@ -53,6 +53,10 @@ dev-frontend:
 dev-landing:
     cd frontend/landing && pnpm dev
 
+# Run Temporal worker (durable workflow execution)
+dev-temporal-worker:
+    uv run python -m dataing.entrypoints.temporal_worker
+
 # Build landing site
 build-landing:
     cd frontend/landing && pnpm build

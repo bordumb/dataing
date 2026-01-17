@@ -86,6 +86,9 @@ class Settings:
         self.TEMPORAL_NAMESPACE = os.getenv("TEMPORAL_NAMESPACE", "default")
         self.TEMPORAL_TASK_QUEUE = os.getenv("TEMPORAL_TASK_QUEUE", "investigations")
 
+        # Investigation engine: "arq" (legacy), "temporal" (durable), "v2" (maistro)
+        self.INVESTIGATION_ENGINE = os.getenv("INVESTIGATION_ENGINE", "arq")
+
 
 settings = Settings()
 
@@ -221,6 +224,29 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
     investigations_store: dict[str, dict[str, Any]] = {}
     app.state.investigations = investigations_store
+
+    # Initialize Temporal client if engine is set to temporal
+    app.state.temporal_client = None
+    if settings.INVESTIGATION_ENGINE == "temporal":
+        try:
+            from dataing.temporal.client import TemporalInvestigationClient
+
+            temporal_client = await TemporalInvestigationClient.connect(
+                host=settings.TEMPORAL_HOST,
+                namespace=settings.TEMPORAL_NAMESPACE,
+                task_queue=settings.TEMPORAL_TASK_QUEUE,
+            )
+            app.state.temporal_client = temporal_client
+            logger.info(
+                f"Temporal client connected: host={settings.TEMPORAL_HOST}, "
+                f"namespace={settings.TEMPORAL_NAMESPACE}, "
+                f"task_queue={settings.TEMPORAL_TASK_QUEUE}"
+            )
+        except Exception as e:
+            logger.warning(
+                f"Failed to connect Temporal client: {e}. "
+                "Falling back to legacy investigation service."
+            )
 
     # Demo mode: seed demo data
     demo_mode = os.getenv("DATADR_DEMO_MODE", "").lower()

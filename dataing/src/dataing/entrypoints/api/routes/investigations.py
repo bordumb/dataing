@@ -2,6 +2,11 @@
 
 This module provides endpoints for the new unified investigation system
 with branch support and real-time updates via SSE streaming.
+
+Supports multiple investigation engines via INVESTIGATION_ENGINE env var:
+- "arq" (default): Legacy Arq-based job queue
+- "temporal": Durable Temporal workflow execution
+- "v2": Maistro-based workflow engine
 """
 
 from __future__ import annotations
@@ -10,7 +15,7 @@ import asyncio
 import json
 import logging
 from collections.abc import AsyncIterator
-from typing import Annotated, Any
+from typing import TYPE_CHECKING, Annotated, Any
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Request
@@ -21,7 +26,11 @@ from dataing.adapters.db.app_db import AppDatabase
 from dataing.core.domain_types import AnomalyAlert, MetricSpec
 from dataing.core.investigation.service import InvestigationService
 from dataing.core.json_utils import to_json_string
+from dataing.entrypoints.api.deps import settings
 from dataing.entrypoints.api.middleware.auth import ApiKeyContext, verify_api_key
+
+if TYPE_CHECKING:
+    from dataing.temporal.client import TemporalInvestigationClient
 
 logger = logging.getLogger(__name__)
 
@@ -115,6 +124,29 @@ class SendMessageResponse(BaseModel):
     branch_id: UUID
 
 
+class TemporalStatusResponse(BaseModel):
+    """Status response for Temporal-based investigations."""
+
+    investigation_id: str
+    workflow_status: str
+    current_step: str | None = None
+    progress: float | None = None
+    is_complete: bool | None = None
+    is_cancelled: bool | None = None
+    is_awaiting_user: bool | None = None
+    hypotheses_count: int | None = None
+    hypotheses_evaluated: int | None = None
+    evidence_count: int | None = None
+
+
+class UserInputRequest(BaseModel):
+    """Request body for sending user input to an investigation."""
+
+    feedback: str
+    action: str | None = None
+    data: dict[str, Any] | None = None
+
+
 def get_investigation_service(request: Request) -> InvestigationService:
     """Get the investigation service from app state.
 
@@ -146,6 +178,26 @@ def get_app_db(request: Request) -> AppDatabase:
 
 
 AppDbDep = Annotated[AppDatabase, Depends(get_app_db)]
+
+
+def get_temporal_client(request: Request) -> TemporalInvestigationClient | None:
+    """Get the Temporal client from app state if available.
+
+    Args:
+        request: The current request.
+
+    Returns:
+        TemporalInvestigationClient if configured, None otherwise.
+    """
+    return getattr(request.app.state, "temporal_client", None)
+
+
+TemporalClientDep = Annotated[TemporalInvestigationClient | None, Depends(get_temporal_client)]
+
+
+def is_temporal_engine() -> bool:
+    """Check if Temporal engine is configured."""
+    return settings.INVESTIGATION_ENGINE == "temporal"
 
 
 @router.get("", response_model=list[InvestigationListItem])
@@ -204,21 +256,28 @@ async def start_investigation(
     request: StartInvestigationRequest,
     auth: AuthDep,
     service: InvestigationServiceDep,
+    temporal_client: TemporalClientDep,
 ) -> StartInvestigationResponse:
     """Start a new investigation for an alert.
 
     Creates a new investigation with a main branch positioned at
     GATHER_CONTEXT step.
 
+    Uses Temporal workflow when INVESTIGATION_ENGINE=temporal, otherwise
+    falls back to the legacy investigation service.
+
     Args:
         http_request: The HTTP request for accessing app state.
         request: The investigation request containing alert data.
         auth: Authentication context from API key/JWT.
         service: Investigation service dependency.
+        temporal_client: Optional Temporal client for durable execution.
 
     Returns:
         StartInvestigationResponse with investigation and branch IDs.
     """
+    from uuid import uuid4
+
     from dataing.entrypoints.api.deps import get_tenant_adapter, resolve_datasource_id
 
     # Parse alert from request
@@ -259,6 +318,36 @@ async def start_investigation(
             detail=str(e),
         ) from e
 
+    # Use Temporal workflow if configured and client is available
+    if is_temporal_engine() and temporal_client is not None:
+        investigation_id = uuid4()
+        alert_summary = f"{alert.anomaly_type} in {alert.dataset_id}"
+
+        try:
+            await temporal_client.start_investigation(
+                investigation_id=str(investigation_id),
+                tenant_id=str(auth.tenant_id),
+                datasource_id=str(datasource_id),
+                alert_data=alert.model_dump(),
+                alert_summary=alert_summary,
+            )
+            logger.info(
+                f"Started Temporal investigation: investigation_id={investigation_id}, "
+                f"tenant_id={auth.tenant_id}"
+            )
+            return StartInvestigationResponse(
+                investigation_id=investigation_id,
+                main_branch_id=investigation_id,  # Temporal uses single workflow ID
+                status="queued",
+            )
+        except Exception as e:
+            logger.error(f"Failed to start Temporal investigation: {e}")
+            raise HTTPException(
+                status_code=500,
+                detail=f"Failed to start investigation: {e}",
+            ) from e
+
+    # Fall back to legacy investigation service
     # Get data adapter for this tenant
     try:
         data_adapter = await get_tenant_adapter(http_request, auth.tenant_id, datasource_id)
@@ -297,17 +386,18 @@ async def cancel_investigation(
     http_request: Request,
     investigation_id: UUID,
     auth: AuthDep,
+    temporal_client: TemporalClientDep,
 ) -> CancelInvestigationResponse:
     """Cancel an investigation and all its child jobs.
 
-    Marks the investigation job as 'cancelling'. The worker detects this
-    at the next step boundary and exits cleanly. Child jobs are cancelled
-    recursively.
+    For Temporal engine: Sends cancel signal to the workflow.
+    For legacy engine: Marks the investigation job as 'cancelling'.
 
     Args:
         http_request: The HTTP request for accessing app state.
         investigation_id: UUID of the investigation to cancel.
         auth: Authentication context from API key/JWT.
+        temporal_client: Optional Temporal client for durable execution.
 
     Returns:
         CancelInvestigationResponse with cancellation status.
@@ -315,6 +405,27 @@ async def cancel_investigation(
     Raises:
         HTTPException: If investigation not found or already complete.
     """
+    # Use Temporal workflow if configured and client is available
+    if is_temporal_engine() and temporal_client is not None:
+        try:
+            await temporal_client.cancel_investigation(str(investigation_id))
+            logger.info(
+                f"Sent cancel signal to Temporal investigation: "
+                f"investigation_id={investigation_id}, tenant_id={auth.tenant_id}"
+            )
+            return CancelInvestigationResponse(
+                investigation_id=investigation_id,
+                status="cancelling",
+                jobs_cancelled=1,  # Temporal handles child workflow cancellation
+            )
+        except Exception as e:
+            logger.error(f"Failed to cancel Temporal investigation: {e}")
+            raise HTTPException(
+                status_code=500,
+                detail=f"Failed to cancel investigation: {e}",
+            ) from e
+
+    # Fall back to legacy cancellation
     # Get database from app state
     app_db: AppDatabase | None = http_request.app.state.app_db
 
@@ -489,6 +600,103 @@ async def send_message(
         raise HTTPException(status_code=404, detail=str(e)) from e
 
     return SendMessageResponse(branch_id=branch_id)
+
+
+@router.get("/{investigation_id}/status", response_model=TemporalStatusResponse)
+async def get_investigation_status(
+    investigation_id: UUID,
+    auth: AuthDep,
+    temporal_client: TemporalClientDep,
+) -> TemporalStatusResponse:
+    """Get the status of an investigation.
+
+    For Temporal engine: Queries the workflow for real-time progress.
+    For legacy engine: Returns basic status from database.
+
+    Args:
+        investigation_id: UUID of the investigation.
+        auth: Authentication context from API key/JWT.
+        temporal_client: Optional Temporal client for durable execution.
+
+    Returns:
+        TemporalStatusResponse with current progress and state.
+    """
+    if is_temporal_engine() and temporal_client is not None:
+        try:
+            status = await temporal_client.get_status(str(investigation_id))
+            return TemporalStatusResponse(
+                investigation_id=status.workflow_id,
+                workflow_status=status.workflow_status,
+                current_step=status.current_step,
+                progress=status.progress,
+                is_complete=status.is_complete,
+                is_cancelled=status.is_cancelled,
+                is_awaiting_user=status.is_awaiting_user,
+                hypotheses_count=status.hypotheses_count,
+                hypotheses_evaluated=status.hypotheses_evaluated,
+                evidence_count=status.evidence_count,
+            )
+        except Exception as e:
+            logger.error(f"Failed to get Temporal investigation status: {e}")
+            raise HTTPException(
+                status_code=500,
+                detail=f"Failed to get investigation status: {e}",
+            ) from e
+
+    # Legacy fallback - return basic status
+    raise HTTPException(
+        status_code=501,
+        detail="Status endpoint only available for Temporal engine. "
+        "Use GET /investigations/{id} for legacy investigations.",
+    )
+
+
+@router.post("/{investigation_id}/input")
+async def send_user_input(
+    investigation_id: UUID,
+    request: UserInputRequest,
+    auth: AuthDep,
+    temporal_client: TemporalClientDep,
+) -> dict[str, str]:
+    """Send user input to an investigation awaiting feedback.
+
+    This endpoint is only available for Temporal-based investigations
+    when the workflow is in AWAIT_USER state.
+
+    Args:
+        investigation_id: UUID of the investigation.
+        request: User input payload.
+        auth: Authentication context from API key/JWT.
+        temporal_client: Optional Temporal client for durable execution.
+
+    Returns:
+        Confirmation message.
+    """
+    if not is_temporal_engine() or temporal_client is None:
+        raise HTTPException(
+            status_code=501,
+            detail="User input endpoint only available for Temporal engine.",
+        )
+
+    try:
+        payload = {
+            "feedback": request.feedback,
+            "action": request.action,
+            "data": request.data or {},
+            "user_id": str(auth.user_id) if auth.user_id else None,
+        }
+        await temporal_client.send_user_input(str(investigation_id), payload)
+        logger.info(
+            f"Sent user input to Temporal investigation: "
+            f"investigation_id={investigation_id}, tenant_id={auth.tenant_id}"
+        )
+        return {"status": "input_received", "investigation_id": str(investigation_id)}
+    except Exception as e:
+        logger.error(f"Failed to send user input to Temporal investigation: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to send user input: {e}",
+        ) from e
 
 
 @router.get("/{investigation_id}/stream")

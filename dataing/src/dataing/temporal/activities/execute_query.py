@@ -14,7 +14,7 @@ from temporalio import activity
 class DatabaseProtocol(Protocol):
     """Protocol for database adapter used by execute_query activity."""
 
-    async def execute_query(self, sql: str) -> dict[str, Any]:
+    async def execute_query(self, sql: str, datasource_id: str | None = None) -> dict[str, Any]:
         """Execute SQL query and return results."""
         ...
 
@@ -38,6 +38,7 @@ class ExecuteQueryInput:
     investigation_id: str
     query: str
     hypothesis_id: str
+    datasource_id: str | None = None
 
 
 @dataclass
@@ -88,10 +89,11 @@ def make_execute_query_activity(
 
         # Execute query
         try:
-            result = await database.execute_query(input.query)
+            result = await database.execute_query(input.query, input.datasource_id)
             # Convert QueryResult to dict if it's a Pydantic model
+            # Use mode="json" to ensure dates, UUIDs, etc. are JSON-serializable
             if hasattr(result, "model_dump"):
-                result_dict: dict[str, Any] = result.model_dump()
+                result_dict: dict[str, Any] = result.model_dump(mode="json")
             else:
                 result_dict = result
         except Exception as e:
@@ -111,23 +113,3 @@ def make_execute_query_activity(
         )
 
     return execute_query
-
-
-# Standalone activity for POC/testing (returns mock result)
-@activity.defn
-async def execute_query(
-    investigation_id: str,
-    query: str,
-    hypothesis_id: str,
-) -> dict[str, Any]:
-    """POC execute_query activity with mock result.
-
-    Used for testing without real dependencies. Production code should use
-    make_execute_query_activity() factory instead.
-    """
-    return {
-        "rows": [{"count": 42}],
-        "columns": ["count"],
-        "row_count": 1,
-        "hypothesis_id": hypothesis_id,
-    }

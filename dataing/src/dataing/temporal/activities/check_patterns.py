@@ -41,6 +41,7 @@ class CheckPatternsResult:
     """Result from check_patterns activity."""
 
     matched_patterns: list[dict[str, Any]]
+    error: str | None = None
 
 
 def _extract_dataset(alert_summary: str) -> str:
@@ -121,18 +122,3 @@ def make_check_patterns_activity(
         return CheckPatternsResult(matched_patterns=patterns)
 
     return check_patterns
-
-
-# Standalone activity for POC/testing (returns empty patterns)
-@activity.defn
-async def check_patterns(
-    investigation_id: str,
-    alert_data: dict[str, Any],
-    context: dict[str, Any],
-) -> list[dict[str, Any]]:
-    """POC check_patterns activity with empty results.
-
-    Used for testing without real dependencies. Production code should use
-    make_check_patterns_activity() factory instead.
-    """
-    return []

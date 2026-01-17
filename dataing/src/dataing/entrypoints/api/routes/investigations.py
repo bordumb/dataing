@@ -1,11 +1,7 @@
 """API routes for the unified investigation system.
 
-This module provides endpoints for the investigation system
-with branch support and real-time updates via SSE streaming.
-
-Supports multiple investigation engines via INVESTIGATION_ENGINE env var:
-- "arq" (default): Legacy Arq-based job queue
-- "temporal": Durable Temporal workflow execution
+This module provides endpoints for Temporal-based investigations
+with real-time updates via SSE streaming.
 """
 
 from __future__ import annotations
@@ -15,7 +11,7 @@ import json
 import logging
 from collections.abc import AsyncIterator
 from typing import Annotated, Any
-from uuid import UUID
+from uuid import UUID, uuid4
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
@@ -23,9 +19,7 @@ from sse_starlette.sse import EventSourceResponse
 
 from dataing.adapters.db.app_db import AppDatabase
 from dataing.core.domain_types import AnomalyAlert, MetricSpec
-from dataing.core.investigation.service import InvestigationService
 from dataing.core.json_utils import to_json_string
-from dataing.entrypoints.api.deps import settings
 from dataing.entrypoints.api.middleware.auth import ApiKeyContext, verify_api_key
 from dataing.temporal.client import TemporalInvestigationClient
 
@@ -118,7 +112,8 @@ class SendMessageRequest(BaseModel):
 class SendMessageResponse(BaseModel):
     """Response for sending a message."""
 
-    branch_id: UUID
+    status: str
+    investigation_id: UUID
 
 
 class TemporalStatusResponse(BaseModel):
@@ -144,30 +139,6 @@ class UserInputRequest(BaseModel):
     data: dict[str, Any] | None = None
 
 
-def get_investigation_service(request: Request) -> InvestigationService:
-    """Get the investigation service from app state.
-
-    Args:
-        request: The current request.
-
-    Returns:
-        The configured InvestigationService.
-
-    Raises:
-        HTTPException: If service is not configured.
-    """
-    service: InvestigationService | None = getattr(request.app.state, "investigation_service", None)
-    if service is None:
-        raise HTTPException(
-            status_code=503,
-            detail="Investigation service not configured",
-        )
-    return service
-
-
-InvestigationServiceDep = Annotated[InvestigationService, Depends(get_investigation_service)]
-
-
 def get_app_db(request: Request) -> AppDatabase:
     """Get the app database from app state."""
     app_db: AppDatabase = request.app.state.app_db
@@ -177,24 +148,28 @@ def get_app_db(request: Request) -> AppDatabase:
 AppDbDep = Annotated[AppDatabase, Depends(get_app_db)]
 
 
-def get_temporal_client(request: Request) -> TemporalInvestigationClient | None:
-    """Get the Temporal client from app state if available.
+def get_temporal_client(request: Request) -> TemporalInvestigationClient:
+    """Get the Temporal client from app state.
 
     Args:
         request: The current request.
 
     Returns:
-        TemporalInvestigationClient if configured, None otherwise.
+        TemporalInvestigationClient.
+
+    Raises:
+        HTTPException: If Temporal client is not configured.
     """
-    return getattr(request.app.state, "temporal_client", None)
+    client: TemporalInvestigationClient | None = getattr(request.app.state, "temporal_client", None)
+    if client is None:
+        raise HTTPException(
+            status_code=503,
+            detail="Temporal client not configured",
+        )
+    return client
 
 
-TemporalClientDep = Annotated[TemporalInvestigationClient | None, Depends(get_temporal_client)]
-
-
-def is_temporal_engine() -> bool:
-    """Check if Temporal engine is configured."""
-    return settings.INVESTIGATION_ENGINE == "temporal"
+TemporalClientDep = Annotated[TemporalInvestigationClient, Depends(get_temporal_client)]
 
 
 @router.get("", response_model=list[InvestigationListItem])
@@ -252,30 +227,24 @@ async def start_investigation(
     http_request: Request,
     request: StartInvestigationRequest,
     auth: AuthDep,
-    service: InvestigationServiceDep,
+    db: AppDbDep,
     temporal_client: TemporalClientDep,
 ) -> StartInvestigationResponse:
     """Start a new investigation for an alert.
 
-    Creates a new investigation with a main branch positioned at
-    GATHER_CONTEXT step.
-
-    Uses Temporal workflow when INVESTIGATION_ENGINE=temporal, otherwise
-    falls back to the legacy investigation service.
+    Creates a new investigation with Temporal workflow for durable execution.
 
     Args:
         http_request: The HTTP request for accessing app state.
         request: The investigation request containing alert data.
         auth: Authentication context from API key/JWT.
-        service: Investigation service dependency.
-        temporal_client: Optional Temporal client for durable execution.
+        db: Application database.
+        temporal_client: Temporal client for durable execution.
 
     Returns:
         StartInvestigationResponse with investigation and branch IDs.
     """
-    from uuid import uuid4
-
-    from dataing.entrypoints.api.deps import get_tenant_adapter, resolve_datasource_id
+    from dataing.entrypoints.api.deps import resolve_datasource_id
 
     # Parse alert from request
     alert_data = request.alert
@@ -315,86 +284,71 @@ async def start_investigation(
             detail=str(e),
         ) from e
 
-    # Use Temporal workflow if configured and client is available
-    if is_temporal_engine() and temporal_client is not None:
-        investigation_id = uuid4()
-        alert_summary = f"{alert.anomaly_type} in {alert.dataset_id}"
+    investigation_id = uuid4()
+    # Build rich alert summary with all critical information (matches main branch)
+    metric_name = alert.metric_spec.display_name
+    columns = ", ".join(alert.metric_spec.columns_referenced) or "unknown column"
+    alert_summary = (
+        f"{alert.anomaly_type} anomaly on {columns} in {alert.dataset_id}: "
+        f"expected {alert.expected_value}, actual {alert.actual_value} "
+        f"({alert.deviation_pct:.1f}% deviation). "
+        f"Metric: {metric_name}. Date: {alert.anomaly_date}."
+    )
 
-        try:
-            await temporal_client.start_investigation(
-                investigation_id=str(investigation_id),
-                tenant_id=str(auth.tenant_id),
-                datasource_id=str(datasource_id),
-                alert_data=alert.model_dump(),
-                alert_summary=alert_summary,
-            )
-            logger.info(
-                f"Started Temporal investigation: investigation_id={investigation_id}, "
-                f"tenant_id={auth.tenant_id}"
-            )
-            return StartInvestigationResponse(
-                investigation_id=investigation_id,
-                main_branch_id=investigation_id,  # Temporal uses single workflow ID
-                status="queued",
-            )
-        except Exception as e:
-            logger.error(f"Failed to start Temporal investigation: {e}")
-            raise HTTPException(
-                status_code=500,
-                detail=f"Failed to start investigation: {e}",
-            ) from e
-
-    # Fall back to legacy investigation service
-    # Get data adapter for this tenant
     try:
-        data_adapter = await get_tenant_adapter(http_request, auth.tenant_id, datasource_id)
-    except ValueError as e:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Could not get data adapter: {e}",
-        ) from e
-    except RuntimeError as e:
+        # Save investigation to database first (so GET /investigations/{id} works)
+        # Note: The unified schema stores datasource_id in alert metadata
+        # Use mode="json" to ensure dates are serialized as ISO strings
+        alert_dict = alert.model_dump(mode="json")
+        alert_dict["datasource_id"] = str(datasource_id)
+        await db.execute(
+            """
+            INSERT INTO investigations (id, tenant_id, alert)
+            VALUES ($1, $2, $3)
+            """,
+            investigation_id,
+            auth.tenant_id,
+            json.dumps(alert_dict),
+        )
+
+        # Start the Temporal workflow
+        # Use mode="json" to ensure all values are JSON-serializable for Temporal
+        await temporal_client.start_investigation(
+            investigation_id=str(investigation_id),
+            tenant_id=str(auth.tenant_id),
+            datasource_id=str(datasource_id),
+            alert_data=alert.model_dump(mode="json"),
+            alert_summary=alert_summary,
+        )
+        logger.info(
+            f"Started Temporal investigation: investigation_id={investigation_id}, "
+            f"tenant_id={auth.tenant_id}"
+        )
+        return StartInvestigationResponse(
+            investigation_id=investigation_id,
+            main_branch_id=investigation_id,  # Temporal uses single workflow ID
+            status="queued",
+        )
+    except Exception as e:
+        logger.error(f"Failed to start Temporal investigation: {e}")
         raise HTTPException(
             status_code=500,
-            detail=f"Data adapter error: {e}",
+            detail=f"Failed to start investigation: {e}",
         ) from e
-
-    # Extract correlation ID from middleware for distributed tracing
-    correlation_id = getattr(http_request.state, "correlation_id", None)
-
-    investigation_id, main_branch_id, status = await service.start_investigation(
-        tenant_id=auth.tenant_id,
-        alert=alert,
-        data_adapter=data_adapter,
-        user_id=auth.user_id,
-        datasource_id=datasource_id,
-        correlation_id=correlation_id,
-    )
-
-    return StartInvestigationResponse(
-        investigation_id=investigation_id,
-        main_branch_id=main_branch_id,
-        status=status,
-    )
 
 
 @router.post("/{investigation_id}/cancel", response_model=CancelInvestigationResponse)
 async def cancel_investigation(
-    http_request: Request,
     investigation_id: UUID,
     auth: AuthDep,
     temporal_client: TemporalClientDep,
 ) -> CancelInvestigationResponse:
-    """Cancel an investigation and all its child jobs.
-
-    For Temporal engine: Sends cancel signal to the workflow.
-    For legacy engine: Marks the investigation job as 'cancelling'.
+    """Cancel an investigation and all its child workflows.
 
     Args:
-        http_request: The HTTP request for accessing app state.
         investigation_id: UUID of the investigation to cancel.
         auth: Authentication context from API key/JWT.
-        temporal_client: Optional Temporal client for durable execution.
+        temporal_client: Temporal client for durable execution.
 
     Returns:
         CancelInvestigationResponse with cancellation status.
@@ -402,13 +356,6 @@ async def cancel_investigation(
     Raises:
         HTTPException: If investigation not found or already complete.
     """
-    # Require Temporal for cancellation
-    if temporal_client is None:
-        raise HTTPException(
-            status_code=503,
-            detail="Temporal client not configured. Set INVESTIGATION_ENGINE=temporal.",
-        )
-
     try:
         await temporal_client.cancel_investigation(str(investigation_id))
         logger.info(
@@ -432,93 +379,52 @@ async def cancel_investigation(
 async def get_investigation(
     investigation_id: UUID,
     auth: AuthDep,
-    service: InvestigationServiceDep,
+    temporal_client: TemporalClientDep,
 ) -> InvestigationStateResponse:
-    """Get investigation state including user branch if exists.
+    """Get investigation state from Temporal workflow.
 
-    Returns the current state of the investigation with the main branch
-    and optionally the user's branch if one exists.
+    Returns the current state of the investigation including progress
+    and any available results.
 
     Args:
         investigation_id: UUID of the investigation.
         auth: Authentication context from API key/JWT.
-        service: Investigation service dependency.
+        temporal_client: Temporal client for durable execution.
 
     Returns:
-        InvestigationStateResponse with main and optional user branch.
+        InvestigationStateResponse with main branch state.
 
     Raises:
         HTTPException: If investigation not found.
     """
-    if auth.user_id is None:
-        raise HTTPException(
-            status_code=400,
-            detail="User authentication required for investigation state",
-        )
-
     try:
-        state = await service.get_state(
+        status = await temporal_client.get_status(str(investigation_id))
+
+        # Build response from Temporal status
+        main_branch = BranchStateResponse(
+            branch_id=investigation_id,
+            status=status.workflow_status,
+            current_step=status.current_step or "unknown",
+            synthesis=status.result.synthesis if status.result else None,
+            evidence=list(status.result.evidence) if status.result else [],
+            step_history=[],
+            matched_patterns=[],
+            can_merge=False,
+            parent_branch_id=None,
+        )
+
+        return InvestigationStateResponse(
             investigation_id=investigation_id,
-            user_id=auth.user_id,
+            status=status.workflow_status,
+            main_branch=main_branch,
+            user_branch=None,
         )
-    except ValueError as e:
-        raise HTTPException(status_code=404, detail=str(e)) from e
-
-    # Convert service state to API response
-    main_branch = BranchStateResponse(
-        branch_id=state.main_branch.branch_id,
-        status=state.main_branch.status,
-        current_step=state.main_branch.current_step,
-        synthesis=state.main_branch.synthesis,
-        evidence=list(state.main_branch.evidence),
-        step_history=[
-            StepHistoryItemResponse(step=s.step, completed=s.completed, timestamp=s.timestamp)
-            for s in state.main_branch.step_history
-        ],
-        matched_patterns=[
-            MatchedPatternResponse(
-                pattern_id=p.pattern_id,
-                pattern_name=p.pattern_name,
-                confidence=p.confidence,
-                description=p.description,
-            )
-            for p in state.main_branch.matched_patterns
-        ],
-        can_merge=state.main_branch.can_merge,
-        parent_branch_id=state.main_branch.parent_branch_id,
-    )
-
-    user_branch = None
-    if state.user_branch:
-        user_branch = BranchStateResponse(
-            branch_id=state.user_branch.branch_id,
-            status=state.user_branch.status,
-            current_step=state.user_branch.current_step,
-            synthesis=state.user_branch.synthesis,
-            evidence=list(state.user_branch.evidence),
-            step_history=[
-                StepHistoryItemResponse(step=s.step, completed=s.completed, timestamp=s.timestamp)
-                for s in state.user_branch.step_history
-            ],
-            matched_patterns=[
-                MatchedPatternResponse(
-                    pattern_id=p.pattern_id,
-                    pattern_name=p.pattern_name,
-                    confidence=p.confidence,
-                    description=p.description,
-                )
-                for p in state.user_branch.matched_patterns
-            ],
-            can_merge=state.user_branch.can_merge,
-            parent_branch_id=state.user_branch.parent_branch_id,
-        )
-
-    return InvestigationStateResponse(
-        investigation_id=state.investigation_id,
-        status=state.status,
-        main_branch=main_branch,
-        user_branch=user_branch,
-    )
+    except Exception as e:
+        logger.error(f"Failed to get Temporal investigation: {e}")
+        raise HTTPException(
+            status_code=404,
+            detail=f"Investigation not found: {e}",
+        ) from e
 
 
 @router.post("/{investigation_id}/messages", response_model=SendMessageResponse)
@@ -526,41 +432,44 @@ async def send_message(
     investigation_id: UUID,
     request: SendMessageRequest,
     auth: AuthDep,
-    service: InvestigationServiceDep,
+    temporal_client: TemporalClientDep,
 ) -> SendMessageResponse:
-    """Send a message to the user's branch (creates branch if needed).
-
-    Gets or creates a user branch and adds the message. Resumes the
-    branch if it was suspended.
+    """Send a message to an investigation via Temporal signal.
 
     Args:
         investigation_id: UUID of the investigation.
         request: The message request.
         auth: Authentication context from API key/JWT.
-        service: Investigation service dependency.
+        temporal_client: Temporal client for durable execution.
 
     Returns:
-        SendMessageResponse with the branch ID.
+        SendMessageResponse with status.
 
     Raises:
-        HTTPException: If user authentication required.
+        HTTPException: If failed to send message.
     """
-    if auth.user_id is None:
-        raise HTTPException(
-            status_code=400,
-            detail="User authentication required to send messages",
-        )
-
     try:
-        branch_id = await service.send_message(
-            investigation_id=investigation_id,
-            user_id=auth.user_id,
-            message=request.message,
+        payload: dict[str, Any] = {
+            "feedback": request.message,
+            "action": "user_message",
+            "data": {},
+            "user_id": str(auth.user_id) if auth.user_id else None,
+        }
+        await temporal_client.send_user_input(str(investigation_id), payload)
+        logger.info(
+            f"Sent message to Temporal investigation: "
+            f"investigation_id={investigation_id}, tenant_id={auth.tenant_id}"
         )
-    except ValueError as e:
-        raise HTTPException(status_code=404, detail=str(e)) from e
-
-    return SendMessageResponse(branch_id=branch_id)
+        return SendMessageResponse(
+            status="message_sent",
+            investigation_id=investigation_id,
+        )
+    except Exception as e:
+        logger.error(f"Failed to send message to Temporal investigation: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to send message: {e}",
+        ) from e
 
 
 @router.get("/{investigation_id}/status", response_model=TemporalStatusResponse)
@@ -571,45 +480,36 @@ async def get_investigation_status(
 ) -> TemporalStatusResponse:
     """Get the status of an investigation.
 
-    For Temporal engine: Queries the workflow for real-time progress.
-    For legacy engine: Returns basic status from database.
+    Queries the Temporal workflow for real-time progress.
 
     Args:
         investigation_id: UUID of the investigation.
         auth: Authentication context from API key/JWT.
-        temporal_client: Optional Temporal client for durable execution.
+        temporal_client: Temporal client for durable execution.
 
     Returns:
         TemporalStatusResponse with current progress and state.
     """
-    if is_temporal_engine() and temporal_client is not None:
-        try:
-            status = await temporal_client.get_status(str(investigation_id))
-            return TemporalStatusResponse(
-                investigation_id=status.workflow_id,
-                workflow_status=status.workflow_status,
-                current_step=status.current_step,
-                progress=status.progress,
-                is_complete=status.is_complete,
-                is_cancelled=status.is_cancelled,
-                is_awaiting_user=status.is_awaiting_user,
-                hypotheses_count=status.hypotheses_count,
-                hypotheses_evaluated=status.hypotheses_evaluated,
-                evidence_count=status.evidence_count,
-            )
-        except Exception as e:
-            logger.error(f"Failed to get Temporal investigation status: {e}")
-            raise HTTPException(
-                status_code=500,
-                detail=f"Failed to get investigation status: {e}",
-            ) from e
-
-    # Legacy fallback - return basic status
-    raise HTTPException(
-        status_code=501,
-        detail="Status endpoint only available for Temporal engine. "
-        "Use GET /investigations/{id} for legacy investigations.",
-    )
+    try:
+        status = await temporal_client.get_status(str(investigation_id))
+        return TemporalStatusResponse(
+            investigation_id=status.workflow_id,
+            workflow_status=status.workflow_status,
+            current_step=status.current_step,
+            progress=status.progress,
+            is_complete=status.is_complete,
+            is_cancelled=status.is_cancelled,
+            is_awaiting_user=status.is_awaiting_user,
+            hypotheses_count=status.hypotheses_count,
+            hypotheses_evaluated=status.hypotheses_evaluated,
+            evidence_count=status.evidence_count,
+        )
+    except Exception as e:
+        logger.error(f"Failed to get Temporal investigation status: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to get investigation status: {e}",
+        ) from e
 
 
 @router.post("/{investigation_id}/input")
@@ -621,24 +521,18 @@ async def send_user_input(
 ) -> dict[str, str]:
     """Send user input to an investigation awaiting feedback.
 
-    This endpoint is only available for Temporal-based investigations
-    when the workflow is in AWAIT_USER state.
+    This endpoint sends a signal to the Temporal workflow when it's
+    in AWAIT_USER state.
 
     Args:
         investigation_id: UUID of the investigation.
         request: User input payload.
         auth: Authentication context from API key/JWT.
-        temporal_client: Optional Temporal client for durable execution.
+        temporal_client: Temporal client for durable execution.
 
     Returns:
         Confirmation message.
     """
-    if not is_temporal_engine() or temporal_client is None:
-        raise HTTPException(
-            status_code=501,
-            detail="User input endpoint only available for Temporal engine.",
-        )
-
     try:
         payload = {
             "feedback": request.feedback,
@@ -664,29 +558,21 @@ async def send_user_input(
 async def stream_updates(
     investigation_id: UUID,
     auth: AuthDep,
-    service: InvestigationServiceDep,
+    temporal_client: TemporalClientDep,
 ) -> EventSourceResponse:
     """Stream real-time updates via SSE.
 
     Returns a Server-Sent Events stream that pushes investigation
-    updates as they occur.
+    updates as they occur by polling the Temporal workflow.
 
     Args:
         investigation_id: UUID of the investigation.
         auth: Authentication context from API key/JWT.
-        service: Investigation service dependency.
+        temporal_client: Temporal client for durable execution.
 
     Returns:
         EventSourceResponse with SSE stream.
     """
-    if auth.user_id is None:
-        raise HTTPException(
-            status_code=400,
-            detail="User authentication required for streaming",
-        )
-
-    # Capture user_id for closure (mypy type narrowing)
-    user_id = auth.user_id
 
     async def event_generator() -> AsyncIterator[dict[str, Any]]:
         """Generate SSE events for investigation updates."""
@@ -698,14 +584,11 @@ async def stream_updates(
         try:
             while poll_count < max_polls:
                 try:
-                    state = await service.get_state(
-                        investigation_id=investigation_id,
-                        user_id=user_id,
-                    )
+                    status = await temporal_client.get_status(str(investigation_id))
 
                     # Check for changes
-                    current_step = state.main_branch.current_step
-                    current_status = state.status
+                    current_step = status.current_step
+                    current_status = status.workflow_status
 
                     if current_step != last_step:
                         yield {
@@ -713,7 +596,8 @@ async def stream_updates(
                             "data": to_json_string(
                                 {
                                     "step": current_step,
-                                    "branch_id": str(state.main_branch.branch_id),
+                                    "investigation_id": str(investigation_id),
+                                    "progress": status.progress,
                                 }
                             ),
                         }
@@ -725,33 +609,39 @@ async def stream_updates(
                             "data": to_json_string(
                                 {
                                     "status": current_status,
-                                    "investigation_id": str(state.investigation_id),
+                                    "investigation_id": str(investigation_id),
+                                    "is_awaiting_user": status.is_awaiting_user,
                                 }
                             ),
                         }
                         last_status = current_status
 
                     # Check for completion
-                    if current_status in ("completed", "failed", "cancelled", "inconclusive"):
+                    if status.is_complete or status.is_cancelled:
                         # Send final state
+                        synthesis = None
+                        if status.result:
+                            synthesis = status.result.synthesis
                         yield {
                             "event": "investigation_ended",
                             "data": to_json_string(
                                 {
                                     "status": current_status,
-                                    "synthesis": state.main_branch.synthesis,
+                                    "synthesis": synthesis,
+                                    "is_cancelled": status.is_cancelled,
                                 }
                             ),
                         }
                         break
 
-                except ValueError:
-                    # Investigation not found
+                except Exception as e:
+                    # Workflow query failed
+                    logger.warning(f"Failed to poll investigation status: {e}")
                     yield {
                         "event": "error",
                         "data": to_json_string(
                             {
-                                "error": "Investigation not found",
+                                "error": f"Failed to get status: {e}",
                             }
                         ),
                     }

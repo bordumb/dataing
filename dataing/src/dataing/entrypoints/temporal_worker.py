@@ -16,13 +16,18 @@ Usage:
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
+import os
 from typing import Any
+from uuid import UUID
 
+from cryptography.fernet import Fernet
 from temporalio.client import Client
 from temporalio.worker import Worker
 
 from dataing.adapters.context import ContextEngine
+from dataing.adapters.datasource import get_registry
 from dataing.adapters.datasource.base import BaseAdapter
 from dataing.adapters.db.app_db import AppDatabase
 from dataing.adapters.investigation.pattern_adapter import InMemoryPatternRepository
@@ -38,6 +43,7 @@ from dataing.temporal.activities import (
     make_interpret_evidence_activity,
     make_synthesize_activity,
 )
+from dataing.temporal.adapters import TemporalAgentAdapter
 from dataing.temporal.workflows import EvaluateHypothesisWorkflow, InvestigationWorkflow
 
 logging.basicConfig(
@@ -64,11 +70,12 @@ async def create_dependencies() -> dict[str, Any]:
     await app_db.connect()
     logger.info("Database connected")
 
-    # LLM client
-    llm = AgentClient(
+    # LLM client with adapter
+    agent_client = AgentClient(
         api_key=settings.anthropic_api_key,
         model=settings.llm_model,
     )
+    agent_adapter = TemporalAgentAdapter(agent_client)
     logger.info(f"Agent client initialized with model: {settings.llm_model}")
 
     # Context engine
@@ -81,7 +88,7 @@ async def create_dependencies() -> dict[str, Any]:
 
     return {
         "app_db": app_db,
-        "llm": llm,
+        "agent_adapter": agent_adapter,
         "context_engine": context_engine,
         "pattern_repository": pattern_repository,
     }
@@ -96,41 +103,107 @@ def create_activities(deps: dict[str, Any]) -> list[Any]:
     Returns:
         List of activity functions ready for registration.
     """
-    llm = deps["llm"]
+    agent_adapter = deps["agent_adapter"]
     context_engine = deps["context_engine"]
     pattern_repository = deps["pattern_repository"]
+    app_db = deps["app_db"]
 
-    # Create a get_adapter function that will resolve adapters
-    # In production, this would look up adapters from a registry
-    # For now, we return a placeholder that logs a warning
+    # Cache for adapters to avoid recreating them
+    adapter_cache: dict[str, BaseAdapter] = {}
+
+    # Get encryption key from environment
+    encryption_key = os.getenv("DATADR_ENCRYPTION_KEY") or os.getenv("ENCRYPTION_KEY")
+
     async def get_adapter(datasource_id: str) -> BaseAdapter:
-        """Get adapter for a datasource ID.
+        """Get adapter for a datasource ID from database config.
 
-        Note: This is a placeholder implementation. In production,
-        this should look up the adapter from a registry based on
-        tenant and datasource configuration.
+        Looks up the datasource configuration, decrypts connection details,
+        and creates the appropriate adapter.
         """
-        logger.warning(
-            f"get_adapter called for {datasource_id} - using placeholder. "
-            "Production should use adapter registry."
-        )
-        # Return a mock adapter - in production this would be from registry
-        raise NotImplementedError(
-            f"Adapter resolution for {datasource_id} not yet implemented. "
-            "Configure datasource adapters in production."
+        # Check cache first
+        if datasource_id in adapter_cache:
+            return adapter_cache[datasource_id]
+
+        # Look up datasource config from database
+        ds = await app_db.fetch_one(
+            """
+            SELECT id, type, connection_config_encrypted, name
+            FROM data_sources
+            WHERE id = $1 AND is_active = true
+            """,
+            UUID(datasource_id),
         )
 
-    # Create a placeholder database adapter for execute_query
-    # In production, this would be resolved per-datasource
-    class PlaceholderDatabase:
-        """Placeholder database for POC - raises error if used."""
+        if not ds:
+            raise ValueError(f"Datasource {datasource_id} not found or inactive")
 
-        async def execute_query(self, sql: str) -> dict[str, Any]:
-            """Execute query placeholder."""
-            raise NotImplementedError(
-                "PlaceholderDatabase.execute_query called. "
-                "Configure per-datasource adapters in production."
+        # Decrypt connection config
+        if not encryption_key:
+            raise RuntimeError(
+                "ENCRYPTION_KEY not set - check DATADR_ENCRYPTION_KEY or ENCRYPTION_KEY env vars"
             )
+
+        encrypted_config = ds.get("connection_config_encrypted", "")
+        try:
+            f = Fernet(encryption_key.encode())
+            decrypted = f.decrypt(encrypted_config.encode()).decode()
+            config: dict[str, Any] = json.loads(decrypted)
+        except Exception as e:
+            raise RuntimeError(f"Failed to decrypt connection config: {e}") from e
+
+        # Create adapter using registry
+        registry = get_registry()
+        ds_type = ds["type"]
+
+        try:
+            adapter = registry.create(ds_type, config)
+            await adapter.connect()
+        except Exception as e:
+            raise RuntimeError(f"Failed to create/connect adapter for {ds_type}: {e}") from e
+
+        # Cache for reuse
+        adapter_cache[datasource_id] = adapter
+        logger.info(f"Created adapter: type={ds_type}, name={ds.get('name')}, id={datasource_id}")
+
+        return adapter
+
+    # Create a database wrapper that uses the adapter for query execution
+    class AdapterDatabase:
+        """Database wrapper that resolves adapter per-datasource for query execution."""
+
+        def __init__(self, get_adapter_fn: Any) -> None:
+            """Initialize with adapter resolver."""
+            self._get_adapter = get_adapter_fn
+
+        async def execute_query(
+            self, sql: str, datasource_id: str | None = None
+        ) -> dict[str, Any]:
+            """Execute a SQL query using the specified datasource adapter."""
+            from dataing.core.json_utils import to_json_safe
+
+            if not datasource_id:
+                raise RuntimeError("No datasource_id provided to execute_query")
+
+            adapter = await self._get_adapter(datasource_id)
+
+            # Execute query through adapter
+            try:
+                result = await adapter.execute_query(sql)
+                rows = result.rows if hasattr(result, "rows") else []
+                columns = result.columns if hasattr(result, "columns") else []
+
+                # Convert rows to JSON-safe types (handles date, datetime, UUID, etc.)
+                safe_rows = to_json_safe(rows)
+
+                return {
+                    "columns": columns,
+                    "rows": safe_rows,
+                    "row_count": len(rows),
+                }
+            except Exception as e:
+                return {"error": str(e), "columns": [], "rows": [], "row_count": 0}
+
+    adapter_database = AdapterDatabase(get_adapter)
 
     activities = [
         # Context and pattern activities
@@ -139,18 +212,16 @@ def create_activities(deps: dict[str, Any]) -> list[Any]:
             get_adapter=get_adapter,
         ),
         make_check_patterns_activity(pattern_repository=pattern_repository),
-        # Hypothesis generation
-        make_generate_hypotheses_activity(llm=llm),
+        # Hypothesis generation (uses adapter for dict↔domain conversion)
+        make_generate_hypotheses_activity(adapter=agent_adapter),
         # Query generation and execution
-        make_generate_query_activity(llm=llm),
-        # Note: execute_query requires per-datasource database adapter
-        # This placeholder will error if actually invoked
-        make_execute_query_activity(database=PlaceholderDatabase()),
+        make_generate_query_activity(adapter=agent_adapter),
+        make_execute_query_activity(database=adapter_database),
         # Evidence interpretation
-        make_interpret_evidence_activity(llm=llm),
+        make_interpret_evidence_activity(adapter=agent_adapter),
         # Synthesis and analysis
-        make_synthesize_activity(llm=llm),
-        make_counter_analyze_activity(llm=llm),
+        make_synthesize_activity(adapter=agent_adapter),
+        make_counter_analyze_activity(adapter=agent_adapter),
     ]
 
     logger.info(f"Created {len(activities)} activities with dependencies")

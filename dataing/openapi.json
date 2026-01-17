@@ -365,7 +365,7 @@
           "investigations"
         ],
         "summary": "Start Investigation",
-        "description": "Start a new investigation for an alert.\n\nCreates a new investigation with a main branch positioned at\nGATHER_CONTEXT step.\n\nArgs:\n    http_request: The HTTP request for accessing app state.\n    request: The investigation request containing alert data.\n    auth: Authentication context from API key/JWT.\n    service: Investigation service dependency.\n\nReturns:\n    StartInvestigationResponse with investigation and branch IDs.",
+        "description": "Start a new investigation for an alert.\n\nCreates a new investigation with Temporal workflow for durable execution.\n\nArgs:\n    http_request: The HTTP request for accessing app state.\n    request: The investigation request containing alert data.\n    auth: Authentication context from API key/JWT.\n    db: Application database.\n    temporal_client: Temporal client for durable execution.\n\nReturns:\n    StartInvestigationResponse with investigation and branch IDs.",
         "operationId": "start_investigation_api_v1_investigations_post",
         "requestBody": {
           "content": {
@@ -415,7 +415,7 @@
           "investigations"
         ],
         "summary": "Cancel Investigation",
-        "description": "Cancel an investigation and all its child jobs.\n\nMarks the investigation job as 'cancelling'. The worker detects this\nat the next step boundary and exits cleanly. Child jobs are cancelled\nrecursively.\n\nArgs:\n    http_request: The HTTP request for accessing app state.\n    investigation_id: UUID of the investigation to cancel.\n    auth: Authentication context from API key/JWT.\n\nReturns:\n    CancelInvestigationResponse with cancellation status.\n\nRaises:\n    HTTPException: If investigation not found or already complete.",
+        "description": "Cancel an investigation and all its child workflows.\n\nArgs:\n    investigation_id: UUID of the investigation to cancel.\n    auth: Authentication context from API key/JWT.\n    temporal_client: Temporal client for durable execution.\n\nReturns:\n    CancelInvestigationResponse with cancellation status.\n\nRaises:\n    HTTPException: If investigation not found or already complete.",
         "operationId": "cancel_investigation_api_v1_investigations__investigation_id__cancel_post",
         "security": [
           {
@@ -467,7 +467,7 @@
           "investigations"
         ],
         "summary": "Get Investigation",
-        "description": "Get investigation state including user branch if exists.\n\nReturns the current state of the investigation with the main branch\nand optionally the user's branch if one exists.\n\nArgs:\n    investigation_id: UUID of the investigation.\n    auth: Authentication context from API key/JWT.\n    service: Investigation service dependency.\n\nReturns:\n    InvestigationStateResponse with main and optional user branch.\n\nRaises:\n    HTTPException: If investigation not found.",
+        "description": "Get investigation state from Temporal workflow.\n\nReturns the current state of the investigation including progress\nand any available results.\n\nArgs:\n    investigation_id: UUID of the investigation.\n    auth: Authentication context from API key/JWT.\n    temporal_client: Temporal client for durable execution.\n\nReturns:\n    InvestigationStateResponse with main branch state.\n\nRaises:\n    HTTPException: If investigation not found.",
         "operationId": "get_investigation_api_v1_investigations__investigation_id__get",
         "security": [
           {
@@ -519,7 +519,7 @@
           "investigations"
         ],
         "summary": "Send Message",
-        "description": "Send a message to the user's branch (creates branch if needed).\n\nGets or creates a user branch and adds the message. Resumes the\nbranch if it was suspended.\n\nArgs:\n    investigation_id: UUID of the investigation.\n    request: The message request.\n    auth: Authentication context from API key/JWT.\n    service: Investigation service dependency.\n\nReturns:\n    SendMessageResponse with the branch ID.\n\nRaises:\n    HTTPException: If user authentication required.",
+        "description": "Send a message to an investigation via Temporal signal.\n\nArgs:\n    investigation_id: UUID of the investigation.\n    request: The message request.\n    auth: Authentication context from API key/JWT.\n    temporal_client: Temporal client for durable execution.\n\nReturns:\n    SendMessageResponse with status.\n\nRaises:\n    HTTPException: If failed to send message.",
         "operationId": "send_message_api_v1_investigations__investigation_id__messages_post",
         "security": [
           {
@@ -575,13 +575,131 @@
         }
       }
     },
+    "/api/v1/investigations/{investigation_id}/status": {
+      "get": {
+        "tags": [
+          "investigations"
+        ],
+        "summary": "Get Investigation Status",
+        "description": "Get the status of an investigation.\n\nQueries the Temporal workflow for real-time progress.\n\nArgs:\n    investigation_id: UUID of the investigation.\n    auth: Authentication context from API key/JWT.\n    temporal_client: Temporal client for durable execution.\n\nReturns:\n    TemporalStatusResponse with current progress and state.",
+        "operationId": "get_investigation_status_api_v1_investigations__investigation_id__status_get",
+        "security": [
+          {
+            "APIKeyHeader": []
+          },
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "investigation_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Investigation Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TemporalStatusResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/investigations/{investigation_id}/input": {
+      "post": {
+        "tags": [
+          "investigations"
+        ],
+        "summary": "Send User Input",
+        "description": "Send user input to an investigation awaiting feedback.\n\nThis endpoint sends a signal to the Temporal workflow when it's\nin AWAIT_USER state.\n\nArgs:\n    investigation_id: UUID of the investigation.\n    request: User input payload.\n    auth: Authentication context from API key/JWT.\n    temporal_client: Temporal client for durable execution.\n\nReturns:\n    Confirmation message.",
+        "operationId": "send_user_input_api_v1_investigations__investigation_id__input_post",
+        "security": [
+          {
+            "APIKeyHeader": []
+          },
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "investigation_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Investigation Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UserInputRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "title": "Response Send User Input Api V1 Investigations  Investigation Id  Input Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/investigations/{investigation_id}/stream": {
       "get": {
         "tags": [
           "investigations"
         ],
         "summary": "Stream Updates",
-        "description": "Stream real-time updates via SSE.\n\nReturns a Server-Sent Events stream that pushes investigation\nupdates as they occur.\n\nArgs:\n    investigation_id: UUID of the investigation.\n    auth: Authentication context from API key/JWT.\n    service: Investigation service dependency.\n\nReturns:\n    EventSourceResponse with SSE stream.",
+        "description": "Stream real-time updates via SSE.\n\nReturns a Server-Sent Events stream that pushes investigation\nupdates as they occur by polling the Temporal workflow.\n\nArgs:\n    investigation_id: UUID of the investigation.\n    auth: Authentication context from API key/JWT.\n    temporal_client: Temporal client for durable execution.\n\nReturns:\n    EventSourceResponse with SSE stream.",
         "operationId": "stream_updates_api_v1_investigations__investigation_id__stream_get",
         "security": [
           {
@@ -11363,15 +11481,20 @@
       },
       "SendMessageResponse": {
         "properties": {
-          "branch_id": {
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "investigation_id": {
             "type": "string",
             "format": "uuid",
-            "title": "Branch Id"
+            "title": "Investigation Id"
           }
         },
         "type": "object",
         "required": [
-          "branch_id"
+          "status",
+          "investigation_id"
         ],
         "title": "SendMessageResponse",
         "description": "Response for sending a message."
@@ -11853,6 +11976,113 @@
         "title": "TeamUpdate",
         "description": "Team update request."
       },
+      "TemporalStatusResponse": {
+        "properties": {
+          "investigation_id": {
+            "type": "string",
+            "title": "Investigation Id"
+          },
+          "workflow_status": {
+            "type": "string",
+            "title": "Workflow Status"
+          },
+          "current_step": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Current Step"
+          },
+          "progress": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Progress"
+          },
+          "is_complete": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Is Complete"
+          },
+          "is_cancelled": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Is Cancelled"
+          },
+          "is_awaiting_user": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Is Awaiting User"
+          },
+          "hypotheses_count": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hypotheses Count"
+          },
+          "hypotheses_evaluated": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hypotheses Evaluated"
+          },
+          "evidence_count": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Evidence Count"
+          }
+        },
+        "type": "object",
+        "required": [
+          "investigation_id",
+          "workflow_status"
+        ],
+        "title": "TemporalStatusResponse",
+        "description": "Status response for Temporal-based investigations."
+      },
       "TestConnectionRequest": {
         "properties": {
           "type": {
@@ -12108,6 +12338,43 @@
         ],
         "title": "UsageMetricsResponse",
         "description": "Usage metrics response."
+      },
+      "UserInputRequest": {
+        "properties": {
+          "feedback": {
+            "type": "string",
+            "title": "Feedback"
+          },
+          "action": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Action"
+          },
+          "data": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Data"
+          }
+        },
+        "type": "object",
+        "required": [
+          "feedback"
+        ],
+        "title": "UserInputRequest",
+        "description": "Request body for sending user input to an investigation."
       },
       "UserListResponse": {
         "properties": {

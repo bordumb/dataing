@@ -9,9 +9,9 @@ from temporalio import workflow
 
 with workflow.unsafe.imports_passed_through():
     from dataing.temporal.activities import (
-        execute_query,
-        generate_query,
-        interpret_evidence,
+        ExecuteQueryInput,
+        GenerateQueryInput,
+        InterpretEvidenceInput,
     )
 
 
@@ -24,6 +24,7 @@ class EvaluateHypothesisInput:
     hypothesis: dict[str, Any]
     schema_info: dict[str, Any]
     alert_summary: str
+    datasource_id: str
     alert: dict[str, Any] | None = None
 
 
@@ -61,25 +62,86 @@ class EvaluateHypothesisWorkflow:
         hypothesis_id = input.hypothesis.get("id", f"h-{input.hypothesis_index}")
 
         # Step 1: Generate SQL query to test this hypothesis
-        query = await workflow.execute_activity(
-            generate_query,
-            args=[input.investigation_id, input.hypothesis, input.schema_info],
+        query_input = GenerateQueryInput(
+            investigation_id=input.investigation_id,
+            hypothesis=input.hypothesis,
+            schema_info=input.schema_info,
+            alert_summary=input.alert_summary,
+            alert=input.alert,
+        )
+        query_result = await workflow.execute_activity(
+            "generate_query",
+            query_input,
             start_to_close_timeout=timedelta(minutes=2),
         )
 
+        if query_result.get("error"):
+            return EvaluateHypothesisResult(
+                hypothesis_index=input.hypothesis_index,
+                hypothesis_id=hypothesis_id,
+                evidence=[],
+                queries_executed=0,
+                error=query_result["error"],
+            )
+
+        query = query_result.get("query", "")
+
         # Step 2: Execute the generated query
-        query_result = await workflow.execute_activity(
-            execute_query,
-            args=[input.investigation_id, query, hypothesis_id],
+        execute_input = ExecuteQueryInput(
+            investigation_id=input.investigation_id,
+            query=query,
+            hypothesis_id=hypothesis_id,
+            datasource_id=input.datasource_id,
+        )
+        execute_result = await workflow.execute_activity(
+            "execute_query",
+            execute_input,
             start_to_close_timeout=timedelta(minutes=5),
         )
 
+        if execute_result.get("error"):
+            return EvaluateHypothesisResult(
+                hypothesis_index=input.hypothesis_index,
+                hypothesis_id=hypothesis_id,
+                evidence=[],
+                queries_executed=1,
+                error=execute_result["error"],
+            )
+
         # Step 3: Interpret the evidence
-        evidence = await workflow.execute_activity(
-            interpret_evidence,
-            args=[input.investigation_id, input.hypothesis, query_result],
+        interpret_input = InterpretEvidenceInput(
+            investigation_id=input.investigation_id,
+            hypothesis=input.hypothesis,
+            query_result={
+                "query": query,
+                "columns": execute_result.get("columns", []),
+                "rows": execute_result.get("rows", []),
+                "row_count": execute_result.get("row_count", 0),
+                "truncated": execute_result.get("truncated", False),
+                "execution_time_ms": execute_result.get("execution_time_ms", 0),
+            },
+            alert_summary=input.alert_summary,
+        )
+        interpret_result = await workflow.execute_activity(
+            "interpret_evidence",
+            interpret_input,
             start_to_close_timeout=timedelta(minutes=2),
         )
+
+        # Build evidence dict from interpretation
+        evidence = {
+            "hypothesis_id": hypothesis_id,
+            "query": query,
+            "supports_hypothesis": interpret_result.get("supports_hypothesis", False),
+            "confidence": interpret_result.get("confidence", 0.0),
+            "interpretation": interpret_result.get("interpretation", ""),
+            "key_findings": interpret_result.get("key_findings", []),
+            "result_summary": str(execute_result.get("rows", [])[:5]),
+            "row_count": execute_result.get("row_count", 0),
+        }
+
+        if interpret_result.get("error"):
+            evidence["error"] = interpret_result["error"]
 
         return EvaluateHypothesisResult(
             hypothesis_index=input.hypothesis_index,
@@ -95,6 +157,7 @@ async def evaluate_hypotheses_parallel(
     hypotheses: list[dict[str, Any]],
     schema_info: dict[str, Any],
     alert_summary: str,
+    datasource_id: str,
     alert: dict[str, Any] | None = None,
 ) -> list[dict[str, Any]]:
     """Evaluate multiple hypotheses in parallel using child workflows.
@@ -108,6 +171,7 @@ async def evaluate_hypotheses_parallel(
         hypotheses: List of hypothesis dictionaries.
         schema_info: Schema information for query generation.
         alert_summary: Summary of the alert being investigated.
+        datasource_id: ID of the datasource to query.
         alert: Optional full alert data.
 
     Returns:
@@ -125,6 +189,7 @@ async def evaluate_hypotheses_parallel(
             hypothesis=hypothesis,
             schema_info=schema_info,
             alert_summary=alert_summary,
+            datasource_id=datasource_id,
             alert=alert,
         )
         handle = await workflow.start_child_workflow(

@@ -83,16 +83,23 @@ def build_user(hypothesis: Hypothesis, alert: AnomalyAlert | None = None) -> str
     # Use the suggested query if available - it was crafted during hypothesis generation
     suggested_query_section = ""
     if hypothesis.suggested_query:
+        # Explicitly tell LLM to update dates if alert has a specific date
+        date_override = ""
+        if alert:
+            date_override = f"""
+CRITICAL: If the suggested query contains ANY date that is NOT {alert.anomaly_date}, \
+you MUST replace it with {alert.anomaly_date}. The anomaly date is {alert.anomaly_date}."""
+
         suggested_query_section = f"""
 
 SUGGESTED QUERY (use this as your starting point, refine if needed):
 ```sql
 {hypothesis.suggested_query}
 ```
-
+{date_override}
 Use this query directly if it looks correct for the schema. Only modify it if:
 - Table/column names need adjustment for the actual schema
-- The date filter needs updating
+- The date filter needs updating to use {alert.anomaly_date if alert else "the correct date"}
 - There's a syntax issue"""
 
     return f"""Generate a SQL query to test this hypothesis:

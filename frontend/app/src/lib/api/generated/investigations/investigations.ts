@@ -22,8 +22,11 @@ import type {
   InvestigationStateResponse,
   SendMessageRequest,
   SendMessageResponse,
+  SendUserInputApiV1InvestigationsInvestigationIdInputPost200,
   StartInvestigationRequest,
   StartInvestigationResponse,
+  TemporalStatusResponse,
+  UserInputRequest,
 } from "../../model";
 import { customInstance } from "../../client";
 
@@ -116,14 +119,14 @@ export const useListInvestigationsApiV1InvestigationsGet = <
 /**
  * Start a new investigation for an alert.
 
-Creates a new investigation with a main branch positioned at
-GATHER_CONTEXT step.
+Creates a new investigation with Temporal workflow for durable execution.
 
 Args:
     http_request: The HTTP request for accessing app state.
     request: The investigation request containing alert data.
     auth: Authentication context from API key/JWT.
-    service: Investigation service dependency.
+    db: Application database.
+    temporal_client: Temporal client for durable execution.
 
 Returns:
     StartInvestigationResponse with investigation and branch IDs.
@@ -204,16 +207,12 @@ export const useStartInvestigationApiV1InvestigationsPost = <
   return useMutation(mutationOptions);
 };
 /**
- * Cancel an investigation and all its child jobs.
-
-Marks the investigation job as 'cancelling'. The worker detects this
-at the next step boundary and exits cleanly. Child jobs are cancelled
-recursively.
+ * Cancel an investigation and all its child workflows.
 
 Args:
-    http_request: The HTTP request for accessing app state.
     investigation_id: UUID of the investigation to cancel.
     auth: Authentication context from API key/JWT.
+    temporal_client: Temporal client for durable execution.
 
 Returns:
     CancelInvestigationResponse with cancellation status.
@@ -318,18 +317,18 @@ export const useCancelInvestigationApiV1InvestigationsInvestigationIdCancelPost 
     return useMutation(mutationOptions);
   };
 /**
- * Get investigation state including user branch if exists.
+ * Get investigation state from Temporal workflow.
 
-Returns the current state of the investigation with the main branch
-and optionally the user's branch if one exists.
+Returns the current state of the investigation including progress
+and any available results.
 
 Args:
     investigation_id: UUID of the investigation.
     auth: Authentication context from API key/JWT.
-    service: Investigation service dependency.
+    temporal_client: Temporal client for durable execution.
 
 Returns:
-    InvestigationStateResponse with main and optional user branch.
+    InvestigationStateResponse with main branch state.
 
 Raises:
     HTTPException: If investigation not found.
@@ -454,22 +453,19 @@ export const useGetInvestigationApiV1InvestigationsInvestigationIdGet = <
 };
 
 /**
- * Send a message to the user's branch (creates branch if needed).
-
-Gets or creates a user branch and adds the message. Resumes the
-branch if it was suspended.
+ * Send a message to an investigation via Temporal signal.
 
 Args:
     investigation_id: UUID of the investigation.
     request: The message request.
     auth: Authentication context from API key/JWT.
-    service: Investigation service dependency.
+    temporal_client: Temporal client for durable execution.
 
 Returns:
-    SendMessageResponse with the branch ID.
+    SendMessageResponse with status.
 
 Raises:
-    HTTPException: If user authentication required.
+    HTTPException: If failed to send message.
  * @summary Send Message
  */
 export const sendMessageApiV1InvestigationsInvestigationIdMessagesPost = (
@@ -573,15 +569,274 @@ export const useSendMessageApiV1InvestigationsInvestigationIdMessagesPost = <
   return useMutation(mutationOptions);
 };
 /**
- * Stream real-time updates via SSE.
+ * Get the status of an investigation.
 
-Returns a Server-Sent Events stream that pushes investigation
-updates as they occur.
+Queries the Temporal workflow for real-time progress.
 
 Args:
     investigation_id: UUID of the investigation.
     auth: Authentication context from API key/JWT.
-    service: Investigation service dependency.
+    temporal_client: Temporal client for durable execution.
+
+Returns:
+    TemporalStatusResponse with current progress and state.
+ * @summary Get Investigation Status
+ */
+export const getInvestigationStatusApiV1InvestigationsInvestigationIdStatusGet =
+  (investigationId: string, signal?: AbortSignal) => {
+    return customInstance<TemporalStatusResponse>({
+      url: `/api/v1/investigations/${investigationId}/status`,
+      method: "GET",
+      signal,
+    });
+  };
+
+export const getGetInvestigationStatusApiV1InvestigationsInvestigationIdStatusGetQueryKey =
+  (investigationId: string) => {
+    return [`/api/v1/investigations/${investigationId}/status`] as const;
+  };
+
+export const getGetInvestigationStatusApiV1InvestigationsInvestigationIdStatusGetQueryOptions =
+  <
+    TData = Awaited<
+      ReturnType<
+        typeof getInvestigationStatusApiV1InvestigationsInvestigationIdStatusGet
+      >
+    >,
+    TError = HTTPValidationError,
+  >(
+    investigationId: string,
+    options?: {
+      query?: Partial<
+        UseQueryOptions<
+          Awaited<
+            ReturnType<
+              typeof getInvestigationStatusApiV1InvestigationsInvestigationIdStatusGet
+            >
+          >,
+          TError,
+          TData
+        >
+      >;
+    },
+  ) => {
+    const { query: queryOptions } = options ?? {};
+
+    const queryKey =
+      queryOptions?.queryKey ??
+      getGetInvestigationStatusApiV1InvestigationsInvestigationIdStatusGetQueryKey(
+        investigationId,
+      );
+
+    const queryFn: QueryFunction<
+      Awaited<
+        ReturnType<
+          typeof getInvestigationStatusApiV1InvestigationsInvestigationIdStatusGet
+        >
+      >
+    > = ({ signal }) =>
+      getInvestigationStatusApiV1InvestigationsInvestigationIdStatusGet(
+        investigationId,
+        signal,
+      );
+
+    return {
+      queryKey,
+      queryFn,
+      enabled: !!investigationId,
+      ...queryOptions,
+    } as UseQueryOptions<
+      Awaited<
+        ReturnType<
+          typeof getInvestigationStatusApiV1InvestigationsInvestigationIdStatusGet
+        >
+      >,
+      TError,
+      TData
+    > & { queryKey: QueryKey };
+  };
+
+export type GetInvestigationStatusApiV1InvestigationsInvestigationIdStatusGetQueryResult =
+  NonNullable<
+    Awaited<
+      ReturnType<
+        typeof getInvestigationStatusApiV1InvestigationsInvestigationIdStatusGet
+      >
+    >
+  >;
+export type GetInvestigationStatusApiV1InvestigationsInvestigationIdStatusGetQueryError =
+  HTTPValidationError;
+
+/**
+ * @summary Get Investigation Status
+ */
+export const useGetInvestigationStatusApiV1InvestigationsInvestigationIdStatusGet =
+  <
+    TData = Awaited<
+      ReturnType<
+        typeof getInvestigationStatusApiV1InvestigationsInvestigationIdStatusGet
+      >
+    >,
+    TError = HTTPValidationError,
+  >(
+    investigationId: string,
+    options?: {
+      query?: Partial<
+        UseQueryOptions<
+          Awaited<
+            ReturnType<
+              typeof getInvestigationStatusApiV1InvestigationsInvestigationIdStatusGet
+            >
+          >,
+          TError,
+          TData
+        >
+      >;
+    },
+  ): UseQueryResult<TData, TError> & { queryKey: QueryKey } => {
+    const queryOptions =
+      getGetInvestigationStatusApiV1InvestigationsInvestigationIdStatusGetQueryOptions(
+        investigationId,
+        options,
+      );
+
+    const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+      queryKey: QueryKey;
+    };
+
+    query.queryKey = queryOptions.queryKey;
+
+    return query;
+  };
+
+/**
+ * Send user input to an investigation awaiting feedback.
+
+This endpoint sends a signal to the Temporal workflow when it's
+in AWAIT_USER state.
+
+Args:
+    investigation_id: UUID of the investigation.
+    request: User input payload.
+    auth: Authentication context from API key/JWT.
+    temporal_client: Temporal client for durable execution.
+
+Returns:
+    Confirmation message.
+ * @summary Send User Input
+ */
+export const sendUserInputApiV1InvestigationsInvestigationIdInputPost = (
+  investigationId: string,
+  userInputRequest: UserInputRequest,
+) => {
+  return customInstance<SendUserInputApiV1InvestigationsInvestigationIdInputPost200>(
+    {
+      url: `/api/v1/investigations/${investigationId}/input`,
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      data: userInputRequest,
+    },
+  );
+};
+
+export const getSendUserInputApiV1InvestigationsInvestigationIdInputPostMutationOptions =
+  <TError = HTTPValidationError, TContext = unknown>(options?: {
+    mutation?: UseMutationOptions<
+      Awaited<
+        ReturnType<
+          typeof sendUserInputApiV1InvestigationsInvestigationIdInputPost
+        >
+      >,
+      TError,
+      { investigationId: string; data: UserInputRequest },
+      TContext
+    >;
+  }): UseMutationOptions<
+    Awaited<
+      ReturnType<
+        typeof sendUserInputApiV1InvestigationsInvestigationIdInputPost
+      >
+    >,
+    TError,
+    { investigationId: string; data: UserInputRequest },
+    TContext
+  > => {
+    const { mutation: mutationOptions } = options ?? {};
+
+    const mutationFn: MutationFunction<
+      Awaited<
+        ReturnType<
+          typeof sendUserInputApiV1InvestigationsInvestigationIdInputPost
+        >
+      >,
+      { investigationId: string; data: UserInputRequest }
+    > = (props) => {
+      const { investigationId, data } = props ?? {};
+
+      return sendUserInputApiV1InvestigationsInvestigationIdInputPost(
+        investigationId,
+        data,
+      );
+    };
+
+    return { mutationFn, ...mutationOptions };
+  };
+
+export type SendUserInputApiV1InvestigationsInvestigationIdInputPostMutationResult =
+  NonNullable<
+    Awaited<
+      ReturnType<
+        typeof sendUserInputApiV1InvestigationsInvestigationIdInputPost
+      >
+    >
+  >;
+export type SendUserInputApiV1InvestigationsInvestigationIdInputPostMutationBody =
+  UserInputRequest;
+export type SendUserInputApiV1InvestigationsInvestigationIdInputPostMutationError =
+  HTTPValidationError;
+
+/**
+ * @summary Send User Input
+ */
+export const useSendUserInputApiV1InvestigationsInvestigationIdInputPost = <
+  TError = HTTPValidationError,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<
+      ReturnType<
+        typeof sendUserInputApiV1InvestigationsInvestigationIdInputPost
+      >
+    >,
+    TError,
+    { investigationId: string; data: UserInputRequest },
+    TContext
+  >;
+}): UseMutationResult<
+  Awaited<
+    ReturnType<typeof sendUserInputApiV1InvestigationsInvestigationIdInputPost>
+  >,
+  TError,
+  { investigationId: string; data: UserInputRequest },
+  TContext
+> => {
+  const mutationOptions =
+    getSendUserInputApiV1InvestigationsInvestigationIdInputPostMutationOptions(
+      options,
+    );
+
+  return useMutation(mutationOptions);
+};
+/**
+ * Stream real-time updates via SSE.
+
+Returns a Server-Sent Events stream that pushes investigation
+updates as they occur by polling the Temporal workflow.
+
+Args:
+    investigation_id: UUID of the investigation.
+    auth: Authentication context from API key/JWT.
+    temporal_client: Temporal client for durable execution.
 
 Returns:
     EventSourceResponse with SSE stream.

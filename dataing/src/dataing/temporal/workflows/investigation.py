@@ -10,11 +10,11 @@ from temporalio.exceptions import CancelledError
 
 with workflow.unsafe.imports_passed_through():
     from dataing.temporal.activities import (
-        check_patterns,
-        counter_analyze,
-        gather_context,
-        generate_hypotheses,
-        synthesize,
+        CheckPatternsInput,
+        CounterAnalyzeInput,
+        GatherContextInput,
+        GenerateHypothesesInput,
+        SynthesizeInput,
     )
     from dataing.temporal.workflows.evaluate_hypothesis import (
         EvaluateHypothesisInput,
@@ -207,11 +207,23 @@ class InvestigationWorkflow:
         self._current_step = "gather_context"
         self._progress = 0.1
         try:
-            context = await workflow.execute_activity(
-                gather_context,
-                args=[input.investigation_id, input.datasource_id],
+            gather_input = GatherContextInput(
+                investigation_id=input.investigation_id,
+                datasource_id=input.datasource_id,
+                alert=input.alert_data,
+            )
+            gather_result = await workflow.execute_activity(
+                "gather_context",
+                gather_input,
                 start_to_close_timeout=timedelta(minutes=5),
             )
+            # Result is returned as dict from Temporal serialization
+            context = {
+                "schema": gather_result.get("schema_info", {}),
+                "lineage": gather_result.get("lineage_info"),
+            }
+            if gather_result.get("error"):
+                workflow.logger.warning(f"Context gathering warning: {gather_result['error']}")
         except CancelledError:
             return InvestigationResult(
                 investigation_id=input.investigation_id,
@@ -225,9 +237,13 @@ class InvestigationWorkflow:
         # Step 2: Check for known patterns (used for hypothesis hints in production)
         self._current_step = "check_patterns"
         try:
-            _patterns = await workflow.execute_activity(
-                check_patterns,
-                args=[input.investigation_id, input.alert_data, context],
+            patterns_input = CheckPatternsInput(
+                investigation_id=input.investigation_id,
+                alert_summary=alert_summary,
+            )
+            _patterns_result = await workflow.execute_activity(
+                "check_patterns",
+                patterns_input,
                 start_to_close_timeout=timedelta(minutes=2),
             )
         except CancelledError:
@@ -248,11 +264,29 @@ class InvestigationWorkflow:
         # Step 3: Generate hypotheses based on context and patterns
         self._current_step = "generate_hypotheses"
         try:
-            hypotheses = await workflow.execute_activity(
-                generate_hypotheses,
-                args=[input.investigation_id, input.alert_data, context],
+            # Get matched patterns from the check_patterns result
+            if _patterns_result:
+                matched_patterns = _patterns_result.get("matched_patterns", [])
+            else:
+                matched_patterns = []
+            hypotheses_input = GenerateHypothesesInput(
+                investigation_id=input.investigation_id,
+                alert_summary=alert_summary,
+                alert=input.alert_data,
+                schema_info=context.get("schema"),
+                lineage_info=context.get("lineage"),
+                matched_patterns=matched_patterns,
+                max_hypotheses=input.max_hypotheses,
+            )
+            hypotheses_result = await workflow.execute_activity(
+                "generate_hypotheses",
+                hypotheses_input,
                 start_to_close_timeout=timedelta(minutes=5),
             )
+            hypotheses = hypotheses_result.get("hypotheses", [])
+            if hypotheses_result.get("error"):
+                err = hypotheses_result["error"]
+                workflow.logger.warning(f"Hypothesis generation warning: {err}")
         except CancelledError:
             return InvestigationResult(
                 investigation_id=input.investigation_id,
@@ -278,6 +312,7 @@ class InvestigationWorkflow:
             hypotheses=hypotheses,
             schema_info=context.get("schema", {}),
             alert_summary=alert_summary,
+            datasource_id=input.datasource_id,
             alert=input.alert_data,
         )
         self._evidence_count = len(evidence) if evidence else 0
@@ -295,11 +330,27 @@ class InvestigationWorkflow:
         # Step 5: Synthesize findings
         self._current_step = "synthesize"
         try:
-            synthesis = await workflow.execute_activity(
-                synthesize,
-                args=[input.investigation_id, context, hypotheses],
+            synthesize_input = SynthesizeInput(
+                investigation_id=input.investigation_id,
+                evidence=evidence,
+                hypotheses=hypotheses,
+                alert_summary=alert_summary,
+                confidence_threshold=input.confidence_threshold,
+            )
+            synthesize_result = await workflow.execute_activity(
+                "synthesize",
+                synthesize_input,
                 start_to_close_timeout=timedelta(minutes=5),
             )
+            # Build synthesis dict from result fields
+            synthesis = {
+                "root_cause": synthesize_result.get("root_cause", ""),
+                "confidence": synthesize_result.get("confidence", 0.0),
+                "recommendations": synthesize_result.get("recommendations", []),
+                "supporting_evidence": synthesize_result.get("supporting_evidence", []),
+            }
+            if synthesize_result.get("error"):
+                workflow.logger.warning(f"Synthesis warning: {synthesize_result['error']}")
         except CancelledError:
             return InvestigationResult(
                 investigation_id=input.investigation_id,
@@ -322,16 +373,31 @@ class InvestigationWorkflow:
 
         # Step 6: Counter-analysis if confidence is below threshold
         counter_analysis = None
-        root_cause = synthesis.get("root_cause", {})
-        confidence = root_cause.get("confidence", 1.0) if isinstance(root_cause, dict) else 1.0
-        if confidence < input.confidence_threshold:
+        confidence = synthesis.get("confidence", 1.0)
+        needs_counter = synthesize_result.get("needs_counter_analysis", False)
+        if needs_counter or confidence < input.confidence_threshold:
             self._current_step = "counter_analyze"
             try:
-                counter_analysis = await workflow.execute_activity(
-                    counter_analyze,
-                    args=[input.investigation_id, synthesis, evidence],
+                counter_input = CounterAnalyzeInput(
+                    investigation_id=input.investigation_id,
+                    synthesis=synthesis,
+                    evidence=evidence,
+                    hypotheses=hypotheses,
+                )
+                counter_result = await workflow.execute_activity(
+                    "counter_analyze",
+                    counter_input,
                     start_to_close_timeout=timedelta(minutes=5),
                 )
+                # Build counter_analysis dict from result fields
+                counter_analysis = {
+                    "alternative_explanations": counter_result.get("alternative_explanations", []),
+                    "weaknesses": counter_result.get("weaknesses", []),
+                    "confidence_adjustment": counter_result.get("confidence_adjustment", 0.0),
+                    "recommendation": counter_result.get("recommendation", "accept"),
+                }
+                if counter_result.get("error"):
+                    workflow.logger.warning(f"Counter-analysis warning: {counter_result['error']}")
             except CancelledError:
                 return InvestigationResult(
                     investigation_id=input.investigation_id,
@@ -363,6 +429,7 @@ class InvestigationWorkflow:
         hypotheses: list[dict[str, Any]],
         schema_info: dict[str, Any],
         alert_summary: str,
+        datasource_id: str,
         alert: dict[str, Any] | None = None,
     ) -> list[dict[str, Any]]:
         """Evaluate hypotheses in parallel using child workflows.
@@ -372,6 +439,7 @@ class InvestigationWorkflow:
             hypotheses: List of hypothesis dictionaries.
             schema_info: Schema information for query generation.
             alert_summary: Summary of the alert being investigated.
+            datasource_id: ID of the datasource to query.
             alert: Optional full alert data.
 
         Returns:
@@ -396,6 +464,7 @@ class InvestigationWorkflow:
                 hypothesis=hypothesis,
                 schema_info=schema_info,
                 alert_summary=alert_summary,
+                datasource_id=datasource_id,
                 alert=alert,
             )
             handle = await workflow.start_child_workflow(

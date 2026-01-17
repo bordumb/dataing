@@ -86,8 +86,8 @@ class Settings:
         self.TEMPORAL_NAMESPACE = os.getenv("TEMPORAL_NAMESPACE", "default")
         self.TEMPORAL_TASK_QUEUE = os.getenv("TEMPORAL_TASK_QUEUE", "investigations")
 
-        # Investigation engine: "arq" (legacy), "temporal" (durable)
-        self.INVESTIGATION_ENGINE = os.getenv("INVESTIGATION_ENGINE", "arq")
+        # Investigation engine: "temporal" (durable workflow execution)
+        self.INVESTIGATION_ENGINE = os.getenv("INVESTIGATION_ENGINE", "temporal")
 
 
 settings = Settings()
@@ -225,28 +225,30 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     investigations_store: dict[str, dict[str, Any]] = {}
     app.state.investigations = investigations_store
 
-    # Initialize Temporal client if engine is set to temporal
-    app.state.temporal_client = None
-    if settings.INVESTIGATION_ENGINE == "temporal":
-        try:
-            from dataing.temporal.client import TemporalInvestigationClient
+    # Initialize Temporal client for durable workflow execution
+    from dataing.temporal.client import TemporalInvestigationClient
 
-            temporal_client = await TemporalInvestigationClient.connect(
-                host=settings.TEMPORAL_HOST,
-                namespace=settings.TEMPORAL_NAMESPACE,
-                task_queue=settings.TEMPORAL_TASK_QUEUE,
-            )
-            app.state.temporal_client = temporal_client
-            logger.info(
-                f"Temporal client connected: host={settings.TEMPORAL_HOST}, "
-                f"namespace={settings.TEMPORAL_NAMESPACE}, "
-                f"task_queue={settings.TEMPORAL_TASK_QUEUE}"
-            )
-        except Exception as e:
-            logger.warning(
-                f"Failed to connect Temporal client: {e}. "
-                "Falling back to legacy investigation service."
-            )
+    try:
+        temporal_client = await TemporalInvestigationClient.connect(
+            host=settings.TEMPORAL_HOST,
+            namespace=settings.TEMPORAL_NAMESPACE,
+            task_queue=settings.TEMPORAL_TASK_QUEUE,
+        )
+        app.state.temporal_client = temporal_client
+        logger.info(
+            f"Temporal client connected: host={settings.TEMPORAL_HOST}, "
+            f"namespace={settings.TEMPORAL_NAMESPACE}, "
+            f"task_queue={settings.TEMPORAL_TASK_QUEUE}"
+        )
+    except Exception as e:
+        logger.error(
+            f"Failed to connect Temporal client: {e}. "
+            "Investigations require Temporal. Please check TEMPORAL_HOST configuration."
+        )
+        raise RuntimeError(
+            f"Temporal client connection failed: {e}. "
+            f"Configure TEMPORAL_HOST (current: {settings.TEMPORAL_HOST})"
+        ) from e
 
     # Demo mode: seed demo data
     demo_mode = os.getenv("DATADR_DEMO_MODE", "").lower()

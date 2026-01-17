@@ -142,39 +142,3 @@ def make_gather_context_activity(
         )
 
     return gather_context
-
-
-# Standalone activity for POC/testing (uses mock data)
-@activity.defn
-async def gather_context(investigation_id: str, datasource_id: str) -> dict[str, Any]:
-    """POC gather_context activity with mock data.
-
-    Used for testing without real dependencies. Production code should use
-    make_gather_context_activity() factory instead.
-    """
-    return {
-        "investigation_id": investigation_id,
-        "datasource_id": datasource_id,
-        "schema": {
-            "tables": [
-                {
-                    "name": "orders",
-                    "columns": ["id", "customer_id", "total", "created_at", "status"],
-                },
-                {
-                    "name": "customers",
-                    "columns": ["id", "name", "email", "created_at"],
-                },
-            ],
-        },
-        "lineage": {
-            "upstream": ["raw_orders", "raw_customers"],
-            "downstream": ["analytics.order_summary"],
-        },
-        "sample_data": {
-            "orders": [
-                {"id": 1, "customer_id": 100, "total": 99.99, "status": "completed"},
-                {"id": 2, "customer_id": 101, "total": None, "status": "pending"},
-            ],
-        },
-    }

@@ -1,36 +1,14 @@
-"""Interpret evidence activity for investigation workflow.
-
-Extracts business logic from InterpretEvidenceStep into a Temporal activity factory.
-"""
+"""Interpret evidence activity for investigation workflow."""
 
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Protocol
+from typing import TYPE_CHECKING, Any
 
 from temporalio import activity
 
-
-class LLMProtocol(Protocol):
-    """Protocol for LLM client used by interpret_evidence activity."""
-
-    async def interpret_evidence(
-        self,
-        *,
-        hypothesis: dict[str, Any],
-        query_result: dict[str, Any],
-        alert_summary: str,
-    ) -> dict[str, Any]:
-        """Interpret query result as evidence for/against hypothesis.
-
-        Returns:
-            Evidence dict with:
-            - supports_hypothesis: bool
-            - confidence: float (0.0 to 1.0)
-            - interpretation: str - Human-readable explanation
-            - key_findings: list[str] - Bullet points of findings
-        """
-        ...
+if TYPE_CHECKING:
+    from dataing.temporal.adapters import TemporalAgentAdapter
 
 
 @dataclass
@@ -55,11 +33,11 @@ class InterpretEvidenceResult:
     error: str | None = None
 
 
-def make_interpret_evidence_activity(llm: LLMProtocol) -> Any:
-    """Factory that creates interpret_evidence activity with injected dependencies.
+def make_interpret_evidence_activity(adapter: TemporalAgentAdapter) -> Any:
+    """Factory that creates interpret_evidence activity with injected adapter.
 
     Args:
-        llm: LLM client for interpreting evidence.
+        adapter: TemporalAgentAdapter for LLM operations.
 
     Returns:
         The interpret_evidence activity function.
@@ -67,17 +45,11 @@ def make_interpret_evidence_activity(llm: LLMProtocol) -> Any:
 
     @activity.defn
     async def interpret_evidence(input: InterpretEvidenceInput) -> InterpretEvidenceResult:
-        """Interpret query result as evidence for/against hypothesis.
-
-        This activity:
-        1. Receives hypothesis and query result
-        2. Calls LLM to interpret the evidence
-        3. Returns structured evidence interpretation
-        """
+        """Interpret query result as evidence for/against hypothesis."""
         hypothesis_id = input.hypothesis.get("id", "unknown")
 
         try:
-            evidence = await llm.interpret_evidence(
+            evidence = await adapter.interpret_evidence(
                 hypothesis=input.hypothesis,
                 query_result=input.query_result,
                 alert_summary=input.alert_summary,
@@ -101,25 +73,3 @@ def make_interpret_evidence_activity(llm: LLMProtocol) -> Any:
         )
 
     return interpret_evidence
-
-
-# Standalone activity for POC/testing (returns mock interpretation)
-@activity.defn
-async def interpret_evidence(
-    investigation_id: str,
-    hypothesis: dict[str, Any],
-    query_result: dict[str, Any],
-) -> dict[str, Any]:
-    """POC interpret_evidence activity with mock result.
-
-    Used for testing without real dependencies. Production code should use
-    make_interpret_evidence_activity() factory instead.
-    """
-    hypothesis_id = hypothesis.get("id", "unknown")
-    return {
-        "hypothesis_id": hypothesis_id,
-        "supports_hypothesis": True,
-        "confidence": 0.75,
-        "interpretation": "Query results support the hypothesis.",
-        "key_findings": ["Found 42 matching records", "Pattern matches expected anomaly"],
-    }

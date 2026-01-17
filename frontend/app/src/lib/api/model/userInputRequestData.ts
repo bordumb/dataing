@@ -5,11 +5,6 @@
  * Autonomous Data Quality Investigation
  * OpenAPI spec version: 2.0.0
  */
+import type { UserInputRequestDataAnyOf } from "./userInputRequestDataAnyOf";
 
-/**
- * Response for sending a message.
- */
-export interface SendMessageResponse {
-  investigation_id: string;
-  status: string;
-}
+export type UserInputRequestData = UserInputRequestDataAnyOf | null;

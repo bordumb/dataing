@@ -6,10 +6,6 @@
  * OpenAPI spec version: 2.0.0
  */
 
-/**
- * Response for sending a message.
- */
-export interface SendMessageResponse {
-  investigation_id: string;
-  status: string;
-}
+export type SendUserInputApiV1InvestigationsInvestigationIdInputPost200 = {
+  [key: string]: string;
+};

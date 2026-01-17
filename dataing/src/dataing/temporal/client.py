@@ -214,15 +214,18 @@ class TemporalInvestigationClient:
         desc = await handle.describe()
 
         # Map Temporal status to our status
+        # desc.status is a WorkflowExecutionStatus enum, get its name
+        status_name = desc.status.name if hasattr(desc.status, "name") else str(desc.status)
         status_map = {
             "RUNNING": "running",
             "COMPLETED": "completed",
             "FAILED": "failed",
             "CANCELED": "cancelled",
+            "CANCELLED": "cancelled",
             "TERMINATED": "terminated",
             "TIMED_OUT": "timed_out",
         }
-        workflow_status = status_map.get(str(desc.status), "unknown")
+        workflow_status = status_map.get(status_name, "unknown")
 
         result = None
         query_status: InvestigationQueryStatus | None = None

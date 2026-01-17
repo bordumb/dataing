@@ -2,7 +2,7 @@
 import Icons from './Icons.astro';
 
 interface Props {
-  currentPage?: 'install' | 'docs' | 'pricing';
+  currentPage?: 'install' | 'docs' ;
 }
 
 const { currentPage = 'install' } = Astro.props;
@@ -22,7 +22,6 @@ const appUrl = import.meta.env.PUBLIC_APP_URL || 'https://app.dataing.dev';
       <div class="tabs">
         <a href="/" class:list={['tab', { active: currentPage === 'install' }]}>Install</a>
         <a href="/docs" class:list={['tab', { active: currentPage === 'docs' }]}>Docs</a>
-        <a href="/pricing" class:list={['tab', { active: currentPage === 'pricing' }]}>Pricing</a>
       </div>
 
       <div class="nav-actions">

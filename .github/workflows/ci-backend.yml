@@ -5,7 +5,6 @@ on:
     branches: [main]
     paths:
       - 'bond/**'
-      - 'maistro/**'
       - 'dataing/**'
       - 'dataing-ee/**'
       - 'pyproject.toml'
@@ -15,7 +14,6 @@ on:
     branches: [main]
     paths:
       - 'bond/**'
-      - 'maistro/**'
       - 'dataing/**'
       - 'dataing-ee/**'
       - 'pyproject.toml'
@@ -58,10 +56,10 @@ jobs:
         run: uv sync --all-extras
 
       - name: Run Ruff
-        run: uv run ruff check bond/src maistro/src dataing/src dataing-ee/src
+        run: uv run ruff check bond/src dataing/src dataing-ee/src
 
       - name: Run mypy
-        run: uv run mypy bond/src maistro/src dataing/src dataing-ee/src
+        run: uv run mypy bond/src dataing/src dataing-ee/src
 
       # Run database migrations for integration tests
       - name: Run migrations
@@ -76,7 +74,6 @@ jobs:
       # Run tests per-package to avoid conftest.py module conflicts
       - name: Run tests
         run: |
-          uv run pytest maistro/tests --cov=maistro/src/maistro --cov-report=xml
           uv run pytest bond/tests --cov=bond/src/bond --cov-report=xml --cov-append
           uv run pytest dataing/tests --cov=dataing/src/dataing --cov-report=xml --cov-append
           uv run pytest dataing-ee/tests --cov=dataing-ee/src/dataing_ee --cov-report=xml --cov-append

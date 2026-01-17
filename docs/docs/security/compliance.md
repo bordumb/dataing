@@ -6,7 +6,7 @@ dataing is designed to help you meet your compliance requirements while investig
 
 ## SOC 2 Type II <span class="beta-badge">Planned</span>
 
-We are pursuing SOC 2 Type II certification with an expected completion in 2025.
+We are pursuing SOC 2 Type II certification with an expected completion in 2026.
 
 ### Trust Service Criteria
 
@@ -30,7 +30,7 @@ Key controls we implement:
 - **Incident Response** - Documented procedures, regular drills
 
 !!! info "Certification Timeline"
-    SOC 2 Type II audit is planned for Q3 2025. Contact sales@dataing.io for current status or to request our SOC 2 readiness report.
+    SOC 2 Type II audit is planned for Q3 2026. Contact sales@dataing.io for current status or to request our SOC 2 readiness report.
 
 ---
 

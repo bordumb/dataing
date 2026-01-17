@@ -28,22 +28,82 @@ pre-commit-install:
 pre-commit:
     pre-commit run --all-files
 
-# Run development servers in parallel (EE - includes all features)
+# Run development servers (EE backend + frontend). Requires infrastructure running.
 dev:
     #!/usr/bin/env bash
     set -euo pipefail
+
+    # Check if infrastructure is running
+    if ! docker ps --format '{{{{.Names}}}}' | grep -q 'dataing-demo-postgres'; then
+        echo "Error: Database not running. Run 'just demo-infra' first."
+        exit 1
+    fi
+
+    # Core environment only (no demo mode)
+    export DATABASE_URL=postgresql://dataing:dataing@localhost:5432/dataing_demo
+    export APP_DATABASE_URL=postgresql://dataing:dataing@localhost:5432/dataing_demo
+    export REDIS_HOST=localhost
+    export REDIS_PORT=6379
+    export ENCRYPTION_KEY=ZnxhCyx4-ZjziPWtUguwGOFMMiLNioSwso5-qNPAGZI=
+
+    # Load .env if exists (for ANTHROPIC_API_KEY etc)
+    if [ -f .env ]; then
+        export $(grep -v '^#' .env | xargs)
+    fi
+
     trap 'kill 0' EXIT
+
+    echo "Starting EE backend + frontend..."
+    echo "  Backend:  http://localhost:8000"
+    echo "  Frontend: http://localhost:3000"
+    echo ""
+
     (uv run fastapi dev dataing-ee/src/dataing_ee/entrypoints/api/app.py --host 0.0.0.0 --port 8000) &
     (cd frontend/app && pnpm dev --port 3000) &
     wait
 
-# Run backend only (EE)
+# Run backend only (EE). Requires infrastructure.
 dev-backend:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    if ! docker ps --format '{{{{.Names}}}}' | grep -q 'dataing-demo-postgres'; then
+        echo "Error: Database not running. Run 'just demo-infra' first."
+        exit 1
+    fi
+    export DATABASE_URL=postgresql://dataing:dataing@localhost:5432/dataing_demo
+    export APP_DATABASE_URL=postgresql://dataing:dataing@localhost:5432/dataing_demo
+    export REDIS_HOST=localhost
+    export REDIS_PORT=6379
+    export ENCRYPTION_KEY=ZnxhCyx4-ZjziPWtUguwGOFMMiLNioSwso5-qNPAGZI=
+    if [ -f .env ]; then export $(grep -v '^#' .env | xargs); fi
     uv run fastapi dev dataing-ee/src/dataing_ee/entrypoints/api/app.py --host 0.0.0.0 --port 8000
 
-# Run CE backend only (no enterprise features)
+# Run CE backend only (no enterprise features). Requires infrastructure.
 dev-backend-ce:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    if ! docker ps --format '{{{{.Names}}}}' | grep -q 'dataing-demo-postgres'; then
+        echo "Error: Database not running. Run 'just demo-infra' first."
+        exit 1
+    fi
+    export DATABASE_URL=postgresql://dataing:dataing@localhost:5432/dataing_demo
+    export APP_DATABASE_URL=postgresql://dataing:dataing@localhost:5432/dataing_demo
+    export REDIS_HOST=localhost
+    export REDIS_PORT=6379
+    export ENCRYPTION_KEY=ZnxhCyx4-ZjziPWtUguwGOFMMiLNioSwso5-qNPAGZI=
+    if [ -f .env ]; then export $(grep -v '^#' .env | xargs); fi
     uv run fastapi dev dataing/src/dataing/entrypoints/api/app.py --host 0.0.0.0 --port 8000
+
+# Stop dev servers
+dev-stop:
+    #!/usr/bin/env bash
+    echo "Stopping dev servers..."
+    pkill -f "fastapi dev" 2>/dev/null || true
+    pkill -f "vite.*3000" 2>/dev/null || true
+    pkill -f "pnpm dev" 2>/dev/null || true
+    lsof -ti:8000 | xargs kill -9 2>/dev/null || true
+    lsof -ti:3000 | xargs kill -9 2>/dev/null || true
+    echo "Done."
 
 # Run frontend only
 dev-frontend:
@@ -145,6 +205,72 @@ docs-serve:
 # ============================================
 # Demo Commands
 # ============================================
+
+# Start infrastructure only (postgres, redis, jaeger + migrations). Use with `just dev`.
+demo-infra:
+    #!/usr/bin/env bash
+    set -euo pipefail
+
+    echo "Starting demo infrastructure..."
+
+    # Start PostgreSQL
+    echo "Setting up PostgreSQL..."
+    docker rm -f dataing-demo-postgres 2>/dev/null || true
+    docker run -d --name dataing-demo-postgres \
+        -e POSTGRES_DB=dataing_demo \
+        -e POSTGRES_USER=dataing \
+        -e POSTGRES_PASSWORD=dataing \
+        -p 5432:5432 \
+        pgvector/pgvector:pg16
+    echo "Waiting for PostgreSQL..."
+    for i in {1..30}; do
+        if PGPASSWORD=dataing psql -h localhost -U dataing -d dataing_demo -c "SELECT 1" > /dev/null 2>&1; then
+            echo "PostgreSQL ready!"
+            break
+        fi
+        sleep 1
+    done
+
+    # Start Redis
+    echo "Setting up Redis..."
+    docker rm -f dataing-demo-redis 2>/dev/null || true
+    docker run -d --name dataing-demo-redis -p 6379:6379 redis:7-alpine
+    for i in {1..10}; do
+        if docker exec dataing-demo-redis redis-cli ping > /dev/null 2>&1; then
+            echo "Redis ready!"
+            break
+        fi
+        sleep 1
+    done
+
+    # Start Jaeger
+    echo "Setting up Jaeger..."
+    docker rm -f dataing-demo-jaeger 2>/dev/null || true
+    echo '{"darkMode":true}' > /tmp/jaeger-ui-config.json
+    docker run -d --name dataing-demo-jaeger \
+        -e COLLECTOR_OTLP_ENABLED=true \
+        -v /tmp/jaeger-ui-config.json:/etc/jaeger/ui-config.json:ro \
+        -e QUERY_UI_CONFIG=/etc/jaeger/ui-config.json \
+        -p 16686:16686 -p 4317:4317 -p 4318:4318 \
+        jaegertracing/all-in-one:1.76.0
+
+    # Run migrations (skip seed files for clean dev environment)
+    echo "Running migrations..."
+    for f in dataing/migrations/*.sql; do
+        # Skip seed migrations - those are demo-only
+        if [[ "$f" == *"seed"* ]]; then
+            echo "  Skipping seed: $(basename $f)"
+            continue
+        fi
+        PGPASSWORD=dataing psql -h localhost -U dataing -d dataing_demo -f "$f" 2>&1 | grep -v "^NOTICE:" || true
+    done
+
+    echo ""
+    echo "Infrastructure ready! Now run: just dev"
+    echo ""
+    echo "  PostgreSQL: localhost:5432"
+    echo "  Redis:      localhost:6379"
+    echo "  Jaeger:     http://localhost:16686"
 
 # Generate demo fixtures if not present
 demo-fixtures:

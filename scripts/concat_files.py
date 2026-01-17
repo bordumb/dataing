@@ -15,10 +15,10 @@ from pathlib import Path
 ROOT_DIR = Path(".")
 
 SEARCH_PREFIXES = [
-    # "dataing",
+    "dataing",
     # "frontend",
     # "bond",
-    "maistro",
+    # "maistro",
     # "docs/feedback",
 ]
 

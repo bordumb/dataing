@@ -7,7 +7,6 @@ requires-python = ">=3.11"
 license = { text = "MIT" }
 authors = [{ name = "dataing team" }]
 dependencies = [
-    "maistro-flow",
     "bond",
     "fastapi[standard]>=0.109.0",
     "uvicorn[standard]>=0.27.0",
@@ -55,7 +54,6 @@ build-backend = "hatchling.build"
 packages = ["src/dataing"]
 
 [tool.uv.sources]
-maistro-flow = { path = "../maistro", editable = true }
 bond = { path = "../bond", editable = true }
 
 [dependency-groups]

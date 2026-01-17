@@ -1,8 +1,8 @@
-"""Adapters for unified investigation steps.
+"""Adapters for investigation components.
 
 This package provides adapters that wire the real implementations
 (AgentClient, ContextEngine, BaseAdapter) to the protocol interfaces
-expected by the unified investigation steps.
+expected by investigation activities.
 """
 
 from dataing.adapters.investigation.context_adapter import (
@@ -19,7 +19,6 @@ from dataing.adapters.investigation.llm_adapter import (
     SynthesisLLMAdapter,
 )
 from dataing.adapters.investigation.pattern_adapter import InMemoryPatternRepository
-from dataing.adapters.investigation.step_factory import create_step_registry
 
 __all__ = [
     # Context adapters
@@ -36,6 +35,4 @@ __all__ = [
     "SynthesisLLMAdapter",
     # Pattern adapters
     "InMemoryPatternRepository",
-    # Step factory
-    "create_step_registry",
 ]

@@ -1,12 +1,11 @@
-"""API routes for the unified investigation system (v2).
+"""API routes for the unified investigation system.
 
-This module provides endpoints for the new unified investigation system
+This module provides endpoints for the investigation system
 with branch support and real-time updates via SSE streaming.
 
 Supports multiple investigation engines via INVESTIGATION_ENGINE env var:
 - "arq" (default): Legacy Arq-based job queue
 - "temporal": Durable Temporal workflow execution
-- "v2": Maistro-based workflow engine
 """
 
 from __future__ import annotations
@@ -15,7 +14,7 @@ import asyncio
 import json
 import logging
 from collections.abc import AsyncIterator
-from typing import TYPE_CHECKING, Annotated, Any
+from typing import Annotated, Any
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Request
@@ -28,9 +27,7 @@ from dataing.core.investigation.service import InvestigationService
 from dataing.core.json_utils import to_json_string
 from dataing.entrypoints.api.deps import settings
 from dataing.entrypoints.api.middleware.auth import ApiKeyContext, verify_api_key
-
-if TYPE_CHECKING:
-    from dataing.temporal.client import TemporalInvestigationClient
+from dataing.temporal.client import TemporalInvestigationClient
 
 logger = logging.getLogger(__name__)
 

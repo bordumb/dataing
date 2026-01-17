@@ -3,7 +3,7 @@
 This module provides the InvestigationService that coordinates between
 the API layer, repository, and collaboration service.
 
-Uses maistro.Workflow for investigation execution.
+Uses Temporal for durable investigation execution.
 """
 
 from __future__ import annotations

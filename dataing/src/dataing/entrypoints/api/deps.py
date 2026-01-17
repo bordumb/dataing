@@ -86,7 +86,7 @@ class Settings:
         self.TEMPORAL_NAMESPACE = os.getenv("TEMPORAL_NAMESPACE", "default")
         self.TEMPORAL_TASK_QUEUE = os.getenv("TEMPORAL_TASK_QUEUE", "investigations")
 
-        # Investigation engine: "arq" (legacy), "temporal" (durable), "v2" (maistro)
+        # Investigation engine: "arq" (legacy), "temporal" (durable)
         self.INVESTIGATION_ENGINE = os.getenv("INVESTIGATION_ENGINE", "arq")
 
 

@@ -1,16 +1,39 @@
 {
-  "assignee": null,
+  "assignee": "bordumbb@gmail.com",
   "claim_note": "",
-  "claimed_at": null,
+  "claimed_at": "2026-01-17T03:31:47.414210Z",
   "created_at": "2026-01-17T01:34:00.160182Z",
   "depends_on": [
     "fn-16.9"
   ],
   "epic": "fn-16",
+  "evidence": {
+    "bond_kept_reason": "Still used by dataing/agents for LLM runtime (BondAgent, StreamHandlers)",
+    "commit": "54f33426",
+    "deleted_directories": [
+      "maistro/",
+      "bond/src/bond/maistro/",
+      "dataing/src/dataing/core/investigation/steps/"
+    ],
+    "deleted_files": [
+      "dataing/src/dataing/core/investigation/flow.py",
+      "dataing/src/dataing/core/investigation/registry.py",
+      "dataing/src/dataing/core/investigation/types.py",
+      "dataing/src/dataing/adapters/investigation/step_factory.py",
+      "dataing/src/dataing/entrypoints/worker.py"
+    ],
+    "lines_added": 511,
+    "lines_deleted": 17188,
+    "verification": {
+      "mypy": "pass",
+      "pytest_unit": "1165 passed, 27 skipped",
+      "ruff_lint": "pass"
+    }
+  },
   "id": "fn-16.10",
   "priority": null,
   "spec_path": ".flow/tasks/fn-16.10.md",
-  "status": "todo",
+  "status": "done",
   "title": "Delete maistro/, bond/ (if unused), Step wrappers",
-  "updated_at": "2026-01-17T01:35:36.794607Z"
+  "updated_at": "2026-01-17T03:41:29.861158Z"
 }

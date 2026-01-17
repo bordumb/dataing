@@ -117,39 +117,117 @@ Enterprise Edition provides comprehensive audit logging for compliance:
 | **Authorization** | Permission grants, role changes |
 | **Data Access** | Investigation views, query execution |
 | **Administration** | User management, settings changes |
+| **SCIM Provisioning** | User/group create, update, delete |
 | **Security** | Failed validation, circuit breaker trips |
 
-### Log Format
+### Log Entry Fields
+
+Every audit log entry contains:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `id` | UUID | Unique log entry identifier |
+| `timestamp` | ISO 8601 | When the action occurred |
+| `tenant_id` | UUID | Organization identifier |
+| `actor_id` | UUID | User who performed the action |
+| `actor_email` | string | User's email address |
+| `actor_ip` | IP | Client IP address |
+| `actor_user_agent` | string | Browser/client identifier |
+| `action` | string | Action type (e.g., `investigation.create`) |
+| `resource_type` | string | Resource affected (e.g., `team`, `datasource`) |
+| `resource_id` | UUID | Specific resource identifier |
+| `resource_name` | string | Human-readable resource name |
+| `request_method` | string | HTTP method (GET, POST, etc.) |
+| `request_path` | string | API endpoint path |
+| `status_code` | int | HTTP response status |
+| `changes` | JSON | Request body or state changes |
+| `metadata` | JSON | Additional context |
+
+### Example Log Entry
 
 ```json
 {
-  "timestamp": "2024-01-15T10:30:00Z",
-  "event_type": "investigation.query_executed",
-  "actor": {
-    "user_id": "user_123",
-    "email": "analyst@company.com",
-    "ip_address": "10.0.1.50"
+  "id": "550e8400-e29b-41d4-a716-446655440000",
+  "timestamp": "2026-01-15T10:30:00Z",
+  "tenant_id": "org_abc123",
+  "actor_id": "user_xyz789",
+  "actor_email": "analyst@company.com",
+  "actor_ip": "10.0.1.50",
+  "actor_user_agent": "Mozilla/5.0...",
+  "action": "investigation.create",
+  "resource_type": "investigation",
+  "resource_id": "inv_456def",
+  "resource_name": "Orders NULL spike investigation",
+  "request_method": "POST",
+  "request_path": "/api/v1/investigations",
+  "status_code": 200,
+  "changes": {
+    "alert": {"type": "null_spike", "table": "orders"}
   },
-  "resource": {
-    "type": "investigation",
-    "id": "inv_456"
-  },
-  "action": "query_executed",
-  "result": "success",
   "metadata": {
-    "datasource": "snowflake_prod",
-    "query_hash": "abc123..."
+    "request_id": "req_abc123"
   }
 }
 ```
+
+### Accessing Audit Logs
+
+=== "Web UI"
+
+    Navigate to **Settings** → **Audit Logs** to view and search logs.
+
+    - Filter by date range, action type, user, or resource
+    - Export to CSV for offline analysis
+    - Real-time streaming of new events
+
+=== "API"
+
+    ```bash
+    # List audit logs (requires admin scope)
+    curl -H "X-API-Key: $API_KEY" \
+      "https://api.dataing.io/api/v1/audit-logs?page=1&limit=100"
+
+    # Filter by action
+    curl -H "X-API-Key: $API_KEY" \
+      "https://api.dataing.io/api/v1/audit-logs?action=investigation.create"
+
+    # Filter by date range
+    curl -H "X-API-Key: $API_KEY" \
+      "https://api.dataing.io/api/v1/audit-logs?start_date=2026-01-01&end_date=2026-01-31"
+
+    # Export to CSV
+    curl -H "X-API-Key: $API_KEY" \
+      "https://api.dataing.io/api/v1/audit-logs/export" > audit.csv
+    ```
+
+### Retention
+
+| Deployment | Default Retention | Configuration |
+|------------|-------------------|---------------|
+| **SaaS** | 90 days | Configurable per plan (up to 2 years) |
+| **Self-hosted** | Unlimited | `AUDIT_LOG_RETENTION_DAYS` env var |
 
 ### Export & Integration
 
 Audit logs can be exported to:
 
-- **SIEM Systems** - Splunk, Datadog, Sumo Logic
-- **Cloud Storage** - S3, GCS, Azure Blob
-- **Custom Webhooks** - Your logging infrastructure
+- **SIEM Systems** - Splunk, Datadog, Sumo Logic via webhook
+- **Cloud Storage** - S3, GCS, Azure Blob (scheduled export)
+- **Custom Webhooks** - Real-time streaming to your infrastructure
+
+```yaml
+# Example webhook configuration
+audit_export:
+  webhook_url: "https://your-siem.com/ingest"
+  format: json
+  batch_size: 100
+  include_fields:
+    - timestamp
+    - action
+    - actor_email
+    - resource_type
+    - status_code
+```
 
 ---
 

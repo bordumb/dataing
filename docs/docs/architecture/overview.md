@@ -15,12 +15,14 @@ a clean separation between business logic and infrastructure.
 
 ### Durable Execution Engine
 
-Investigations are executed durably using a Redis-backed job queue (Arq):
+Investigations are executed durably using [Temporal](https://temporal.io):
 
-- **Asynchronous**: Investigations run in background workers
-- **Resilient**: Workers checkpoint state to PostgreSQL after every step
-- **Scalable**: Workers can be scaled horizontally
-- **Recovery**: Interrupted jobs resume automatically from the last checkpoint
+- **Asynchronous**: Investigations run as Temporal workflows
+- **Resilient**: Temporal persists workflow state automatically
+- **Parallel**: Hypotheses are evaluated concurrently via child workflows
+- **Recovery**: Workflows automatically resume from failures
+
+See [Temporal Workflows](temporal-workflows.md) for implementation details.
 
 ### Event Sourcing
 
@@ -58,26 +60,29 @@ Safety is enforced at multiple levels:
 ## Directory Structure
 
 ```
-backend/src/dataing/
+dataing/src/dataing/
 ├── core/           # Pure domain logic (no dependencies)
 │   ├── domain_types.py
 │   ├── state.py
 │   ├── interfaces.py
-│   ├── orchestrator.py
-│   └── exceptions.py
+│   └── investigation/  # Investigation domain entities
 ├── adapters/       # Infrastructure implementations
 │   ├── db/         # Database adapters
-│   ├── llm/        # LLM client
+│   ├── datasource/ # Warehouse connectors (Snowflake, BigQuery, etc.)
+│   ├── lineage/    # Lineage providers (dbt, DataHub, etc.)
 │   └── context/    # Context gathering
+├── agents/         # LLM agent client and prompts
 ├── safety/         # Guardrails
 │   ├── validator.py
 │   ├── circuit_breaker.py
 │   └── pii.py
-├── prompts/        # YAML prompt templates
+├── temporal/       # Temporal workflow engine
+│   ├── workflows/  # Workflow definitions
+│   ├── activities/ # Activity implementations
+│   └── client.py   # Temporal client
 └── entrypoints/    # External interfaces
-    ├── api/        # FastAPI (Job Producer)
-    ├── worker/     # Arq Worker (Job Consumer)
-    └── mcp/        # MCP server
+    ├── api/        # FastAPI
+    └── temporal_worker.py  # Temporal worker
 ```
 
 ## Key Interfaces

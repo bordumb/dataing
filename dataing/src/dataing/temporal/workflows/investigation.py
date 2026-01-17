@@ -49,6 +49,21 @@ class InvestigationResult:
     user_feedback: dict[str, Any] | None = None
 
 
+@dataclass
+class InvestigationQueryStatus:
+    """Status returned by the get_status query."""
+
+    investigation_id: str
+    current_step: str
+    progress: float  # 0.0 to 1.0
+    is_complete: bool
+    is_cancelled: bool
+    is_awaiting_user: bool
+    hypotheses_count: int
+    hypotheses_evaluated: int
+    evidence_count: int
+
+
 @workflow.defn
 class InvestigationWorkflow:
     """Main investigation workflow that orchestrates the full investigation process.
@@ -72,6 +87,14 @@ class InvestigationWorkflow:
         self._user_input: dict[str, Any] | None = None
         self._awaiting_user = False
         self._child_handles: list[Any] = []
+        # Progress tracking
+        self._investigation_id = ""
+        self._current_step = "initializing"
+        self._progress = 0.0
+        self._is_complete = False
+        self._hypotheses_count = 0
+        self._hypotheses_evaluated = 0
+        self._evidence_count = 0
 
     @workflow.signal
     def cancel_investigation(self) -> None:
@@ -90,6 +113,25 @@ class InvestigationWorkflow:
             payload: User feedback data (e.g., {"feedback": "...", "action": "..."}).
         """
         self._user_input = payload
+
+    @workflow.query
+    def get_status(self) -> InvestigationQueryStatus:
+        """Query the current status of the investigation.
+
+        Returns:
+            InvestigationQueryStatus with current progress and state.
+        """
+        return InvestigationQueryStatus(
+            investigation_id=self._investigation_id,
+            current_step=self._current_step,
+            progress=self._progress,
+            is_complete=self._is_complete,
+            is_cancelled=self._cancelled,
+            is_awaiting_user=self._awaiting_user,
+            hypotheses_count=self._hypotheses_count,
+            hypotheses_evaluated=self._hypotheses_evaluated,
+            evidence_count=self._evidence_count,
+        )
 
     def _check_cancelled(self, investigation_id: str) -> InvestigationResult | None:
         """Check if cancellation was requested and return early if so.
@@ -150,6 +192,11 @@ class InvestigationWorkflow:
         Returns:
             InvestigationResult with status and findings.
         """
+        # Initialize progress tracking
+        self._investigation_id = input.investigation_id
+        self._current_step = "starting"
+        self._progress = 0.0
+
         alert_summary = input.alert_summary or str(input.alert_data)
 
         # Check cancellation before starting
@@ -157,6 +204,8 @@ class InvestigationWorkflow:
             return result
 
         # Step 1: Gather context (schema, lineage, sample data)
+        self._current_step = "gather_context"
+        self._progress = 0.1
         try:
             context = await workflow.execute_activity(
                 gather_context,
@@ -168,11 +217,13 @@ class InvestigationWorkflow:
                 investigation_id=input.investigation_id,
                 status="cancelled",
             )
+        self._progress = 0.2
 
         if result := self._check_cancelled(input.investigation_id):
             return result
 
         # Step 2: Check for known patterns (used for hypothesis hints in production)
+        self._current_step = "check_patterns"
         try:
             _patterns = await workflow.execute_activity(
                 check_patterns,
@@ -185,6 +236,7 @@ class InvestigationWorkflow:
                 status="cancelled",
                 context=context,
             )
+        self._progress = 0.3
 
         if result := self._check_cancelled(input.investigation_id):
             return InvestigationResult(
@@ -194,6 +246,7 @@ class InvestigationWorkflow:
             )
 
         # Step 3: Generate hypotheses based on context and patterns
+        self._current_step = "generate_hypotheses"
         try:
             hypotheses = await workflow.execute_activity(
                 generate_hypotheses,
@@ -206,6 +259,8 @@ class InvestigationWorkflow:
                 status="cancelled",
                 context=context,
             )
+        self._hypotheses_count = len(hypotheses) if hypotheses else 0
+        self._progress = 0.4
 
         if result := self._check_cancelled(input.investigation_id):
             await self._cancel_children()
@@ -217,6 +272,7 @@ class InvestigationWorkflow:
             )
 
         # Step 4: Evaluate hypotheses in parallel via child workflows
+        self._current_step = "evaluate_hypotheses"
         evidence = await self._evaluate_hypotheses_parallel(
             investigation_id=input.investigation_id,
             hypotheses=hypotheses,
@@ -224,6 +280,8 @@ class InvestigationWorkflow:
             alert_summary=alert_summary,
             alert=input.alert_data,
         )
+        self._evidence_count = len(evidence) if evidence else 0
+        self._progress = 0.7
 
         if result := self._check_cancelled(input.investigation_id):
             return InvestigationResult(
@@ -235,6 +293,7 @@ class InvestigationWorkflow:
             )
 
         # Step 5: Synthesize findings
+        self._current_step = "synthesize"
         try:
             synthesis = await workflow.execute_activity(
                 synthesize,
@@ -249,6 +308,7 @@ class InvestigationWorkflow:
                 hypotheses=hypotheses,
                 evidence=evidence,
             )
+        self._progress = 0.85
 
         if result := self._check_cancelled(input.investigation_id):
             return InvestigationResult(
@@ -265,6 +325,7 @@ class InvestigationWorkflow:
         root_cause = synthesis.get("root_cause", {})
         confidence = root_cause.get("confidence", 1.0) if isinstance(root_cause, dict) else 1.0
         if confidence < input.confidence_threshold:
+            self._current_step = "counter_analyze"
             try:
                 counter_analysis = await workflow.execute_activity(
                     counter_analyze,
@@ -280,6 +341,11 @@ class InvestigationWorkflow:
                     evidence=evidence,
                     synthesis=synthesis,
                 )
+
+        # Mark complete
+        self._current_step = "completed"
+        self._progress = 1.0
+        self._is_complete = True
 
         return InvestigationResult(
             investigation_id=input.investigation_id,
@@ -349,11 +415,14 @@ class InvestigationWorkflow:
 
         # Aggregate evidence from successful evaluations
         all_evidence: list[dict[str, Any]] = []
+        evaluated_count = 0
         for result in results:
             if isinstance(result, BaseException):
                 workflow.logger.warning(f"Child workflow failed: {result}")
                 continue
             # result is now narrowed to EvaluateHypothesisResult
+            evaluated_count += 1
+            self._hypotheses_evaluated = evaluated_count
             if result.error:
                 workflow.logger.warning(
                     f"Hypothesis {result.hypothesis_id} evaluation error: {result.error}"

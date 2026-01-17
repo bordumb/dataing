@@ -11,13 +11,12 @@ class TestSignal:
     """Tests for Signal enum."""
 
     def test_signal_values(self) -> None:
-        """Signal has exactly 6 core values."""
-        assert len(Signal) == 6
+        """Signal has exactly 5 core values."""
+        assert len(Signal) == 5
         assert Signal.CONTINUE == "continue"
         assert Signal.COMPLETE == "complete"
         assert Signal.FAIL == "fail"
         assert Signal.BRANCH == "branch"
-        assert Signal.MERGE == "merge"
         assert Signal.AWAIT_USER == "await_user"
 
     def test_signal_is_str_enum(self) -> None:

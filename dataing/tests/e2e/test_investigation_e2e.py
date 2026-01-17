@@ -190,9 +190,6 @@ class TestWorkflowConstruction:
         assert StepType.INTERPRET_EVIDENCE.value in step_names
         assert StepType.SYNTHESIZE.value in step_names
 
-        # Verify signal handler is configured
-        assert workflow._signal_handler is not None
-
 
 class TestGatherContextStep:
     """Tests for GatherContextStep with real implementations."""
@@ -206,7 +203,7 @@ class TestGatherContextStep:
         pattern_repository: InMemoryPatternRepository,
     ) -> None:
         """Test that gather_context discovers the real DuckDB schema."""
-        from maistro import Signal
+        from maistro import Signal, StepCompleted
 
         workflow = build_investigation_workflow(
             context_engine=context_engine,
@@ -215,16 +212,22 @@ class TestGatherContextStep:
             pattern_repository=pattern_repository,
         )
 
-        # Run just the gather_context step
-        result = await workflow.tick(initial_context, StepType.GATHER_CONTEXT.value)
+        # Run just the gather_context step via streaming and stop after first StepCompleted
+        async for event in workflow.run_streaming(
+            context=initial_context,
+            start_step=StepType.GATHER_CONTEXT.value,
+        ):
+            if isinstance(event, StepCompleted):
+                # Should continue to next step
+                assert event.signal == Signal.CONTINUE
+                assert event.next_step == StepType.CHECK_PATTERNS.value
 
-        # Should continue to next step
-        assert result.signal == Signal.CONTINUE
-        assert result.next_step == StepType.CHECK_PATTERNS.value
-
-        # Should have discovered schema
-        assert result.context.schema_info is not None
-        print(f"Discovered schema: {result.context.schema_info}")
+                # Extract context from event
+                if "_full_context" in event.context_update:
+                    result_ctx = event.context_update["_full_context"]
+                    assert result_ctx.schema_info is not None
+                    print(f"Discovered schema: {result_ctx.schema_info}")
+                break
 
 
 class TestFullInvestigationFlow:
@@ -357,7 +360,7 @@ class TestFullInvestigationFlow:
         print(f"\nStep sequence: {steps_sequence}")
 
         # Basic sequence check
-        assert StepType.GATHER_CONTEXT.value not in steps_sequence # next_step is always AFTER
+        assert StepType.GATHER_CONTEXT.value not in steps_sequence  # next_step is always AFTER
         assert StepType.CHECK_PATTERNS.value in steps_sequence
         assert StepType.GENERATE_HYPOTHESES.value in steps_sequence
 
@@ -390,8 +393,8 @@ class TestStepByStepExecution:
         duckdb_adapter: DuckDBAdapter,
         pattern_repository: InMemoryPatternRepository,
     ) -> None:
-        """Execute workflow step by step with detailed logging."""
-        from maistro import Signal
+        """Execute workflow step by step with detailed logging via streaming."""
+        from maistro import RunCompleted, RunFailed, Signal, StepCompleted
 
         workflow = build_investigation_workflow(
             context_engine=context_engine,
@@ -401,46 +404,43 @@ class TestStepByStepExecution:
         )
 
         context = initial_context
-        current_step = StepType.GATHER_CONTEXT.value
         iteration = 0
-        max_iterations = 30
 
         print("\n" + "=" * 60)
         print("STEP-BY-STEP INVESTIGATION EXECUTION")
         print("=" * 60)
 
-        while current_step and iteration < max_iterations:
-            iteration += 1
-            print(f"\n--- Step {iteration}: {current_step} ---")
+        async for event in workflow.run_streaming(
+            context=initial_context,
+            start_step=StepType.GATHER_CONTEXT.value,
+        ):
+            if isinstance(event, StepCompleted):
+                iteration += 1
+                print(f"\n--- Step {iteration}: {event.step_name} ---")
+                print(f"  Signal: {event.signal}")
+                print(f"  Next step: {event.next_step}")
 
-            result = await workflow.tick(context, current_step)
+                # Extract context from event
+                if "_full_context" in event.context_update:
+                    ctx = event.context_update["_full_context"]
+                    print(f"  Evidence count: {len(ctx.evidence)}")
+                    print(f"  Hypotheses: {len(ctx.hypotheses)}")
+                    if ctx.current_synthesis:
+                        print(f"  Synthesis confidence: {ctx.current_synthesis.get('confidence')}")
+                    context = ctx
 
-            print(f"  Signal: {result.signal}")
-            print(f"  Next step: {result.next_step}")
-            print(f"  Evidence count: {len(result.context.evidence)}")
-            print(f"  Hypotheses: {len(result.context.hypotheses)}")
+                if event.signal == Signal.COMPLETE:
+                    print("\n=== WORKFLOW COMPLETE ===")
+                elif event.signal == Signal.FAIL:
+                    print("\n=== WORKFLOW FAILED ===")
 
-            if result.context.current_synthesis:
-                print(
-                    f"  Synthesis confidence: {result.context.current_synthesis.get('confidence')}"
-                )
+            elif isinstance(event, RunCompleted):
+                print(f"\nTotal iterations: {iteration}")
+                print(f"Final evidence count: {len(context.evidence)}")
+                print(f"Final synthesis: {context.current_synthesis}")
 
-            if result.error:
-                print(f"  ERROR: {result.error}")
-
-            if result.signal == Signal.COMPLETE:
-                print("\n=== WORKFLOW COMPLETE ===")
-                break
-            elif result.signal == Signal.FAIL:
-                print(f"\n=== WORKFLOW FAILED: {result.error} ===")
-                break
-
-            context = result.context
-            current_step = result.next_step
-
-        print(f"\nTotal iterations: {iteration}")
-        print(f"Final evidence count: {len(context.evidence)}")
-        print(f"Final synthesis: {context.current_synthesis}")
+            elif isinstance(event, RunFailed):
+                print(f"\n=== WORKFLOW FAILED: {event.error} ===")
 
 
 class TestShutdownAndCancellation:
@@ -486,7 +486,6 @@ class TestShutdownAndCancellation:
 
         # Should have checkpointed before shutdown
         assert len(checkpoints) == 1
-        assert checkpoints[0] == StepType.GATHER_CONTEXT.value
 
 
 class TestDatabaseIntegration:

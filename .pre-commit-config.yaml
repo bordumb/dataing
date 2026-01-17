@@ -38,19 +38,19 @@ repos:
       # Linting
       - id: ruff
         args: [--fix]
-        files: ^backend/
+        files: ^(bond|maistro|dataing|dataing-ee)/src/
       # Formatting
       - id: ruff-format
-        files: ^backend/
+        files: ^(bond|maistro|dataing|dataing-ee)/src/
 
   # Python: mypy for type checking
   - repo: local
     hooks:
       - id: mypy
-        name: mypy (backend)
-        entry: bash -c 'cd backend && uv run mypy src/'
+        name: mypy
+        entry: uv run mypy bond/src maistro/src dataing/src dataing-ee/src
         language: system
-        files: ^backend/src/.*\.py$
+        files: ^(bond|maistro|dataing|dataing-ee)/src/.*\.py$
         pass_filenames: false
         types: [python]
 
@@ -77,13 +77,6 @@ repos:
         language: system
         files: ^frontend/src/.*\.(ts|tsx|js|jsx|json|css|scss|md)$
         pass_filenames: true
-
-  # SQL formatting (optional - comment out if not using)
-  # - repo: https://github.com/sqlfluff/sqlfluff
-  #   rev: 3.0.0
-  #   hooks:
-  #     - id: sqlfluff-lint
-  #       files: ^backend/migrations/.*\.sql$
 
   # Security checks
   - repo: https://github.com/Yelp/detect-secrets

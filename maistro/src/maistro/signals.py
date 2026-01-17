@@ -16,13 +16,14 @@ class Signal(str, Enum):
     - COMPLETE: Workflow finished successfully
     - FAIL: Workflow failed
     - BRANCH: Create child workflows for parallel execution
-    - MERGE: Await convergence of child branches
     - AWAIT_USER: Pause workflow and wait for external input
+
+    Note: Merge is handled internally by the Engine when branches complete.
+    Steps should not emit a merge signal.
     """
 
     CONTINUE = "continue"
     COMPLETE = "complete"
     FAIL = "fail"
     BRANCH = "branch"
-    MERGE = "merge"
     AWAIT_USER = "await_user"

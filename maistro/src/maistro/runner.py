@@ -12,7 +12,7 @@ Key principles:
 
 from __future__ import annotations
 
-import asyncio
+import copy
 from collections.abc import AsyncGenerator
 from dataclasses import dataclass, field
 from typing import Any, Generic, Literal, TypeVar
@@ -32,7 +32,7 @@ from maistro.events import (
     StepStarted,
 )
 from maistro.log import EventLog, InMemoryEventLog
-from maistro.result import BranchRequest
+from maistro.result import BranchRequest, BranchSpec
 from maistro.signals import Signal
 from maistro.state import RunState
 from maistro.step import Step
@@ -44,7 +44,8 @@ ContextT = TypeVar("ContextT")
 class RunOutcome(Generic[ContextT]):
     """Result of a workflow run.
 
-    Attributes:
+    Attributes
+    ----------
         status: Terminal status of the run.
         context: Final workflow context (if completed).
         error: Error message (if failed).
@@ -70,7 +71,8 @@ class Runner(Generic[ContextT]):
     - Running branches in parallel with canonical completion ordering
     - Maintaining an event log for replay
 
-    Attributes:
+    Attributes
+    ----------
         _engine: The pure Engine for state transitions.
         _steps: Map of step name to Step instance.
         _log: Event log for storing events.
@@ -86,6 +88,7 @@ class Runner(Generic[ContextT]):
         """Initialize the Runner.
 
         Args:
+        ----
             engine: The pure Engine for state transitions.
             steps: Map of step name to Step instance.
             log: Optional event log. Defaults to InMemoryEventLog.
@@ -109,6 +112,7 @@ class Runner(Generic[ContextT]):
         context from the final state.
 
         Args:
+        ----
             run_id: Unique identifier for this workflow run.
             context: Initial workflow context.
             start_step: Name of the step to begin execution.
@@ -116,6 +120,7 @@ class Runner(Generic[ContextT]):
             max_iterations: Maximum number of iterations before failing.
 
         Returns:
+        -------
             RunOutcome with final status, context, and all events.
 
         """
@@ -123,9 +128,7 @@ class Runner(Generic[ContextT]):
         iteration_count = 0
 
         # Initialize run
-        state, cmd, run_started = self._engine.init(
-            run_id, context, start_step, input_data
-        )
+        state, cmd, run_started = self._engine.init(run_id, context, start_step, input_data)
         logged_event = self._log.append(run_started)
         events.append(logged_event)
 
@@ -232,19 +235,19 @@ class Runner(Generic[ContextT]):
         allowing callers to persist at any event boundary.
 
         Args:
+        ----
             run_id: Unique identifier for this workflow run.
             context: Initial workflow context.
             start_step: Name of the step to begin execution.
             input_data: Optional input data for the first step.
 
         Yields:
+        ------
             Events as they occur during execution.
 
         """
         # Initialize run
-        state, cmd, run_started = self._engine.init(
-            run_id, context, start_step, input_data
-        )
+        state, cmd, run_started = self._engine.init(run_id, context, start_step, input_data)
         logged_event = self._log.append(run_started)
         yield logged_event
 
@@ -301,10 +304,12 @@ class Runner(Generic[ContextT]):
         """Execute a single step and yield events.
 
         Args:
+        ----
             state: Current run state.
             cmd: ExecuteStep command with step name.
 
         Yields:
+        ------
             StepStarted followed by StepCompleted or StepFailed.
             For BRANCH signal, also yields BranchesRequested.
             For AWAIT_USER signal, also yields InputRequested.
@@ -372,71 +377,253 @@ class Runner(Generic[ContextT]):
     async def _execute_branches(
         self, state: RunState[ContextT], branch_request: BranchRequest
     ) -> AsyncGenerator[Event, None]:
-        """Execute branches in parallel and yield events in canonical order.
+        """Execute branches sequentially and yield events in canonical order.
+
+        Branches run one at a time in alphabetical order by name. This ensures
+        deterministic execution - no concurrent side effects or race conditions.
+
+        Event order: BranchStarted(A) → BranchCompleted(A) → BranchStarted(B) → ...
 
         Args:
+        ----
             state: Current run state.
             branch_request: Branch specifications.
 
         Yields:
-            BranchStarted for each branch, then BranchCompleted in alphabetical order.
+        ------
+            For each branch in sorted order: BranchStarted, then BranchCompleted.
 
         """
-        # Create tasks for each branch
-        tasks: dict[str, asyncio.Task[dict[str, Any]]] = {}
-        for spec in branch_request.branches:
+        # Sort branches alphabetically for deterministic execution order
+        sorted_branches = sorted(branch_request.branches, key=lambda s: s.name)
+
+        # Execute branches sequentially in sorted order
+        for spec in sorted_branches:
             # Emit BranchStarted
             yield BranchStarted(
                 branch_name=spec.name,
                 start_step=branch_request.child_start_step or "",
             )
-            # Create task for branch execution
-            task = asyncio.create_task(self._run_branch(state, spec.name, spec.data))
-            tasks[spec.name] = task
 
-        # Wait for all branches
-        results: dict[str, dict[str, Any]] = {}
-        for name, task in tasks.items():
+            # Execute branch and get result
             try:
-                results[name] = await task
+                result = await self._run_branch(
+                    state, spec.name, spec, branch_request.child_start_step
+                )
             except Exception as e:
-                results[name] = {"_error": str(e)}
+                result = {"_error": str(e)}
 
-        # Emit BranchCompleted events in CANONICAL ORDER (alphabetical)
-        for branch_name in sorted(results.keys()):
+            # Emit BranchCompleted immediately after this branch finishes
             yield BranchCompleted(
-                branch_name=branch_name,
-                context_update=results[branch_name],
+                branch_name=spec.name,
+                context_update=result,
             )
 
-    async def _run_branch(
-        self, state: RunState[ContextT], branch_name: str, branch_data: dict[str, Any]
+    def _branch_error(
+        self,
+        branch_name: str,
+        reason: str,
+        message: str,
+        step_id: str | None = None,
+        exception_class: str | None = None,
     ) -> dict[str, Any]:
-        """Run a single branch and return its context update.
+        """Create a structured error payload for branch failures.
 
         Args:
-            state: Parent run state.
-            branch_name: Name of the branch.
-            branch_data: Data passed to the branch.
+        ----
+            branch_name: Name of the failed branch.
+            reason: Error reason code (EXCEPTION, SIGNAL_FAIL, AWAIT_USER, etc.)
+            message: Human-readable error message.
+            step_id: Step where the error occurred (if applicable).
+            exception_class: Exception class name (if applicable).
 
         Returns:
-            Context update from the branch execution.
+        -------
+            Structured error dict with "maistro.branch_error" key.
 
         """
-        # Simple implementation - just return branch data as context update
-        # A real implementation would run a sub-workflow
-        return branch_data
+        return {
+            "maistro": {
+                "branch_error": {
+                    "branch_name": branch_name,
+                    "step_id": step_id,
+                    "reason": reason,
+                    "exception_class": exception_class,
+                    "message": message,
+                }
+            }
+        }
 
-    def _create_terminal_event(
-        self, cmd: Stop, state: RunState[ContextT]
-    ) -> Event:
+    def _compute_context_delta(self, initial_context: Any, final_context: Any) -> dict[str, Any]:
+        """Compute context delta or wrap non-dict in _full_context.
+
+        For dict contexts, returns only new/changed keys.
+        For non-dict contexts, returns {"_full_context": final_context}.
+
+        Args:
+        ----
+            initial_context: Context at start of branch (deep-copied from parent).
+            final_context: Context at end of branch execution.
+
+        Returns:
+        -------
+            Delta dict or {"_full_context": ...} wrapper.
+
+        """
+        if isinstance(final_context, dict) and isinstance(initial_context, dict):
+            # Compute delta: only keys that are new or changed
+            delta: dict[str, Any] = {}
+            for k, v in final_context.items():
+                if k not in initial_context or initial_context[k] != v:
+                    delta[k] = v
+            return delta
+        # Non-dict contexts: wrap full context
+        return {"_full_context": final_context}
+
+    async def _run_branch(
+        self,
+        state: RunState[ContextT],
+        branch_name: str,
+        branch_spec: BranchSpec,
+        child_start_step: str | None,
+        max_iterations: int = 100,
+    ) -> dict[str, Any]:
+        """Run a single branch sub-workflow and return its context update.
+
+        Executes steps starting at child_start_step until a termination signal.
+        Branch context is deep-copied from parent for isolation.
+        BranchSpec.data is passed as input_data to the first step (not merged into context).
+
+        Args:
+        ----
+            state: Parent run state.
+            branch_name: Name of the branch.
+            branch_spec: Branch specification containing name and data.
+            child_start_step: Step to start execution at, or None for workflow default.
+            max_iterations: Maximum step executions before failing (default 100).
+
+        Returns:
+        -------
+            Context delta (for dict contexts) or {"_full_context": ctx} (for non-dict).
+            On failure, returns structured error: {"maistro": {"branch_error": {...}}}.
+
+        """
+        # Fork context from parent (deep copy for isolation)
+        initial_context = copy.deepcopy(state.context)
+        branch_context = initial_context
+
+        # Resolve start step
+        current_step = child_start_step
+        if current_step is None:
+            # Use first step in step_order as default
+            if not self._engine._step_order:
+                return self._branch_error(
+                    branch_name=branch_name,
+                    reason="NO_STEPS_REGISTERED",
+                    message="Cannot start branch: no steps registered in workflow",
+                )
+            current_step = self._engine._step_order[0]
+
+        # Deep copy branch_spec.data for input_data (first step only)
+        input_data: Any = copy.deepcopy(branch_spec.data) if branch_spec.data else None
+
+        # Execute steps until termination
+        for _ in range(max_iterations):
+            # Look up step from registry
+            step = self._steps.get(current_step)
+            if step is None:
+                return self._branch_error(
+                    branch_name=branch_name,
+                    reason="STEP_NOT_FOUND",
+                    message=f"Step not found in registry: {current_step}",
+                    step_id=current_step,
+                )
+
+            # Execute step
+            try:
+                result = await step.execute(branch_context, input_data)
+            except Exception as e:
+                return self._branch_error(
+                    branch_name=branch_name,
+                    reason="EXCEPTION",
+                    message=str(e),
+                    step_id=current_step,
+                    exception_class=type(e).__name__,
+                )
+
+            # Clear input_data for subsequent steps
+            input_data = None
+
+            # Update branch context from result
+            branch_context = result.context
+
+            # Handle signals
+            signal = result.signal
+
+            if signal == Signal.COMPLETE:
+                # Branch completed successfully
+                return self._compute_context_delta(initial_context, branch_context)
+
+            if signal == Signal.FAIL:
+                return self._branch_error(
+                    branch_name=branch_name,
+                    reason="SIGNAL_FAIL",
+                    message=result.error or "Step returned FAIL signal",
+                    step_id=current_step,
+                )
+
+            if signal == Signal.AWAIT_USER:
+                return self._branch_error(
+                    branch_name=branch_name,
+                    reason="AWAIT_USER",
+                    message="AWAIT_USER signal not allowed in branches",
+                    step_id=current_step,
+                )
+
+            if signal == Signal.BRANCH:
+                return self._branch_error(
+                    branch_name=branch_name,
+                    reason="NESTED_BRANCH",
+                    message="Nested branching not supported",
+                    step_id=current_step,
+                )
+
+            # CONTINUE or unknown signal: resolve next step
+            next_step = result.next_step or self._engine._default_next(current_step)
+
+            if next_step is None:
+                # End of steps - branch completed
+                return self._compute_context_delta(initial_context, branch_context)
+
+            # Verify next step exists
+            if next_step not in self._steps:
+                return self._branch_error(
+                    branch_name=branch_name,
+                    reason="STEP_NOT_FOUND",
+                    message=f"Next step not found in registry: {next_step}",
+                    step_id=current_step,
+                )
+
+            current_step = next_step
+
+        # Max iterations exceeded
+        return self._branch_error(
+            branch_name=branch_name,
+            reason="MAX_ITERATIONS",
+            message=f"Branch exceeded {max_iterations} iterations",
+            step_id=current_step,
+        )
+
+    def _create_terminal_event(self, cmd: Stop, state: RunState[ContextT]) -> Event:
         """Create the appropriate terminal event based on Stop command.
 
         Args:
+        ----
             cmd: Stop command with status.
             state: Current run state.
 
         Returns:
+        -------
             RunCompleted or RunFailed event.
 
         """

@@ -1,0 +1,37 @@
+{
+  "assignee": "bordumbb@gmail.com",
+  "claim_note": "",
+  "claimed_at": "2026-01-17T00:07:14.726034Z",
+  "created_at": "2026-01-16T22:13:47.694539Z",
+  "depends_on": [],
+  "epic": "fn-16",
+  "evidence": {
+    "files_changed": [
+      "maistro/tests/unit/test_branch_execution.py"
+    ],
+    "tests": [
+      "maistro/tests/unit/test_branch_execution.py::TestContextForking::test_branch_context_is_deep_copied",
+      "maistro/tests/unit/test_branch_execution.py::TestContextForking::test_mutations_in_one_branch_dont_leak_to_another",
+      "maistro/tests/unit/test_branch_execution.py::TestSequentialExecution::test_branches_execute_in_alphabetical_order",
+      "maistro/tests/unit/test_branch_execution.py::TestEventOrdering::test_event_order_is_started_then_completed_per_branch",
+      "maistro/tests/unit/test_branch_execution.py::TestEventOrdering::test_branch_started_includes_start_step",
+      "maistro/tests/unit/test_branch_execution.py::TestBranchStepExecution::test_branch_executes_steps",
+      "maistro/tests/unit/test_branch_execution.py::TestBranchStepExecution::test_branch_receives_input_data_first_step_only",
+      "maistro/tests/unit/test_branch_execution.py::TestBranchStepExecution::test_branch_terminates_on_complete",
+      "maistro/tests/unit/test_branch_execution.py::TestBranchStepExecution::test_branch_terminates_on_fail",
+      "maistro/tests/unit/test_branch_execution.py::TestBranchStepExecution::test_branch_await_user_error",
+      "maistro/tests/unit/test_branch_execution.py::TestBranchStepExecution::test_branch_nested_branch_error",
+      "maistro/tests/unit/test_branch_execution.py::TestBranchStepExecution::test_branch_step_not_found",
+      "maistro/tests/unit/test_branch_execution.py::TestBranchStepExecution::test_branch_max_iterations",
+      "maistro/tests/unit/test_branch_execution.py::TestBranchStepExecution::test_branch_returns_delta_for_dict",
+      "maistro/tests/unit/test_branch_execution.py::TestBranchStepExecution::test_branch_exception_handling",
+      "maistro/tests/unit/test_branch_execution.py::TestBranchStepExecution::test_branch_returns_full_context_wrapper"
+    ]
+  },
+  "id": "fn-16.4",
+  "priority": 4,
+  "spec_path": ".flow/tasks/fn-16.4.md",
+  "status": "done",
+  "title": "Add branch execution unit tests",
+  "updated_at": "2026-01-17T00:08:07.561393Z"
+}

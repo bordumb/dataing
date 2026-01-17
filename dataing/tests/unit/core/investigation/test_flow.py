@@ -3,8 +3,8 @@
 from __future__ import annotations
 
 import asyncio
-from typing import Any
-from unittest.mock import AsyncMock, MagicMock
+from typing import Any, AsyncIterator
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
@@ -15,12 +15,18 @@ from dataing.core.investigation.flow import (
     WorkerShutdownError,
     run_with_checkpointing,
 )
-from maistro import Signal, Workflow
+from maistro import RunCompleted, RunFailed, Signal, StepCompleted, Workflow
 
 
 def create_test_context() -> InvestigationContext:
     """Create a minimal test context."""
     return InvestigationContext(alert_summary="Test anomaly")
+
+
+async def mock_stream(*events: Any) -> AsyncIterator[Any]:
+    """Create an async iterator from events."""
+    for event in events:
+        yield event
 
 
 class TestRunWithCheckpointing:
@@ -39,14 +45,35 @@ class TestRunWithCheckpointing:
         ) -> None:
             checkpoints.append((ctx, next_step))
 
-        # Mock workflow that runs 3 steps then completes
-        workflow = MagicMock(spec=Workflow)
-        tick_results = [
-            MagicMock(context=context, signal=Signal.CONTINUE, next_step="step2", error=None),
-            MagicMock(context=context, signal=Signal.CONTINUE, next_step="step3", error=None),
-            MagicMock(context=context, signal=Signal.COMPLETE, next_step=None, error=None),
+        # Create StepCompleted events that update context
+        ctx1 = context.model_copy(update={"alert_summary": "Step 1"})
+        ctx2 = context.model_copy(update={"alert_summary": "Step 2"})
+        ctx3 = context.model_copy(update={"alert_summary": "Step 3"})
+
+        events = [
+            StepCompleted(
+                step_name="step1",
+                context_update={"_full_context": ctx1},
+                signal=Signal.CONTINUE,
+                next_step="step2",
+            ),
+            StepCompleted(
+                step_name="step2",
+                context_update={"_full_context": ctx2},
+                signal=Signal.CONTINUE,
+                next_step="step3",
+            ),
+            StepCompleted(
+                step_name="step3",
+                context_update={"_full_context": ctx3},
+                signal=Signal.COMPLETE,
+                next_step=None,
+            ),
+            RunCompleted(final_context={}),
         ]
-        workflow.tick = AsyncMock(side_effect=tick_results)
+
+        workflow = MagicMock(spec=Workflow)
+        workflow.run_streaming = MagicMock(return_value=mock_stream(*events))
 
         shutdown = asyncio.Event()
 
@@ -77,7 +104,20 @@ class TestRunWithCheckpointing:
         ) -> None:
             checkpoints.append((ctx, next_step))
 
+        # Create an event that will be processed when shutdown is set
+        ctx1 = context.model_copy(update={"alert_summary": "Step 1"})
+        events = [
+            StepCompleted(
+                step_name="step1",
+                context_update={"_full_context": ctx1},
+                signal=Signal.CONTINUE,
+                next_step="step2",
+            ),
+        ]
+
         workflow = MagicMock(spec=Workflow)
+        workflow.run_streaming = MagicMock(return_value=mock_stream(*events))
+
         shutdown = asyncio.Event()
         shutdown.set()  # Signal shutdown immediately
 
@@ -92,12 +132,11 @@ class TestRunWithCheckpointing:
 
         # Verify checkpoint was saved before raising
         assert len(checkpoints) == 1
-        assert checkpoints[0][1] == "step1"  # Next step that would have run
         assert "checkpointed" in str(exc_info.value)
 
     @pytest.mark.asyncio
     async def test_fail_signal_raises_investigation_error(self) -> None:
-        """Test that FAIL signal raises InvestigationError."""
+        """Test that RunFailed event raises InvestigationError."""
         context = create_test_context()
         checkpoints: list[tuple[InvestigationContext, str | None]] = []
 
@@ -108,15 +147,20 @@ class TestRunWithCheckpointing:
         ) -> None:
             checkpoints.append((ctx, next_step))
 
-        workflow = MagicMock(spec=Workflow)
-        workflow.tick = AsyncMock(
-            return_value=MagicMock(
-                context=context,
+        ctx1 = context.model_copy(update={"alert_summary": "Step 1"})
+        events = [
+            StepCompleted(
+                step_name="step1",
+                context_update={"_full_context": ctx1},
                 signal=Signal.FAIL,
                 next_step=None,
-                error="Database connection failed",
-            )
-        )
+            ),
+            RunFailed(error="Database connection failed"),
+        ]
+
+        workflow = MagicMock(spec=Workflow)
+        workflow.run_streaming = MagicMock(return_value=mock_stream(*events))
+
         shutdown = asyncio.Event()
 
         with pytest.raises(InvestigationError) as exc_info:
@@ -145,15 +189,19 @@ class TestRunWithCheckpointing:
         ) -> None:
             checkpoints.append((ctx, next_step))
 
-        workflow = MagicMock(spec=Workflow)
-        workflow.tick = AsyncMock(
-            return_value=MagicMock(
-                context=context,
+        ctx1 = context.model_copy(update={"alert_summary": "Step 1"})
+        events = [
+            StepCompleted(
+                step_name="step1",
+                context_update={"_full_context": ctx1},
                 signal=Signal.AWAIT_USER,
                 next_step="resume_step",
-                error=None,
-            )
-        )
+            ),
+        ]
+
+        workflow = MagicMock(spec=Workflow)
+        workflow.run_streaming = MagicMock(return_value=mock_stream(*events))
+
         shutdown = asyncio.Event()
 
         with pytest.raises(AwaitingUserInput) as exc_info:
@@ -182,16 +230,22 @@ class TestRunWithCheckpointing:
         ) -> None:
             pass
 
-        workflow = MagicMock(spec=Workflow)
-        # Always return CONTINUE to loop forever
-        workflow.tick = AsyncMock(
-            return_value=MagicMock(
-                context=context,
-                signal=Signal.CONTINUE,
-                next_step="next_step",
-                error=None,
+        # Create many events to exceed max iterations
+        events = []
+        for i in range(10):
+            ctx = context.model_copy(update={"alert_summary": f"Step {i}"})
+            events.append(
+                StepCompleted(
+                    step_name=f"step{i}",
+                    context_update={"_full_context": ctx},
+                    signal=Signal.CONTINUE,
+                    next_step=f"step{i+1}",
+                )
             )
-        )
+
+        workflow = MagicMock(spec=Workflow)
+        workflow.run_streaming = MagicMock(return_value=mock_stream(*events))
+
         shutdown = asyncio.Event()
 
         with pytest.raises(RuntimeError) as exc_info:

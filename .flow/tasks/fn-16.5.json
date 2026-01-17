@@ -1,0 +1,24 @@
+{
+  "assignee": "bordumbb@gmail.com",
+  "claim_note": "",
+  "claimed_at": "2026-01-17T00:08:15.698950Z",
+  "created_at": "2026-01-16T22:13:51.803090Z",
+  "depends_on": [],
+  "epic": "fn-16",
+  "evidence": {
+    "files_changed": [
+      "dataing/tests/unit/core/investigation/test_values.py"
+    ],
+    "tests": [
+      "maistro/tests/ (97 passed)",
+      "dataing/tests/unit/core/investigation/ (172 passed)",
+      "dataing/tests/e2e/test_investigation_e2e.py (6 non-LLM tests passed)"
+    ]
+  },
+  "id": "fn-16.5",
+  "priority": 5,
+  "spec_path": ".flow/tasks/fn-16.5.md",
+  "status": "done",
+  "title": "Verify investigation workflow runs hypotheses in parallel",
+  "updated_at": "2026-01-17T00:09:20.668377Z"
+}

@@ -1,28 +1,20 @@
-"""Maistro: Generic step-based workflow engine.
+"""Maistro: Event-sourced workflow engine.
 
-Maistro provides a simple, type-safe foundation for building
-step-based workflows. It is intentionally minimal and generic,
-with no dependencies on specific LLM libraries or domains.
+Maistro provides a deterministic, replayable workflow engine using
+event sourcing. Workflows are defined as sequences of Steps that transform
+context and emit signals to control flow.
 
 Core concepts:
 - Step: A unit of work that transforms context and produces signals
-- StepResult: The result of executing a step
-- Signal: Control flow instructions (CONTINUE, COMPLETE, FAIL, etc.)
-
-New Event-Sourced Architecture (v2):
-- Engine: Pure reducer for state transitions (state, event) -> (state, command)
+- Signal: Control flow instructions (CONTINUE, COMPLETE, FAIL, BRANCH, AWAIT_USER)
+- Engine: Pure reducer (state, event) -> (state, command)
 - Runner: Async executor that runs commands and emits events
 - Events: Immutable records of what happened during execution
-- Replay: Deterministic state reconstruction from event logs
 
 Example:
+-------
     ```python
-    from dataclasses import dataclass
-    from maistro import Signal, Step, StepResult
-
-    @dataclass(frozen=True)
-    class MyContext:
-        counter: int
+    from maistro import Signal, Step, StepResult, Workflow
 
     class IncrementStep:
         @property
@@ -30,22 +22,24 @@ Example:
             return "increment"
 
         async def execute(
-            self, context: MyContext, input_data: None = None
-        ) -> StepResult[MyContext, None]:
-            new_ctx = MyContext(counter=context.counter + 1)
-            signal = Signal.COMPLETE if new_ctx.counter >= 10 else Signal.CONTINUE
+            self, context: dict, input_data: None = None
+        ) -> StepResult[dict, None]:
+            new_ctx = {"counter": context.get("counter", 0) + 1}
+            signal = Signal.COMPLETE if new_ctx["counter"] >= 10 else Signal.CONTINUE
             return StepResult(context=new_ctx, signal=signal)
 
-        def can_execute(self, context: MyContext) -> bool:
+        def can_execute(self, context: dict) -> bool:
             return True
+
+    # Build and run workflow
+    workflow = Workflow()
+    workflow.add_step(IncrementStep())
+    result = await workflow.run({"counter": 0})
     ```
 
 """
 
-import warnings
-from typing import Any
-
-# New event-sourced architecture
+# Commands
 from maistro.commands import (
     Command,
     ExecuteStep,
@@ -54,7 +48,11 @@ from maistro.commands import (
     Stop,
     WaitForInput,
 )
+
+# Engine (pure reducer)
 from maistro.engine import Engine
+
+# Events
 from maistro.events import (
     BranchCompleted,
     BranchesRequested,
@@ -72,28 +70,32 @@ from maistro.events import (
     StepStarted,
 )
 
-# Legacy handlers (deprecated, but still available for backward compatibility)
-from maistro.handlers import (
-    BranchContext,
-    BranchingSignalHandler,
-    DefaultSignalHandler,
-    MergeStrategy,
-    SignalHandler,
-    SignalHandlerError,
-    SignalResult,
-)
+# Event log
 from maistro.log import EventLog, InMemoryEventLog
-from maistro.merge import DefaultMergeStrategy
-from maistro.merge import MergeStrategy as NewMergeStrategy
+
+# Merge strategy
+from maistro.merge import DefaultMergeStrategy, MergeStrategy
+
+# Replay
 from maistro.replay import Replayer
 
-# Core types (always available)
+# Result types
 from maistro.result import BranchRequest, BranchSpec, StepResult
+
+# Runner
 from maistro.runner import Runner, RunOutcome
+
+# Signals
 from maistro.signals import Signal
+
+# State
 from maistro.state import AwaitState, BranchState, RunState
+
+# Step protocol
 from maistro.step import Step
-from maistro.workflow import TickResult, Workflow, WorkflowError
+
+# Workflow facade
+from maistro.workflow import Workflow, WorkflowError
 
 __all__ = [
     # Core types
@@ -102,72 +104,45 @@ __all__ = [
     "Signal",
     "Step",
     "StepResult",
-    "TickResult",
     "Workflow",
     "WorkflowError",
-    # New event-sourced architecture
-    "AwaitState",
+    # Engine and Runner
+    "Engine",
+    "Runner",
+    "RunOutcome",
+    # Events
     "BranchCompleted",
     "BranchesRequested",
     "BranchStarted",
-    "BranchState",
-    "Command",
-    "DefaultMergeStrategy",
-    "Engine",
     "Event",
-    "EventLog",
-    "ExecuteStep",
-    "InMemoryEventLog",
     "InputReceived",
     "InputRequested",
-    "NewMergeStrategy",
-    "NoOp",
-    "Replayer",
     "RunCompleted",
     "RunFailed",
-    "RunOutcome",
     "RunPaused",
     "RunResumed",
-    "Runner",
     "RunStarted",
-    "RunState",
-    "StartBranches",
     "StepCompleted",
     "StepFailed",
     "StepStarted",
+    # Commands
+    "Command",
+    "ExecuteStep",
+    "NoOp",
+    "StartBranches",
     "Stop",
     "WaitForInput",
-    # Legacy (deprecated but available for backward compat)
-    "BranchContext",
-    "BranchingSignalHandler",
-    "DefaultSignalHandler",
+    # State
+    "AwaitState",
+    "BranchState",
+    "RunState",
+    # Event log and replay
+    "EventLog",
+    "InMemoryEventLog",
+    "Replayer",
+    # Merge strategy
+    "DefaultMergeStrategy",
     "MergeStrategy",
-    "SignalHandler",
-    "SignalHandlerError",
-    "SignalResult",
 ]
 
 __version__ = "0.1.0"
-
-# Deprecation warnings for legacy APIs
-_DEPRECATED_APIS: dict[str, str] = {
-    "BranchingSignalHandler": "Use Engine for signal handling instead.",
-    "DefaultSignalHandler": "Use Engine for signal handling instead.",
-    "SignalHandler": "Use Engine for signal handling instead.",
-    "SignalResult": "Use Event types for workflow state communication.",
-}
-
-
-def __getattr__(name: str) -> Any:
-    """Handle deprecated attribute access with warnings."""
-    if name in _DEPRECATED_APIS:
-        warnings.warn(
-            f"{name} is deprecated. {_DEPRECATED_APIS[name]}",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-        # Return from handlers module for backward compatibility
-        from maistro import handlers
-
-        return getattr(handlers, name)
-    raise AttributeError(f"module 'maistro' has no attribute '{name}'")

@@ -1,0 +1,13 @@
+{
+  "branch_name": "fn-16",
+  "created_at": "2026-01-16T22:11:36.729830Z",
+  "depends_on_epics": [],
+  "id": "fn-16",
+  "next_task": 1,
+  "plan_review_status": "ship",
+  "plan_reviewed_at": "2026-01-16T23:02:20.334120Z",
+  "spec_path": ".flow/specs/fn-16.md",
+  "status": "open",
+  "title": "Implement maistro branch sub-workflow execution",
+  "updated_at": "2026-01-16T23:02:20.334304Z"
+}

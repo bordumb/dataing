@@ -8,6 +8,7 @@ Key principles:
 - Engine never performs I/O, logging, or side effects
 - Engine computes resume_step for AWAIT_USER (Steps don't decide routing)
 - All state changes use dataclasses.replace() for immutability
+- Context is dict[str, Any] - the Engine does not support other context types
 """
 
 from __future__ import annotations
@@ -46,7 +47,8 @@ class Engine(Generic[ContextT]):
     completely stateless and deterministic - the same sequence of events always
     produces the same state.
 
-    Attributes:
+    Attributes
+    ----------
         _step_order: Ordered list of step names for default routing.
         _merge: Strategy for merging branch contexts.
 
@@ -56,6 +58,7 @@ class Engine(Generic[ContextT]):
         """Initialize the Engine with step ordering and merge strategy.
 
         Args:
+        ----
             step_order: Ordered list of step names for default routing.
             merge_strategy: Strategy for merging branch contexts.
 
@@ -76,12 +79,14 @@ class Engine(Generic[ContextT]):
         along with the RunStarted event.
 
         Args:
+        ----
             run_id: Unique identifier for this workflow run.
             context: Initial workflow context.
             start_step: Name of the step to begin execution.
             input_data: Optional input data for the first step.
 
         Returns:
+        -------
             Tuple of (initial_state, first_command, RunStarted_event).
 
         """
@@ -96,9 +101,7 @@ class Engine(Generic[ContextT]):
         event: Event = RunStarted(run_id=run_id, start_step=start_step)
         return initial_state, command, event
 
-    def apply(
-        self, state: RunState[ContextT], event: Event
-    ) -> tuple[RunState[ContextT], Command]:
+    def apply(self, state: RunState[ContextT], event: Event) -> tuple[RunState[ContextT], Command]:
         """Apply an event to state, returning new state and next command.
 
         This is the pure reducer function at the heart of the event-sourced
@@ -109,10 +112,12 @@ class Engine(Generic[ContextT]):
         Given the same state and event, it always produces the same result.
 
         Args:
+        ----
             state: Current workflow run state.
             event: Event to apply.
 
         Returns:
+        -------
             Tuple of (new_state, command_to_execute).
 
         """
@@ -199,15 +204,6 @@ class Engine(Generic[ContextT]):
             # Return NoOp; let BranchesRequested drive the StartBranches command
             return new_state, NoOp()
 
-        if signal == Signal.MERGE:
-            # MERGE signal is handled internally via branch completion
-            # Reaching here means no pending branches - treat as error
-            failed_state = replace(new_state, status="failed", current_step=None)
-            return failed_state, Stop(
-                status="failed",
-                error="MERGE signal without pending branches",
-            )
-
         if signal == Signal.AWAIT_USER:
             # AWAIT_USER - do NOT schedule next step here
             # Let InputRequested event drive the pause via _handle_input_requested
@@ -241,11 +237,11 @@ class Engine(Generic[ContextT]):
         # Extract expected branch names
         expected_branches = frozenset(spec.name for spec in event.branch_request.branches)
 
-        # Create branch state
+        # Create immutable branch state
         branch_state = BranchState(
             merge_step=event.merge_step,
             expected=expected_branches,
-            completed={},
+            completed=(),  # Immutable empty tuple
         )
 
         new_state = replace(state, pending_branches=branch_state)
@@ -265,23 +261,18 @@ class Engine(Generic[ContextT]):
         """Handle BranchCompleted event."""
         if state.pending_branches is None:
             # No pending branches - this is an error
-            return state, Stop(
-                status="failed", error="BranchCompleted without pending branches"
-            )
+            return state, Stop(status="failed", error="BranchCompleted without pending branches")
 
-        # Add this branch to completed
-        new_completed = dict(state.pending_branches.completed)
-        new_completed[event.branch_name] = event.context_update
-
-        new_branch_state = replace(state.pending_branches, completed=new_completed)
+        # Add this branch to completed using immutable update
+        new_branch_state = state.pending_branches.with_completion(
+            event.branch_name, event.context_update
+        )
         new_state = replace(state, pending_branches=new_branch_state)
 
         # Check if all branches are complete
         if new_branch_state.is_complete():
             # Merge branch contexts
-            merged_context = self._merge.merge(
-                state.context, new_branch_state.completed
-            )
+            merged_context = self._merge.merge(state.context, new_branch_state.get_completed_dict())
             final_state = replace(
                 new_state,
                 context=merged_context,
@@ -314,9 +305,7 @@ class Engine(Generic[ContextT]):
     ) -> tuple[RunState[ContextT], Command]:
         """Handle InputReceived event (external input provided)."""
         if state.pending_await is None:
-            return state, Stop(
-                status="failed", error="InputReceived without pending await"
-            )
+            return state, Stop(status="failed", error="InputReceived without pending await")
 
         # Validate token matches
         if state.pending_await.token != event.token:
@@ -378,9 +367,11 @@ class Engine(Generic[ContextT]):
         """Get the next step in the default step order.
 
         Args:
+        ----
             current_step: Current step name.
 
         Returns:
+        -------
             Next step name, or None if at end of workflow.
 
         """
@@ -395,9 +386,7 @@ class Engine(Generic[ContextT]):
             # Step not in order - no default next
             return None
 
-    def _apply_context_update(
-        self, context: ContextT, update: dict[str, Any]
-    ) -> ContextT:
+    def _apply_context_update(self, context: ContextT, update: dict[str, Any]) -> ContextT:
         """Apply a context update delta to the current context.
 
         For dict contexts, merges the update as a delta.
@@ -405,10 +394,12 @@ class Engine(Generic[ContextT]):
         "_full_context" key that contains the full updated context.
 
         Args:
+        ----
             context: Current context.
             update: Delta to apply, or dict with "_full_context" key.
 
         Returns:
+        -------
             Updated context.
 
         """

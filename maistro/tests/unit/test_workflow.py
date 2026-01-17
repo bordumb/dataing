@@ -9,7 +9,6 @@ from maistro import (
     BranchSpec,
     Signal,
     StepResult,
-    TickResult,
     Workflow,
     WorkflowError,
 )
@@ -101,26 +100,6 @@ class FailStep:
         return True
 
 
-class ConditionalStep:
-    """Step that only executes when count < 10."""
-
-    @property
-    def name(self) -> str:
-        """Return step name."""
-        return "conditional"
-
-    async def execute(
-        self, context: CounterContext, input_data: None = None
-    ) -> StepResult[CounterContext, None]:
-        """Execute conditionally."""
-        new_ctx = CounterContext(count=context.count + 1)
-        return StepResult(context=new_ctx, signal=Signal.CONTINUE)
-
-    def can_execute(self, context: CounterContext) -> bool:
-        """Only execute when count < 10."""
-        return context.count < 10
-
-
 class BranchingStep:
     """Step that requests branching."""
 
@@ -189,77 +168,6 @@ class TestWorkflow:
         """Getting unknown step returns None."""
         workflow: Workflow[CounterContext] = Workflow()
         assert workflow.get_step("unknown") is None
-
-    @pytest.mark.asyncio
-    async def test_tick_step_not_found(self) -> None:
-        """Tick with unknown step returns FAIL."""
-        workflow: Workflow[CounterContext] = Workflow()
-        ctx = CounterContext(count=0)
-        result = await workflow.tick(ctx, "unknown")
-        assert result.signal == Signal.FAIL
-        assert "not found" in (result.error or "")
-
-    @pytest.mark.asyncio
-    async def test_tick_executes_step(self) -> None:
-        """Tick executes step and returns result."""
-        workflow: Workflow[CounterContext] = Workflow()
-        workflow.add_step(IncrementStep())
-        ctx = CounterContext(count=5)
-        result = await workflow.tick(ctx, "increment")
-        assert result.signal == Signal.CONTINUE
-        assert result.context.count == 6
-        assert result.output == 6
-
-    @pytest.mark.asyncio
-    async def test_tick_with_input_data(self) -> None:
-        """Tick passes input data to step."""
-        workflow: Workflow[CounterContext] = Workflow()
-        workflow.add_step(IncrementStep())
-        ctx = CounterContext(count=5)
-        result = await workflow.tick(ctx, "increment", input_data=10)
-        assert result.context.count == 15
-
-    @pytest.mark.asyncio
-    async def test_tick_can_execute_false_fails(self) -> None:
-        """Tick returns FAIL when can_execute is False."""
-        workflow: Workflow[CounterContext] = Workflow(fail_on_cannot_execute=True)
-        workflow.add_step(ConditionalStep())
-        ctx = CounterContext(count=100)
-        result = await workflow.tick(ctx, "conditional")
-        assert result.signal == Signal.FAIL
-        assert "preconditions not met" in (result.error or "")
-
-    @pytest.mark.asyncio
-    async def test_tick_can_execute_false_skips(self) -> None:
-        """Tick skips step when can_execute is False and configured to skip."""
-        workflow: Workflow[CounterContext] = Workflow(fail_on_cannot_execute=False)
-        workflow.add_step(ConditionalStep())
-        workflow.add_step(CompleteStep())
-        ctx = CounterContext(count=100)
-        result = await workflow.tick(ctx, "conditional")
-        assert result.signal == Signal.CONTINUE
-        assert result.next_step == "complete"
-
-    @pytest.mark.asyncio
-    async def test_tick_determines_next_step(self) -> None:
-        """Tick determines next step from order."""
-        workflow: Workflow[CounterContext] = Workflow()
-        workflow.add_step(IncrementStep())
-        workflow.add_step(DoubleStep())
-        ctx = CounterContext(count=1)
-        result = await workflow.tick(ctx, "increment")
-        assert result.next_step == "double"
-
-    @pytest.mark.asyncio
-    async def test_tick_respects_explicit_routing(self) -> None:
-        """Tick uses explicit next_step from result."""
-        workflow: Workflow[CounterContext] = Workflow()
-        workflow.add_step(RoutingStep("complete"))
-        workflow.add_step(IncrementStep())
-        workflow.add_step(CompleteStep())
-        ctx = CounterContext(count=1)
-        result = await workflow.tick(ctx, "router")
-        assert result.next_step == "complete"
 
 
 class TestWorkflowRun:
@@ -382,37 +290,6 @@ class TestWorkflowRun:
 
         result = await workflow.run(CounterContext(count=0), "increment")
         assert result.count == 1
-
-
-class TestTickResult:
-    """Tests for TickResult dataclass."""
-
-    def test_tick_result_creation(self) -> None:
-        """TickResult can be created."""
-        ctx = CounterContext(count=1)
-        result: TickResult[CounterContext] = TickResult(
-            context=ctx, signal=Signal.CONTINUE
-        )
-        assert result.context.count == 1
-        assert result.signal == Signal.CONTINUE
-        assert result.next_step is None
-
-    def test_tick_result_with_error(self) -> None:
-        """TickResult can include error."""
-        ctx = CounterContext(count=1)
-        result: TickResult[CounterContext] = TickResult(
-            context=ctx, signal=Signal.FAIL, error="Something went wrong"
-        )
-        assert result.error == "Something went wrong"
-
-    def test_tick_result_is_frozen(self) -> None:
-        """TickResult is immutable."""
-        ctx = CounterContext(count=1)
-        result: TickResult[CounterContext] = TickResult(
-            context=ctx, signal=Signal.CONTINUE
-        )
-        with pytest.raises(AttributeError):
-            result.signal = Signal.FAIL  # type: ignore[misc]
 
 
 class TestWorkflowError:

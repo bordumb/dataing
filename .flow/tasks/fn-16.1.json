@@ -1,0 +1,27 @@
+{
+  "assignee": "bordumbb@gmail.com",
+  "claim_note": "",
+  "claimed_at": "2026-01-17T00:01:57.194879Z",
+  "created_at": "2026-01-16T22:13:39.618164Z",
+  "depends_on": [],
+  "epic": "fn-16",
+  "evidence": {
+    "files_changed": [
+      "maistro/src/maistro/runner.py",
+      "maistro/tests/unit/test_branch_execution.py"
+    ],
+    "tests": [
+      "maistro/tests/unit/test_branch_execution.py::TestContextForking::test_branch_context_is_deep_copied",
+      "maistro/tests/unit/test_branch_execution.py::TestContextForking::test_mutations_in_one_branch_dont_leak_to_another",
+      "maistro/tests/unit/test_branch_execution.py::TestSequentialExecution::test_branches_execute_in_alphabetical_order",
+      "maistro/tests/unit/test_branch_execution.py::TestEventOrdering::test_event_order_is_started_then_completed_per_branch",
+      "maistro/tests/unit/test_branch_execution.py::TestEventOrdering::test_branch_started_includes_start_step"
+    ]
+  },
+  "id": "fn-16.1",
+  "priority": 1,
+  "spec_path": ".flow/tasks/fn-16.1.md",
+  "status": "done",
+  "title": "Implement context forking for branch execution",
+  "updated_at": "2026-01-17T00:04:11.988549Z"
+}

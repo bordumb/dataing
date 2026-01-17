@@ -7,21 +7,14 @@ delegating to the Engine and Runner for actual execution.
 from __future__ import annotations
 
 import uuid
-import warnings
 from collections.abc import AsyncGenerator
-from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any, Generic, TypeVar
+from typing import Any, Generic, TypeVar
 
 from maistro.engine import Engine
 from maistro.events import Event
 from maistro.merge import DefaultMergeStrategy, MergeStrategy
-from maistro.result import BranchRequest, StepResult
 from maistro.runner import Runner, RunOutcome
-from maistro.signals import Signal
 from maistro.step import Step
-
-if TYPE_CHECKING:
-    from maistro.handlers import SignalHandler
 
 ContextT = TypeVar("ContextT")
 
@@ -29,7 +22,8 @@ ContextT = TypeVar("ContextT")
 class WorkflowError(Exception):
     """Exception raised when a workflow fails.
 
-    Attributes:
+    Attributes
+    ----------
         context: The context at the time of failure.
         message: Error description.
 
@@ -39,6 +33,7 @@ class WorkflowError(Exception):
         """Initialize WorkflowError.
 
         Args:
+        ----
             message: Error description.
             context: The context at the time of failure.
 
@@ -46,31 +41,6 @@ class WorkflowError(Exception):
         super().__init__(message)
         self.context = context
         self.message = message
-
-
-@dataclass(frozen=True)
-class TickResult(Generic[ContextT]):
-    """Result of a single tick (step execution).
-
-    .. deprecated::
-        Use run() or run_with_events() instead of tick().
-
-    Attributes:
-        context: The (possibly updated) context after the step.
-        signal: The signal returned by the step.
-        next_step: Name of the next step to execute (if CONTINUE).
-        branch_request: Branch specifications (if BRANCH signal).
-        output: Any output from the step.
-        error: Error message if the tick failed.
-
-    """
-
-    context: ContextT
-    signal: Signal
-    next_step: str | None = None
-    branch_request: BranchRequest | None = None
-    output: Any = None
-    error: str | None = None
 
 
 class Workflow(Generic[ContextT]):
@@ -81,20 +51,21 @@ class Workflow(Generic[ContextT]):
     for step execution.
 
     Example:
+    -------
         ```python
-        workflow = Workflow[MyContext]()
+        workflow = Workflow()
         workflow.add_step(InitStep(), is_start=True)
         workflow.add_step(ProcessStep())
         workflow.add_step(FinalizeStep())
 
         # Run to completion
-        result = await workflow.run(MyContext(...))
+        result = await workflow.run({"key": "value"})
 
         # Or with events
-        outcome, events = await workflow.run_with_events(MyContext(...))
+        outcome, events = await workflow.run_with_events({"key": "value"})
 
         # Or streaming
-        async for event in workflow.run_streaming(MyContext(...)):
+        async for event in workflow.run_streaming({"key": "value"}):
             print(event)
         ```
 
@@ -108,6 +79,7 @@ class Workflow(Generic[ContextT]):
         """Initialize workflow.
 
         Args:
+        ----
             fail_on_cannot_execute: If True, raise an error when can_execute()
                 returns False. If False, skip the step and continue.
             merge_strategy: Strategy for merging branch contexts.
@@ -119,7 +91,6 @@ class Workflow(Generic[ContextT]):
         self._start_step: str | None = None
         self._fail_on_cannot_execute = fail_on_cannot_execute
         self._merge_strategy: MergeStrategy = merge_strategy or DefaultMergeStrategy()
-        self._signal_handler: SignalHandler[ContextT] | None = None
 
     @property
     def steps(self) -> dict[str, Step[ContextT, Any, Any]]:
@@ -136,48 +107,19 @@ class Workflow(Generic[ContextT]):
         """Get the configured start step."""
         return self._start_step
 
-    def set_signal_handler(self, handler: SignalHandler[ContextT]) -> None:
-        """Set a custom signal handler.
-
-        .. deprecated::
-            Signal handlers are deprecated. The Engine handles signals internally.
-
-        Args:
-            handler: The signal handler to use.
-
-        """
-        warnings.warn(
-            "Signal handlers are deprecated. The Engine handles signals internally.",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-        self._signal_handler = handler
-
-    def get_signal_handler(self) -> SignalHandler[ContextT] | None:
-        """Get the current signal handler.
-
-        .. deprecated::
-            Signal handlers are deprecated.
-
-        Returns:
-            The current signal handler, or None if not set.
-
-        """
-        return self._signal_handler
-
-    def add_step(
-        self, step: Step[ContextT, Any, Any], is_start: bool = False
-    ) -> None:
+    def add_step(self, step: Step[ContextT, Any, Any], is_start: bool = False) -> None:
         """Register a step with the workflow.
 
         Steps are executed in the order they are added unless
         explicitly routed via StepResult.next_step.
 
         Args:
+        ----
             step: The step to register.
             is_start: If True, mark this as the default start step.
 
         Raises:
+        ------
             ValueError: If a step with the same name is already registered.
 
         """
@@ -192,9 +134,11 @@ class Workflow(Generic[ContextT]):
         """Get a step by name.
 
         Args:
+        ----
             name: The step name.
 
         Returns:
+        -------
             The step, or None if not found.
 
         """
@@ -205,55 +149,51 @@ class Workflow(Generic[ContextT]):
         context: ContextT,
         start_step: str | None = None,
         *,
-        initial_context: ContextT | None = None,
         input_data: Any = None,
         max_iterations: int = 1000,
     ) -> ContextT:
         """Execute the workflow until completion or failure.
 
-        This method is backward compatible with the original API.
-        It delegates to run_with_events() internally.
-
         Args:
-            context: The initial workflow context (preferred).
+        ----
+            context: The initial workflow context.
             start_step: Name of the first step to execute.
-            initial_context: Alias for context (deprecated).
             input_data: Optional input data for the first step.
             max_iterations: Maximum number of iterations before failing.
 
         Returns:
+        -------
             The final context after COMPLETE signal.
 
         Raises:
+        ------
             WorkflowError: If the workflow fails or pauses.
 
         """
-        # Handle legacy parameter name
-        ctx = initial_context if initial_context is not None else context
         start = start_step or self._start_step
 
         if start is None:
-            raise WorkflowError("No start step configured", context=ctx)
+            raise WorkflowError("No start step configured", context=context)
 
         outcome, _ = await self.run_with_events(
-            ctx, start, input_data=input_data, max_iterations=max_iterations
+            context, start, input_data=input_data, max_iterations=max_iterations
         )
 
         if outcome.status == "completed":
             if outcome.context is not None:
                 return outcome.context
-            return ctx
+            return context
 
         if outcome.status == "failed":
             raise WorkflowError(
                 message=outcome.error or "Workflow failed",
-                context=outcome.context or ctx,
+                context=outcome.context or context,
             )
 
         # Paused
         raise WorkflowError(
             message=f"Workflow paused on await_token: {outcome.await_token}",
-            context=outcome.context or ctx,
+            context=outcome.context or context,
         )
 
     async def run_with_events(
@@ -266,15 +206,15 @@ class Workflow(Generic[ContextT]):
     ) -> tuple[RunOutcome[ContextT], list[Event]]:
         """Run workflow and return outcome with events.
 
-        This is the new API for accessing workflow events.
-
         Args:
+        ----
             context: Initial workflow context.
             start_step: Name of the first step to execute.
             input_data: Optional input data for the first step.
             max_iterations: Maximum number of iterations before failing.
 
         Returns:
+        -------
             Tuple of (RunOutcome, list of events).
 
         """
@@ -309,15 +249,17 @@ class Workflow(Generic[ContextT]):
     ) -> AsyncGenerator[Event, None]:
         """Yield events as they occur during workflow execution.
 
-        This is the new streaming API for real-time event consumption.
+        This is the streaming API for real-time event consumption.
         Callers can checkpoint at any event boundary.
 
         Args:
+        ----
             context: Initial workflow context.
             start_step: Name of the first step to execute.
             input_data: Optional input data for the first step.
 
         Yields:
+        ------
             Events as they occur during execution.
 
         """
@@ -342,108 +284,11 @@ class Workflow(Generic[ContextT]):
         ):
             yield event
 
-    async def tick(
-        self,
-        context: ContextT,
-        step_name: str,
-        input_data: Any = None,
-    ) -> TickResult[ContextT]:
-        """Execute a single step.
-
-        .. deprecated::
-            Use run() or run_with_events() instead.
-
-        Args:
-            context: Current workflow context.
-            step_name: Name of the step to execute.
-            input_data: Optional input data for the step.
-
-        Returns:
-            TickResult with the execution outcome.
-
-        """
-        warnings.warn(
-            "tick() is deprecated. Use run() or run_with_events() instead.",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-
-        step = self._steps.get(step_name)
-        if step is None:
-            return TickResult(
-                context=context,
-                signal=Signal.FAIL,
-                error=f"Step not found: {step_name}",
-            )
-
-        # Check preconditions
-        if not step.can_execute(context):
-            if self._fail_on_cannot_execute:
-                return TickResult(
-                    context=context,
-                    signal=Signal.FAIL,
-                    error=f"Step preconditions not met: {step_name}",
-                )
-            else:
-                # Skip this step, try to get next
-                skip_next = self._get_next_step(step_name)
-                if skip_next is None:
-                    return TickResult(
-                        context=context,
-                        signal=Signal.COMPLETE,
-                    )
-                return TickResult(
-                    context=context,
-                    signal=Signal.CONTINUE,
-                    next_step=skip_next,
-                )
-
-        # Execute step
-        try:
-            result: StepResult[ContextT, Any] = await step.execute(context, input_data)
-        except Exception as e:
-            return TickResult(
-                context=context,
-                signal=Signal.FAIL,
-                error=f"Step execution failed: {e}",
-            )
-
-        # Determine next step for CONTINUE signal
-        next_step: str | None = None
-        if result.signal == Signal.CONTINUE:
-            next_step = result.next_step or self._get_next_step(step_name)
-
-        return TickResult(
-            context=result.context,
-            signal=result.signal,
-            next_step=next_step,
-            branch_request=result.branch_request,
-            output=result.output,
-            error=result.error,
-        )
-
-    def _get_next_step(self, current_step: str) -> str | None:
-        """Get the next step in sequence.
-
-        Args:
-            current_step: Current step name.
-
-        Returns:
-            Name of the next step, or None if no more steps.
-
-        """
-        try:
-            idx = self._step_order.index(current_step)
-            if idx + 1 < len(self._step_order):
-                return self._step_order[idx + 1]
-        except ValueError:
-            pass
-        return None
-
     def _generate_run_id(self) -> str:
         """Generate a unique run ID.
 
-        Returns:
+        Returns
+        -------
             UUID string for the run.
 
         """

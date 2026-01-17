@@ -89,11 +89,11 @@ class TestBranchStateTracking:
         state = BranchState(
             merge_step="merge_step",
             expected=frozenset({"branch_a", "branch_b", "branch_c"}),
-            completed={
-                "branch_a": {"result": 1},
-                "branch_b": {"result": 2},
-                "branch_c": {"result": 3},
-            },
+            completed=(
+                ("branch_a", (("result", 1),)),
+                ("branch_b", (("result", 2),)),
+                ("branch_c", (("result", 3),)),
+            ),
         )
 
         assert state.is_complete()
@@ -103,11 +103,11 @@ class TestBranchStateTracking:
         state = BranchState(
             merge_step="merge_step",
             expected=frozenset({"branch_a", "branch_b", "branch_c"}),
-            completed={
-                "branch_a": {"result": 1},
-                "branch_b": {"result": 2},
+            completed=(
+                ("branch_a", (("result", 1),)),
+                ("branch_b", (("result", 2),)),
                 # branch_c missing
-            },
+            ),
         )
 
         assert not state.is_complete()
@@ -117,7 +117,7 @@ class TestBranchStateTracking:
         state = BranchState(
             merge_step="merge_step",
             expected=frozenset(),
-            completed={},
+            completed=(),
         )
 
         assert state.is_complete()
@@ -252,7 +252,7 @@ class TestEngineBranchEvents:
             pending_branches=BranchState(
                 merge_step="step_b",
                 expected=frozenset({"branch_1"}),
-                completed={},
+                completed=(),
             ),
         )
 

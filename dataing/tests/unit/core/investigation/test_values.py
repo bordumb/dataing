@@ -100,9 +100,9 @@ class TestEnums:
     def test_execution_signal_values(self) -> None:
         """Signal has expected values (from maistro)."""
         # Signal is now from maistro - verify key signals exist
+        # Note: MERGE is not a Signal - merge is handled internally by Engine
         assert hasattr(Signal, "CONTINUE")
         assert hasattr(Signal, "AWAIT_USER")
         assert hasattr(Signal, "BRANCH")
-        assert hasattr(Signal, "MERGE")
         assert hasattr(Signal, "COMPLETE")
         assert hasattr(Signal, "FAIL")

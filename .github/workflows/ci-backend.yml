@@ -74,14 +74,25 @@ jobs:
           PGPASSWORD: test
 
       # Run tests per-package to avoid conftest.py module conflicts
-      - name: Run tests
+      - name: Run dataing tests
         run: |
-          uv run pytest maistro/tests --cov=maistro/src/maistro --cov-report=xml
-          uv run pytest bond/tests --cov=bond/src/bond --cov-report=xml --cov-append
-          uv run pytest dataing/tests --cov=dataing/src/dataing --cov-report=xml --cov-append
-          uv run pytest dataing-ee/tests --cov=dataing-ee/src/dataing_ee --cov-report=xml --cov-append
+          uv run pytest dataing/tests/unit --cov=dataing/src/dataing --cov-report=xml --cov-append
         env:
           DATABASE_URL: postgresql://test:test@localhost:5432/test
+
+      - name: Run dataing-ee tests
+        run: |
+          uv run pytest dataing-ee/tests/unit --cov=dataing-ee/src/dataing_ee --cov-report=xml --cov-append
+        env:
+          DATABASE_URL: postgresql://test:test@localhost:5432/test
+
+      - name: Run maistro tests
+        run: |
+          uv run pytest maistro/tests/unit --cov=maistro/src/maistro --cov-report=xml
+
+      - name: Run bond tests
+        run: |
+          uv run pytest bond/tests/unit --cov=bond/src/bond --cov-report=xml --cov-append
 
       - name: Upload coverage
         uses: codecov/codecov-action@v4

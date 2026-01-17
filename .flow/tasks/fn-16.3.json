@@ -1,0 +1,27 @@
+{
+  "assignee": "bordumbb@gmail.com",
+  "claim_note": "",
+  "claimed_at": "2026-01-17T00:06:50.288217Z",
+  "created_at": "2026-01-16T22:13:45.590376Z",
+  "depends_on": [],
+  "epic": "fn-16",
+  "evidence": {
+    "files_changed": [
+      "maistro/src/maistro/runner.py"
+    ],
+    "tests": [
+      "maistro/tests/unit/test_branch_execution.py::TestBranchStepExecution::test_branch_terminates_on_fail",
+      "maistro/tests/unit/test_branch_execution.py::TestBranchStepExecution::test_branch_await_user_error",
+      "maistro/tests/unit/test_branch_execution.py::TestBranchStepExecution::test_branch_nested_branch_error",
+      "maistro/tests/unit/test_branch_execution.py::TestBranchStepExecution::test_branch_step_not_found",
+      "maistro/tests/unit/test_branch_execution.py::TestBranchStepExecution::test_branch_max_iterations",
+      "maistro/tests/unit/test_branch_execution.py::TestBranchStepExecution::test_branch_exception_handling"
+    ]
+  },
+  "id": "fn-16.3",
+  "priority": 3,
+  "spec_path": ".flow/tasks/fn-16.3.md",
+  "status": "done",
+  "title": "Handle branch failures gracefully with error dict return",
+  "updated_at": "2026-01-17T00:07:07.063257Z"
+}

@@ -16,8 +16,17 @@ from temporalio.client import Client
 from temporalio.worker import Worker
 
 from dataing.entrypoints.api.deps import settings
-from dataing.temporal.activities import gather_context, generate_hypotheses, synthesize
-from dataing.temporal.workflows import InvestigationWorkflow
+from dataing.temporal.activities import (
+    check_patterns,
+    counter_analyze,
+    execute_query,
+    gather_context,
+    generate_hypotheses,
+    generate_query,
+    interpret_evidence,
+    synthesize,
+)
+from dataing.temporal.workflows import EvaluateHypothesisWorkflow, InvestigationWorkflow
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -42,8 +51,20 @@ async def main() -> None:
     worker = Worker(
         client,
         task_queue=settings.TEMPORAL_TASK_QUEUE,
-        workflows=[InvestigationWorkflow],
-        activities=[gather_context, generate_hypotheses, synthesize],
+        workflows=[InvestigationWorkflow, EvaluateHypothesisWorkflow],
+        activities=[
+            # Context and pattern activities
+            gather_context,
+            check_patterns,
+            # Hypothesis generation and evaluation
+            generate_hypotheses,
+            generate_query,
+            execute_query,
+            interpret_evidence,
+            # Synthesis and analysis
+            synthesize,
+            counter_analyze,
+        ],
     )
 
     await worker.run()

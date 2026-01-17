@@ -125,7 +125,11 @@ def make_check_patterns_activity(
 
 # Standalone activity for POC/testing (returns empty patterns)
 @activity.defn
-async def check_patterns(investigation_id: str, alert_summary: str) -> list[dict[str, Any]]:
+async def check_patterns(
+    investigation_id: str,
+    alert_data: dict[str, Any],
+    context: dict[str, Any],
+) -> list[dict[str, Any]]:
     """POC check_patterns activity with empty results.
 
     Used for testing without real dependencies. Production code should use

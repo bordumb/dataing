@@ -44,6 +44,75 @@ if TYPE_CHECKING:
     from dataing.core.investigation.steps.gather_context import ContextEngineProtocol
 
 
+class InvestigationMergeStrategy:
+    """Merge strategy for investigation branches.
+
+    Combines evidence and query counters from multiple hypothesis branches
+    back into the parent InvestigationContext.
+
+    Branch payloads are expected to be either:
+    - {"_full_context": InvestigationContext} for successful branches
+    - {"maistro": {"branch_error": {...}}} for failed branches
+    """
+
+    def merge(
+        self,
+        parent_context: InvestigationContext,
+        branch_contexts: dict[str, Any],
+    ) -> InvestigationContext:
+        """Merge branch investigation contexts into parent.
+
+        Concatenates evidence from all successful branches and sums query counters.
+        Failed branches are logged but don't contribute to merged context.
+
+        Args:
+            parent_context: The context from before branching (has hypotheses).
+            branch_contexts: Map of branch_name -> branch payload.
+
+        Returns:
+            Merged InvestigationContext with combined evidence.
+        """
+        merged_evidence: list[dict[str, Any]] = list(parent_context.evidence)
+        total_queries_delta = 0
+
+        for branch_name in sorted(branch_contexts.keys()):
+            payload = branch_contexts[branch_name]
+
+            # Skip error payloads
+            if isinstance(payload, dict):
+                if "maistro" in payload and "branch_error" in payload.get("maistro", {}):
+                    # Log error but continue - branch failed
+                    continue
+
+                # Unwrap _full_context
+                if "_full_context" in payload:
+                    branch_ctx = payload["_full_context"]
+                    if isinstance(branch_ctx, InvestigationContext):
+                        # Compute evidence delta (new items only)
+                        parent_evidence_len = len(parent_context.evidence)
+                        if len(branch_ctx.evidence) > parent_evidence_len:
+                            new_evidence = branch_ctx.evidence[parent_evidence_len:]
+                            merged_evidence.extend(new_evidence)
+
+                        # Compute query counter delta
+                        query_delta = max(
+                            0,
+                            branch_ctx.total_queries_executed
+                            - parent_context.total_queries_executed,
+                        )
+                        total_queries_delta += query_delta
+
+        # Create merged context
+        return parent_context.model_copy(
+            update={
+                "evidence": merged_evidence,
+                "total_queries_executed": (
+                    parent_context.total_queries_executed + total_queries_delta
+                ),
+            }
+        )
+
+
 class WorkerShutdownError(Exception):
     """Raised when worker receives shutdown signal during execution.
 
@@ -115,7 +184,8 @@ def build_investigation_workflow(
     Returns:
         Configured Workflow ready for execution.
     """
-    workflow: Workflow[InvestigationContext] = Workflow()
+    # Use custom merge strategy for proper evidence aggregation
+    workflow: Workflow[InvestigationContext] = Workflow(merge_strategy=InvestigationMergeStrategy())
 
     # Create LLM adapters that wrap AgentClient with step-compatible interfaces
     hypothesis_llm = HypothesisLLMAdapter(llm)

@@ -1,0 +1,41 @@
+{
+  "assignee": "bordumbb@gmail.com",
+  "claim_note": "",
+  "claimed_at": "2026-01-17T03:47:11.438236Z",
+  "created_at": "2026-01-17T01:34:00.588959Z",
+  "depends_on": [
+    "fn-16.11"
+  ],
+  "epic": "fn-16",
+  "evidence": {
+    "commit": "3ac8badc",
+    "functions_deleted": [
+      "create_investigation_job",
+      "get_investigation_job",
+      "update_job_status",
+      "increment_job_attempts",
+      "create_child_job",
+      "get_pending_children_count",
+      "get_child_jobs",
+      "set_job_awaiting_merge",
+      "get_parent_job",
+      "cancel_investigation_with_children",
+      "get_job_status",
+      "mark_job_cancelled"
+    ],
+    "lines_deleted": 414,
+    "migration_file": "dataing/migrations/023_drop_investigation_jobs.sql",
+    "verification": {
+      "investigation_jobs_refs": "none found in source",
+      "mypy": "pass",
+      "pytest": "1152 passed, 27 skipped",
+      "ruff_lint": "pass"
+    }
+  },
+  "id": "fn-16.12",
+  "priority": null,
+  "spec_path": ".flow/tasks/fn-16.12.md",
+  "status": "done",
+  "title": "Add migration to drop investigation_jobs table",
+  "updated_at": "2026-01-17T03:50:56.575308Z"
+}

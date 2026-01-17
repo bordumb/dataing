@@ -6,9 +6,10 @@ Each prompt module exposes:
 - build_user(**kwargs) -> str: Build user prompt from context
 """
 
-from . import hypothesis, interpretation, query, reflexion, synthesis
+from . import counter_analysis, hypothesis, interpretation, query, reflexion, synthesis
 
 __all__ = [
+    "counter_analysis",
     "hypothesis",
     "interpretation",
     "query",

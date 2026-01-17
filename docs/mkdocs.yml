@@ -86,26 +86,54 @@ extra_css:
 nav:
   - Home: index.md
   - Quickstart: quickstart.md
-  - Architecture: architecture.md
+  - Guides:
+      - "Interpreting Results": guides/interpreting-results.md
+  - Architecture:
+      - Overview: architecture.md
+      - "Deep Dive": architecture/overview.md
+      - "Temporal Workflows": architecture/temporal-workflows.md
+      - ADRs:
+          - "ADR-002: No LangGraph": architecture/adr-002-no-langgraph.md
+          - "ADR-003: sqlglot Safety": architecture/adr-003-sqlglot-safety.md
+          - "ADR-004: Event Sourcing": architecture/adr-004-event-sourcing.md
   - Concepts:
       - "How Investigations Work": concepts/investigations.md
-      - "The Agent Engine (Maistro)": concepts/agent-workflows.md
       - "Safety & Guardrails": concepts/guardrails.md
   - Integrations:
       - Warehouses:
-          - Snowflake: integrations/warehouses/snowflake.md
           - BigQuery: integrations/warehouses/bigquery.md
           - DuckDB: integrations/warehouses/duckdb.md
+          - MySQL: integrations/warehouses/mysql.md
           - Postgres: integrations/warehouses/postgres.md
+          - Redshift: integrations/warehouses/redshift.md
+          - Snowflake: integrations/warehouses/snowflake.md
+          - SQLite: integrations/warehouses/sqlite.md
+          - Trino: integrations/warehouses/trino.md
+      - Document Stores:
+          - MongoDB: integrations/documents/mongodb.md
+          - DynamoDB: integrations/documents/dynamodb.md
+          - Cassandra: integrations/documents/cassandra.md
+      - Filesystem:
+          - Amazon S3: integrations/filesystem/s3.md
+          - Google Cloud Storage: integrations/filesystem/gcs.md
+          - HDFS: integrations/filesystem/hdfs.md
+          - Local Files: integrations/filesystem/local.md
       - Lineage:
+          - Airflow: integrations/lineage/airflow.md
+          - Dagster: integrations/lineage/dagster.md
           - dbt: integrations/lineage/dbt.md
           - DataHub: integrations/lineage/datahub.md
+          - OpenLineage: integrations/lineage/openlineage.md
       - Notifications:
           - Slack: integrations/notifications/slack.md
   - Security:
       - "Data Privacy": security/data-privacy.md
       - "RBAC & SSO": security/rbac.md
       - "Compliance": security/compliance.md
+  - Development:
+      - "Deployment": development/deployment.md
+  - Tooling:
+      - "Distributed Tracing": tooling/jeager-logging.md
 
 extra:
   social:

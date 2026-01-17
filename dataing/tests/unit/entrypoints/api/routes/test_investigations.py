@@ -183,9 +183,10 @@ class TestSendMessageRoute:
             SendMessageResponse,
         )
 
-        branch_id = uuid.uuid4()
-        response = SendMessageResponse(branch_id=branch_id)
-        assert response.branch_id == branch_id
+        investigation_id = uuid.uuid4()
+        response = SendMessageResponse(status="sent", investigation_id=investigation_id)
+        assert response.status == "sent"
+        assert response.investigation_id == investigation_id
 
 
 class TestStreamUpdatesRoute:
@@ -269,49 +270,37 @@ class TestInvestigationServiceIntegration:
     """Integration tests for route handlers with mocked service."""
 
     @pytest.mark.asyncio
-    async def test_start_investigation_calls_service(
+    async def test_start_investigation_parses_alert(
         self,
         mock_auth_context: ApiKeyContext,
-        mock_service: AsyncMock,
         sample_alert: dict[str, Any],
     ) -> None:
-        """Test that start_investigation route calls service correctly."""
+        """Test that start_investigation request parses alert correctly."""
         from dataing.entrypoints.api.routes.investigations import (
             StartInvestigationRequest,
         )
 
         request = StartInvestigationRequest(alert=sample_alert)
 
-        # Call the route handler directly with mocked dependencies
-        with patch(
-            "dataing.entrypoints.api.routes.investigations.get_investigation_service",
-            return_value=mock_service,
-        ):
-            # Simulate what the route would receive
-            mock_service.start_investigation.return_value = (
-                uuid.uuid4(),
-                uuid.uuid4(),
-            )
+        # Verify the request parsing works
+        alert = AnomalyAlert(
+            dataset_id=request.alert["dataset_id"],
+            metric_spec=MetricSpec(
+                metric_type=request.alert["metric_spec"]["metric_type"],
+                expression=request.alert["metric_spec"]["expression"],
+                display_name=request.alert["metric_spec"]["display_name"],
+                columns_referenced=request.alert["metric_spec"].get("columns_referenced", []),
+            ),
+            anomaly_type=request.alert["anomaly_type"],
+            expected_value=request.alert["expected_value"],
+            actual_value=request.alert["actual_value"],
+            deviation_pct=request.alert["deviation_pct"],
+            anomaly_date=request.alert["anomaly_date"],
+            severity=request.alert["severity"],
+        )
 
-            # Verify the request parsing works
-            alert = AnomalyAlert(
-                dataset_id=request.alert["dataset_id"],
-                metric_spec=MetricSpec(
-                    metric_type=request.alert["metric_spec"]["metric_type"],
-                    expression=request.alert["metric_spec"]["expression"],
-                    display_name=request.alert["metric_spec"]["display_name"],
-                    columns_referenced=request.alert["metric_spec"].get("columns_referenced", []),
-                ),
-                anomaly_type=request.alert["anomaly_type"],
-                expected_value=request.alert["expected_value"],
-                actual_value=request.alert["actual_value"],
-                deviation_pct=request.alert["deviation_pct"],
-                anomaly_date=request.alert["anomaly_date"],
-                severity=request.alert["severity"],
-            )
-
-            assert alert.dataset_id == "analytics.events"
-            assert alert.metric_spec.display_name == "NULL rate"
+        assert alert.dataset_id == "analytics.events"
+        assert alert.metric_spec.display_name == "NULL rate"
 
     @pytest.mark.asyncio
     async def test_get_investigation_returns_state(

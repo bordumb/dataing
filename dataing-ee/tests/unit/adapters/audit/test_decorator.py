@@ -54,9 +54,10 @@ class TestAuditedDecorator:
         mock_request.method = "POST"
         mock_request.url = MagicMock(path="/api/v1/teams")
         mock_request.state = MagicMock()
-        mock_request.state.tenant_id = uuid4()
-        mock_request.state.user_id = uuid4()
-        mock_request.state.user_email = "test@example.com"
+        # Decorator expects auth_context with tenant_id and user_id
+        mock_request.state.auth_context = MagicMock()
+        mock_request.state.auth_context.tenant_id = uuid4()
+        mock_request.state.auth_context.user_id = uuid4()
         mock_request.app = MagicMock()
         mock_request.app.state = MagicMock()
         mock_request.app.state.audit_repo = mock_repo
@@ -80,9 +81,9 @@ class TestAuditedDecorator:
         mock_request.method = "POST"
         mock_request.url = MagicMock(path="/api/v1/teams")
         mock_request.state = MagicMock()
-        mock_request.state.tenant_id = uuid4()
-        mock_request.state.user_id = uuid4()
-        mock_request.state.user_email = "test@example.com"
+        mock_request.state.auth_context = MagicMock()
+        mock_request.state.auth_context.tenant_id = uuid4()
+        mock_request.state.auth_context.user_id = uuid4()
         mock_request.app = MagicMock()
         mock_request.app.state = MagicMock()
         mock_request.app.state.audit_repo = mock_repo
@@ -107,9 +108,9 @@ class TestAuditedDecorator:
         mock_request.method = "DELETE"
         mock_request.url = MagicMock(path=f"/api/v1/teams/{team_id}")
         mock_request.state = MagicMock()
-        mock_request.state.tenant_id = uuid4()
-        mock_request.state.user_id = uuid4()
-        mock_request.state.user_email = "test@example.com"
+        mock_request.state.auth_context = MagicMock()
+        mock_request.state.auth_context.tenant_id = uuid4()
+        mock_request.state.auth_context.user_id = uuid4()
         mock_request.app = MagicMock()
         mock_request.app.state = MagicMock()
         mock_request.app.state.audit_repo = mock_repo
@@ -180,9 +181,9 @@ class TestAuditedDecorator:
         mock_request.method = "POST"
         mock_request.url = MagicMock(path="/api/v1/teams")
         mock_request.state = MagicMock()
-        mock_request.state.tenant_id = uuid4()
-        mock_request.state.user_id = uuid4()
-        mock_request.state.user_email = "test@example.com"
+        mock_request.state.auth_context = MagicMock()
+        mock_request.state.auth_context.tenant_id = uuid4()
+        mock_request.state.auth_context.user_id = uuid4()
         mock_request.app = MagicMock()
         mock_request.app.state = MagicMock()
         mock_request.app.state.audit_repo = mock_repo

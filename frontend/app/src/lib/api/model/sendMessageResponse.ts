@@ -10,5 +10,6 @@
  * Response for sending a message.
  */
 export interface SendMessageResponse {
-  branch_id: string;
+  investigation_id: string;
+  status: string;
 }

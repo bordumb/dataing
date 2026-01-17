@@ -3,7 +3,7 @@
 This module provides the InvestigationService that coordinates between
 the API layer, repository, and collaboration service.
 
-Uses maistro.Workflow for investigation execution.
+Uses Temporal for durable investigation execution.
 """
 
 from __future__ import annotations
@@ -131,23 +131,20 @@ class InvestigationService:
     ) -> tuple[UUID, UUID, str]:
         """Start a new investigation for an alert.
 
-        Creates the investigation, main branch, and initial snapshot,
-        then queues the job for durable execution via Redis/Arq.
+        Creates the investigation, main branch, and initial snapshot.
+        Actual execution is handled by Temporal workflows.
 
         Args:
             tenant_id: ID of the tenant starting the investigation.
             alert: The anomaly alert triggering this investigation.
             data_adapter: Connected data source adapter (unused, for interface compat).
             user_id: Optional ID of the user starting the investigation.
-            datasource_id: Datasource ID for worker adapter reconstruction.
+            datasource_id: Datasource ID for Temporal workflow.
             correlation_id: Optional correlation ID for distributed tracing.
 
         Returns:
             Tuple of (investigation_id, main_branch_id, status).
-            Status is always "queued".
-
-        Raises:
-            RuntimeError: If app_db is not configured (required for job creation).
+            Status is "created".
         """
         # Create investigation
         investigation = await self.repository.create_investigation(
@@ -202,33 +199,8 @@ class InvestigationService:
         # Update branch head
         await self.repository.update_branch_head(main_branch.id, snapshot.id)
 
-        # Require app_db for job creation
-        if not self._app_db:
-            raise RuntimeError("app_db is required for investigation job creation")
-
-        # Create job record for durable execution
-        job = await self._app_db.create_investigation_job(
-            investigation_id=investigation.id,
-            tenant_id=tenant_id,
-            datasource_id=datasource_id,
-            priority=0,
-        )
-        logger.info(
-            f"Created investigation job: job_id={job['id']}, investigation_id={investigation.id}"
-        )
-
-        # Queue for durable execution
-        from dataing.core.queue import enqueue_investigation
-
-        await enqueue_investigation(
-            investigation_id=str(investigation.id),
-            tenant_id=str(tenant_id),
-            datasource_id=str(datasource_id) if datasource_id else None,
-            correlation_id=correlation_id,
-        )
-        logger.info(f"Enqueued investigation {investigation.id} for durable execution")
-
-        return investigation.id, main_branch.id, "queued"
+        logger.info(f"Created investigation {investigation.id}")
+        return investigation.id, main_branch.id, "created"
 
     async def _create_completion_notification(
         self,

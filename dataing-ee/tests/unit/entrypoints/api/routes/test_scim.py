@@ -57,20 +57,16 @@ class TestValidateScimToken:
 class TestListUsers:
     """Tests for GET /scim/v2/Users."""
 
-    @patch("dataing_ee.entrypoints.api.routes.scim.validate_scim_token")
-    async def test_returns_empty_list(self, mock_validate: AsyncMock) -> None:
-        """Returns empty SCIM list response."""
+    def test_returns_empty_list(self) -> None:
+        """Returns empty SCIM list response when auth is mocked."""
+        from dataing_ee.entrypoints.api.routes.scim import validate_scim_token
+
         org_id = uuid4()
-        mock_validate.return_value = org_id
 
         # Create app with overridden dependency
         app = FastAPI()
         app.include_router(router)
-        app.dependency_overrides[
-            __import__(
-                "dataing.entrypoints.api.routes.scim", fromlist=["validate_scim_token"]
-            ).validate_scim_token
-        ] = lambda: org_id
+        app.dependency_overrides[validate_scim_token] = lambda: org_id
 
         client = TestClient(app)
         response = client.get(
@@ -78,9 +74,10 @@ class TestListUsers:
             headers={"Authorization": "Bearer test"},
         )
 
-        # Still gets 501 because validate_scim_token raises before returning
-        # This is expected - full implementation will fix this
-        assert response.status_code in [200, 501]
+        assert response.status_code == 200
+        data = response.json()
+        assert data["totalResults"] == 0
+        assert data["Resources"] == []
 
 
 class TestGetUser:

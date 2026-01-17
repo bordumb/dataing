@@ -103,7 +103,7 @@ CREATE TABLE audit_logs (
     api_key_id UUID,
     action VARCHAR(50) NOT NULL,
     resource_type VARCHAR(50),
-    resource_id VARCHAR(100),
+    resource_id UUID,
     request_id VARCHAR(36),
     ip_address INET,
     user_agent VARCHAR(500),

@@ -5,6 +5,8 @@ This catches the bug where AuditMiddleware was not registered or the database
 attribute name was incorrect.
 """
 
+import asyncio
+import os
 from collections.abc import AsyncGenerator
 from uuid import UUID
 
@@ -24,10 +26,16 @@ class TestAuditLoggingIntegration:
     @pytest.fixture
     async def db(self) -> AsyncGenerator[AppDatabase, None]:
         """Create database connection."""
-        db = AppDatabase(dsn="postgresql://localhost/dataing")  # pragma: allowlist secret
+        # Use DATABASE_URL from env (set by CI) or default for local dev
+        dsn = os.environ.get(
+            "DATABASE_URL",
+            "postgresql://localhost/dataing",  # pragma: allowlist secret
+        )
+        db = AppDatabase(dsn=dsn)
         try:
-            await db.connect()
-        except Exception as e:
+            # Add timeout to prevent hanging in CI
+            await asyncio.wait_for(db.connect(), timeout=5.0)
+        except (Exception, asyncio.TimeoutError) as e:
             pytest.skip(f"Database not available: {e}")
         yield db
         await db.close()

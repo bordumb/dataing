@@ -241,3 +241,35 @@ class SynthesisResponse(BaseModel):
         if v is not None and len(v) < 20:
             raise ValueError("Root cause description too vague (min 20 chars)")
         return v
+
+
+class CounterAnalysisResponse(BaseModel):
+    """Counter-analysis challenging the synthesis conclusion."""
+
+    alternative_explanations: list[str] = Field(
+        description="Other explanations that could fit the same evidence",
+        min_length=1,
+        max_length=5,
+    )
+    weaknesses: list[str] = Field(
+        description="Specific weaknesses or gaps in the current analysis",
+        min_length=1,
+        max_length=5,
+    )
+    confidence_adjustment: float = Field(
+        ge=-0.5,
+        le=0.5,
+        description="Adjustment to confidence (-0.5 to 0.5, negative = weaker)",
+    )
+    recommendation: str = Field(
+        description="One of: 'accept', 'investigate_more', or 'reject'",
+    )
+
+    @field_validator("recommendation")
+    @classmethod
+    def validate_recommendation(cls, v: str) -> str:
+        """Ensure recommendation is one of the valid values."""
+        valid = {"accept", "investigate_more", "reject"}
+        if v not in valid:
+            raise ValueError(f"recommendation must be one of {valid}")
+        return v

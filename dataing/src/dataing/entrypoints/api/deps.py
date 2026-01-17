@@ -81,6 +81,11 @@ class Settings:
         self.redis_password = os.getenv("REDIS_PASSWORD", "")
         self.redis_db = int(os.getenv("REDIS_DB", "0"))
 
+        # Temporal settings for durable workflow execution
+        self.TEMPORAL_HOST = os.getenv("TEMPORAL_HOST", "localhost:7233")
+        self.TEMPORAL_NAMESPACE = os.getenv("TEMPORAL_NAMESPACE", "default")
+        self.TEMPORAL_TASK_QUEUE = os.getenv("TEMPORAL_TASK_QUEUE", "investigations")
+
 
 settings = Settings()
 

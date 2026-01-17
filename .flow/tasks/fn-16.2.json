@@ -1,16 +1,26 @@
 {
-  "assignee": null,
+  "assignee": "bordumbb@gmail.com",
   "claim_note": "",
-  "claimed_at": null,
+  "claimed_at": "2026-01-17T02:58:44.182556Z",
   "created_at": "2026-01-17T01:33:58.714184Z",
   "depends_on": [
     "fn-16.1"
   ],
   "epic": "fn-16",
+  "evidence": {
+    "commits": [
+      "6f02bbb2a86f4ed907e13f177d0e9325474bc464"
+    ],
+    "prs": [],
+    "tests": [
+      "uv run ruff check dataing/src/dataing/temporal/",
+      "uv run mypy dataing/src/dataing/temporal/"
+    ]
+  },
   "id": "fn-16.2",
   "priority": null,
   "spec_path": ".flow/tasks/fn-16.2.md",
-  "status": "todo",
+  "status": "done",
   "title": "Create minimal InvestigationWorkflow POC",
-  "updated_at": "2026-01-17T01:34:42.741967Z"
+  "updated_at": "2026-01-17T03:00:53.067337Z"
 }

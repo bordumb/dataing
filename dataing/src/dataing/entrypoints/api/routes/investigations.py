@@ -402,66 +402,30 @@ async def cancel_investigation(
     Raises:
         HTTPException: If investigation not found or already complete.
     """
-    # Use Temporal workflow if configured and client is available
-    if is_temporal_engine() and temporal_client is not None:
-        try:
-            await temporal_client.cancel_investigation(str(investigation_id))
-            logger.info(
-                f"Sent cancel signal to Temporal investigation: "
-                f"investigation_id={investigation_id}, tenant_id={auth.tenant_id}"
-            )
-            return CancelInvestigationResponse(
-                investigation_id=investigation_id,
-                status="cancelling",
-                jobs_cancelled=1,  # Temporal handles child workflow cancellation
-            )
-        except Exception as e:
-            logger.error(f"Failed to cancel Temporal investigation: {e}")
-            raise HTTPException(
-                status_code=500,
-                detail=f"Failed to cancel investigation: {e}",
-            ) from e
-
-    # Fall back to legacy cancellation
-    # Get database from app state
-    app_db: AppDatabase | None = http_request.app.state.app_db
-
-    if app_db is None:
+    # Require Temporal for cancellation
+    if temporal_client is None:
         raise HTTPException(
-            status_code=500,
-            detail="Database not configured",
+            status_code=503,
+            detail="Temporal client not configured. Set INVESTIGATION_ENGINE=temporal.",
         )
 
-    # Cancel investigation and all child jobs
-    jobs_cancelled = await app_db.cancel_investigation_with_children(
-        investigation_id=investigation_id,
-        tenant_id=auth.tenant_id,
-    )
-
-    if jobs_cancelled > 0:
+    try:
+        await temporal_client.cancel_investigation(str(investigation_id))
         logger.info(
-            f"Investigation cancelled: investigation_id={investigation_id}, "
-            f"tenant_id={auth.tenant_id}, jobs_cancelled={jobs_cancelled}"
+            f"Sent cancel signal to Temporal investigation: "
+            f"investigation_id={investigation_id}, tenant_id={auth.tenant_id}"
         )
         return CancelInvestigationResponse(
             investigation_id=investigation_id,
             status="cancelling",
-            jobs_cancelled=jobs_cancelled,
+            jobs_cancelled=1,  # Temporal handles child workflow cancellation
         )
-
-    # Check if investigation exists but is already complete
-    job = await app_db.get_investigation_job(investigation_id)
-    if job and job.get("status") in ("completed", "failed", "cancelled"):
-        return CancelInvestigationResponse(
-            investigation_id=investigation_id,
-            status="already_complete",
-            jobs_cancelled=0,
-        )
-
-    raise HTTPException(
-        status_code=404,
-        detail="Investigation job not found",
-    )
+    except Exception as e:
+        logger.error(f"Failed to cancel Temporal investigation: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to cancel investigation: {e}",
+        ) from e
 
 
 @router.get("/{investigation_id}", response_model=InvestigationStateResponse)

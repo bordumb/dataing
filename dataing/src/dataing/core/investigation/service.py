@@ -199,22 +199,6 @@ class InvestigationService:
         # Update branch head
         await self.repository.update_branch_head(main_branch.id, snapshot.id)
 
-        # Create job record for tracking (optional, Temporal handles execution)
-        if self._app_db:
-            try:
-                job = await self._app_db.create_investigation_job(
-                    investigation_id=investigation.id,
-                    tenant_id=tenant_id,
-                    datasource_id=datasource_id,
-                    priority=0,
-                )
-                logger.info(
-                    f"Created investigation job: job_id={job['id']}, "
-                    f"investigation_id={investigation.id}"
-                )
-            except Exception as e:
-                logger.warning(f"Failed to create job record (continuing): {e}")
-
         logger.info(f"Created investigation {investigation.id}")
         return investigation.id, main_branch.id, "created"
 

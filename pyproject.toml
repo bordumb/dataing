@@ -36,7 +36,6 @@ dependencies = [
     # Bond agent runtime dependencies
     "qdrant-client>=1.7.0",
     "sentence-transformers>=2.2.0",
-    "arq>=0.26.3",
     "temporalio>=1.7.1",
 ]
 

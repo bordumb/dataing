@@ -201,6 +201,9 @@ This is weak because:
 
 If investigations consistently produce low-confidence results:
 
+!!! note "This is by design"
+    Just as Google and SEO incentivized better internet standards, dataing incentivizes better data standards. When investigations require richer context to produce confident results, it encourages teams to invest in lineage, documentation, and data quality practices that benefit everyone.
+
 ### Add More Context
 
 - **Connect lineage providers** (dbt, DataHub) to trace upstream dependencies

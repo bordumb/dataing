@@ -53,6 +53,10 @@ dev-frontend:
 dev-landing:
     cd frontend/landing && pnpm dev
 
+# Run Temporal worker (durable workflow execution)
+dev-temporal-worker:
+    uv run python -m dataing.entrypoints.temporal_worker
+
 # Build landing site
 build-landing:
     cd frontend/landing && pnpm build
@@ -199,16 +203,18 @@ demo: demo-fixtures
         sleep 1
     done
 
-    # Start Redis
-    echo "Setting up Redis..."
-    docker rm -f dataing-demo-redis 2>/dev/null || true
-    docker run -d --name dataing-demo-redis \
-        -p 6379:6379 \
-        redis:7-alpine
-    echo "Waiting for Redis to be ready..."
-    for i in {1..10}; do
-        if docker exec dataing-demo-redis redis-cli ping > /dev/null 2>&1; then
-            echo "Redis is ready!"
+    # Start Temporal dev server (SQLite-backed, no external deps)
+    echo "Setting up Temporal..."
+    docker rm -f dataing-demo-temporal 2>/dev/null || true
+    docker run -d --name dataing-demo-temporal \
+        -p 7233:7233 \
+        -p 8233:8233 \
+        --entrypoint temporal \
+        temporalio/admin-tools:latest server start-dev --ip 0.0.0.0
+    echo "Waiting for Temporal to be ready..."
+    for i in {1..30}; do
+        if curl -s http://localhost:8233 > /dev/null 2>&1; then
+            echo "Temporal is ready!"
             break
         fi
         sleep 1
@@ -265,6 +271,7 @@ demo: demo-fixtures
     PGPASSWORD=dataing psql -h localhost -U dataing -d dataing_demo -f dataing/migrations/020_integrations.sql 2>&1 | grep -v "^NOTICE:" || true
     PGPASSWORD=dataing psql -h localhost -U dataing -d dataing_demo -f dataing/migrations/021_automation_rules.sql 2>&1 | grep -v "^NOTICE:" || true
     PGPASSWORD=dataing psql -h localhost -U dataing -d dataing_demo -f dataing/migrations/022_runbooks.sql 2>&1 | grep -v "^NOTICE:" || true
+    PGPASSWORD=dataing psql -h localhost -U dataing -d dataing_demo -f dataing/migrations/023_drop_investigation_jobs.sql 2>&1 | grep -v "^NOTICE:" || true
 
     trap 'kill 0' EXIT
 
@@ -275,6 +282,7 @@ demo: demo-fixtures
     echo ""
     echo "  Frontend:  http://localhost:3000"
     echo "  Backend:   http://localhost:8000"
+    echo "  Temporal:  http://localhost:8233"
     echo "  Telemetry: http://localhost:16686"
     echo ""
     echo "  Login credentials:"
@@ -290,8 +298,9 @@ demo: demo-fixtures
     export DATADR_FIXTURE_PATH="$(pwd)/demo/fixtures/null_spike"
     export DATABASE_URL=postgresql://dataing:dataing@localhost:5432/dataing_demo
     export APP_DATABASE_URL=postgresql://dataing:dataing@localhost:5432/dataing_demo
-    export REDIS_HOST=localhost
-    export REDIS_PORT=6379
+    # Temporal configuration
+    export INVESTIGATION_ENGINE=temporal
+    export TEMPORAL_HOST=localhost:7233
     # Stable demo encryption key (valid Fernet key)
     export ENCRYPTION_KEY=ZnxhCyx4-ZjziPWtUguwGOFMMiLNioSwso5-qNPAGZI=
     # OpenTelemetry configuration (Jaeger supports traces only, not metrics)
@@ -311,9 +320,9 @@ demo: demo-fixtures
     (uv run fastapi dev dataing/src/dataing/entrypoints/api/app.py --host 0.0.0.0 --port 8000) &
     BACKEND_PID=$!
 
-    # Start worker (processes investigation jobs from Redis queue)
-    echo "Starting worker..."
-    (uv run python -m dataing.entrypoints.worker) &
+    # Start Temporal worker (processes investigation workflows)
+    echo "Starting Temporal worker..."
+    (uv run python -m dataing.entrypoints.temporal_worker) &
     WORKER_PID=$!
 
     # Wait for backend to be ready, then sync datasets
@@ -341,21 +350,21 @@ demo-stop:
     #!/usr/bin/env bash
     echo "Stopping demo services..."
 
-    # Stop worker first and wait for it to exit (needs Redis for cleanup)
-    WORKER_PIDS=$(pgrep -f "dataing.entrypoints.worker" 2>/dev/null || true)
+    # Stop Temporal worker first and wait for it to exit
+    WORKER_PIDS=$(pgrep -f "dataing.entrypoints.temporal_worker" 2>/dev/null || true)
     if [ -n "$WORKER_PIDS" ]; then
-        echo "Stopping worker (pid: $WORKER_PIDS)..."
-        pkill -TERM -f "dataing.entrypoints.worker" 2>/dev/null || true
+        echo "Stopping Temporal worker (pid: $WORKER_PIDS)..."
+        pkill -TERM -f "dataing.entrypoints.temporal_worker" 2>/dev/null || true
         # Wait for worker to actually exit (up to 10 seconds)
         for i in {1..10}; do
-            if ! pgrep -f "dataing.entrypoints.worker" > /dev/null 2>&1; then
-                echo "Worker stopped."
+            if ! pgrep -f "dataing.entrypoints.temporal_worker" > /dev/null 2>&1; then
+                echo "Temporal worker stopped."
                 break
             fi
             sleep 1
         done
         # Force kill if still running
-        pkill -9 -f "dataing.entrypoints.worker" 2>/dev/null || true
+        pkill -9 -f "dataing.entrypoints.temporal_worker" 2>/dev/null || true
     fi
 
     # Now stop other processes
@@ -368,15 +377,11 @@ demo-stop:
     lsof -ti:8000 | xargs kill -9 2>/dev/null || true
     lsof -ti:3000 | xargs kill -9 2>/dev/null || true
 
-    # Now safe to stop infrastructure
-    docker stop dataing-demo-redis 2>/dev/null || true
-    docker rm -f dataing-demo-redis 2>/dev/null || true
-
-    docker stop dataing-demo-postgres 2>/dev/null || true
-    docker rm -f dataing-demo-postgres 2>/dev/null || true
-
-    docker stop dataing-demo-jaeger 2>/dev/null || true
-    docker rm -f dataing-demo-jaeger 2>/dev/null || true
+    # Stop all dataing-demo-* containers
+    for container in $(docker ps -aq --filter "name=dataing-demo-" 2>/dev/null); do
+        docker stop "$container" 2>/dev/null || true
+        docker rm -f "$container" 2>/dev/null || true
+    done
 
     # Stop docker-compose stack with volume cleanup
     docker-compose -f demo/docker-compose.demo.yml down -v 2>/dev/null || true

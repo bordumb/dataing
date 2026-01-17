@@ -46,6 +46,9 @@ def app(mock_audit_repo: AsyncMock, mock_auth_context: ApiKeyContext) -> FastAPI
     app = FastAPI()
     app.include_router(router, prefix="/api/v1")
 
+    # Set up app state that middleware expects
+    app.state.entitlements_adapter = AsyncMock()
+
     # Override dependencies
     app.dependency_overrides[get_audit_repo] = lambda: mock_audit_repo
     app.dependency_overrides[verify_api_key] = lambda: mock_auth_context

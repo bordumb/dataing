@@ -89,11 +89,20 @@ class TestAPIEndToEnd:
         )
         mock_investigation_service.get_state.side_effect = ValueError("Investigation not found")
 
+        # Mock Temporal client (required for investigation routes)
+        mock_temporal_client = AsyncMock()
+        mock_temporal_client.start_investigation.return_value = AsyncMock()
+        mock_temporal_client.get_status.return_value = AsyncMock(
+            workflow_status="completed",
+            result=None,
+        )
+
         # Set up app state
         app.state.db = mock_db
         app.state.app_db = mock_db
         app.state.orchestrator = mock_orchestrator
         app.state.investigation_service = mock_investigation_service
+        app.state.temporal_client = mock_temporal_client
         app.state.investigations = {}
 
     @pytest.fixture

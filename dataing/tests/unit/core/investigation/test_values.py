@@ -9,7 +9,6 @@ from dataing.core.investigation.values import (
     StepType,
     VersionId,
 )
-from maistro import Signal
 
 
 class TestVersionId:
@@ -96,13 +95,3 @@ class TestEnums:
         # Terminal
         assert StepType.COMPLETE == "complete"
         assert StepType.FAIL == "fail"
-
-    def test_execution_signal_values(self) -> None:
-        """Signal has expected values (from maistro)."""
-        # Signal is now from maistro - verify key signals exist
-        assert hasattr(Signal, "CONTINUE")
-        assert hasattr(Signal, "AWAIT_USER")
-        assert hasattr(Signal, "BRANCH")
-        assert hasattr(Signal, "MERGE")
-        assert hasattr(Signal, "COMPLETE")
-        assert hasattr(Signal, "FAIL")

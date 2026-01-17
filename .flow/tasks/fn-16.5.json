@@ -1,0 +1,33 @@
+{
+  "assignee": "bordumbb@gmail.com",
+  "claim_note": "",
+  "claimed_at": "2026-01-17T03:09:11.387730Z",
+  "created_at": "2026-01-17T01:33:59.275703Z",
+  "depends_on": [
+    "fn-16.4"
+  ],
+  "epic": "fn-16",
+  "evidence": {
+    "commit": "20fea6aa",
+    "files_created": [
+      "dataing/src/dataing/temporal/workflows/evaluate_hypothesis.py"
+    ],
+    "files_modified": [
+      "dataing/src/dataing/temporal/workflows/__init__.py",
+      "dataing/src/dataing/temporal/workflows/investigation.py",
+      "dataing/src/dataing/temporal/worker.py",
+      "dataing/src/dataing/temporal/activities/check_patterns.py"
+    ],
+    "verification": {
+      "import_test": "pass",
+      "mypy": "pass",
+      "ruff_lint": "pass"
+    }
+  },
+  "id": "fn-16.5",
+  "priority": null,
+  "spec_path": ".flow/tasks/fn-16.5.md",
+  "status": "done",
+  "title": "Implement EvaluateHypothesisWorkflow child workflow",
+  "updated_at": "2026-01-17T03:11:31.831205Z"
+}

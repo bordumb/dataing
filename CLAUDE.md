@@ -7,8 +7,7 @@ DO NOT WORRY ABOUT LEGACY CODE.
 
 ## Repository Map (Monorepo)
 
-- maistro/ - Generic workflow engine (zero deps, protocol-based steps)
-- bond/ - Agent runtime (PydanticAI wrapper, streaming, BondStep bridge to maistro)
+- bond/ - Agent runtime (PydanticAI wrapper, streaming)
 - dataing/ - Community Edition (CE) backend package, migrations, scripts
 - dataing-ee/ - Enterprise Edition (EE) extension package
 - frontend/ - React + Vite + TypeScript + Tailwind + shadcn/ui
@@ -18,7 +17,7 @@ DO NOT WORRY ABOUT LEGACY CODE.
 ### Package Dependency Order
 
 ```
-maistro (zero deps) → bond (maistro + pydantic-ai) → dataing (bond + maistro)
+bond (pydantic-ai) → dataing (bond + temporal)
 ```
 
 ## Development Commands
@@ -78,39 +77,27 @@ The repo is open-core:
 - EE lives in `dataing-ee/` and extends CE with enterprise-only features
 - `bond/` provides the agent runtime and memory tools used by the backend
 
-## Maistro Workflow Engine
-
-`maistro/src/maistro/` is a standalone generic workflow engine with zero dependencies:
-- `step.py` - `Step[ContextT, InputT, OutputT]` protocol for workflow steps
-- `result.py` - `StepResult`, `BranchRequest`, `BranchSpec` immutable result types
-- `signals.py` - `Signal` enum (CONTINUE, COMPLETE, FAIL, BRANCH, MERGE, AWAIT_USER)
-- `handlers.py` - `SignalHandler` ABC, `DefaultSignalHandler`, `BranchingSignalHandler`
-- `workflow.py` - `Workflow` executor with `tick()` and `run()` methods
-
-Key design: Protocol-based structural subtyping. Any class with `name`, `execute()`, and
-`can_execute()` methods satisfies `Step` without inheritance.
-
 ## Bond Agent Runtime
 
 `bond/src/bond/` wraps PydanticAI for LLM interactions:
 - `agent.py` - `BondAgent` with streaming and structured output
-- `maistro/bond_step.py` - `BondStep` template method pattern bridging `BondAgent` + `maistro.Step`
-
-`BondStep` provides: `create_agent()`, `build_prompt()`, `map_response()` hooks with automatic
-`execute()` orchestration.
+- Provides agent orchestration with prompt building and response mapping
 
 ## Backend Architecture (CE)
 
 Core domain: `dataing/src/dataing/core/`
-- `investigation/` - Workflow steps, flow builder, registry, repository
-- `investigation/flow.py` - `build_investigation_workflow()` using maistro
-- `investigation/steps/protocol.py` - `DataingStep` ABC satisfying maistro.Step
+- `investigation/` - Domain entities, repository, collaboration service
 - `auth/`, `rbac/`, `entitlements/` - Identity and feature gating
 - `quality/` - LLM-as-judge quality validation
 - `state.py`, `domain_types.py`, `interfaces.py` - Event-sourced state + protocols
 
-Investigation workflow: Use `INVESTIGATION_ENGINE=v2` to enable maistro-based workflow (default
-is v1 legacy orchestrator).
+Temporal workflows: `dataing/src/dataing/temporal/`
+- `workflows.py` - `InvestigationWorkflow` with child workflows for parallel hypothesis evaluation
+- `activities.py` - Activity functions for LLM calls, SQL execution, context gathering
+- `client.py` - `TemporalInvestigationClient` for starting/cancelling workflows
+- `worker.py` - Worker setup with activity factory for dependency injection
+
+Investigation workflow: Uses Temporal for durable execution with `INVESTIGATION_ENGINE=temporal`.
 
 Adapters: `dataing/src/dataing/adapters/`
 - `datasource/` - SQL, document, filesystem adapters; API base types

@@ -704,21 +704,20 @@ class AppDatabase:
             changes: JSON object with request body or changes made.
             metadata: Additional metadata about the request.
         """
-        # Convert UUIDs to strings at database boundary (codebase convention)
         await self.execute(
             """INSERT INTO audit_logs
                (tenant_id, action, actor_id, actor_email, actor_ip, actor_user_agent,
                 resource_type, resource_id, resource_name, request_method, request_path,
                 status_code, changes, metadata)
                VALUES ($1, $2, $3, $4, $5::inet, $6, $7, $8, $9, $10, $11, $12, $13, $14)""",
-            str(tenant_id),
+            tenant_id,
             action,
-            str(actor_id) if actor_id else None,
+            actor_id,
             actor_email,
             actor_ip,
             actor_user_agent,
             resource_type,
-            str(resource_id) if resource_id else None,
+            resource_id,
             resource_name,
             request_method,
             request_path,

@@ -1,10 +1,12 @@
 """Investigation workflow definition for Temporal."""
 
-from dataclasses import dataclass
+import asyncio
+from dataclasses import dataclass, field
 from datetime import timedelta
 from typing import Any
 
 from temporalio import workflow
+from temporalio.exceptions import CancelledError
 
 with workflow.unsafe.imports_passed_through():
     from dataing.temporal.activities import (
@@ -39,11 +41,12 @@ class InvestigationResult:
 
     investigation_id: str
     status: str
-    context: dict[str, Any]
-    hypotheses: list[dict[str, Any]]
-    evidence: list[dict[str, Any]]
-    synthesis: dict[str, Any]
+    context: dict[str, Any] = field(default_factory=dict)
+    hypotheses: list[dict[str, Any]] = field(default_factory=list)
+    evidence: list[dict[str, Any]] = field(default_factory=list)
+    synthesis: dict[str, Any] = field(default_factory=dict)
     counter_analysis: dict[str, Any] | None = None
+    user_feedback: dict[str, Any] | None = None
 
 
 @workflow.defn
@@ -57,7 +60,85 @@ class InvestigationWorkflow:
     4. Evaluates hypotheses in parallel via child workflows
     5. Synthesizes findings into root cause analysis
     6. Optionally performs counter-analysis if confidence is low
+
+    Signals:
+    - cancel_investigation: Gracefully cancel the investigation
+    - user_input: Provide user feedback when AWAIT_USER is triggered
     """
+
+    def __init__(self) -> None:
+        """Initialize workflow state."""
+        self._cancelled = False
+        self._user_input: dict[str, Any] | None = None
+        self._awaiting_user = False
+        self._child_handles: list[Any] = []
+
+    @workflow.signal
+    def cancel_investigation(self) -> None:
+        """Signal to cancel the investigation.
+
+        The workflow will complete current activity and return with cancelled status.
+        Child workflows will also be cancelled.
+        """
+        self._cancelled = True
+
+    @workflow.signal
+    def user_input(self, payload: dict[str, Any]) -> None:
+        """Signal to provide user input when awaiting feedback.
+
+        Args:
+            payload: User feedback data (e.g., {"feedback": "...", "action": "..."}).
+        """
+        self._user_input = payload
+
+    def _check_cancelled(self, investigation_id: str) -> InvestigationResult | None:
+        """Check if cancellation was requested and return early if so.
+
+        Args:
+            investigation_id: The investigation ID for the result.
+
+        Returns:
+            InvestigationResult with cancelled status if cancelled, None otherwise.
+        """
+        if self._cancelled:
+            return InvestigationResult(
+                investigation_id=investigation_id,
+                status="cancelled",
+            )
+        return None
+
+    async def _cancel_children(self) -> None:
+        """Cancel all running child workflows."""
+        for handle in self._child_handles:
+            try:
+                handle.cancel()
+            except Exception as e:
+                workflow.logger.warning(f"Failed to cancel child workflow: {e}")
+
+    async def _await_user_input(self, timeout_minutes: int = 60) -> dict[str, Any] | None:
+        """Wait for user input signal.
+
+        Args:
+            timeout_minutes: Maximum time to wait for user input.
+
+        Returns:
+            User input payload or None if cancelled/timed out.
+        """
+        self._awaiting_user = True
+        self._user_input = None
+
+        try:
+            # Wait for user input or cancellation
+            await workflow.wait_condition(
+                lambda: self._user_input is not None or self._cancelled,
+                timeout=timedelta(minutes=timeout_minutes),
+            )
+        except TimeoutError:
+            self._awaiting_user = False
+            return None
+
+        self._awaiting_user = False
+        return self._user_input
 
     @workflow.run
     async def run(self, input: InvestigationInput) -> InvestigationResult:
@@ -71,26 +152,69 @@ class InvestigationWorkflow:
         """
         alert_summary = input.alert_summary or str(input.alert_data)
 
+        # Check cancellation before starting
+        if result := self._check_cancelled(input.investigation_id):
+            return result
+
         # Step 1: Gather context (schema, lineage, sample data)
-        context = await workflow.execute_activity(
-            gather_context,
-            args=[input.investigation_id, input.datasource_id],
-            start_to_close_timeout=timedelta(minutes=5),
-        )
+        try:
+            context = await workflow.execute_activity(
+                gather_context,
+                args=[input.investigation_id, input.datasource_id],
+                start_to_close_timeout=timedelta(minutes=5),
+            )
+        except CancelledError:
+            return InvestigationResult(
+                investigation_id=input.investigation_id,
+                status="cancelled",
+            )
+
+        if result := self._check_cancelled(input.investigation_id):
+            return result
 
         # Step 2: Check for known patterns (used for hypothesis hints in production)
-        _patterns = await workflow.execute_activity(
-            check_patterns,
-            args=[input.investigation_id, input.alert_data, context],
-            start_to_close_timeout=timedelta(minutes=2),
-        )
+        try:
+            _patterns = await workflow.execute_activity(
+                check_patterns,
+                args=[input.investigation_id, input.alert_data, context],
+                start_to_close_timeout=timedelta(minutes=2),
+            )
+        except CancelledError:
+            return InvestigationResult(
+                investigation_id=input.investigation_id,
+                status="cancelled",
+                context=context,
+            )
+
+        if result := self._check_cancelled(input.investigation_id):
+            return InvestigationResult(
+                investigation_id=input.investigation_id,
+                status="cancelled",
+                context=context,
+            )
 
         # Step 3: Generate hypotheses based on context and patterns
-        hypotheses = await workflow.execute_activity(
-            generate_hypotheses,
-            args=[input.investigation_id, input.alert_data, context],
-            start_to_close_timeout=timedelta(minutes=5),
-        )
+        try:
+            hypotheses = await workflow.execute_activity(
+                generate_hypotheses,
+                args=[input.investigation_id, input.alert_data, context],
+                start_to_close_timeout=timedelta(minutes=5),
+            )
+        except CancelledError:
+            return InvestigationResult(
+                investigation_id=input.investigation_id,
+                status="cancelled",
+                context=context,
+            )
+
+        if result := self._check_cancelled(input.investigation_id):
+            await self._cancel_children()
+            return InvestigationResult(
+                investigation_id=input.investigation_id,
+                status="cancelled",
+                context=context,
+                hypotheses=hypotheses,
+            )
 
         # Step 4: Evaluate hypotheses in parallel via child workflows
         evidence = await self._evaluate_hypotheses_parallel(
@@ -101,23 +225,61 @@ class InvestigationWorkflow:
             alert=input.alert_data,
         )
 
+        if result := self._check_cancelled(input.investigation_id):
+            return InvestigationResult(
+                investigation_id=input.investigation_id,
+                status="cancelled",
+                context=context,
+                hypotheses=hypotheses,
+                evidence=evidence,
+            )
+
         # Step 5: Synthesize findings
-        synthesis = await workflow.execute_activity(
-            synthesize,
-            args=[input.investigation_id, context, hypotheses],
-            start_to_close_timeout=timedelta(minutes=5),
-        )
+        try:
+            synthesis = await workflow.execute_activity(
+                synthesize,
+                args=[input.investigation_id, context, hypotheses],
+                start_to_close_timeout=timedelta(minutes=5),
+            )
+        except CancelledError:
+            return InvestigationResult(
+                investigation_id=input.investigation_id,
+                status="cancelled",
+                context=context,
+                hypotheses=hypotheses,
+                evidence=evidence,
+            )
+
+        if result := self._check_cancelled(input.investigation_id):
+            return InvestigationResult(
+                investigation_id=input.investigation_id,
+                status="cancelled",
+                context=context,
+                hypotheses=hypotheses,
+                evidence=evidence,
+                synthesis=synthesis,
+            )
 
         # Step 6: Counter-analysis if confidence is below threshold
         counter_analysis = None
         root_cause = synthesis.get("root_cause", {})
         confidence = root_cause.get("confidence", 1.0) if isinstance(root_cause, dict) else 1.0
         if confidence < input.confidence_threshold:
-            counter_analysis = await workflow.execute_activity(
-                counter_analyze,
-                args=[input.investigation_id, synthesis, evidence],
-                start_to_close_timeout=timedelta(minutes=5),
-            )
+            try:
+                counter_analysis = await workflow.execute_activity(
+                    counter_analyze,
+                    args=[input.investigation_id, synthesis, evidence],
+                    start_to_close_timeout=timedelta(minutes=5),
+                )
+            except CancelledError:
+                return InvestigationResult(
+                    investigation_id=input.investigation_id,
+                    status="cancelled",
+                    context=context,
+                    hypotheses=hypotheses,
+                    evidence=evidence,
+                    synthesis=synthesis,
+                )
 
         return InvestigationResult(
             investigation_id=input.investigation_id,
@@ -149,14 +311,19 @@ class InvestigationWorkflow:
         Returns:
             List of evidence dictionaries from all successful evaluations.
         """
-        import asyncio
-
         if not hypotheses:
             return []
 
+        # Clear previous handles
+        self._child_handles = []
+
         # Start all child workflows
-        handles = []
         for i, hypothesis in enumerate(hypotheses):
+            # Check cancellation before starting each child
+            if self._cancelled:
+                await self._cancel_children()
+                break
+
             child_input = EvaluateHypothesisInput(
                 investigation_id=investigation_id,
                 hypothesis_index=i,
@@ -170,10 +337,15 @@ class InvestigationWorkflow:
                 child_input,
                 id=f"{workflow.info().workflow_id}-hypothesis-{i}",
             )
-            handles.append(handle)
+            self._child_handles.append(handle)
+
+        # If cancelled during child workflow creation, cancel all and return
+        if self._cancelled:
+            await self._cancel_children()
+            return []
 
         # Wait for all children to complete (don't crash on individual failures)
-        results = await asyncio.gather(*handles, return_exceptions=True)
+        results = await asyncio.gather(*self._child_handles, return_exceptions=True)
 
         # Aggregate evidence from successful evaluations
         all_evidence: list[dict[str, Any]] = []

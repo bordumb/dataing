@@ -12,6 +12,7 @@ from bond.tools.schema._models import (
     TableSchema,
 )
 from bond.tools.schema._protocols import SchemaLookupProtocol
+from bond.tools.schema.tools import schema_toolset
 
 __all__ = [
     # Protocol
@@ -23,4 +24,6 @@ __all__ = [
     "GetDownstreamRequest",
     "TableSchema",
     "ColumnSchema",
+    # Toolset
+    "schema_toolset",
 ]

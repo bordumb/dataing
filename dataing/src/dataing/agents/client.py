@@ -528,7 +528,7 @@ class AgentClient:
             )
 
             return AnomalyAlert(
-                dataset_id=alert.get("dataset_id", "unknown"),
+                dataset_ids=alert.get("dataset_ids", ["unknown"]),
                 metric_spec=metric_spec,
                 anomaly_type=alert.get("anomaly_type", "unknown"),
                 expected_value=alert.get("expected_value", 0.0),
@@ -541,7 +541,7 @@ class AgentClient:
         else:
             # Create minimal alert from summary
             return AnomalyAlert(
-                dataset_id="unknown",
+                dataset_ids=["unknown"],
                 metric_spec=MetricSpec(
                     metric_type="description",
                     expression=alert_summary,

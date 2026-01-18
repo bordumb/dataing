@@ -30,7 +30,7 @@ def mock_auth_context() -> ApiKeyContext:
 def sample_alert() -> dict[str, Any]:
     """Return a sample alert dict for requests."""
     return {
-        "dataset_id": "analytics.events",
+        "dataset_ids": ["analytics.events"],
         "metric_spec": {
             "metric_type": "column",
             "expression": "user_id",
@@ -78,7 +78,7 @@ class TestStartInvestigationRoute:
         )
 
         request = StartInvestigationRequest(alert=sample_alert)
-        assert request.alert["dataset_id"] == "analytics.events"
+        assert request.alert["dataset_ids"] == ["analytics.events"]
         assert request.alert["anomaly_type"] == "null_rate"
 
     def test_response_model(self) -> None:
@@ -284,7 +284,7 @@ class TestInvestigationServiceIntegration:
 
         # Verify the request parsing works
         alert = AnomalyAlert(
-            dataset_id=request.alert["dataset_id"],
+            dataset_ids=request.alert["dataset_ids"],
             metric_spec=MetricSpec(
                 metric_type=request.alert["metric_spec"]["metric_type"],
                 expression=request.alert["metric_spec"]["expression"],

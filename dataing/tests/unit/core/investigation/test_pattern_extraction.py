@@ -38,7 +38,7 @@ def investigation_id() -> UUID:
 def sample_alert() -> AnomalyAlert:
     """Create sample anomaly alert."""
     return AnomalyAlert(
-        dataset_id="analytics.events",
+        dataset_ids=["analytics.events"],
         metric_spec=MetricSpec.from_column("user_id"),
         anomaly_type="null_rate",
         expected_value=1.0,

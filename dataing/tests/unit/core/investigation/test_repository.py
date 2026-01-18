@@ -11,7 +11,7 @@ from dataing.core.investigation.repository import InvestigationRepository
 def sample_alert() -> AnomalyAlert:
     """Create sample alert."""
     return AnomalyAlert(
-        dataset_id="analytics.events",
+        dataset_ids=["analytics.events"],
         metric_spec=MetricSpec.from_column("user_id", "NULL rate"),
         anomaly_type="null_rate",
         expected_value=0.01,

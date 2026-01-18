@@ -1,8 +1,8 @@
-"""Schema Context - Builds and formats schema context for LLM prompts.
+"""Schema Context - Builds schema context for investigation.
 
-This module handles schema discovery and formatting for the LLM,
-providing clear table and column information that helps the AI
-generate accurate SQL queries.
+This module handles schema discovery for investigations, providing
+table and column information. The LLM now accesses schema through
+tools rather than having full schema dumped upfront.
 
 Updated to use the unified SchemaResponse type from the datasource layer.
 """
@@ -26,8 +26,10 @@ class SchemaContextBuilder:
 
     This class is responsible for:
     1. Discovering tables and columns from the data source
-    2. Formatting schema information for LLM prompts
-    3. Filtering tables by pattern when needed
+    2. Providing table lookup and related table discovery
+
+    The LLM now accesses schema through tools (see bond.tools.schema)
+    rather than having full schema formatted upfront.
 
     Uses the unified SchemaResponse type from the datasource layer.
     """
@@ -82,80 +84,6 @@ class SchemaContextBuilder:
             for db_schema in catalog.schemas:
                 tables.extend(db_schema.tables)
         return tables
-
-    def format_for_llm(self, schema: SchemaResponse) -> str:
-        """Format schema as markdown for LLM prompt.
-
-        Creates a clear, structured representation of the schema
-        that helps the LLM understand available tables and columns.
-
-        Args:
-            schema: SchemaResponse to format.
-
-        Returns:
-            Markdown-formatted schema string.
-        """
-        tables = self._get_all_tables(schema)
-
-        if not tables:
-            return "No tables available."
-
-        lines = [
-            "## Available Tables",
-            "",
-            "Use ONLY these tables and columns in your SQL queries.",
-            "",
-        ]
-
-        for table in tables[: self.max_tables]:
-            lines.append(f"### {table.native_path}")
-            lines.append("")
-            lines.append("| Column | Type | Nullable |")
-            lines.append("|--------|------|----------|")
-
-            for col in table.columns[: self.max_columns]:
-                nullable = "Yes" if col.nullable else "No"
-                lines.append(f"| {col.name} | {col.data_type.value} | {nullable} |")
-
-            if len(table.columns) > self.max_columns:
-                remaining = len(table.columns) - self.max_columns
-                lines.append(f"| ... | ({remaining} more columns) | |")
-
-            lines.append("")
-
-        if len(tables) > self.max_tables:
-            remaining = len(tables) - self.max_tables
-            lines.append(f"*({remaining} more tables not shown)*")
-            lines.append("")
-
-        lines.append("**IMPORTANT**: Only use tables and columns listed above.")
-        lines.append("Do NOT invent or assume other tables exist.")
-
-        return "\n".join(lines)
-
-    def format_compact(self, schema: SchemaResponse) -> str:
-        """Format schema in compact form for smaller context windows.
-
-        Args:
-            schema: SchemaResponse to format.
-
-        Returns:
-            Compact schema string.
-        """
-        tables = self._get_all_tables(schema)
-
-        if not tables:
-            return "No tables."
-
-        lines = ["Tables:"]
-        for table in tables[: self.max_tables]:
-            col_names = [col.name for col in table.columns[: self.max_columns]]
-            cols = ", ".join(col_names)
-            if len(table.columns) > self.max_columns:
-                cols += f" (+{len(table.columns) - self.max_columns} more)"
-            lines.append(f"  {table.native_path}: {cols}")
-
-        return "\n".join(lines)
 
     def get_table_info(
         self,

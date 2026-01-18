@@ -23,7 +23,7 @@ from dataing.core.investigation.values import (
 def sample_alert() -> AnomalyAlert:
     """Create a sample anomaly alert for testing."""
     return AnomalyAlert(
-        dataset_id="analytics.events",
+        dataset_ids=["analytics.events"],
         metric_spec=MetricSpec.from_column("user_id", "NULL rate"),
         anomaly_type="null_rate",
         expected_value=0.01,

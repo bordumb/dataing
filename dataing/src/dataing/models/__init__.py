@@ -2,6 +2,7 @@
 
 from dataing.models.api_key import ApiKey
 from dataing.models.base import BaseModel
+from dataing.models.credentials import QueryAuditLog, UserDatasourceCredentials
 from dataing.models.data_source import DataSource, DataSourceType
 from dataing.models.investigation import Investigation, InvestigationStatus
 from dataing.models.issue import (
@@ -36,6 +37,8 @@ __all__ = [
     "ApiKey",
     "DataSource",
     "DataSourceType",
+    "QueryAuditLog",
+    "UserDatasourceCredentials",
     "Investigation",
     "InvestigationStatus",
     "Issue",

@@ -1666,3 +1666,226 @@ class AppDatabase:
             # Return in chronological order (oldest first)
             rows = await self.fetch_all(query, tenant_id, limit)
             return list(reversed(rows))
+
+    # User Datasource Credentials operations
+
+    async def get_user_credentials(
+        self,
+        user_id: UUID,
+        datasource_id: UUID,
+    ) -> dict[str, Any] | None:
+        """Get user credentials for a datasource.
+
+        Args:
+            user_id: The user ID.
+            datasource_id: The datasource ID.
+
+        Returns:
+            Credentials record or None if not found.
+        """
+        return await self.fetch_one(
+            """SELECT id, user_id, datasource_id, credentials_encrypted,
+                      db_username, last_used_at, created_at, updated_at
+               FROM user_datasource_credentials
+               WHERE user_id = $1 AND datasource_id = $2""",
+            user_id,
+            datasource_id,
+        )
+
+    async def upsert_user_credentials(
+        self,
+        user_id: UUID,
+        datasource_id: UUID,
+        credentials_encrypted: bytes,
+        db_username: str | None = None,
+    ) -> dict[str, Any]:
+        """Upsert user credentials for a datasource.
+
+        Args:
+            user_id: The user ID.
+            datasource_id: The datasource ID.
+            credentials_encrypted: Encrypted credentials blob.
+            db_username: Optional username for display.
+
+        Returns:
+            Created or updated credentials record.
+        """
+        result = await self.execute_returning(
+            """INSERT INTO user_datasource_credentials
+                   (user_id, datasource_id, credentials_encrypted, db_username)
+               VALUES ($1, $2, $3, $4)
+               ON CONFLICT (user_id, datasource_id) DO UPDATE SET
+                   credentials_encrypted = EXCLUDED.credentials_encrypted,
+                   db_username = EXCLUDED.db_username,
+                   updated_at = NOW()
+               RETURNING *""",
+            user_id,
+            datasource_id,
+            credentials_encrypted,
+            db_username,
+        )
+        if result is None:
+            raise RuntimeError("Failed to upsert user credentials")
+        return result
+
+    async def delete_user_credentials(
+        self,
+        user_id: UUID,
+        datasource_id: UUID,
+    ) -> bool:
+        """Delete user credentials for a datasource.
+
+        Args:
+            user_id: The user ID.
+            datasource_id: The datasource ID.
+
+        Returns:
+            True if deleted, False if not found.
+        """
+        result = await self.execute(
+            """DELETE FROM user_datasource_credentials
+               WHERE user_id = $1 AND datasource_id = $2""",
+            user_id,
+            datasource_id,
+        )
+        return "DELETE 1" in result
+
+    async def update_credentials_last_used(
+        self,
+        user_id: UUID,
+        datasource_id: UUID,
+        last_used_at: Any,
+    ) -> None:
+        """Update credentials last_used_at timestamp.
+
+        Args:
+            user_id: The user ID.
+            datasource_id: The datasource ID.
+            last_used_at: The timestamp to set.
+        """
+        await self.execute(
+            """UPDATE user_datasource_credentials
+               SET last_used_at = $3
+               WHERE user_id = $1 AND datasource_id = $2""",
+            user_id,
+            datasource_id,
+            last_used_at,
+        )
+
+    # Query Audit Log operations
+
+    async def insert_query_audit_log(
+        self,
+        tenant_id: UUID,
+        user_id: UUID,
+        datasource_id: UUID,
+        sql_hash: str,
+        sql_text: str | None,
+        tables_accessed: list[str] | None,
+        executed_at: Any,
+        duration_ms: int,
+        row_count: int | None,
+        status: str,
+        error_message: str | None,
+        investigation_id: UUID | None = None,
+        source: str | None = None,
+    ) -> dict[str, Any]:
+        """Insert a query audit log entry.
+
+        Args:
+            tenant_id: The tenant ID.
+            user_id: The user ID.
+            datasource_id: The datasource ID.
+            sql_hash: Hash of the SQL query.
+            sql_text: The SQL query text.
+            tables_accessed: List of table names accessed.
+            executed_at: When the query was executed.
+            duration_ms: Query duration in milliseconds.
+            row_count: Number of rows returned.
+            status: Query status (success, denied, error, timeout).
+            error_message: Error message if any.
+            investigation_id: Optional investigation ID.
+            source: Query source (agent, api, preview, etc.).
+
+        Returns:
+            Created audit log record.
+        """
+        result = await self.execute_returning(
+            """INSERT INTO query_audit_log
+                   (tenant_id, user_id, datasource_id, sql_hash, sql_text,
+                    tables_accessed, executed_at, duration_ms, row_count,
+                    status, error_message, investigation_id, source)
+               VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+               RETURNING *""",
+            tenant_id,
+            user_id,
+            datasource_id,
+            sql_hash,
+            sql_text,
+            tables_accessed,
+            executed_at,
+            duration_ms,
+            row_count,
+            status,
+            error_message,
+            investigation_id,
+            source,
+        )
+        if result is None:
+            raise RuntimeError("Failed to insert query audit log")
+        return result
+
+    async def get_query_audit_logs(
+        self,
+        tenant_id: UUID,
+        user_id: UUID | None = None,
+        datasource_id: UUID | None = None,
+        status: str | None = None,
+        limit: int = 100,
+        offset: int = 0,
+    ) -> list[dict[str, Any]]:
+        """Get query audit logs with optional filters.
+
+        Args:
+            tenant_id: The tenant ID.
+            user_id: Optional user ID filter.
+            datasource_id: Optional datasource ID filter.
+            status: Optional status filter.
+            limit: Maximum records to return.
+            offset: Number of records to skip.
+
+        Returns:
+            List of audit log records.
+        """
+        conditions = ["tenant_id = $1"]
+        params: list[Any] = [tenant_id]
+        param_idx = 2
+
+        if user_id:
+            conditions.append(f"user_id = ${param_idx}")
+            params.append(user_id)
+            param_idx += 1
+
+        if datasource_id:
+            conditions.append(f"datasource_id = ${param_idx}")
+            params.append(datasource_id)
+            param_idx += 1
+
+        if status:
+            conditions.append(f"status = ${param_idx}")
+            params.append(status)
+            param_idx += 1
+
+        where_clause = " AND ".join(conditions)
+        params.extend([limit, offset])
+
+        query = f"""
+            SELECT id, tenant_id, user_id, datasource_id, sql_hash, sql_text,
+                   tables_accessed, executed_at, duration_ms, row_count,
+                   status, error_message, investigation_id, source
+            FROM query_audit_log
+            WHERE {where_clause}
+            ORDER BY executed_at DESC
+            LIMIT ${param_idx} OFFSET ${param_idx + 1}
+        """
+        return await self.fetch_all(query, *params)

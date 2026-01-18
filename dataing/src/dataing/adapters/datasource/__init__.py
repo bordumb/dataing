@@ -26,12 +26,19 @@ from dataing.adapters.datasource.errors import (
     AuthenticationFailedError,
     ConnectionFailedError,
     ConnectionTimeoutError,
+    CredentialsInvalidError,
+    CredentialsNotConfiguredError,
     DatasourceNotFoundError,
     QuerySyntaxError,
     QueryTimeoutError,
     RateLimitedError,
     SchemaFetchFailedError,
     TableNotFoundError,
+)
+from dataing.adapters.datasource.gateway import (
+    QueryContext,
+    QueryGateway,
+    QueryPrincipal,
 )
 from dataing.adapters.datasource.factory import create_adapter_for_datasource
 from dataing.adapters.datasource.filesystem.gcs import GCSAdapter
@@ -126,10 +133,16 @@ __all__ = [
     "ConnectionTimeoutError",
     "AuthenticationFailedError",
     "AccessDeniedError",
+    "CredentialsNotConfiguredError",
+    "CredentialsInvalidError",
     "DatasourceNotFoundError",
     "QuerySyntaxError",
     "QueryTimeoutError",
     "RateLimitedError",
     "SchemaFetchFailedError",
     "TableNotFoundError",
+    # Query Gateway
+    "QueryGateway",
+    "QueryPrincipal",
+    "QueryContext",
 ]

@@ -14,6 +14,7 @@ from dataing.core.json_utils import to_json_string
 from dataing.models.base import BaseModel
 
 if TYPE_CHECKING:
+    from dataing.models.credentials import UserDatasourceCredentials
     from dataing.models.investigation import Investigation
     from dataing.models.tenant import Tenant
 
@@ -53,6 +54,9 @@ class DataSource(BaseModel):
     tenant: Mapped["Tenant"] = relationship("Tenant", back_populates="data_sources")
     investigations: Mapped[list["Investigation"]] = relationship(
         "Investigation", back_populates="data_source"
+    )
+    user_credentials: Mapped[list["UserDatasourceCredentials"]] = relationship(
+        "UserDatasourceCredentials", back_populates="datasource", cascade="all, delete-orphan"
     )
 
     def get_connection_config(self, encryption_key: bytes) -> dict[str, Any]:

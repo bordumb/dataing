@@ -10,6 +10,7 @@ from dataing.models.base import BaseModel
 
 if TYPE_CHECKING:
     from dataing.models.api_key import ApiKey
+    from dataing.models.credentials import UserDatasourceCredentials
     from dataing.models.investigation import Investigation
     from dataing.models.issue import Issue
     from dataing.models.notification import NotificationRead
@@ -43,6 +44,9 @@ class User(BaseModel):
     )
     created_issues: Mapped[list["Issue"]] = relationship(
         "Issue", foreign_keys="Issue.created_by_user_id", back_populates="created_by_user"
+    )
+    datasource_credentials: Mapped[list["UserDatasourceCredentials"]] = relationship(
+        "UserDatasourceCredentials", back_populates="user", cascade="all, delete-orphan"
     )
 
     __table_args__ = (

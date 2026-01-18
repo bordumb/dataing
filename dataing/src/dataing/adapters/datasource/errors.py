@@ -19,6 +19,10 @@ class ErrorCode(str, Enum):
     AUTHENTICATION_FAILED = "AUTHENTICATION_FAILED"
     SSL_ERROR = "SSL_ERROR"
 
+    # Credentials errors
+    CREDENTIALS_NOT_CONFIGURED = "CREDENTIALS_NOT_CONFIGURED"
+    CREDENTIALS_INVALID = "CREDENTIALS_INVALID"
+
     # Permission errors
     ACCESS_DENIED = "ACCESS_DENIED"
     INSUFFICIENT_PERMISSIONS = "INSUFFICIENT_PERMISSIONS"
@@ -425,6 +429,52 @@ class DatasourceNotFoundError(AdapterError):
         super().__init__(
             code=ErrorCode.DATASOURCE_NOT_FOUND,
             message=message or f"Datasource not found: {datasource_id}",
+            details=details,
+            retryable=False,
+        )
+
+
+class CredentialsNotConfiguredError(AdapterError):
+    """User has not configured credentials for this datasource."""
+
+    def __init__(
+        self,
+        datasource_id: str,
+        datasource_name: str | None = None,
+        action_url: str | None = None,
+    ) -> None:
+        """Initialize credentials not configured error."""
+        ds_display = datasource_name or datasource_id
+        details: dict[str, Any] = {"datasource_id": datasource_id}
+        if action_url:
+            details["action_url"] = action_url
+        super().__init__(
+            code=ErrorCode.CREDENTIALS_NOT_CONFIGURED,
+            message=f"You haven't configured credentials for '{ds_display}'",
+            details=details,
+            retryable=False,
+        )
+
+
+class CredentialsInvalidError(AdapterError):
+    """User's credentials were rejected by the database."""
+
+    def __init__(
+        self,
+        datasource_id: str,
+        db_message: str | None = None,
+        action_url: str | None = None,
+    ) -> None:
+        """Initialize credentials invalid error."""
+        message = "Database rejected your credentials"
+        if db_message:
+            message = f"Database rejected your credentials: {db_message}"
+        details: dict[str, Any] = {"datasource_id": datasource_id}
+        if action_url:
+            details["action_url"] = action_url
+        super().__init__(
+            code=ErrorCode.CREDENTIALS_INVALID,
+            message=message,
             details=details,
             retryable=False,
         )

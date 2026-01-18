@@ -275,17 +275,15 @@ class TemporalAgentAdapter:
     def _to_schema(self, schema_info: dict[str, Any] | None) -> SchemaResponse:
         """Convert schema dict to SchemaResponse.
 
-        Supports two formats:
-        1. New minimal format: {"target_table": {...}, "related_tables": [...]}
-        2. Legacy full format: {"catalogs": [...]}
+        Expected format: {"target_table": {...}}
 
         Args:
-            schema_info: Schema data as dict, or None.
+            schema_info: Schema data with target_table, or None.
 
         Returns:
             SchemaResponse object.
         """
-        if not schema_info:
+        if not schema_info or "target_table" not in schema_info:
             return SchemaResponse(
                 source_id="unknown",
                 source_type=SourceType.POSTGRESQL,
@@ -294,81 +292,7 @@ class TemporalAgentAdapter:
                 catalogs=[],
             )
 
-        # Check for new minimal format (target_table + related_tables)
-        if "target_table" in schema_info:
-            return self._to_schema_from_minimal(schema_info)
-
-        # Try Pydantic validation first (legacy format)
-        try:
-            return SchemaResponse.model_validate(schema_info)
-        except Exception:
-            pass
-
-        # Manual reconstruction from nested structure (legacy format)
-        catalogs = []
-        for cat_data in schema_info.get("catalogs", []):
-            schemas = []
-            for sch_data in cat_data.get("schemas", []):
-                tables = []
-                for tbl_data in sch_data.get("tables", []):
-                    columns = []
-                    for col_data in tbl_data.get("columns", []):
-                        try:
-                            data_type = NormalizedType(col_data.get("data_type", "unknown"))
-                        except ValueError:
-                            data_type = NormalizedType.UNKNOWN
-                        columns.append(
-                            Column(
-                                name=col_data.get("name", "unknown"),
-                                data_type=data_type,
-                                native_type=col_data.get("native_type", "unknown"),
-                                nullable=col_data.get("nullable", True),
-                            )
-                        )
-                    tables.append(
-                        Table(
-                            name=tbl_data.get("name", "unknown"),
-                            table_type=tbl_data.get("table_type", "table"),
-                            native_type=tbl_data.get("native_type", "TABLE"),
-                            native_path=tbl_data.get(
-                                "native_path", tbl_data.get("name", "unknown")
-                            ),
-                            columns=columns,
-                        )
-                    )
-                schemas.append(Schema(name=sch_data.get("name", "default"), tables=tables))
-            catalogs.append(Catalog(name=cat_data.get("name", "default"), schemas=schemas))
-
-        try:
-            source_type = SourceType(schema_info.get("source_type", "postgresql"))
-        except ValueError:
-            source_type = SourceType.POSTGRESQL
-
-        try:
-            source_category = SourceCategory(schema_info.get("source_category", "database"))
-        except ValueError:
-            source_category = SourceCategory.DATABASE
-
-        return SchemaResponse(
-            source_id=schema_info.get("source_id", "unknown"),
-            source_type=source_type,
-            source_category=source_category,
-            fetched_at=datetime.now(),
-            catalogs=catalogs,
-        )
-
-    def _to_schema_from_minimal(self, schema_info: dict[str, Any]) -> SchemaResponse:
-        """Convert minimal schema format to SchemaResponse.
-
-        Minimal format: {"target_table": {...}, "related_tables": ["t1", "t2"]}
-
-        Args:
-            schema_info: Minimal schema dict with target_table.
-
-        Returns:
-            SchemaResponse with target table wrapped in catalog/schema structure.
-        """
-        target = schema_info.get("target_table", {})
+        target = schema_info["target_table"]
         if not target:
             return SchemaResponse(
                 source_id="unknown",

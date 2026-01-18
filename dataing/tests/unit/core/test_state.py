@@ -60,7 +60,7 @@ class TestInvestigationState:
     def alert(self) -> AnomalyAlert:
         """Return a sample anomaly alert."""
         return AnomalyAlert(
-            dataset_id="public.orders",
+            dataset_ids=["public.orders"],
             metric_spec=MetricSpec.from_column("row_count"),
             anomaly_type="row_count",
             expected_value=1000.0,

@@ -68,7 +68,8 @@ class AnomalyAlert(BaseModel):
     The upstream anomaly detector provides structured metric specification.
 
     Attributes:
-        dataset_id: The affected table in "schema.table_name" format.
+        dataset_ids: The affected tables in "schema.table_name" format.
+            First table is the primary target; additional tables are reference context.
         metric_spec: Structured specification of what metric is anomalous.
         anomaly_type: What kind of anomaly (null_rate, row_count, freshness, custom).
         expected_value: The expected metric value based on historical data.
@@ -84,7 +85,12 @@ class AnomalyAlert(BaseModel):
 
     model_config = ConfigDict(frozen=True)
 
-    dataset_id: str
+    dataset_ids: list[str]
+
+    @property
+    def dataset_id(self) -> str:
+        """Primary dataset (first in list) for backward compatibility."""
+        return self.dataset_ids[0] if self.dataset_ids else "unknown"
     metric_spec: MetricSpec
     anomaly_type: str  # null_rate, row_count, freshness, custom, etc.
     expected_value: float

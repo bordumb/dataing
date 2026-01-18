@@ -48,7 +48,7 @@ export interface InvestigationListItem {
 }
 
 export interface AlertData {
-  dataset_id: string
+  dataset_ids: string[]
   metric_spec: {
     metric_type: string
     expression: string

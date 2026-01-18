@@ -67,8 +67,9 @@ def make_gather_context_activity(
     async def gather_context(input: GatherContextInput) -> GatherContextResult:
         """Gather schema context from the data source.
 
-        Returns MINIMAL initial context:
-        - target_table: Full schema for the anomaly table
+        Returns initial context for all user-provided datasets:
+        - target_table: Full schema for the primary anomaly table (first dataset)
+        - reference_tables: Full schema for additional datasets provided by user
 
         Agents use tools for everything else:
         - get_table_schema: Fetch schema for any table
@@ -103,8 +104,19 @@ def make_gather_context_activity(
         schema_lookup = SchemaLookupAdapter(adapter)
 
         try:
-            # Build minimal context: target table schema only
-            schema_info = await schema_lookup.build_initial_context(alert.dataset_id)
+            # Build context for primary table (first in list)
+            primary_dataset = alert.dataset_id  # Uses property that returns dataset_ids[0]
+            schema_info = await schema_lookup.build_initial_context(primary_dataset)
+
+            # Add reference tables if user provided multiple datasets
+            if len(alert.dataset_ids) > 1:
+                reference_tables = []
+                for dataset_id in alert.dataset_ids[1:]:
+                    ref_schema = await schema_lookup.get_table_schema(dataset_id)
+                    if ref_schema:
+                        reference_tables.append(ref_schema)
+                if reference_tables:
+                    schema_info["reference_tables"] = reference_tables
         except Exception as e:
             return GatherContextResult(
                 schema_info={},
@@ -117,7 +129,7 @@ def make_gather_context_activity(
             return GatherContextResult(
                 schema_info={},
                 lineage_info=None,
-                error=f"Table not found: {alert.dataset_id} - check connectivity/permissions",
+                error=f"Table not found: {primary_dataset} - check connectivity/permissions",
             )
 
         return GatherContextResult(

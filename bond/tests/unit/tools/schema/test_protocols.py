@@ -7,7 +7,7 @@ from bond.tools.schema._protocols import SchemaLookupProtocol
 
 def test_protocol_is_runtime_checkable() -> None:
     """Protocol should be runtime checkable for isinstance."""
-    assert hasattr(SchemaLookupProtocol, "__protocol_attrs__")
+    assert getattr(SchemaLookupProtocol, "_is_runtime_protocol", False)
 
 
 def test_mock_implements_protocol() -> None:

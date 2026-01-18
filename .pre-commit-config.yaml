@@ -38,19 +38,19 @@ repos:
       # Linting
       - id: ruff
         args: [--fix]
-        files: ^backend/
+        files: ^(bond|dataing|dataing-ee)/src/
       # Formatting
       - id: ruff-format
-        files: ^backend/
+        files: ^(bond|dataing|dataing-ee)/src/
 
   # Python: mypy for type checking
   - repo: local
     hooks:
       - id: mypy
         name: mypy (backend)
-        entry: bash -c 'cd backend && uv run mypy src/'
+        entry: uv run mypy bond/src dataing/src dataing-ee/src
         language: system
-        files: ^backend/src/.*\.py$
+        files: ^(bond|dataing|dataing-ee)/src/.*\.py$
         pass_filenames: false
         types: [python]
 

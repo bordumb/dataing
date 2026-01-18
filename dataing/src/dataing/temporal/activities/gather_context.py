@@ -2,9 +2,9 @@
 
 Extracts business logic from GatherContextStep into a Temporal activity factory.
 
-Note: This activity now returns minimal initial context (target table + related names)
-instead of the full schema. Agents can fetch additional schema details on demand
-via schema tools (see bond.tools.schema).
+Note: This activity returns minimal initial context (target table schema only).
+Agents fetch related tables and additional schema details on demand via tools
+(see bond.tools.schema for get_upstream_tables, get_downstream_tables, etc).
 """
 
 from __future__ import annotations
@@ -45,21 +45,19 @@ class GatherContextResult:
     """Result from gather_context activity."""
 
     schema_info: dict[str, Any]
-    lineage_info: dict[str, Any] | None
+    lineage_info: dict[str, Any] | None  # Deprecated: agents use tools for lineage
     error: str | None = None
 
 
 def make_gather_context_activity(
     context_engine: ContextEngineProtocol,
     get_adapter: Any,  # Callable[[str], Awaitable[BaseAdapter]]
-    get_lineage_adapter: Any | None = None,  # Callable[[str], Awaitable[LineageAdapter | None]]
 ) -> Any:
     """Factory that creates gather_context activity with injected dependencies.
 
     Args:
         context_engine: Engine for gathering context from data source.
         get_adapter: Async function to get adapter for a datasource ID.
-        get_lineage_adapter: Optional async function to get lineage adapter.
 
     Returns:
         The gather_context activity function.
@@ -67,13 +65,16 @@ def make_gather_context_activity(
 
     @activity.defn
     async def gather_context(input: GatherContextInput) -> GatherContextResult:
-        """Gather schema and lineage context from the data source.
+        """Gather schema context from the data source.
 
-        This activity now returns MINIMAL initial context:
+        Returns MINIMAL initial context:
         - target_table: Full schema for the anomaly table
-        - related_tables: List of upstream/downstream table names
 
-        Agents can fetch additional schema details on demand via schema tools.
+        Agents use tools for everything else:
+        - get_table_schema: Fetch schema for any table
+        - get_upstream_tables: Discover upstream dependencies
+        - get_downstream_tables: Discover downstream dependencies
+        - list_tables: List all available tables
         """
         from dataing.adapters.context.schema_lookup import SchemaLookupAdapter
         from dataing.core.domain_types import AnomalyAlert
@@ -98,20 +99,11 @@ def make_gather_context_activity(
                 error=f"Failed to get adapter: {e}",
             )
 
-        # Get lineage adapter (optional)
-        lineage_adapter = None
-        if get_lineage_adapter:
-            try:
-                lineage_adapter = await get_lineage_adapter(input.datasource_id)
-            except Exception:
-                # Lineage is optional, continue without it
-                pass
-
-        # Create schema lookup adapter and build initial context
-        schema_lookup = SchemaLookupAdapter(adapter, lineage_adapter)
+        # Create schema lookup adapter (no lineage - agent uses tools)
+        schema_lookup = SchemaLookupAdapter(adapter)
 
         try:
-            # Build minimal context: target table schema + related table names
+            # Build minimal context: target table schema only
             schema_info = await schema_lookup.build_initial_context(alert.dataset_id)
         except Exception as e:
             return GatherContextResult(
@@ -128,20 +120,9 @@ def make_gather_context_activity(
                 error=f"Table not found: {alert.dataset_id} - check connectivity/permissions",
             )
 
-        # Lineage is now embedded in schema_info.related_tables
-        # Keep lineage_info for backward compatibility but it's derived from schema_info
-        lineage_info: dict[str, Any] | None = None
-        related = schema_info.get("related_tables", [])
-        if related:
-            lineage_info = {
-                "target": alert.dataset_id,
-                "upstream": related,  # SchemaLookupAdapter combines upstream+downstream
-                "downstream": [],
-            }
-
         return GatherContextResult(
             schema_info=schema_info,
-            lineage_info=lineage_info,
+            lineage_info=None,  # Deprecated: agents use tools for lineage
         )
 
     return gather_context

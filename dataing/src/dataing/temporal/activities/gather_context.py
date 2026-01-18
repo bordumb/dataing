@@ -1,6 +1,10 @@
 """Gather context activity for investigation workflow.
 
 Extracts business logic from GatherContextStep into a Temporal activity factory.
+
+Note: This activity now returns minimal initial context (target table + related names)
+instead of the full schema. Agents can fetch additional schema details on demand
+via schema tools (see bond.tools.schema).
 """
 
 from __future__ import annotations
@@ -48,12 +52,14 @@ class GatherContextResult:
 def make_gather_context_activity(
     context_engine: ContextEngineProtocol,
     get_adapter: Any,  # Callable[[str], Awaitable[BaseAdapter]]
+    get_lineage_adapter: Any | None = None,  # Callable[[str], Awaitable[LineageAdapter | None]]
 ) -> Any:
     """Factory that creates gather_context activity with injected dependencies.
 
     Args:
         context_engine: Engine for gathering context from data source.
         get_adapter: Async function to get adapter for a datasource ID.
+        get_lineage_adapter: Optional async function to get lineage adapter.
 
     Returns:
         The gather_context activity function.
@@ -63,12 +69,13 @@ def make_gather_context_activity(
     async def gather_context(input: GatherContextInput) -> GatherContextResult:
         """Gather schema and lineage context from the data source.
 
-        This activity:
-        1. Validates the alert data
-        2. Gets the data source adapter
-        3. Calls context engine to gather schema and lineage
-        4. Returns structured context result
+        This activity now returns MINIMAL initial context:
+        - target_table: Full schema for the anomaly table
+        - related_tables: List of upstream/downstream table names
+
+        Agents can fetch additional schema details on demand via schema tools.
         """
+        from dataing.adapters.context.schema_lookup import SchemaLookupAdapter
         from dataing.core.domain_types import AnomalyAlert
 
         # Validate alert data
@@ -91,9 +98,21 @@ def make_gather_context_activity(
                 error=f"Failed to get adapter: {e}",
             )
 
-        # Gather context
+        # Get lineage adapter (optional)
+        lineage_adapter = None
+        if get_lineage_adapter:
+            try:
+                lineage_adapter = await get_lineage_adapter(input.datasource_id)
+            except Exception:
+                # Lineage is optional, continue without it
+                pass
+
+        # Create schema lookup adapter and build initial context
+        schema_lookup = SchemaLookupAdapter(adapter, lineage_adapter)
+
         try:
-            gathered = await context_engine.gather(alert, adapter)
+            # Build minimal context: target table schema + related table names
+            schema_info = await schema_lookup.build_initial_context(alert.dataset_id)
         except Exception as e:
             return GatherContextResult(
                 schema_info={},
@@ -101,40 +120,24 @@ def make_gather_context_activity(
                 error=f"Context gathering failed: {e}",
             )
 
-        # Convert schema to dict
-        schema_info: dict[str, Any] = {}
-        if gathered.schema:
-            try:
-                schema_info = gathered.schema.model_dump(mode="json")
-            except AttributeError:
-                schema_info = {"raw": str(gathered.schema)}
-
         # Check for empty schema
-        if not schema_info or (
-            "catalogs" in schema_info
-            and not any(
-                schema.get("tables")
-                for catalog in schema_info.get("catalogs", [])
-                for schema in catalog.get("schemas", [])
-            )
-        ):
+        if not schema_info.get("target_table"):
             return GatherContextResult(
                 schema_info={},
                 lineage_info=None,
-                error="Empty schema - check connectivity/permissions",
+                error=f"Table not found: {alert.dataset_id} - check connectivity/permissions",
             )
 
-        # Convert lineage to dict
+        # Lineage is now embedded in schema_info.related_tables
+        # Keep lineage_info for backward compatibility but it's derived from schema_info
         lineage_info: dict[str, Any] | None = None
-        if gathered.lineage:
-            try:
-                lineage_info = {
-                    "target": gathered.lineage.target,
-                    "upstream": list(gathered.lineage.upstream),
-                    "downstream": list(gathered.lineage.downstream),
-                }
-            except AttributeError:
-                lineage_info = None
+        related = schema_info.get("related_tables", [])
+        if related:
+            lineage_info = {
+                "target": alert.dataset_id,
+                "upstream": related,  # SchemaLookupAdapter combines upstream+downstream
+                "downstream": [],
+            }
 
         return GatherContextResult(
             schema_info=schema_info,

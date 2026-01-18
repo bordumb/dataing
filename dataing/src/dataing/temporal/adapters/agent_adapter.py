@@ -275,6 +275,10 @@ class TemporalAgentAdapter:
     def _to_schema(self, schema_info: dict[str, Any] | None) -> SchemaResponse:
         """Convert schema dict to SchemaResponse.
 
+        Supports two formats:
+        1. New minimal format: {"target_table": {...}, "related_tables": [...]}
+        2. Legacy full format: {"catalogs": [...]}
+
         Args:
             schema_info: Schema data as dict, or None.
 
@@ -290,13 +294,17 @@ class TemporalAgentAdapter:
                 catalogs=[],
             )
 
-        # Try Pydantic validation first
+        # Check for new minimal format (target_table + related_tables)
+        if "target_table" in schema_info:
+            return self._to_schema_from_minimal(schema_info)
+
+        # Try Pydantic validation first (legacy format)
         try:
             return SchemaResponse.model_validate(schema_info)
         except Exception:
             pass
 
-        # Manual reconstruction from nested structure
+        # Manual reconstruction from nested structure (legacy format)
         catalogs = []
         for cat_data in schema_info.get("catalogs", []):
             schemas = []
@@ -347,6 +355,75 @@ class TemporalAgentAdapter:
             source_category=source_category,
             fetched_at=datetime.now(),
             catalogs=catalogs,
+        )
+
+    def _to_schema_from_minimal(self, schema_info: dict[str, Any]) -> SchemaResponse:
+        """Convert minimal schema format to SchemaResponse.
+
+        Minimal format: {"target_table": {...}, "related_tables": ["t1", "t2"]}
+
+        Args:
+            schema_info: Minimal schema dict with target_table.
+
+        Returns:
+            SchemaResponse with target table wrapped in catalog/schema structure.
+        """
+        target = schema_info.get("target_table", {})
+        if not target:
+            return SchemaResponse(
+                source_id="unknown",
+                source_type=SourceType.POSTGRESQL,
+                source_category=SourceCategory.DATABASE,
+                fetched_at=datetime.now(),
+                catalogs=[],
+            )
+
+        # Build columns from target table
+        columns = []
+        for col_data in target.get("columns", []):
+            try:
+                data_type = NormalizedType(col_data.get("data_type", "unknown"))
+            except ValueError:
+                data_type = NormalizedType.UNKNOWN
+            columns.append(
+                Column(
+                    name=col_data.get("name", "unknown"),
+                    data_type=data_type,
+                    native_type=col_data.get("native_type"),
+                    nullable=col_data.get("nullable", True),
+                    is_primary_key=col_data.get("is_primary_key", False),
+                    is_partition_key=col_data.get("is_partition_key", False),
+                    description=col_data.get("description"),
+                    default_value=col_data.get("default_value"),
+                )
+            )
+
+        # Parse native_path to extract schema name
+        native_path = target.get("native_path", target.get("name", "unknown"))
+        parts = native_path.split(".")
+        schema_name = parts[0] if len(parts) > 1 else "default"
+        table_name = parts[-1]
+
+        table = Table(
+            name=table_name,
+            table_type=target.get("table_type", "table"),
+            native_type=target.get("native_type", "TABLE"),
+            native_path=native_path,
+            columns=columns,
+        )
+
+        # Wrap in catalog/schema structure
+        return SchemaResponse(
+            source_id="unknown",
+            source_type=SourceType.POSTGRESQL,
+            source_category=SourceCategory.DATABASE,
+            fetched_at=datetime.now(),
+            catalogs=[
+                Catalog(
+                    name="default",
+                    schemas=[Schema(name=schema_name, tables=[table])],
+                )
+            ],
         )
 
     def _to_lineage(self, lineage_info: dict[str, Any] | None) -> LineageContext | None:

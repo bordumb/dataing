@@ -259,7 +259,7 @@ async def start_investigation(
     )
 
     alert = AnomalyAlert(
-        dataset_id=alert_data["dataset_id"],
+        dataset_ids=alert_data["dataset_ids"],
         metric_spec=metric_spec,
         anomaly_type=alert_data["anomaly_type"],
         expected_value=alert_data["expected_value"],

@@ -80,8 +80,13 @@ export function NewInvestigation() {
         formData.display_name.trim() ||
         `${formData.anomaly_type} on ${formData.column_name || primaryDataset.identifier}`
 
+      // Send all datasets - first is primary, rest are reference context
+      const datasetIds = datasets
+        .map((ds) => ds.identifier.trim())
+        .filter((id) => id.length > 0)
+
       const result = await startInvestigation.mutateAsync({
-        dataset_id: primaryDataset.identifier,
+        dataset_ids: datasetIds,
         metric_spec: {
           metric_type: 'column',
           expression: formData.column_name || primaryDataset.identifier,

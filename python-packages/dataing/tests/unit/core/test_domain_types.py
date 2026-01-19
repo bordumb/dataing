@@ -67,7 +67,7 @@ class TestAnomalyAlert:
     def test_create_alert(self) -> None:
         """Test creating an anomaly alert."""
         alert = AnomalyAlert(
-            dataset_id="public.orders",
+            dataset_ids=["public.orders"],
             metric_spec=MetricSpec.from_column("row_count"),
             anomaly_type="row_count",
             expected_value=1000.0,
@@ -84,7 +84,7 @@ class TestAnomalyAlert:
     def test_alert_is_frozen(self) -> None:
         """Test that alert is immutable."""
         alert = AnomalyAlert(
-            dataset_id="public.orders",
+            dataset_ids=["public.orders"],
             metric_spec=MetricSpec.from_column("row_count"),
             anomaly_type="row_count",
             expected_value=1000.0,
@@ -100,7 +100,7 @@ class TestAnomalyAlert:
     def test_alert_with_metadata(self) -> None:
         """Test alert with optional metadata."""
         alert = AnomalyAlert(
-            dataset_id="public.orders",
+            dataset_ids=["public.orders"],
             metric_spec=MetricSpec.from_column("row_count"),
             anomaly_type="row_count",
             expected_value=1000.0,

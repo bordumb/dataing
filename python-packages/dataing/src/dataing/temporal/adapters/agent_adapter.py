@@ -245,7 +245,7 @@ class TemporalAgentAdapter:
                 )
 
             return AnomalyAlert(
-                dataset_id=alert.get("dataset_id", "unknown"),
+                dataset_ids=alert.get("dataset_ids", ["unknown"]),
                 metric_spec=metric_spec,
                 anomaly_type=alert.get("anomaly_type", "unknown"),
                 expected_value=float(alert.get("expected_value", 0.0)),
@@ -258,7 +258,7 @@ class TemporalAgentAdapter:
 
         # Create minimal alert from summary
         return AnomalyAlert(
-            dataset_id="unknown",
+            dataset_ids=["unknown"],
             metric_spec=MetricSpec(
                 metric_type="description",
                 expression=alert_summary,
@@ -275,13 +275,15 @@ class TemporalAgentAdapter:
     def _to_schema(self, schema_info: dict[str, Any] | None) -> SchemaResponse:
         """Convert schema dict to SchemaResponse.
 
+        Expected format: {"target_table": {...}}
+
         Args:
-            schema_info: Schema data as dict, or None.
+            schema_info: Schema data with target_table, or None.
 
         Returns:
             SchemaResponse object.
         """
-        if not schema_info:
+        if not schema_info or "target_table" not in schema_info:
             return SchemaResponse(
                 source_id="unknown",
                 source_type=SourceType.POSTGRESQL,
@@ -290,63 +292,62 @@ class TemporalAgentAdapter:
                 catalogs=[],
             )
 
-        # Try Pydantic validation first
-        try:
-            return SchemaResponse.model_validate(schema_info)
-        except Exception:
-            pass
+        target = schema_info["target_table"]
+        if not target:
+            return SchemaResponse(
+                source_id="unknown",
+                source_type=SourceType.POSTGRESQL,
+                source_category=SourceCategory.DATABASE,
+                fetched_at=datetime.now(),
+                catalogs=[],
+            )
 
-        # Manual reconstruction from nested structure
-        catalogs = []
-        for cat_data in schema_info.get("catalogs", []):
-            schemas = []
-            for sch_data in cat_data.get("schemas", []):
-                tables = []
-                for tbl_data in sch_data.get("tables", []):
-                    columns = []
-                    for col_data in tbl_data.get("columns", []):
-                        try:
-                            data_type = NormalizedType(col_data.get("data_type", "unknown"))
-                        except ValueError:
-                            data_type = NormalizedType.UNKNOWN
-                        columns.append(
-                            Column(
-                                name=col_data.get("name", "unknown"),
-                                data_type=data_type,
-                                native_type=col_data.get("native_type", "unknown"),
-                                nullable=col_data.get("nullable", True),
-                            )
-                        )
-                    tables.append(
-                        Table(
-                            name=tbl_data.get("name", "unknown"),
-                            table_type=tbl_data.get("table_type", "table"),
-                            native_type=tbl_data.get("native_type", "TABLE"),
-                            native_path=tbl_data.get(
-                                "native_path", tbl_data.get("name", "unknown")
-                            ),
-                            columns=columns,
-                        )
-                    )
-                schemas.append(Schema(name=sch_data.get("name", "default"), tables=tables))
-            catalogs.append(Catalog(name=cat_data.get("name", "default"), schemas=schemas))
+        # Build columns from target table
+        columns = []
+        for col_data in target.get("columns", []):
+            try:
+                data_type = NormalizedType(col_data.get("data_type", "unknown"))
+            except ValueError:
+                data_type = NormalizedType.UNKNOWN
+            columns.append(
+                Column(
+                    name=col_data.get("name", "unknown"),
+                    data_type=data_type,
+                    native_type=col_data.get("native_type"),
+                    nullable=col_data.get("nullable", True),
+                    is_primary_key=col_data.get("is_primary_key", False),
+                    is_partition_key=col_data.get("is_partition_key", False),
+                    description=col_data.get("description"),
+                    default_value=col_data.get("default_value"),
+                )
+            )
 
-        try:
-            source_type = SourceType(schema_info.get("source_type", "postgresql"))
-        except ValueError:
-            source_type = SourceType.POSTGRESQL
+        # Parse native_path to extract schema name
+        native_path = target.get("native_path", target.get("name", "unknown"))
+        parts = native_path.split(".")
+        schema_name = parts[0] if len(parts) > 1 else "default"
+        table_name = parts[-1]
 
-        try:
-            source_category = SourceCategory(schema_info.get("source_category", "database"))
-        except ValueError:
-            source_category = SourceCategory.DATABASE
+        table = Table(
+            name=table_name,
+            table_type=target.get("table_type", "table"),
+            native_type=target.get("native_type", "TABLE"),
+            native_path=native_path,
+            columns=columns,
+        )
 
+        # Wrap in catalog/schema structure
         return SchemaResponse(
-            source_id=schema_info.get("source_id", "unknown"),
-            source_type=source_type,
-            source_category=source_category,
+            source_id="unknown",
+            source_type=SourceType.POSTGRESQL,
+            source_category=SourceCategory.DATABASE,
             fetched_at=datetime.now(),
-            catalogs=catalogs,
+            catalogs=[
+                Catalog(
+                    name="default",
+                    schemas=[Schema(name=schema_name, tables=[table])],
+                )
+            ],
         )
 
     def _to_lineage(self, lineage_info: dict[str, Any] | None) -> LineageContext | None:

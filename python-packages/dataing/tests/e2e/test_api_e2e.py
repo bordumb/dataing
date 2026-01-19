@@ -156,7 +156,7 @@ class TestAPIEndToEnd:
 
         payload = {
             "alert": {
-                "dataset_id": "public.orders",
+                "dataset_ids": ["public.orders"],
                 "metric_spec": {
                     "metric_type": "column",
                     "expression": "row_count",

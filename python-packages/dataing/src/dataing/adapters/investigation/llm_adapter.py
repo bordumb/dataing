@@ -48,7 +48,7 @@ def _create_minimal_alert(alert_summary: str) -> AnomalyAlert:
         columns_referenced=[],
     )
     return AnomalyAlert(
-        dataset_id="unknown",
+        dataset_ids=["unknown"],
         metric_spec=metric_spec,
         anomaly_type="unknown",
         expected_value=0,

@@ -21,6 +21,7 @@ from .correlation_context import Correlation, CorrelationContext, TimeSeriesPatt
 from .engine import ContextEngine, DefaultContextEngine, EnrichedContext
 from .query_context import QueryContext, QueryExecutionError
 from .schema_context import SchemaContextBuilder
+from .schema_lookup import SchemaLookupAdapter
 
 __all__ = [
     # Core engine
@@ -30,6 +31,7 @@ __all__ = [
     "InvestigationContext",
     # Schema
     "SchemaContextBuilder",
+    "SchemaLookupAdapter",
     # Query execution
     "QueryContext",
     "QueryExecutionError",

@@ -35,28 +35,33 @@ logger = structlog.get_logger()
 class EnrichedContext:
     """Extended context with anomaly confirmation and correlations.
 
+    The LLM now accesses schema through tools (see bond.tools.schema)
+    rather than having full schema formatted upfront, so schema_formatted
+    is no longer included here.
+
     Attributes:
         base: The base investigation context (schema + lineage).
         anomaly_confirmed: Whether the anomaly was verified in data.
         confirmation: Anomaly confirmation details.
         correlations: Cross-table correlations found.
-        schema_formatted: Schema formatted for LLM prompt.
     """
 
     base: InvestigationContext
     anomaly_confirmed: bool
     confirmation: AnomalyConfirmation | None
     correlations: list[Correlation]
-    schema_formatted: str
 
 
 class ContextEngine:
     """Thin coordinator for context gathering.
 
     This class orchestrates the specialized context modules:
-    - SchemaContextBuilder: Schema discovery and formatting
+    - SchemaContextBuilder: Schema discovery
     - AnomalyContext: Anomaly confirmation
     - CorrelationContext: Cross-table pattern detection
+
+    Note: The LLM now accesses schema through tools (see bond.tools.schema)
+    rather than having full schema formatted upfront.
     """
 
     def __init__(
@@ -230,15 +235,15 @@ class ContextEngine:
             log.warning("correlation_analysis_failed", error=str(e))
             correlations = []
 
-        # 4. Format schema for LLM
-        schema_formatted = self.schema_builder.format_for_llm(base.schema)
+        # Note: Schema is no longer formatted here. The LLM accesses schema
+        # through tools (see bond.tools.schema) rather than having full
+        # schema dumped upfront.
 
         return EnrichedContext(
             base=base,
             anomaly_confirmed=anomaly_confirmed,
             confirmation=confirmation,
             correlations=correlations,
-            schema_formatted=schema_formatted,
         )
 
 

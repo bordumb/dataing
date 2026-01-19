@@ -1,0 +1,15 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "investigator"
+version = "0.1.0"
+description = "Rust-powered investigation state machine runtime"
+requires-python = ">=3.11"
+dependencies = []
+# Note: dataing-investigator (Rust bindings) is installed separately via maturin
+# It cannot be listed as a dependency because it requires native compilation
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/investigator"]

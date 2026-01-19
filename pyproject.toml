@@ -8,6 +8,7 @@ license = { text = "MIT" }
 authors = [{ name = "dataing team" }]
 dependencies = [
     "bond",
+    "investigator",
     "fastapi[standard]>=0.109.0",
     "uvicorn[standard]>=0.27.0",
     "pydantic[email]>=2.5.0",
@@ -160,5 +161,6 @@ dev = [
 
 [tool.uv.sources]
 bond = { path = "python-packages/bond", editable = true }
+investigator = { path = "python-packages/investigator", editable = true }
 # Note: dataing-investigator is built separately via `just rust-dev` (maturin)
 # It cannot be included as a uv source because it requires native compilation

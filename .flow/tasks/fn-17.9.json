@@ -7,10 +7,21 @@
     "fn-17.8"
   ],
   "epic": "fn-17",
+  "evidence": {
+    "commits": [
+      "65b0b7fa"
+    ],
+    "prs": [],
+    "tests": [
+      "just rust-dev",
+      "uv sync",
+      "Python import"
+    ]
+  },
   "id": "fn-17.9",
   "priority": null,
   "spec_path": ".flow/tasks/fn-17.9.md",
-  "status": "in_progress",
+  "status": "done",
   "title": "Integrate Rust bindings with uv workspace",
-  "updated_at": "2026-01-19T02:04:05.936600Z"
+  "updated_at": "2026-01-19T02:06:10.698820Z"
 }

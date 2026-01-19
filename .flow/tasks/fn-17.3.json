@@ -7,10 +7,19 @@
     "fn-17.2"
   ],
   "epic": "fn-17",
+  "evidence": {
+    "commits": [
+      "9994c1df"
+    ],
+    "prs": [],
+    "tests": [
+      "cargo test"
+    ]
+  },
   "id": "fn-17.3",
   "priority": null,
   "spec_path": ".flow/tasks/fn-17.3.md",
-  "status": "in_progress",
+  "status": "done",
   "title": "Implement protocol types (Event, Intent)",
-  "updated_at": "2026-01-19T01:53:21.451708Z"
+  "updated_at": "2026-01-19T01:54:36.888395Z"
 }

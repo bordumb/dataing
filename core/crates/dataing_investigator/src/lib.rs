@@ -23,14 +23,15 @@ pub const PROTOCOL_VERSION: u32 = 1;
 
 pub mod domain;
 pub mod protocol;
+pub mod state;
 
 // Modules will be added in subsequent tasks:
-// pub mod state;     // fn-17.4
 // pub mod machine;   // fn-17.5
 
 // Re-export types for convenience
 pub use domain::{CallKind, CallMeta, Scope};
 pub use protocol::{Event, Intent};
+pub use state::{Phase, State};
 
 #[cfg(test)]
 mod tests {

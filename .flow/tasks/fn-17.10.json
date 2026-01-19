@@ -7,10 +7,21 @@
     "fn-17.9"
   ],
   "epic": "fn-17",
+  "evidence": {
+    "commits": [
+      "161eedb6"
+    ],
+    "prs": [],
+    "tests": [
+      "uv sync",
+      "just rust-dev",
+      "Python import"
+    ]
+  },
   "id": "fn-17.10",
   "priority": null,
   "spec_path": ".flow/tasks/fn-17.10.md",
-  "status": "in_progress",
+  "status": "done",
   "title": "Create investigator Python package structure",
-  "updated_at": "2026-01-19T02:06:26.908953Z"
+  "updated_at": "2026-01-19T02:07:43.483458Z"
 }

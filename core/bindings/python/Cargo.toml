@@ -1,0 +1,17 @@
+[package]
+name = "dataing_investigator_py"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Python bindings for dataing_investigator"
+
+[lib]
+name = "dataing_investigator"
+crate-type = ["cdylib"]
+
+[dependencies]
+pyo3.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+dataing_investigator = { path = "../../crates/dataing_investigator" }

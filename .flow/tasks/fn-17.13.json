@@ -1,0 +1,17 @@
+{
+  "assignee": null,
+  "claim_note": "",
+  "claimed_at": null,
+  "created_at": "2026-01-19T01:18:52.640563Z",
+  "depends_on": [
+    "fn-17.11",
+    "fn-17.12"
+  ],
+  "epic": "fn-17",
+  "id": "fn-17.13",
+  "priority": null,
+  "spec_path": ".flow/tasks/fn-17.13.md",
+  "status": "todo",
+  "title": "Implement runtime module",
+  "updated_at": "2026-01-19T01:19:11.268462Z"
+}

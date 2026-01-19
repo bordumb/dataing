@@ -450,3 +450,8 @@ export * from "./webhookIssueResponse";
 export * from "./webhookResponse";
 export * from "./webhookResponseLastStatus";
 export * from "./webhookResponseLastTriggeredAt";
+export * from "./dataingEntrypointsApiRoutesDatasourcesTestConnectionResponse";
+export * from "./dataingEntrypointsApiRoutesDatasourcesTestConnectionResponseLatencyMs";
+export * from "./dataingEntrypointsApiRoutesDatasourcesTestConnectionResponseServerVersion";
+export * from "./testConnectionResponseError";
+export * from "./testConnectionResponseTablesAccessible";

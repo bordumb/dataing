@@ -1,0 +1,18 @@
+[workspace]
+members = ["crates/dataing_investigator", "bindings/python"]
+resolver = "2"
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+license = "Apache-2.0"
+repository = "https://github.com/bordumb/dataing"
+
+[workspace.dependencies]
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+pyo3 = { version = "0.23", features = ["extension-module", "abi3-py311"] }
+
+# Required for catch_unwind at FFI boundary
+[profile.release]
+panic = "unwind"

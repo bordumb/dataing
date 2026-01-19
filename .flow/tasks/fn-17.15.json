@@ -1,0 +1,16 @@
+{
+  "assignee": null,
+  "claim_note": "",
+  "claimed_at": null,
+  "created_at": "2026-01-19T01:18:53.007755Z",
+  "depends_on": [
+    "fn-17.9"
+  ],
+  "epic": "fn-17",
+  "id": "fn-17.15",
+  "priority": null,
+  "spec_path": ".flow/tasks/fn-17.15.md",
+  "status": "todo",
+  "title": "Add Python integration tests for bindings",
+  "updated_at": "2026-01-19T01:19:11.623468Z"
+}

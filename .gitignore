@@ -165,6 +165,12 @@ chainlit.md
 /investigations/
 *.investigation.json
 
+# Performance benchmark data
+tests/performance/.temporal/
+tests/performance/results.json
+tests/performance/results.md
+benchmarks/
+
 ############################
 # Helm / Kubernetes
 ############################

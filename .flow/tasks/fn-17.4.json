@@ -8,10 +8,19 @@
     "fn-17.3"
   ],
   "epic": "fn-17",
+  "evidence": {
+    "commits": [
+      "a8ee797d"
+    ],
+    "prs": [],
+    "tests": [
+      "cargo test"
+    ]
+  },
   "id": "fn-17.4",
   "priority": null,
   "spec_path": ".flow/tasks/fn-17.4.md",
-  "status": "in_progress",
+  "status": "done",
   "title": "Implement state module with Phase enum",
-  "updated_at": "2026-01-19T01:54:49.849310Z"
+  "updated_at": "2026-01-19T01:56:28.411073Z"
 }

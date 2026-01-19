@@ -29,8 +29,8 @@ pub mod state;
 // Re-export types for convenience
 pub use domain::{CallKind, CallMeta, Scope};
 pub use machine::Investigator;
-pub use protocol::{Event, Intent};
-pub use state::{Phase, State};
+pub use protocol::{Envelope, ErrorKind, Event, Intent, MachineError};
+pub use state::{phase_name, PendingCall, Phase, State};
 
 #[cfg(test)]
 mod tests {

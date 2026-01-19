@@ -6,10 +6,23 @@
 
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 use crate::domain::{CallMeta, Scope};
 use crate::PROTOCOL_VERSION;
+
+/// Pending call awaiting scheduling by the workflow.
+///
+/// When the machine emits a RequestCall intent, it transitions to a
+/// "pending" sub-state. The workflow generates a call_id and sends
+/// a CallScheduled event, which completes the scheduling.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct PendingCall {
+    /// Name of the requested operation.
+    pub name: String,
+    /// Whether we're waiting for CallScheduled (true) or CallResult (false).
+    pub awaiting_schedule: bool,
+}
 
 /// Current phase of an investigation.
 ///
@@ -24,32 +37,59 @@ pub enum Phase {
 
     /// Gathering schema and context from the data source.
     GatheringContext {
-        /// ID of the schema discovery call, if initiated.
-        schema_call_id: Option<String>,
+        /// Pending call info, if any.
+        #[serde(default)]
+        pending: Option<PendingCall>,
+        /// Assigned call_id after CallScheduled, if scheduled.
+        #[serde(default)]
+        call_id: Option<String>,
     },
 
     /// Generating hypotheses using LLM.
     GeneratingHypotheses {
-        /// ID of the LLM call for hypothesis generation.
-        llm_call_id: Option<String>,
+        /// Pending call info, if any.
+        #[serde(default)]
+        pending: Option<PendingCall>,
+        /// Assigned call_id after CallScheduled.
+        #[serde(default)]
+        call_id: Option<String>,
     },
 
     /// Evaluating hypotheses by executing queries.
     EvaluatingHypotheses {
-        /// IDs of pending evaluation calls.
-        pending_call_ids: Vec<String>,
+        /// Pending call info for next evaluation.
+        #[serde(default)]
+        pending: Option<PendingCall>,
+        /// IDs of calls awaiting results.
+        #[serde(default)]
+        awaiting_results: Vec<String>,
+        /// Total hypotheses to evaluate.
+        #[serde(default)]
+        total_hypotheses: usize,
+        /// Completed evaluations.
+        #[serde(default)]
+        completed: usize,
     },
 
     /// Waiting for user input (human-in-the-loop).
     AwaitingUser {
-        /// Question presented to the user.
-        question: String,
+        /// Unique ID for this question (workflow-generated).
+        question_id: String,
+        /// Prompt presented to the user.
+        prompt: String,
+        /// Timeout in seconds (0 = no timeout).
+        #[serde(default)]
+        timeout_seconds: u64,
     },
 
     /// Synthesizing findings into final insight.
     Synthesizing {
-        /// ID of the synthesis LLM call.
-        synthesis_call_id: Option<String>,
+        /// Pending call info, if any.
+        #[serde(default)]
+        pending: Option<PendingCall>,
+        /// Assigned call_id after CallScheduled.
+        #[serde(default)]
+        call_id: Option<String>,
     },
 
     /// Investigation completed successfully.
@@ -71,25 +111,23 @@ pub enum Phase {
 /// The state is designed to be serializable for persistence and
 /// resumption from snapshots.
 ///
-/// # ID Generation
+/// # Workflow-Owned IDs and Steps
 ///
-/// Uses `sequence` counter for generating unique IDs within an investigation.
-/// Each call to `generate_id()` increments the sequence, ensuring uniqueness
-/// even after snapshot restoration.
+/// The workflow (Temporal) owns ID generation and step counting.
+/// The state machine validates but does not generate these values.
+/// This ensures deterministic replay.
 ///
-/// # Logical Clock
+/// # Idempotency
 ///
-/// The `step` counter acts as a logical clock, incremented for each
-/// event processed. This enables ordering of events and debugging.
+/// The `seen_event_ids` set enables event deduplication. Duplicate
+/// events are silently ignored (returns current intent without
+/// state change).
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct State {
     /// Protocol version for this state snapshot.
     pub version: u32,
 
-    /// Sequence counter for ID generation (monotonically increasing).
-    pub sequence: u64,
-
-    /// Logical clock / step counter (events processed).
+    /// Last processed step (workflow-owned, validated for monotonicity).
     pub step: u64,
 
     /// Investigation objective/description.
@@ -103,7 +141,7 @@ pub struct State {
     /// Current phase of the investigation.
     pub phase: Phase,
 
-    /// Collected evidence keyed by hypothesis ID.
+    /// Collected evidence keyed by identifier.
     #[serde(default)]
     pub evidence: BTreeMap<String, Value>,
 
@@ -111,9 +149,13 @@ pub struct State {
     #[serde(default)]
     pub call_index: BTreeMap<String, CallMeta>,
 
-    /// Order in which calls were initiated.
+    /// Order in which calls were completed.
     #[serde(default)]
     pub call_order: Vec<String>,
+
+    /// Event IDs that have been processed (for deduplication).
+    #[serde(default)]
+    pub seen_event_ids: BTreeSet<String>,
 }
 
 impl Default for State {
@@ -125,13 +167,12 @@ impl Default for State {
 impl State {
     /// Create a new state with default values.
     ///
-    /// Initializes with current protocol version, zero counters,
+    /// Initializes with current protocol version, zero step,
     /// and Init phase.
     #[must_use]
     pub fn new() -> Self {
         State {
             version: PROTOCOL_VERSION,
-            sequence: 0,
             step: 0,
             objective: None,
             scope: None,
@@ -139,41 +180,36 @@ impl State {
             evidence: BTreeMap::new(),
             call_index: BTreeMap::new(),
             call_order: Vec::new(),
+            seen_event_ids: BTreeSet::new(),
         }
     }
 
-    /// Generate a unique ID with the given prefix.
-    ///
-    /// Increments the sequence counter and returns a prefixed ID.
-    /// Format: `{prefix}_{sequence}`
-    ///
-    /// # Example
-    ///
-    /// ```
-    /// use dataing_investigator::state::State;
-    ///
-    /// let mut state = State::new();
-    /// assert_eq!(state.generate_id("call"), "call_1");
-    /// assert_eq!(state.generate_id("call"), "call_2");
-    /// assert_eq!(state.generate_id("hyp"), "hyp_3");
-    /// ```
-    pub fn generate_id(&mut self, prefix: &str) -> String {
-        self.sequence += 1;
-        format!("{}_{}", prefix, self.sequence)
+    /// Check if an event ID has already been processed.
+    #[must_use]
+    pub fn is_duplicate_event(&self, event_id: &str) -> bool {
+        self.seen_event_ids.contains(event_id)
     }
 
-    /// Increment the step counter.
-    ///
-    /// Called when processing each event to advance the logical clock.
-    pub fn advance_step(&mut self) {
-        self.step += 1;
+    /// Mark an event ID as processed.
+    pub fn mark_event_processed(&mut self, event_id: String) {
+        self.seen_event_ids.insert(event_id);
+    }
+
+    /// Update the step counter (workflow-owned).
+    pub fn set_step(&mut self, step: u64) {
+        self.step = step;
+    }
+
+    /// Check if state is in a terminal phase.
+    #[must_use]
+    pub fn is_terminal(&self) -> bool {
+        matches!(self.phase, Phase::Finished { .. } | Phase::Failed { .. })
     }
 }
 
 impl PartialEq for State {
     fn eq(&self, other: &Self) -> bool {
         self.version == other.version
-            && self.sequence == other.sequence
             && self.step == other.step
             && self.objective == other.objective
             && self.scope == other.scope
@@ -181,6 +217,22 @@ impl PartialEq for State {
             && self.evidence == other.evidence
             && self.call_index == other.call_index
             && self.call_order == other.call_order
+            && self.seen_event_ids == other.seen_event_ids
+    }
+}
+
+/// Get a human-readable name for a phase.
+#[must_use]
+pub fn phase_name(phase: &Phase) -> &'static str {
+    match phase {
+        Phase::Init => "init",
+        Phase::GatheringContext { .. } => "gathering_context",
+        Phase::GeneratingHypotheses { .. } => "generating_hypotheses",
+        Phase::EvaluatingHypotheses { .. } => "evaluating_hypotheses",
+        Phase::AwaitingUser { .. } => "awaiting_user",
+        Phase::Synthesizing { .. } => "synthesizing",
+        Phase::Finished { .. } => "finished",
+        Phase::Failed { .. } => "failed",
     }
 }
 
@@ -194,7 +246,6 @@ mod tests {
         let state = State::new();
 
         assert_eq!(state.version, PROTOCOL_VERSION);
-        assert_eq!(state.sequence, 0);
         assert_eq!(state.step, 0);
         assert_eq!(state.phase, Phase::Init);
         assert!(state.objective.is_none());
@@ -202,28 +253,52 @@ mod tests {
         assert!(state.evidence.is_empty());
         assert!(state.call_index.is_empty());
         assert!(state.call_order.is_empty());
+        assert!(state.seen_event_ids.is_empty());
     }
 
     #[test]
-    fn test_generate_id() {
+    fn test_set_step() {
         let mut state = State::new();
 
-        assert_eq!(state.generate_id("call"), "call_1");
-        assert_eq!(state.generate_id("call"), "call_2");
-        assert_eq!(state.generate_id("hyp"), "hyp_3");
-        assert_eq!(state.sequence, 3);
+        state.set_step(5);
+        assert_eq!(state.step, 5);
+
+        state.set_step(10);
+        assert_eq!(state.step, 10);
     }
 
     #[test]
-    fn test_advance_step() {
+    fn test_duplicate_event_detection() {
         let mut state = State::new();
 
-        state.advance_step();
-        assert_eq!(state.step, 1);
+        assert!(!state.is_duplicate_event("evt_001"));
 
-        state.advance_step();
-        state.advance_step();
-        assert_eq!(state.step, 3);
+        state.mark_event_processed("evt_001".to_string());
+
+        assert!(state.is_duplicate_event("evt_001"));
+        assert!(!state.is_duplicate_event("evt_002"));
+    }
+
+    #[test]
+    fn test_is_terminal() {
+        let mut state = State::new();
+        assert!(!state.is_terminal());
+
+        state.phase = Phase::GatheringContext {
+            pending: None,
+            call_id: None,
+        };
+        assert!(!state.is_terminal());
+
+        state.phase = Phase::Finished {
+            insight: "done".to_string(),
+        };
+        assert!(state.is_terminal());
+
+        state.phase = Phase::Failed {
+            error: "error".to_string(),
+        };
+        assert!(state.is_terminal());
     }
 
     #[test]
@@ -231,22 +306,34 @@ mod tests {
         let phases = vec![
             Phase::Init,
             Phase::GatheringContext {
-                schema_call_id: Some("call_1".to_string()),
+                pending: Some(PendingCall {
+                    name: "get_schema".to_string(),
+                    awaiting_schedule: true,
+                }),
+                call_id: None,
             },
             Phase::GatheringContext {
-                schema_call_id: None,
+                pending: None,
+                call_id: Some("call_1".to_string()),
             },
             Phase::GeneratingHypotheses {
-                llm_call_id: Some("call_2".to_string()),
+                pending: None,
+                call_id: Some("call_2".to_string()),
             },
             Phase::EvaluatingHypotheses {
-                pending_call_ids: vec!["call_3".to_string(), "call_4".to_string()],
+                pending: None,
+                awaiting_results: vec!["call_3".to_string(), "call_4".to_string()],
+                total_hypotheses: 3,
+                completed: 1,
             },
             Phase::AwaitingUser {
-                question: "Proceed?".to_string(),
+                question_id: "q_1".to_string(),
+                prompt: "Proceed?".to_string(),
+                timeout_seconds: 3600,
             },
             Phase::Synthesizing {
-                synthesis_call_id: None,
+                pending: None,
+                call_id: None,
             },
             Phase::Finished {
                 insight: "Root cause found".to_string(),
@@ -264,14 +351,23 @@ mod tests {
     }
 
     #[test]
-    fn test_phase_tagged_format() {
-        let phase = Phase::GatheringContext {
-            schema_call_id: Some("call_1".to_string()),
-        };
-        let json = serde_json::to_string(&phase).expect("serialize");
-
-        assert!(json.contains(r#""type":"GatheringContext""#));
-        assert!(json.contains(r#""data""#));
+    fn test_phase_name() {
+        assert_eq!(phase_name(&Phase::Init), "init");
+        assert_eq!(
+            phase_name(&Phase::GatheringContext {
+                pending: None,
+                call_id: None
+            }),
+            "gathering_context"
+        );
+        assert_eq!(
+            phase_name(&Phase::AwaitingUser {
+                question_id: "q".to_string(),
+                prompt: "p".to_string(),
+                timeout_seconds: 0,
+            }),
+            "awaiting_user"
+        );
     }
 
     #[test]
@@ -285,7 +381,8 @@ mod tests {
             extra: BTreeMap::new(),
         });
         state.phase = Phase::GeneratingHypotheses {
-            llm_call_id: Some("call_1".to_string()),
+            pending: None,
+            call_id: Some("call_1".to_string()),
         };
         state.evidence.insert(
             "hyp_1".to_string(),
@@ -303,7 +400,8 @@ mod tests {
         );
         state.call_order.push("call_1".to_string());
         state.step = 3;
-        state.sequence = 5;
+        state.seen_event_ids.insert("evt_1".to_string());
+        state.seen_event_ids.insert("evt_2".to_string());
 
         let json = serde_json::to_string(&state).expect("serialize");
         let deser: State = serde_json::from_str(&json).expect("deserialize");
@@ -316,7 +414,6 @@ mod tests {
         // Simulate a minimal snapshot (forward compatibility test)
         let json = r#"{
             "version": 1,
-            "sequence": 0,
             "step": 0,
             "phase": {"type": "Init"}
         }"#;
@@ -329,27 +426,22 @@ mod tests {
         assert!(state.evidence.is_empty());
         assert!(state.call_index.is_empty());
         assert!(state.call_order.is_empty());
+        assert!(state.seen_event_ids.is_empty());
     }
 
     #[test]
-    fn test_btreemap_ordering() {
+    fn test_btreeset_ordering() {
         let mut state = State::new();
-        state
-            .evidence
-            .insert("z_hyp".to_string(), Value::Bool(true));
-        state
-            .evidence
-            .insert("a_hyp".to_string(), Value::Bool(true));
-        state
-            .evidence
-            .insert("m_hyp".to_string(), Value::Bool(true));
+        state.mark_event_processed("evt_z".to_string());
+        state.mark_event_processed("evt_a".to_string());
+        state.mark_event_processed("evt_m".to_string());
 
         let json = serde_json::to_string(&state).expect("serialize");
 
-        // BTreeMap ensures alphabetical ordering
-        let a_pos = json.find("a_hyp").expect("a_hyp");
-        let m_pos = json.find("m_hyp").expect("m_hyp");
-        let z_pos = json.find("z_hyp").expect("z_hyp");
+        // BTreeSet ensures alphabetical ordering
+        let a_pos = json.find("evt_a").expect("evt_a");
+        let m_pos = json.find("evt_m").expect("evt_m");
+        let z_pos = json.find("evt_z").expect("evt_z");
 
         assert!(a_pos < m_pos);
         assert!(m_pos < z_pos);

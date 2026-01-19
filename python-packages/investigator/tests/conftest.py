@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import json
 from typing import Any
 
 import pytest
@@ -17,18 +16,6 @@ def basic_scope() -> dict[str, Any]:
         "tenant_id": "test-tenant",
         "permissions": ["orders", "customers"],
     }
-
-
-@pytest.fixture
-def start_event(basic_scope: dict[str, Any]) -> str:
-    """Create a Start event JSON string."""
-    return json.dumps({
-        "type": "Start",
-        "payload": {
-            "objective": "Test investigation",
-            "scope": basic_scope,
-        },
-    })
 
 
 @pytest.fixture

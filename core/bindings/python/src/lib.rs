@@ -9,6 +9,10 @@
 //! - `StateError`: Base exception for all state machine errors
 //! - `SerializationError`: JSON serialization/deserialization failures
 //! - `InvalidTransitionError`: Invalid state transitions
+//! - `ProtocolMismatchError`: Protocol version mismatch
+//! - `DuplicateEventError`: Duplicate event ID (idempotent, not an error in practice)
+//! - `StepViolationError`: Step not monotonically increasing
+//! - `UnexpectedCallError`: Unexpected call_id received
 //!
 //! # Panic Safety
 //!
@@ -26,6 +30,11 @@ use ::dataing_investigator as core;
 pyo3::create_exception!(dataing_investigator, StateError, pyo3::exceptions::PyException);
 pyo3::create_exception!(dataing_investigator, SerializationError, StateError);
 pyo3::create_exception!(dataing_investigator, InvalidTransitionError, StateError);
+pyo3::create_exception!(dataing_investigator, ProtocolMismatchError, StateError);
+pyo3::create_exception!(dataing_investigator, DuplicateEventError, StateError);
+pyo3::create_exception!(dataing_investigator, StepViolationError, StateError);
+pyo3::create_exception!(dataing_investigator, UnexpectedCallError, StateError);
+pyo3::create_exception!(dataing_investigator, InvariantError, StateError);
 
 /// Returns the protocol version used by the state machine.
 #[pyfunction]
@@ -84,48 +93,73 @@ impl Investigator {
             .map_err(|e| SerializationError::new_err(format!("Snapshot serialization failed: {}", e)))
     }
 
-    /// Process an optional event and return the next intent.
+    /// Process an event envelope and return the next intent.
     ///
     /// This is the main entry point for interacting with the state machine.
-    /// Call with an event JSON to advance the state, or with None to query
-    /// the current intent without providing new input.
+    /// The envelope must include protocol_version, event_id, step, and event.
     ///
     /// Args:
-    ///     event_json: JSON string of the event, or None for query-only
+    ///     envelope_json: JSON string of the envelope containing the event
     ///
     /// Returns:
     ///     JSON string of the resulting intent
     ///
     /// Raises:
-    ///     SerializationError: If event JSON is invalid or intent serialization fails
+    ///     SerializationError: If envelope JSON is invalid or intent serialization fails
+    ///     ProtocolMismatchError: If protocol version doesn't match
+    ///     StepViolationError: If step is not monotonically increasing
     ///     InvalidTransitionError: If the event causes an invalid state transition
-    #[pyo3(signature = (event_json=None))]
-    fn ingest(&mut self, event_json: Option<&str>) -> PyResult<String> {
-        // Parse event if provided
-        let event = match event_json {
-            Some(json) => {
-                let e: core::Event = serde_json::from_str(json)
-                    .map_err(|e| SerializationError::new_err(format!("Invalid event JSON: {}", e)))?;
-                Some(e)
-            }
-            None => None,
-        };
+    ///     UnexpectedCallError: If an unexpected call_id is received
+    fn ingest(&mut self, envelope_json: &str) -> PyResult<String> {
+        // Parse envelope
+        let envelope: core::Envelope = serde_json::from_str(envelope_json)
+            .map_err(|e| SerializationError::new_err(format!("Invalid envelope JSON: {}", e)))?;
 
         // Use catch_unwind for panic safety at FFI boundary
         let result = catch_unwind(AssertUnwindSafe(|| {
-            self.inner.ingest(event)
+            self.inner.ingest(envelope)
         }));
 
-        let intent = match result {
-            Ok(intent) => intent,
+        let intent_result = match result {
+            Ok(r) => r,
             Err(_) => {
                 return Err(StateError::new_err("Internal error: Rust panic caught at FFI boundary"));
             }
         };
 
-        // Note: Intent::Error is a valid response, not an exception.
-        // The caller can inspect the intent type in Python to handle errors.
+        // Convert MachineError to appropriate Python exception
+        let intent = match intent_result {
+            Ok(i) => i,
+            Err(e) => {
+                let msg = e.to_string();
+                return Err(match e.kind {
+                    core::ErrorKind::InvalidTransition => InvalidTransitionError::new_err(msg),
+                    core::ErrorKind::Serialization => SerializationError::new_err(msg),
+                    core::ErrorKind::ProtocolMismatch => ProtocolMismatchError::new_err(msg),
+                    core::ErrorKind::DuplicateEvent => DuplicateEventError::new_err(msg),
+                    core::ErrorKind::StepViolation => StepViolationError::new_err(msg),
+                    core::ErrorKind::UnexpectedCall => UnexpectedCallError::new_err(msg),
+                    core::ErrorKind::Invariant => InvariantError::new_err(msg),
+                });
+            }
+        };
 
+        serde_json::to_string(&intent)
+            .map_err(|e| SerializationError::new_err(format!("Intent serialization failed: {}", e)))
+    }
+
+    /// Query the current intent without providing an event.
+    ///
+    /// Useful for getting the initial intent or checking state without
+    /// advancing the state machine.
+    ///
+    /// Returns:
+    ///     JSON string of the current intent
+    ///
+    /// Raises:
+    ///     SerializationError: If intent serialization fails
+    fn query(&self) -> PyResult<String> {
+        let intent = self.inner.query();
         serde_json::to_string(&intent)
             .map_err(|e| SerializationError::new_err(format!("Intent serialization failed: {}", e)))
     }
@@ -150,17 +184,16 @@ impl Investigator {
 
     /// Get the current step (logical clock value).
     ///
-    /// The step counter increments with each event processed.
+    /// The step is owned by the workflow and validated for monotonicity.
     fn current_step(&self) -> u64 {
-        self.inner.snapshot().step
+        self.inner.current_step()
     }
 
     /// Check if the investigation is in a terminal state.
     ///
     /// Returns True if phase is 'finished' or 'failed'.
     fn is_terminal(&self) -> bool {
-        let phase = self.current_phase();
-        phase == "finished" || phase == "failed"
+        self.inner.is_terminal()
     }
 
     /// Get string representation.
@@ -186,6 +219,11 @@ fn dataing_investigator(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add("StateError", m.py().get_type::<StateError>())?;
     m.add("SerializationError", m.py().get_type::<SerializationError>())?;
     m.add("InvalidTransitionError", m.py().get_type::<InvalidTransitionError>())?;
+    m.add("ProtocolMismatchError", m.py().get_type::<ProtocolMismatchError>())?;
+    m.add("DuplicateEventError", m.py().get_type::<DuplicateEventError>())?;
+    m.add("StepViolationError", m.py().get_type::<StepViolationError>())?;
+    m.add("UnexpectedCallError", m.py().get_type::<UnexpectedCallError>())?;
+    m.add("InvariantError", m.py().get_type::<InvariantError>())?;
 
     Ok(())
 }

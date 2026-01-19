@@ -17,6 +17,7 @@ ROOT_DIR = Path(".")
 SEARCH_PREFIXES = [
     "python-packages/dataing",
     "python-packages/bond",
+    "python-packages/investigator",
     "core",
     # "frontend",
     # "docs/feedback",
@@ -44,6 +45,9 @@ INCLUDE_EXTS = {
     ".jsx",
     ".css",
     ".html",
+    ".rs",
+    ".toml",
+    
 }
 
 EXCLUDE = {

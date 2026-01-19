@@ -7,16 +7,17 @@ Useful for testing and simple deployments.
 from __future__ import annotations
 
 import json
+import uuid
 from typing import Any, Callable, TypeVar
 
-from dataing_investigator import Investigator
+from dataing_investigator import Investigator, protocol_version
 
-from .envelope import create_trace, wrap
-from .security import SecurityViolation, validate_tool_call
+from .envelope import create_trace
+from .security import validate_tool_call
 
 # Type alias for tool executor function
 ToolExecutor = Callable[[str, dict[str, Any]], Any]
-UserResponder = Callable[[str], str]
+UserResponder = Callable[[str, str], str]  # (question_id, prompt) -> response
 
 T = TypeVar("T")
 
@@ -25,6 +26,32 @@ class InvestigationError(Exception):
     """Raised when an investigation fails."""
 
     pass
+
+
+class EnvelopeBuilder:
+    """Builds event envelopes with monotonically increasing steps."""
+
+    def __init__(self) -> None:
+        """Initialize envelope builder."""
+        self._step = 0
+
+    def build(self, event: dict[str, Any]) -> str:
+        """Build an envelope for the given event.
+
+        Args:
+            event: The event payload.
+
+        Returns:
+            JSON string of the envelope.
+        """
+        self._step += 1
+        envelope = {
+            "protocol_version": protocol_version(),
+            "event_id": f"evt_{uuid.uuid4().hex[:12]}",
+            "step": self._step,
+            "event": event,
+        }
+        return json.dumps(envelope)
 
 
 async def run_local(
@@ -48,6 +75,7 @@ async def run_local(
         tool_executor: Async function to execute tool calls.
             Signature: (tool_name: str, args: dict) -> Any
         user_responder: Optional function to get user responses for HITL.
+            Signature: (question_id: str, prompt: str) -> str
             If None and user response is needed, raises RuntimeError.
         max_steps: Maximum number of steps before aborting (prevents infinite loops).
 
@@ -61,24 +89,40 @@ async def run_local(
     """
     inv = Investigator()
     trace_id = create_trace()
+    envelope_builder = EnvelopeBuilder()
 
     # Build and send Start event
-    start_event = _build_start_event(objective, scope)
-    intent = _ingest_and_parse(inv, start_event)
+    start_event = {"type": "Start", "payload": {"objective": objective, "scope": scope}}
+    envelope = envelope_builder.build(start_event)
+    intent = _ingest_and_parse(inv, envelope)
 
-    steps = 0
-    while steps < max_steps:
-        steps += 1
+    loop_count = 0
+    while loop_count < max_steps:
+        loop_count += 1
 
         if intent["type"] == "Idle":
-            # State machine waiting - query again without event
-            intent = _ingest_and_parse(inv, None)
+            # State machine waiting - query without event
+            intent = json.loads(inv.query())
 
-        elif intent["type"] == "Call":
+        elif intent["type"] == "RequestCall":
             payload = intent["payload"]
-            call_id = payload["call_id"]
             tool_name = payload["name"]
             args = payload["args"]
+
+            # Generate a call_id and send CallScheduled
+            call_id = f"call_{uuid.uuid4().hex[:12]}"
+            scheduled_event = {
+                "type": "CallScheduled",
+                "payload": {"call_id": call_id, "name": tool_name},
+            }
+            envelope = envelope_builder.build(scheduled_event)
+            intent = _ingest_and_parse(inv, envelope)
+
+            # Should return Idle, now execute the tool
+            if intent["type"] != "Idle":
+                raise InvestigationError(
+                    f"Expected Idle after CallScheduled, got {intent['type']}"
+                )
 
             # Security validation before execution
             validate_tool_call(tool_name, args, scope)
@@ -91,30 +135,40 @@ async def run_local(
                 result = {"error": str(e)}
 
             # Send CallResult event
-            call_result_event = _build_call_result_event(call_id, result)
-            intent = _ingest_and_parse(inv, call_result_event)
+            call_result_event = {
+                "type": "CallResult",
+                "payload": {"call_id": call_id, "output": result},
+            }
+            envelope = envelope_builder.build(call_result_event)
+            intent = _ingest_and_parse(inv, envelope)
 
         elif intent["type"] == "RequestUser":
-            question = intent["payload"]["question"]
+            payload = intent["payload"]
+            question_id = payload["question_id"]
+            prompt = payload["prompt"]
 
             if user_responder is None:
                 raise RuntimeError(
-                    f"User response required but no responder provided. Question: {question}"
+                    f"User response required but no responder provided. Prompt: {prompt}"
                 )
 
             # Get user response
-            response = user_responder(question)
+            response = user_responder(question_id, prompt)
 
             # Send UserResponse event
-            user_response_event = _build_user_response_event(response)
-            intent = _ingest_and_parse(inv, user_response_event)
+            user_response_event = {
+                "type": "UserResponse",
+                "payload": {"question_id": question_id, "content": response},
+            }
+            envelope = envelope_builder.build(user_response_event)
+            intent = _ingest_and_parse(inv, envelope)
 
         elif intent["type"] == "Finish":
             # Success - return the insight
             return {
                 "status": "completed",
                 "insight": intent["payload"]["insight"],
-                "steps": steps,
+                "steps": loop_count,
                 "trace_id": trace_id,
             }
 
@@ -128,85 +182,19 @@ async def run_local(
     raise InvestigationError(f"Investigation exceeded max_steps ({max_steps})")
 
 
-def _ingest_and_parse(inv: Investigator, event_json: str | None) -> dict[str, Any]:
-    """Ingest an event and parse the resulting intent.
+def _ingest_and_parse(inv: Investigator, envelope_json: str) -> dict[str, Any]:
+    """Ingest an envelope and parse the resulting intent.
 
     Args:
         inv: The Investigator instance.
-        event_json: JSON string of the event, or None.
+        envelope_json: JSON string of the envelope.
 
     Returns:
         Parsed intent dictionary.
     """
-    intent_json = inv.ingest(event_json)
+    intent_json = inv.ingest(envelope_json)
     result: dict[str, Any] = json.loads(intent_json)
     return result
-
-
-def _build_start_event(objective: str, scope: dict[str, Any]) -> str:
-    """Build a Start event JSON string.
-
-    Args:
-        objective: Investigation objective.
-        scope: Security scope.
-
-    Returns:
-        JSON string of the Start event.
-    """
-    return json.dumps({
-        "type": "Start",
-        "payload": {
-            "objective": objective,
-            "scope": scope,
-        },
-    })
-
-
-def _build_call_result_event(call_id: str, output: Any) -> str:
-    """Build a CallResult event JSON string.
-
-    Args:
-        call_id: ID of the call being responded to.
-        output: Result of the tool execution.
-
-    Returns:
-        JSON string of the CallResult event.
-    """
-    return json.dumps({
-        "type": "CallResult",
-        "payload": {
-            "call_id": call_id,
-            "output": output,
-        },
-    })
-
-
-def _build_user_response_event(content: str) -> str:
-    """Build a UserResponse event JSON string.
-
-    Args:
-        content: User's response content.
-
-    Returns:
-        JSON string of the UserResponse event.
-    """
-    return json.dumps({
-        "type": "UserResponse",
-        "payload": {
-            "content": content,
-        },
-    })
-
-
-def _build_cancel_event() -> str:
-    """Build a Cancel event JSON string.
-
-    Returns:
-        JSON string of the Cancel event.
-    """
-    return json.dumps({
-        "type": "Cancel",
-    })
 
 
 class LocalInvestigator:
@@ -217,18 +205,20 @@ class LocalInvestigator:
 
     Example:
         >>> inv = LocalInvestigator()
-        >>> inv.start("Find null spike", scope)
+        >>> intent = inv.start("Find null spike", scope)
         >>> while not inv.is_terminal:
         ...     intent = inv.current_intent()
-        ...     if intent["type"] == "Call":
+        ...     if intent["type"] == "RequestCall":
+        ...         call_id = inv.schedule_call(intent["payload"]["name"])
         ...         result = execute_tool(intent["payload"])
-        ...         inv.send_call_result(intent["payload"]["call_id"], result)
+        ...         intent = inv.send_call_result(call_id, result)
     """
 
     def __init__(self) -> None:
         """Initialize a new local investigator."""
         self._inv = Investigator()
         self._trace_id = create_trace()
+        self._envelope_builder = EnvelopeBuilder()
         self._started = False
 
     @property
@@ -259,8 +249,9 @@ class LocalInvestigator:
         if self._started:
             raise RuntimeError("Investigation already started")
 
-        event = _build_start_event(objective, scope)
-        intent = _ingest_and_parse(self._inv, event)
+        event = {"type": "Start", "payload": {"objective": objective, "scope": scope}}
+        envelope = self._envelope_builder.build(event)
+        intent = _ingest_and_parse(self._inv, envelope)
         self._started = True
         return intent
 
@@ -270,7 +261,26 @@ class LocalInvestigator:
         Returns:
             The current intent.
         """
-        return _ingest_and_parse(self._inv, None)
+        intent_json = self._inv.query()
+        return json.loads(intent_json)
+
+    def schedule_call(self, name: str) -> str:
+        """Schedule a call by sending CallScheduled event.
+
+        Args:
+            name: Name of the tool being scheduled.
+
+        Returns:
+            The generated call_id.
+        """
+        call_id = f"call_{uuid.uuid4().hex[:12]}"
+        event = {
+            "type": "CallScheduled",
+            "payload": {"call_id": call_id, "name": name},
+        }
+        envelope = self._envelope_builder.build(event)
+        _ingest_and_parse(self._inv, envelope)
+        return call_id
 
     def send_call_result(self, call_id: str, output: Any) -> dict[str, Any]:
         """Send a CallResult event.
@@ -282,20 +292,29 @@ class LocalInvestigator:
         Returns:
             The next intent.
         """
-        event = _build_call_result_event(call_id, output)
-        return _ingest_and_parse(self._inv, event)
+        event = {
+            "type": "CallResult",
+            "payload": {"call_id": call_id, "output": output},
+        }
+        envelope = self._envelope_builder.build(event)
+        return _ingest_and_parse(self._inv, envelope)
 
-    def send_user_response(self, content: str) -> dict[str, Any]:
+    def send_user_response(self, question_id: str, content: str) -> dict[str, Any]:
         """Send a UserResponse event.
 
         Args:
+            question_id: ID of the question being answered.
             content: User's response content.
 
         Returns:
             The next intent.
         """
-        event = _build_user_response_event(content)
-        return _ingest_and_parse(self._inv, event)
+        event = {
+            "type": "UserResponse",
+            "payload": {"question_id": question_id, "content": content},
+        }
+        envelope = self._envelope_builder.build(event)
+        return _ingest_and_parse(self._inv, envelope)
 
     def cancel(self) -> dict[str, Any]:
         """Cancel the investigation.
@@ -303,8 +322,9 @@ class LocalInvestigator:
         Returns:
             The Error intent after cancellation.
         """
-        event = _build_cancel_event()
-        return _ingest_and_parse(self._inv, event)
+        event = {"type": "Cancel"}
+        envelope = self._envelope_builder.build(event)
+        return _ingest_and_parse(self._inv, envelope)
 
     def snapshot(self) -> str:
         """Get a JSON snapshot of the current state.

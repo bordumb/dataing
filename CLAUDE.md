@@ -7,9 +7,10 @@ DO NOT WORRY ABOUT LEGACY CODE.
 
 ## Repository Map (Monorepo)
 
-- bond/ - Agent runtime (PydanticAI wrapper, streaming)
-- dataing/ - Community Edition (CE) backend package, migrations, scripts
-- dataing-ee/ - Enterprise Edition (EE) extension package
+- python-packages/ - Python packages (bond, dataing, dataing-ee)
+  - bond/ - Agent runtime (PydanticAI wrapper, streaming)
+  - dataing/ - Community Edition (CE) backend package, migrations, scripts
+  - dataing-ee/ - Enterprise Edition (EE) extension package
 - frontend/ - React + Vite + TypeScript + Tailwind + shadcn/ui
 - docs/ - MkDocs site and ADRs
 - demo/ - Demo fixtures, generator, docker-compose stack
@@ -61,8 +62,8 @@ just demo
 Single test examples:
 
 ```bash
-uv run pytest dataing/tests/unit/core/test_state.py -v
-uv run pytest dataing/tests/unit/core/test_state.py::test_name -v
+uv run pytest python-packages/dataing/tests/unit/core/test_state.py -v
+uv run pytest python-packages/dataing/tests/unit/core/test_state.py::test_name -v
 ```
 
 ## Project Overview
@@ -73,25 +74,25 @@ testing them via SQL queries in parallel, and synthesizing findings into root
 cause analysis.
 
 The repo is open-core:
-- CE lives in `dataing/`
-- EE lives in `dataing-ee/` and extends CE with enterprise-only features
-- `bond/` provides the agent runtime and memory tools used by the backend
+- CE lives in `python-packages/dataing/`
+- EE lives in `python-packages/dataing-ee/` and extends CE with enterprise-only features
+- `python-packages/bond/` provides the agent runtime and memory tools used by the backend
 
 ## Bond Agent Runtime
 
-`bond/src/bond/` wraps PydanticAI for LLM interactions:
+`python-packages/bond/src/bond/` wraps PydanticAI for LLM interactions:
 - `agent.py` - `BondAgent` with streaming and structured output
 - Provides agent orchestration with prompt building and response mapping
 
 ## Backend Architecture (CE)
 
-Core domain: `dataing/src/dataing/core/`
+Core domain: `python-packages/dataing/src/dataing/core/`
 - `investigation/` - Domain entities, repository, collaboration service
 - `auth/`, `rbac/`, `entitlements/` - Identity and feature gating
 - `quality/` - LLM-as-judge quality validation
 - `state.py`, `domain_types.py`, `interfaces.py` - Event-sourced state + protocols
 
-Temporal workflows: `dataing/src/dataing/temporal/`
+Temporal workflows: `python-packages/dataing/src/dataing/temporal/`
 - `workflows.py` - `InvestigationWorkflow` with child workflows for parallel hypothesis evaluation
 - `activities.py` - Activity functions for LLM calls, SQL execution, context gathering
 - `client.py` - `TemporalInvestigationClient` for starting/cancelling workflows
@@ -99,7 +100,7 @@ Temporal workflows: `dataing/src/dataing/temporal/`
 
 Investigation workflow: Uses Temporal for durable execution with `INVESTIGATION_ENGINE=temporal`.
 
-Adapters: `dataing/src/dataing/adapters/`
+Adapters: `python-packages/dataing/src/dataing/adapters/`
 - `datasource/` - SQL, document, filesystem adapters; API base types
 - `lineage/` - Lineage providers (OpenLineage, dbt, Dagster, Airflow, DataHub)
 - `context/`, `investigation/` - Context + LLM/DB step adapters
@@ -107,17 +108,17 @@ Adapters: `dataing/src/dataing/adapters/`
 - `db/` - Application database access
 
 Services + entrypoints:
-- `dataing/src/dataing/services/` - Auth, tenant, usage, notifications
-- `dataing/src/dataing/entrypoints/api/` - FastAPI app, routes, middleware
-- `dataing/src/dataing/models/` - SQLAlchemy models
+- `python-packages/dataing/src/dataing/services/` - Auth, tenant, usage, notifications
+- `python-packages/dataing/src/dataing/entrypoints/api/` - FastAPI app, routes, middleware
+- `python-packages/dataing/src/dataing/models/` - SQLAlchemy models
 
 Agents + safety:
-- `dataing/src/dataing/agents/` - Agent client + prompt templates
-- `dataing/src/dataing/safety/` - SQL validation, circuit breaker, PII checks
+- `python-packages/dataing/src/dataing/agents/` - Agent client + prompt templates
+- `python-packages/dataing/src/dataing/safety/` - SQL validation, circuit breaker, PII checks
 
 ## Enterprise Edition (EE)
 
-`dataing-ee/src/dataing_ee/` extends CE with:
+`python-packages/dataing-ee/src/dataing_ee/` extends CE with:
 - SSO (OIDC/SAML), SCIM, audit logging, and admin settings APIs
 - Enterprise datasource adapters (Salesforce, HubSpot, Stripe)
 
@@ -152,7 +153,7 @@ React + Vite + TypeScript + Tailwind + shadcn/ui.
 - Tests: pytest-asyncio with `asyncio_mode = "auto"`
 - Frontend: TypeScript strict mode, ESLint, Prettier
 - Multi-tenancy: all operations scoped to tenant via API key or JWT auth
-- Migrations live in `dataing/migrations/` and are append-only
+- Migrations live in `python-packages/dataing/migrations/` and are append-only
 - When API shapes change, regenerate the frontend client with `just generate-client`
 
 ## Demo Fixtures

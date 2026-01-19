@@ -58,7 +58,7 @@ dev:
     echo "  Frontend: http://localhost:3000"
     echo ""
 
-    (uv run fastapi dev dataing-ee/src/dataing_ee/entrypoints/api/app.py --host 0.0.0.0 --port 8000) &
+    (uv run fastapi dev python-packages/dataing-ee/src/dataing_ee/entrypoints/api/app.py --host 0.0.0.0 --port 8000) &
     (cd frontend/app && pnpm dev --port 3000) &
     wait
 
@@ -76,7 +76,7 @@ dev-backend:
     export REDIS_PORT=6379
     export ENCRYPTION_KEY=ZnxhCyx4-ZjziPWtUguwGOFMMiLNioSwso5-qNPAGZI=
     if [ -f .env ]; then export $(grep -v '^#' .env | xargs); fi
-    uv run fastapi dev dataing-ee/src/dataing_ee/entrypoints/api/app.py --host 0.0.0.0 --port 8000
+    uv run fastapi dev python-packages/dataing-ee/src/dataing_ee/entrypoints/api/app.py --host 0.0.0.0 --port 8000
 
 # Run CE backend only (no enterprise features). Requires infrastructure.
 dev-backend-ce:
@@ -92,7 +92,7 @@ dev-backend-ce:
     export REDIS_PORT=6379
     export ENCRYPTION_KEY=ZnxhCyx4-ZjziPWtUguwGOFMMiLNioSwso5-qNPAGZI=
     if [ -f .env ]; then export $(grep -v '^#' .env | xargs); fi
-    uv run fastapi dev dataing/src/dataing/entrypoints/api/app.py --host 0.0.0.0 --port 8000
+    uv run fastapi dev python-packages/dataing/src/dataing/entrypoints/api/app.py --host 0.0.0.0 --port 8000
 
 # Stop dev servers
 dev-stop:
@@ -128,17 +128,17 @@ setup-landing:
 # Run all tests (CE + EE)
 test:
     @echo "Running dataing tests..."
-    uv run pytest dataing/tests dataing-ee/tests
+    uv run pytest python-packages/dataing/tests python-packages/dataing-ee/tests
     @echo "Running frontend tests..."
     cd frontend/app && pnpm test
 
 # Run CE tests only
 test-ce:
-    uv run pytest dataing/tests
+    uv run pytest python-packages/dataing/tests
 
 # Run EE tests only
 test-ee:
-    uv run pytest dataing-ee/tests
+    uv run pytest python-packages/dataing-ee/tests
 
 # Run frontend tests only
 test-frontend:
@@ -147,20 +147,20 @@ test-frontend:
 # Run linters (CE + EE)
 lint:
     @echo "Linting dataing..."
-    uv run ruff check dataing/src dataing-ee/src
-    uv run mypy dataing/src/dataing dataing-ee/src/dataing_ee
+    uv run ruff check python-packages/dataing/src python-packages/dataing-ee/src
+    uv run mypy python-packages/dataing/src/dataing python-packages/dataing-ee/src/dataing_ee
     @echo "Linting frontend..."
     cd frontend/app && pnpm lint
 
 # Format code
 format:
-    uv run ruff format dataing/src dataing-ee/src
+    uv run ruff format python-packages/dataing/src python-packages/dataing-ee/src
     cd frontend/app && pnpm format
 
 # Generate OpenAPI client for frontend
 generate-client:
     @echo "Exporting OpenAPI schema from backend..."
-    uv run python dataing/scripts/export_openapi.py
+    uv run python python-packages/dataing/scripts/export_openapi.py
     @echo "Generating OpenAPI client..."
     cd frontend/app && pnpm orval
 
@@ -175,14 +175,14 @@ build:
 
 # Run type checking
 typecheck:
-    uv run mypy dataing/src/dataing dataing-ee/src/dataing_ee
+    uv run mypy python-packages/dataing/src/dataing python-packages/dataing-ee/src/dataing_ee
     cd frontend/app && pnpm typecheck
 
 # Clean build artifacts
 clean:
     rm -rf dist .pytest_cache .ruff_cache .mypy_cache
-    rm -rf dataing/.pytest_cache dataing/.ruff_cache
-    rm -rf dataing-ee/.pytest_cache dataing-ee/.ruff_cache
+    rm -rf python-packages/dataing/.pytest_cache python-packages/dataing/.ruff_cache
+    rm -rf python-packages/dataing-ee/.pytest_cache python-packages/dataing-ee/.ruff_cache
     rm -rf frontend/app/dist frontend/app/node_modules/.cache
     rm -rf frontend/landing/dist frontend/landing/node_modules/.cache
 
@@ -260,7 +260,7 @@ demo-infra:
 
     # Run migrations (skip seed files for clean dev environment)
     echo "Running migrations..."
-    for f in dataing/migrations/*.sql; do
+    for f in python-packages/dataing/migrations/*.sql; do
         # Skip seed migrations - those are demo-only
         if [[ "$f" == *"seed"* ]]; then
             echo "  Skipping seed: $(basename $f)"
@@ -307,7 +307,7 @@ demo: demo-fixtures
 
     # Generate OpenAPI client for frontend
     echo "Generating OpenAPI client..."
-    uv run python dataing/scripts/export_openapi.py
+    uv run python python-packages/dataing/scripts/export_openapi.py
     (cd frontend/app && pnpm orval)
     echo ""
 
@@ -372,32 +372,32 @@ demo: demo-fixtures
     # IMPORTANT: Order matters! 007_auth_tables creates organizations/users/teams,
     # 007_sso_scim adds SSO columns, 008_seed_demo_auth creates demo data
     echo "Running database migrations..."
-    PGPASSWORD=dataing psql -h localhost -U dataing -d dataing_demo -f dataing/migrations/001_initial.sql 2>&1 | grep -v "^NOTICE:" || true
-    PGPASSWORD=dataing psql -h localhost -U dataing -d dataing_demo -f dataing/migrations/002_datasets.sql 2>&1 | grep -v "^NOTICE:" || true
-    PGPASSWORD=dataing psql -h localhost -U dataing -d dataing_demo -f dataing/migrations/003_investigation_feedback_events.sql 2>&1 | grep -v "^NOTICE:" || true
-    PGPASSWORD=dataing psql -h localhost -U dataing -d dataing_demo -f dataing/migrations/004_schema_comments.sql 2>&1 | grep -v "^NOTICE:" || true
-    PGPASSWORD=dataing psql -h localhost -U dataing -d dataing_demo -f dataing/migrations/005_knowledge_comments.sql 2>&1 | grep -v "^NOTICE:" || true
-    PGPASSWORD=dataing psql -h localhost -U dataing -d dataing_demo -f dataing/migrations/006_comment_votes.sql 2>&1 | grep -v "^NOTICE:" || true
-    PGPASSWORD=dataing psql -h localhost -U dataing -d dataing_demo -f dataing/migrations/007_auth_tables.sql 2>&1 | grep -v "^NOTICE:" || true
-    PGPASSWORD=dataing psql -h localhost -U dataing -d dataing_demo -f dataing/migrations/007_sso_scim_tables.sql 2>&1 | grep -v "^NOTICE:" || true
-    PGPASSWORD=dataing psql -h localhost -U dataing -d dataing_demo -f dataing/migrations/008_rbac_tables.sql 2>&1 | grep -v "^NOTICE:" || true
-    PGPASSWORD=dataing psql -h localhost -U dataing -d dataing_demo -f dataing/migrations/008_seed_demo_auth.sql 2>&1 | grep -v "^NOTICE:" || true
-    PGPASSWORD=dataing psql -h localhost -U dataing -d dataing_demo -f dataing/migrations/009_password_reset_tokens.sql 2>&1 | grep -v "^NOTICE:" || true
-    PGPASSWORD=dataing psql -h localhost -U dataing -d dataing_demo -f dataing/migrations/009_seed_multi_org_demo.sql 2>&1 | grep -v "^NOTICE:" || true
-    PGPASSWORD=dataing psql -h localhost -U dataing -d dataing_demo -f dataing/migrations/010_audit_logs.sql 2>&1 | grep -v "^NOTICE:" || true
-    PGPASSWORD=dataing psql -h localhost -U dataing -d dataing_demo -f dataing/migrations/011_rl_training_signals.sql 2>&1 | grep -v "^NOTICE:" || true
-    PGPASSWORD=dataing psql -h localhost -U dataing -d dataing_demo -f dataing/migrations/012_agent_memories.sql 2>&1 | grep -v "^NOTICE:" || true
-    PGPASSWORD=dataing psql -h localhost -U dataing -d dataing_demo -f dataing/migrations/013_unified_investigation.sql 2>&1 | grep -v "^NOTICE:" || true
-    PGPASSWORD=dataing psql -h localhost -U dataing -d dataing_demo -f dataing/migrations/014_notifications.sql 2>&1 | grep -v "^NOTICE:" || true
-    PGPASSWORD=dataing psql -h localhost -U dataing -d dataing_demo -f dataing/migrations/015_sso_states.sql 2>&1 | grep -v "^NOTICE:" || true
-    PGPASSWORD=dataing psql -h localhost -U dataing -d dataing_demo -f dataing/migrations/016_investigation_jobs.sql 2>&1 | grep -v "^NOTICE:" || true
-    PGPASSWORD=dataing psql -h localhost -U dataing -d dataing_demo -f dataing/migrations/017_add_trace_context.sql 2>&1 | grep -v "^NOTICE:" || true
-    PGPASSWORD=dataing psql -h localhost -U dataing -d dataing_demo -f dataing/migrations/018_issues.sql 2>&1 | grep -v "^NOTICE:" || true
-    PGPASSWORD=dataing psql -h localhost -U dataing -d dataing_demo -f dataing/migrations/019_sla_policies.sql 2>&1 | grep -v "^NOTICE:" || true
-    PGPASSWORD=dataing psql -h localhost -U dataing -d dataing_demo -f dataing/migrations/020_integrations.sql 2>&1 | grep -v "^NOTICE:" || true
-    PGPASSWORD=dataing psql -h localhost -U dataing -d dataing_demo -f dataing/migrations/021_automation_rules.sql 2>&1 | grep -v "^NOTICE:" || true
-    PGPASSWORD=dataing psql -h localhost -U dataing -d dataing_demo -f dataing/migrations/022_runbooks.sql 2>&1 | grep -v "^NOTICE:" || true
-    PGPASSWORD=dataing psql -h localhost -U dataing -d dataing_demo -f dataing/migrations/023_drop_investigation_jobs.sql 2>&1 | grep -v "^NOTICE:" || true
+    PGPASSWORD=dataing psql -h localhost -U dataing -d dataing_demo -f python-packages/dataing/migrations/001_initial.sql 2>&1 | grep -v "^NOTICE:" || true
+    PGPASSWORD=dataing psql -h localhost -U dataing -d dataing_demo -f python-packages/dataing/migrations/002_datasets.sql 2>&1 | grep -v "^NOTICE:" || true
+    PGPASSWORD=dataing psql -h localhost -U dataing -d dataing_demo -f python-packages/dataing/migrations/003_investigation_feedback_events.sql 2>&1 | grep -v "^NOTICE:" || true
+    PGPASSWORD=dataing psql -h localhost -U dataing -d dataing_demo -f python-packages/dataing/migrations/004_schema_comments.sql 2>&1 | grep -v "^NOTICE:" || true
+    PGPASSWORD=dataing psql -h localhost -U dataing -d dataing_demo -f python-packages/dataing/migrations/005_knowledge_comments.sql 2>&1 | grep -v "^NOTICE:" || true
+    PGPASSWORD=dataing psql -h localhost -U dataing -d dataing_demo -f python-packages/dataing/migrations/006_comment_votes.sql 2>&1 | grep -v "^NOTICE:" || true
+    PGPASSWORD=dataing psql -h localhost -U dataing -d dataing_demo -f python-packages/dataing/migrations/007_auth_tables.sql 2>&1 | grep -v "^NOTICE:" || true
+    PGPASSWORD=dataing psql -h localhost -U dataing -d dataing_demo -f python-packages/dataing/migrations/007_sso_scim_tables.sql 2>&1 | grep -v "^NOTICE:" || true
+    PGPASSWORD=dataing psql -h localhost -U dataing -d dataing_demo -f python-packages/dataing/migrations/008_rbac_tables.sql 2>&1 | grep -v "^NOTICE:" || true
+    PGPASSWORD=dataing psql -h localhost -U dataing -d dataing_demo -f python-packages/dataing/migrations/008_seed_demo_auth.sql 2>&1 | grep -v "^NOTICE:" || true
+    PGPASSWORD=dataing psql -h localhost -U dataing -d dataing_demo -f python-packages/dataing/migrations/009_password_reset_tokens.sql 2>&1 | grep -v "^NOTICE:" || true
+    PGPASSWORD=dataing psql -h localhost -U dataing -d dataing_demo -f python-packages/dataing/migrations/009_seed_multi_org_demo.sql 2>&1 | grep -v "^NOTICE:" || true
+    PGPASSWORD=dataing psql -h localhost -U dataing -d dataing_demo -f python-packages/dataing/migrations/010_audit_logs.sql 2>&1 | grep -v "^NOTICE:" || true
+    PGPASSWORD=dataing psql -h localhost -U dataing -d dataing_demo -f python-packages/dataing/migrations/011_rl_training_signals.sql 2>&1 | grep -v "^NOTICE:" || true
+    PGPASSWORD=dataing psql -h localhost -U dataing -d dataing_demo -f python-packages/dataing/migrations/012_agent_memories.sql 2>&1 | grep -v "^NOTICE:" || true
+    PGPASSWORD=dataing psql -h localhost -U dataing -d dataing_demo -f python-packages/dataing/migrations/013_unified_investigation.sql 2>&1 | grep -v "^NOTICE:" || true
+    PGPASSWORD=dataing psql -h localhost -U dataing -d dataing_demo -f python-packages/dataing/migrations/014_notifications.sql 2>&1 | grep -v "^NOTICE:" || true
+    PGPASSWORD=dataing psql -h localhost -U dataing -d dataing_demo -f python-packages/dataing/migrations/015_sso_states.sql 2>&1 | grep -v "^NOTICE:" || true
+    PGPASSWORD=dataing psql -h localhost -U dataing -d dataing_demo -f python-packages/dataing/migrations/016_investigation_jobs.sql 2>&1 | grep -v "^NOTICE:" || true
+    PGPASSWORD=dataing psql -h localhost -U dataing -d dataing_demo -f python-packages/dataing/migrations/017_add_trace_context.sql 2>&1 | grep -v "^NOTICE:" || true
+    PGPASSWORD=dataing psql -h localhost -U dataing -d dataing_demo -f python-packages/dataing/migrations/018_issues.sql 2>&1 | grep -v "^NOTICE:" || true
+    PGPASSWORD=dataing psql -h localhost -U dataing -d dataing_demo -f python-packages/dataing/migrations/019_sla_policies.sql 2>&1 | grep -v "^NOTICE:" || true
+    PGPASSWORD=dataing psql -h localhost -U dataing -d dataing_demo -f python-packages/dataing/migrations/020_integrations.sql 2>&1 | grep -v "^NOTICE:" || true
+    PGPASSWORD=dataing psql -h localhost -U dataing -d dataing_demo -f python-packages/dataing/migrations/021_automation_rules.sql 2>&1 | grep -v "^NOTICE:" || true
+    PGPASSWORD=dataing psql -h localhost -U dataing -d dataing_demo -f python-packages/dataing/migrations/022_runbooks.sql 2>&1 | grep -v "^NOTICE:" || true
+    PGPASSWORD=dataing psql -h localhost -U dataing -d dataing_demo -f python-packages/dataing/migrations/023_drop_investigation_jobs.sql 2>&1 | grep -v "^NOTICE:" || true
 
     trap 'kill 0' EXIT
 
@@ -438,12 +438,12 @@ demo: demo-fixtures
     # Load .env file if it exists (check both root and dataing/)
     if [ -f .env ]; then
         export $(grep -v '^#' .env | xargs)
-    elif [ -f dataing/.env ]; then
-        export $(grep -v '^#' dataing/.env | xargs)
+    elif [ -f python-packages/dataing/.env ]; then
+        export $(grep -v '^#' python-packages/dataing/.env | xargs)
     fi
 
     # Start backend
-    (uv run fastapi dev dataing/src/dataing/entrypoints/api/app.py --host 0.0.0.0 --port 8000) &
+    (uv run fastapi dev python-packages/dataing/src/dataing/entrypoints/api/app.py --host 0.0.0.0 --port 8000) &
     BACKEND_PID=$!
 
     # Start Temporal worker (processes investigation workflows)

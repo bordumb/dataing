@@ -417,7 +417,7 @@ wheels = [
 [[package]]
 name = "bond"
 version = "0.0.1"
-source = { editable = "bond" }
+source = { editable = "python-packages/bond" }
 dependencies = [
     { name = "asyncpg" },
     { name = "pydantic" },
@@ -915,7 +915,7 @@ requires-dist = [
     { name = "anthropic", specifier = ">=0.18.0" },
     { name = "asyncpg", specifier = ">=0.29.0" },
     { name = "bcrypt", specifier = ">=5.0.0" },
-    { name = "bond", editable = "bond" },
+    { name = "bond", editable = "python-packages/bond" },
     { name = "cryptography", specifier = ">=41.0.0" },
     { name = "duckdb", specifier = ">=0.9.0" },
     { name = "duckdb", marker = "extra == 'demo'", specifier = ">=0.9.0" },

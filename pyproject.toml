@@ -66,12 +66,12 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
-packages = ["dataing/src/dataing"]
+packages = ["python-packages/dataing/src/dataing"]
 
 [tool.mypy]
 python_version = "3.11"
-mypy_path = ["bond/src", "dataing/src", "dataing-ee/src"]
-files = ["bond/src/bond", "dataing/src/dataing", "dataing-ee/src/dataing_ee"]
+mypy_path = ["python-packages/bond/src", "python-packages/dataing/src", "python-packages/dataing-ee/src"]
+files = ["python-packages/bond/src/bond", "python-packages/dataing/src/dataing", "python-packages/dataing-ee/src/dataing_ee"]
 namespace_packages = true
 explicit_package_bases = true
 # Strict mode flags (equivalent to --strict but with SQLAlchemy-compatible settings)
@@ -123,7 +123,7 @@ disallow_any_generics = false
 [tool.ruff]
 target-version = "py311"
 line-length = 100
-src = ["bond/src", "dataing/src", "dataing-ee"]
+src = ["python-packages/bond/src", "python-packages/dataing/src", "python-packages/dataing-ee"]
 
 [tool.ruff.lint]
 select = [
@@ -148,9 +148,9 @@ convention = "google"
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
-pythonpath = [".", "bond/src", "dataing/src", "dataing-ee/src", "dataing/tests", "dataing-ee/tests"]
-testpaths = ["bond/tests", "dataing/tests", "dataing-ee/tests"]
-addopts = "-v --import-mode=importlib --cov=bond/src/bond --cov=dataing/src/dataing --cov=dataing-ee/src/dataing_ee --cov-report=term-missing"
+pythonpath = [".", "python-packages/bond/src", "python-packages/dataing/src", "python-packages/dataing-ee/src", "python-packages/dataing/tests", "python-packages/dataing-ee/tests"]
+testpaths = ["python-packages/bond/tests", "python-packages/dataing/tests", "python-packages/dataing-ee/tests"]
+addopts = "-v --import-mode=importlib --cov=python-packages/bond/src/bond --cov=python-packages/dataing/src/dataing --cov=python-packages/dataing-ee/src/dataing_ee --cov-report=term-missing"
 
 [dependency-groups]
 dev = [
@@ -159,4 +159,4 @@ dev = [
 ]
 
 [tool.uv.sources]
-bond = { path = "bond", editable = true }
+bond = { path = "python-packages/bond", editable = true }

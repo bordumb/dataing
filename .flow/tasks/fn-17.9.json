@@ -1,7 +1,7 @@
 {
-  "assignee": null,
+  "assignee": "bordumbb@gmail.com",
   "claim_note": "",
-  "claimed_at": null,
+  "claimed_at": "2026-01-19T02:04:05.936382Z",
   "created_at": "2026-01-19T01:18:51.857586Z",
   "depends_on": [
     "fn-17.8"
@@ -10,7 +10,7 @@
   "id": "fn-17.9",
   "priority": null,
   "spec_path": ".flow/tasks/fn-17.9.md",
-  "status": "todo",
+  "status": "in_progress",
   "title": "Integrate Rust bindings with uv workspace",
-  "updated_at": "2026-01-19T01:19:10.384894Z"
+  "updated_at": "2026-01-19T02:04:05.936600Z"
 }

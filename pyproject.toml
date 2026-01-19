@@ -160,3 +160,5 @@ dev = [
 
 [tool.uv.sources]
 bond = { path = "python-packages/bond", editable = true }
+# Note: dataing-investigator is built separately via `just rust-dev` (maturin)
+# It cannot be included as a uv source because it requires native compilation

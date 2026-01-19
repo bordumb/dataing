@@ -10,6 +10,8 @@ default:
 setup:
     @echo "Setting up dataing (CE)..."
     uv sync
+    @echo "Building Rust bindings..."
+    just rust-dev
     @echo "Setting up frontend app..."
     cd frontend/app && pnpm install
     @echo "Setting up landing site..."
@@ -18,6 +20,38 @@ setup:
     uv tool install pre-commit || pip install pre-commit
     pre-commit install
     @echo "Setup complete!"
+
+# ============================================
+# Rust Commands
+# ============================================
+
+# Check Rust toolchain is installed
+rust-check:
+    @command -v cargo >/dev/null || (echo "Install Rust: https://rustup.rs" && exit 1)
+
+# Build Rust crates (release mode)
+rust-build: rust-check
+    cd core && cargo build --release
+
+# Build and install Rust bindings to Python venv (development)
+rust-dev: rust-check
+    #!/usr/bin/env bash
+    set -euo pipefail
+    echo "Building Rust bindings..."
+    cd core/bindings/python && uvx maturin develop --uv
+    echo "Rust bindings installed!"
+
+# Run Rust tests
+rust-test: rust-check
+    cd core && cargo test
+
+# Run Rust clippy linter
+rust-lint: rust-check
+    cd core && cargo clippy --workspace
+
+# Clean Rust build artifacts
+rust-clean:
+    rm -rf core/target
 
 # Install/update pre-commit hooks
 pre-commit-install:
@@ -179,7 +213,7 @@ typecheck:
     cd frontend/app && pnpm typecheck
 
 # Clean build artifacts
-clean:
+clean: rust-clean
     rm -rf dist .pytest_cache .ruff_cache .mypy_cache
     rm -rf python-packages/dataing/.pytest_cache python-packages/dataing/.ruff_cache
     rm -rf python-packages/dataing-ee/.pytest_cache python-packages/dataing-ee/.ruff_cache

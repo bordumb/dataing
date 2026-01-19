@@ -8,10 +8,21 @@
     "fn-17.7"
   ],
   "epic": "fn-17",
+  "evidence": {
+    "commits": [
+      "50aa9b99"
+    ],
+    "prs": [],
+    "tests": [
+      "maturin develop",
+      "Python smoke test",
+      "cargo test"
+    ]
+  },
   "id": "fn-17.8",
   "priority": null,
   "spec_path": ".flow/tasks/fn-17.8.md",
-  "status": "in_progress",
+  "status": "done",
   "title": "Implement panic-free Python wrappers",
-  "updated_at": "2026-01-19T02:02:14.200758Z"
+  "updated_at": "2026-01-19T02:03:51.497124Z"
 }

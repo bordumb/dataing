@@ -7,10 +7,20 @@
     "fn-17.1"
   ],
   "epic": "fn-17",
+  "evidence": {
+    "commits": [
+      "7b9638d3"
+    ],
+    "prs": [],
+    "tests": [
+      "maturin develop --uv",
+      "cargo test"
+    ]
+  },
   "id": "fn-17.7",
   "priority": null,
   "spec_path": ".flow/tasks/fn-17.7.md",
-  "status": "in_progress",
+  "status": "done",
   "title": "Set up PyO3 bindings crate with Maturin",
-  "updated_at": "2026-01-19T01:59:55.403733Z"
+  "updated_at": "2026-01-19T02:02:01.132542Z"
 }

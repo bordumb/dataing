@@ -1,3 +1,10 @@
+# [1.1.0](https://github.com/bordumb/dataing/compare/v1.0.0...v1.1.0) (2026-01-19)
+
+
+### Features
+
+* add principal-bound query execution infrastructure ([f2d0b64](https://github.com/bordumb/dataing/commit/f2d0b645533a1f814851412c90efa1bc09071743))
+
 # 1.0.0 (2026-01-18)
 
 

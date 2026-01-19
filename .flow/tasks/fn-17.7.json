@@ -1,7 +1,7 @@
 {
-  "assignee": null,
+  "assignee": "bordumbb@gmail.com",
   "claim_note": "",
-  "claimed_at": null,
+  "claimed_at": "2026-01-19T01:59:55.403560Z",
   "created_at": "2026-01-19T01:18:51.482597Z",
   "depends_on": [
     "fn-17.1"
@@ -10,7 +10,7 @@
   "id": "fn-17.7",
   "priority": null,
   "spec_path": ".flow/tasks/fn-17.7.md",
-  "status": "todo",
+  "status": "in_progress",
   "title": "Set up PyO3 bindings crate with Maturin",
-  "updated_at": "2026-01-19T01:19:09.826459Z"
+  "updated_at": "2026-01-19T01:59:55.403733Z"
 }

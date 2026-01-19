@@ -7,10 +7,19 @@
     "fn-17.4"
   ],
   "epic": "fn-17",
+  "evidence": {
+    "commits": [
+      "4f08b714"
+    ],
+    "prs": [],
+    "tests": [
+      "cargo test"
+    ]
+  },
   "id": "fn-17.5",
   "priority": null,
   "spec_path": ".flow/tasks/fn-17.5.md",
-  "status": "in_progress",
+  "status": "done",
   "title": "Implement state machine logic",
-  "updated_at": "2026-01-19T01:56:41.924282Z"
+  "updated_at": "2026-01-19T01:58:48.522561Z"
 }

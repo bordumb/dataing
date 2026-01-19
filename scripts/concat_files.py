@@ -15,10 +15,10 @@ from pathlib import Path
 ROOT_DIR = Path(".")
 
 SEARCH_PREFIXES = [
-    "dataing",
+    "python-packages/dataing",
+    "python-packages/bond",
+    "core",
     # "frontend",
-    # "bond",
-    # "maistro",
     # "docs/feedback",
 ]
 
@@ -72,6 +72,7 @@ EXCLUDE = {
     "site",
     "output",
     "tests",
+    "target"
 }
 
 ENCODING = "utf-8"

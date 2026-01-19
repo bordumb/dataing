@@ -7,10 +7,18 @@
     "fn-17.13"
   ],
   "epic": "fn-17",
+  "evidence": {
+    "commits": [],
+    "prs": [],
+    "tests": [
+      "Core imports",
+      "Temporal imports"
+    ]
+  },
   "id": "fn-17.14",
   "priority": null,
   "spec_path": ".flow/tasks/fn-17.14.md",
-  "status": "in_progress",
+  "status": "done",
   "title": "Integrate Rust state machine with Temporal workflows",
-  "updated_at": "2026-01-19T02:11:43.226420Z"
+  "updated_at": "2026-01-19T02:15:57.216274Z"
 }

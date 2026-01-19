@@ -144,22 +144,25 @@ Human-readable summary table:
 ### Console Output
 
 ```
-=== Performance Benchmark Results ===
+============================================================
+  PERFORMANCE BENCHMARK RESULTS
+============================================================
 
-fn-17 (abc123):
-  Mean:   47.3s
-  Median: 46.5s
-  P95:    51.2s
-  Stdev:  2.1s
+fn-17 (b8153f9e):
+  Mean:   58.06s
+  Median: 59.75s
+  P95:    71.43s
+  Stdev:  8.12s
+  Range:  42.77s - 71.43s
 
-main (def456):
-  Mean:   52.5s
-  Median: 51.8s
-  P95:    56.1s
-  Stdev:  2.8s
+main (f57281ff):
+  Mean:   63.58s
+  Median: 63.90s
+  P95:    72.50s
+  Stdev:  7.09s
+  Range:  52.55s - 72.50s
 
-Delta:
-  fn-17 is 5.2s (9.9%) FASTER than main
+Delta: fn-17 is 5.52s (8.7%) FASTER
 ```
 
 ## Temporal Analysis

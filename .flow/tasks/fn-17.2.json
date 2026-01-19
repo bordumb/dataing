@@ -7,10 +7,19 @@
     "fn-17.1"
   ],
   "epic": "fn-17",
+  "evidence": {
+    "commits": [
+      "bbc1bb88"
+    ],
+    "prs": [],
+    "tests": [
+      "cargo test"
+    ]
+  },
   "id": "fn-17.2",
   "priority": null,
   "spec_path": ".flow/tasks/fn-17.2.md",
-  "status": "in_progress",
+  "status": "done",
   "title": "Implement investigator_core domain types",
-  "updated_at": "2026-01-19T01:51:44.596367Z"
+  "updated_at": "2026-01-19T01:53:07.705150Z"
 }

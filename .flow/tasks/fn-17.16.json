@@ -7,10 +7,19 @@
     "fn-17.14"
   ],
   "epic": "fn-17",
+  "evidence": {
+    "commits": [],
+    "prs": [],
+    "tests": [
+      "TestInvestigatorWorkflowE2E (4 tests)",
+      "TestBrainStepActivity (2 tests)",
+      "TestSignalDeduplication (1 test)"
+    ]
+  },
   "id": "fn-17.16",
   "priority": null,
   "spec_path": ".flow/tasks/fn-17.16.md",
-  "status": "in_progress",
+  "status": "done",
   "title": "Add E2E workflow tests",
-  "updated_at": "2026-01-19T02:21:41.831176Z"
+  "updated_at": "2026-01-19T02:24:24.972993Z"
 }

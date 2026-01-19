@@ -3,7 +3,7 @@ import { defineConfig } from 'orval';
 export default defineConfig({
   dataing: {
     input: {
-      target: '../../dataing/openapi.json',
+      target: '../../python-packages/dataing/openapi.json',
     },
     output: {
       mode: 'tags-split',

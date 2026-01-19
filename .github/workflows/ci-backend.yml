@@ -4,18 +4,18 @@ on:
   push:
     branches: [main]
     paths:
-      - 'bond/**'
-      - 'dataing/**'
-      - 'dataing-ee/**'
+      - 'python-packages/bond/**'
+      - 'python-packages/dataing/**'
+      - 'python-packages/dataing-ee/**'
       - 'pyproject.toml'
       - 'uv.lock'
       - '.github/workflows/ci-backend.yml'
   pull_request:
     branches: [main]
     paths:
-      - 'bond/**'
-      - 'dataing/**'
-      - 'dataing-ee/**'
+      - 'python-packages/bond/**'
+      - 'python-packages/dataing/**'
+      - 'python-packages/dataing-ee/**'
       - 'pyproject.toml'
       - 'uv.lock'
       - '.github/workflows/ci-backend.yml'
@@ -56,15 +56,15 @@ jobs:
         run: uv sync --all-extras
 
       - name: Run Ruff
-        run: uv run ruff check bond/src dataing/src dataing-ee/src
+        run: uv run ruff check python-packages/bond/src python-packages/dataing/src python-packages/dataing-ee/src
 
       - name: Run mypy
-        run: uv run mypy bond/src dataing/src dataing-ee/src
+        run: uv run mypy python-packages/bond/src python-packages/dataing/src python-packages/dataing-ee/src
 
       # Run database migrations for integration tests
       - name: Run migrations
         run: |
-          for f in dataing/migrations/*.sql; do
+          for f in python-packages/dataing/migrations/*.sql; do
             echo "Running $f..."
             psql -h localhost -U test -d test -f "$f" 2>&1 | grep -v "^NOTICE:" || true
           done
@@ -74,9 +74,9 @@ jobs:
       # Run tests per-package to avoid conftest.py module conflicts
       - name: Run tests
         run: |
-          uv run pytest bond/tests --cov=bond/src/bond --cov-report=xml --cov-append
-          uv run pytest dataing/tests --cov=dataing/src/dataing --cov-report=xml --cov-append
-          uv run pytest dataing-ee/tests --cov=dataing-ee/src/dataing_ee --cov-report=xml --cov-append
+          uv run pytest python-packages/bond/tests --cov=python-packages/bond/src/bond --cov-report=xml --cov-append
+          uv run pytest python-packages/dataing/tests --cov=python-packages/dataing/src/dataing --cov-report=xml --cov-append
+          uv run pytest python-packages/dataing-ee/tests --cov=python-packages/dataing-ee/src/dataing_ee --cov-report=xml --cov-append
         env:
           DATABASE_URL: postgresql://test:test@localhost:5432/test
 

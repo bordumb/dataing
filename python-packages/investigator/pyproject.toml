@@ -11,5 +11,8 @@ dependencies = []
 # Note: dataing-investigator (Rust bindings) is installed separately via maturin
 # It cannot be listed as a dependency because it requires native compilation
 
+[project.optional-dependencies]
+temporal = ["temporalio>=1.0.0"]
+
 [tool.hatch.build.targets.wheel]
 packages = ["src/investigator"]

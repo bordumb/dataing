@@ -1904,6 +1904,10 @@ name = "investigator"
 version = "0.1.0"
 source = { editable = "python-packages/investigator" }
 
+[package.metadata]
+requires-dist = [{ name = "temporalio", marker = "extra == 'temporal'", specifier = ">=1.0.0" }]
+provides-extras = ["temporal"]
+
 [[package]]
 name = "invoke"
 version = "2.2.1"

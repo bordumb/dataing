@@ -8,10 +8,19 @@
     "fn-17.12"
   ],
   "epic": "fn-17",
+  "evidence": {
+    "commits": [
+      "2abac50d"
+    ],
+    "prs": [],
+    "tests": [
+      "Python smoke test"
+    ]
+  },
   "id": "fn-17.13",
   "priority": null,
   "spec_path": ".flow/tasks/fn-17.13.md",
-  "status": "in_progress",
+  "status": "done",
   "title": "Implement runtime module",
-  "updated_at": "2026-01-19T02:09:57.862244Z"
+  "updated_at": "2026-01-19T02:11:18.089645Z"
 }

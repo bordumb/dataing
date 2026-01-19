@@ -37,6 +37,21 @@ from investigator.security import (
     create_scope,
     validate_tool_call,
 )
+# Temporal integration (requires temporalio)
+try:
+    from investigator.temporal import (
+        BrainStepInput,
+        BrainStepOutput,
+        InvestigatorInput,
+        InvestigatorResult,
+        InvestigatorStatus,
+        InvestigatorWorkflow,
+        brain_step,
+    )
+
+    _HAS_TEMPORAL = True
+except ImportError:
+    _HAS_TEMPORAL = False
 
 __all__ = [
     # Rust bindings
@@ -61,5 +76,17 @@ __all__ = [
     "LocalInvestigator",
     "InvestigationError",
 ]
+
+# Add temporal exports if available
+if _HAS_TEMPORAL:
+    __all__ += [
+        "InvestigatorWorkflow",
+        "InvestigatorInput",
+        "InvestigatorResult",
+        "InvestigatorStatus",
+        "brain_step",
+        "BrainStepInput",
+        "BrainStepOutput",
+    ]
 
 __version__ = "0.1.0"

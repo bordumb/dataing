@@ -27,6 +27,11 @@ from investigator.envelope import (
     unwrap,
     wrap,
 )
+from investigator.runtime import (
+    InvestigationError,
+    LocalInvestigator,
+    run_local,
+)
 from investigator.security import (
     SecurityViolation,
     create_scope,
@@ -51,6 +56,10 @@ __all__ = [
     "SecurityViolation",
     "validate_tool_call",
     "create_scope",
+    # Runtime
+    "run_local",
+    "LocalInvestigator",
+    "InvestigationError",
 ]
 
 __version__ = "0.1.0"

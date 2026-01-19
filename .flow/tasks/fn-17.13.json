@@ -1,7 +1,7 @@
 {
-  "assignee": null,
+  "assignee": "bordumbb@gmail.com",
   "claim_note": "",
-  "claimed_at": null,
+  "claimed_at": "2026-01-19T02:09:57.862029Z",
   "created_at": "2026-01-19T01:18:52.640563Z",
   "depends_on": [
     "fn-17.11",
@@ -11,7 +11,7 @@
   "id": "fn-17.13",
   "priority": null,
   "spec_path": ".flow/tasks/fn-17.13.md",
-  "status": "todo",
+  "status": "in_progress",
   "title": "Implement runtime module",
-  "updated_at": "2026-01-19T01:19:11.268462Z"
+  "updated_at": "2026-01-19T02:09:57.862244Z"
 }

@@ -7,10 +7,19 @@
     "fn-17.10"
   ],
   "epic": "fn-17",
+  "evidence": {
+    "commits": [
+      "fab51ee4"
+    ],
+    "prs": [],
+    "tests": [
+      "Python smoke test"
+    ]
+  },
   "id": "fn-17.11",
   "priority": null,
   "spec_path": ".flow/tasks/fn-17.11.md",
-  "status": "in_progress",
+  "status": "done",
   "title": "Implement envelope module for tracing",
-  "updated_at": "2026-01-19T02:08:11.394072Z"
+  "updated_at": "2026-01-19T02:09:27.618664Z"
 }

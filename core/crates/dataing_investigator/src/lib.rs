@@ -21,11 +21,15 @@
 /// Increment when making breaking changes to serialization format.
 pub const PROTOCOL_VERSION: u32 = 1;
 
+pub mod domain;
+
 // Modules will be added in subsequent tasks:
-// pub mod domain;    // fn-17.2
 // pub mod protocol;  // fn-17.3
 // pub mod state;     // fn-17.4
 // pub mod machine;   // fn-17.5
+
+// Re-export domain types for convenience
+pub use domain::{CallKind, CallMeta, Scope};
 
 #[cfg(test)]
 mod tests {

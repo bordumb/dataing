@@ -7,10 +7,20 @@
     "fn-17.9"
   ],
   "epic": "fn-17",
+  "evidence": {
+    "commits": [],
+    "prs": [],
+    "tests": [
+      "test_investigator.py (17 tests)",
+      "test_envelope.py (13 tests)",
+      "test_security.py (25 tests)",
+      "test_runtime.py (11 tests)"
+    ]
+  },
   "id": "fn-17.15",
   "priority": null,
   "spec_path": ".flow/tasks/fn-17.15.md",
-  "status": "in_progress",
+  "status": "done",
   "title": "Add Python integration tests for bindings",
-  "updated_at": "2026-01-19T02:16:20.562773Z"
+  "updated_at": "2026-01-19T02:21:35.654173Z"
 }

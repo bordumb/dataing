@@ -1,7 +1,7 @@
 {
-  "assignee": null,
+  "assignee": "bordumbb@gmail.com",
   "claim_note": "",
-  "claimed_at": null,
+  "claimed_at": "2026-01-19T02:21:41.831011Z",
   "created_at": "2026-01-19T01:18:53.204267Z",
   "depends_on": [
     "fn-17.14"
@@ -10,7 +10,7 @@
   "id": "fn-17.16",
   "priority": null,
   "spec_path": ".flow/tasks/fn-17.16.md",
-  "status": "todo",
+  "status": "in_progress",
   "title": "Add E2E workflow tests",
-  "updated_at": "2026-01-19T01:19:11.795304Z"
+  "updated_at": "2026-01-19T02:21:41.831176Z"
 }

@@ -258,8 +258,15 @@ async def start_investigation(
         source_url=metric_spec_data.get("source_url"),
     )
 
+    # Handle both dataset_id (singular) and dataset_ids (plural) for backward compatibility
+    dataset_ids = alert_data.get("dataset_ids")
+    if dataset_ids is None:
+        # Convert singular to list
+        dataset_id = alert_data.get("dataset_id", "unknown")
+        dataset_ids = [dataset_id] if isinstance(dataset_id, str) else dataset_id
+
     alert = AnomalyAlert(
-        dataset_ids=alert_data["dataset_ids"],
+        dataset_ids=dataset_ids,
         metric_spec=metric_spec,
         anomaly_type=alert_data["anomaly_type"],
         expected_value=alert_data["expected_value"],

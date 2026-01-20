@@ -295,8 +295,8 @@ demo: demo-fixtures
     echo "Starting demo stack..."
     echo ""
 
-    # Ensure Python dependencies are installed
-    uv sync --quiet
+    # Ensure Python dependencies are installed (including SDK and notebook packages)
+    uv sync --quiet --extra demo
 
     # Ensure frontend dependencies are installed
     if [ ! -d "frontend/app/node_modules" ]; then
@@ -406,17 +406,18 @@ demo: demo-fixtures
     echo "  Dataing Demo Ready!"
     echo "========================================="
     echo ""
-    echo "  Frontend:  http://localhost:3000"
-    echo "  Backend:   http://localhost:8000"
-    echo "  Temporal:  http://localhost:8233"
-    echo "  Telemetry: http://localhost:16686"
+    echo "  Browser tabs will open automatically for:"
+    echo "    - Frontend:  http://localhost:3000"
+    echo "    - Backend:   http://localhost:8000/docs"
+    echo "    - Temporal:  http://localhost:8233"
+    echo "    - Telemetry: http://localhost:16686"
+    echo "    - Notebook:  http://localhost:8888/notebooks/demo_notebook.ipynb"
     echo ""
     echo "  Login credentials:"
     echo "    Email:    demo@dataing.io"
     echo "    Password: demo123456"
-    echo "    Org ID:   00000000-0000-0000-0000-000000000001"
     echo ""
-    echo "  Legacy API Key: dd_demo_12345"
+    echo "  API Key: dd_demo_12345"
     echo "========================================="
     echo ""
 
@@ -467,6 +468,46 @@ demo: demo-fixtures
         done
     ) &
 
+    # Start Jupyter notebook with dataing extension
+    (
+        echo "Starting Jupyter notebook on port 8888..."
+        sleep 2
+        DATAING_BACKEND_URL=http://localhost:8000 \
+        DATAING_API_KEY=dd_demo_12345 \
+        uv run jupyter notebook demo/demo_notebook.ipynb --port 8888 --no-browser \
+            --NotebookApp.token='' --NotebookApp.password='' 2>&1 | \
+            grep -v "^\[" || true
+    ) &
+
+    # Open all browser tabs after services are ready
+    (
+        echo "Waiting for all services before opening browsers..."
+        # Wait for frontend (usually the slowest to start)
+        for i in {1..45}; do
+            if curl -s http://localhost:3000 > /dev/null 2>&1; then
+                echo "All services ready! Opening browser tabs..."
+                sleep 1
+                if command -v open &> /dev/null; then
+                    # macOS
+                    open "http://localhost:3000"                              # Frontend
+                    open "http://localhost:8000/docs"                         # Backend API docs
+                    open "http://localhost:8233"                              # Temporal UI
+                    open "http://localhost:16686"                             # Jaeger UI
+                    open "http://localhost:8888/notebooks/demo_notebook.ipynb" # Demo notebook
+                elif command -v xdg-open &> /dev/null; then
+                    # Linux
+                    xdg-open "http://localhost:3000" &
+                    xdg-open "http://localhost:8000/docs" &
+                    xdg-open "http://localhost:8233" &
+                    xdg-open "http://localhost:16686" &
+                    xdg-open "http://localhost:8888/notebooks/demo_notebook.ipynb" &
+                fi
+                break
+            fi
+            sleep 1
+        done
+    ) &
+
     # Start frontend
     (cd frontend/app && pnpm dev --port 3000) &
     wait
@@ -497,11 +538,13 @@ demo-stop:
     pkill -f "fastapi dev" 2>/dev/null || true
     pkill -f "vite.*3000" 2>/dev/null || true
     pkill -f "pnpm dev" 2>/dev/null || true
+    pkill -f "jupyter notebook" 2>/dev/null || true
     sleep 1
 
     # Kill by port (fallback)
     lsof -ti:8000 | xargs kill -9 2>/dev/null || true
     lsof -ti:3000 | xargs kill -9 2>/dev/null || true
+    lsof -ti:8888 | xargs kill -9 2>/dev/null || true
 
     # Stop all dataing-demo-* containers
     for container in $(docker ps -aq --filter "name=dataing-demo-" 2>/dev/null); do

@@ -16,7 +16,6 @@ import sys
 from typing import TYPE_CHECKING, Any
 
 from IPython.core.magic import Magics, line_magic, magics_class
-from IPython.core.magic_arguments import argument, magic_arguments, parse_argstring
 
 from .state import get_state, reset_state
 
@@ -63,17 +62,15 @@ class DataingMagics(Magics):
         self._state = get_state()
 
     @line_magic
-    def dataing(self, line: str) -> Any:
+    def dataing(self, line: str) -> None:
         """Main dataing magic command.
 
         Args:
             line: Command line arguments.
-
-        Returns:
-            Command result or None.
         """
         if not line.strip():
-            return self._show_help()
+            self._show_help()
+            return
 
         # Parse the subcommand
         parts = shlex.split(line)
@@ -94,9 +91,10 @@ class DataingMagics(Magics):
         handler = handlers.get(subcommand)
         if handler is None:
             print(f"Unknown subcommand: {subcommand}", file=sys.stderr)
-            return self._show_help()
+            self._show_help()
+            return
 
-        return handler(args)
+        handler(args)
 
     def _show_help(self, args: list[str] | None = None) -> None:
         """Show help message."""
@@ -251,8 +249,9 @@ Dataing Magic Commands
             return
 
         lineage = ctx.lineage
-        if lineage is None:
-            print("No lineage information available")
+        if lineage is None or not lineage:
+            print("No lineage information available for this context.")
+            print("(Lineage requires a configured lineage provider like dbt or Airflow)")
             return
 
         # Try to use rich for nice output
@@ -322,11 +321,58 @@ Dataing Magic Commands
             )
 
             print(f"Run ID: {run.run_id}")
-            print(f"Status: {run.status}")
-            print(f"Events URL: {self._state.client.base_url}/api/v1/runs/{run.run_id}/events")
+            print(f"Status: {run.status.value}")
+            print("")
+            print("Waiting for results (polling every 2s)...")
 
-            # TODO: Implement SSE streaming when httpx-sse is available
-            # For now, just show the run info
+            # Poll for completion
+            def on_progress(r: Any) -> None:
+                print(f"  Status: {r.status.value}", end="\r")
+
+            try:
+                final_run = self._state.client.wait_for_run(
+                    run.run_id,
+                    poll_interval=2.0,
+                    timeout=120.0,
+                    on_progress=on_progress,
+                )
+                print("")  # Clear the status line
+                print("---")
+                print(f"Investigation {final_run.status.value}")
+
+                # Show clickable link in Jupyter
+                base_url = self._state.client.base_url.replace(":8000", ":3000")
+                ui_url = f"{base_url}/investigations/{final_run.run_id}"
+
+                # Use IPython display for clickable link
+                try:
+                    from IPython.display import HTML, display
+
+                    display(HTML(f'<a href="{ui_url}" target="_blank">View in UI: {ui_url}</a>'))
+                except ImportError:
+                    print(f"View in UI: {ui_url}")
+
+                if final_run.status.value == "completed":
+                    print("Investigation completed. Click link above to see full results.")
+                elif final_run.status.value == "failed":
+                    print("Investigation failed. Check logs for details.")
+
+            except TimeoutError:
+                print("")
+                print("---")
+                print("Investigation still running after timeout.")
+
+                # Show link even for timeout
+                base_url = self._state.client.base_url.replace(":8000", ":3000")
+                ui_url = f"{base_url}/investigations/{run.run_id}"
+                try:
+                    from IPython.display import HTML, display
+
+                    display(HTML(f'<a href="{ui_url}" target="_blank">View in UI: {ui_url}</a>'))
+                except ImportError:
+                    print(f"View in UI: {ui_url}")
+
+                print("Check status later with: %dataing status")
 
         except Exception as e:
             print(f"Error starting investigation: {e}", file=sys.stderr)
@@ -350,7 +396,7 @@ Dataing Magic Commands
         # Context status
         if self._state.is_attached and self._state.context:
             ctx = self._state.context
-            print(f"Context: Attached")
+            print("Context: Attached")
             print(f"  Bundle ID: {ctx.bundle_id[:16]}...")
             print(f"  Bundle Hash: {ctx.bundle_hash}")
             print(f"  Assets: {len(ctx.resolved_assets)}")

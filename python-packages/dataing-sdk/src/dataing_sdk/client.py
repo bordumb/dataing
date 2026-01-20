@@ -163,7 +163,7 @@ class DataingClient:
             await self._async_client.aclose()
             self._async_client = None
 
-    def __enter__(self) -> "DataingClient":
+    def __enter__(self) -> DataingClient:
         """Enter context manager for sync usage."""
         return self
 
@@ -171,7 +171,7 @@ class DataingClient:
         """Exit context manager for sync usage."""
         self.close()
 
-    async def __aenter__(self) -> "DataingClient":
+    async def __aenter__(self) -> DataingClient:
         """Enter context manager for async usage."""
         return self
 
@@ -338,19 +338,21 @@ class DataingClient:
 
         payload: dict[str, Any] = {"goal": goal}
 
+        # Always include assets for dataset identification
+        payload["bundle"] = {
+            "assets": [
+                {
+                    "platform": a.platform,
+                    "name": a.name,
+                    "datasource_id": a.datasource_id,
+                }
+                for a in assets
+            ]
+        }
+
+        # Optionally include bundle_id for caching
         if bundle_id:
             payload["bundle_id"] = bundle_id
-        else:
-            payload["bundle"] = {
-                "assets": [
-                    {
-                        "platform": a.platform,
-                        "name": a.name,
-                        "datasource_id": a.datasource_id,
-                    }
-                    for a in assets
-                ]
-            }
 
         response = self._request("POST", "/api/v1/runs", json=payload)
         data = response.json()
@@ -374,19 +376,21 @@ class DataingClient:
 
         payload: dict[str, Any] = {"goal": goal}
 
+        # Always include assets for dataset identification
+        payload["bundle"] = {
+            "assets": [
+                {
+                    "platform": a.platform,
+                    "name": a.name,
+                    "datasource_id": a.datasource_id,
+                }
+                for a in assets
+            ]
+        }
+
+        # Optionally include bundle_id for caching
         if bundle_id:
             payload["bundle_id"] = bundle_id
-        else:
-            payload["bundle"] = {
-                "assets": [
-                    {
-                        "platform": a.platform,
-                        "name": a.name,
-                        "datasource_id": a.datasource_id,
-                    }
-                    for a in assets
-                ]
-            }
 
         response = await self._async_request("POST", "/api/v1/runs", json=payload)
         data = response.json()
@@ -398,6 +402,85 @@ class DataingClient:
             status=RunStatus(data["status"]),
             created_at=data["created_at"],
         )
+
+    # --- Run status methods ---
+
+    def get_run(self, run_id: str) -> Run:
+        """Get run status and metadata.
+
+        Args:
+            run_id: The run ID to check.
+
+        Returns:
+            Run object with current status.
+        """
+        from .types import Run, RunStatus
+
+        response = self._request("GET", f"/api/v1/runs/{run_id}")
+        data = response.json()
+
+        return Run(
+            run_id=data["run_id"],
+            bundle_id=data["bundle_id"],
+            bundle_hash=data["bundle_hash"],
+            status=RunStatus(data["status"]),
+            created_at=data["created_at"],
+        )
+
+    async def async_get_run(self, run_id: str) -> Run:
+        """Async version of get_run."""
+        from .types import Run, RunStatus
+
+        response = await self._async_request("GET", f"/api/v1/runs/{run_id}")
+        data = response.json()
+
+        return Run(
+            run_id=data["run_id"],
+            bundle_id=data["bundle_id"],
+            bundle_hash=data["bundle_hash"],
+            status=RunStatus(data["status"]),
+            created_at=data["created_at"],
+        )
+
+    def wait_for_run(
+        self,
+        run_id: str,
+        poll_interval: float = 1.0,
+        timeout: float | None = 300.0,
+        on_progress: Any | None = None,
+    ) -> Run:
+        """Wait for a run to complete by polling.
+
+        Args:
+            run_id: The run ID to wait for.
+            poll_interval: Seconds between status checks.
+            timeout: Max seconds to wait (None = no timeout).
+            on_progress: Optional callback called with Run on each poll.
+
+        Returns:
+            Final Run object.
+
+        Raises:
+            TimeoutError: If timeout exceeded.
+        """
+        import time
+
+        start = time.time()
+        terminal_statuses = {"completed", "failed", "cancelled"}
+
+        while True:
+            run = self.get_run(run_id)
+
+            if on_progress:
+                on_progress(run)
+
+            if run.status.value in terminal_statuses:
+                return run
+
+            if timeout and (time.time() - start) > timeout:
+                raise TimeoutError(f"Run {run_id} did not complete within {timeout}s")
+
+            time.sleep(poll_interval)
 
     # --- Health check ---
 

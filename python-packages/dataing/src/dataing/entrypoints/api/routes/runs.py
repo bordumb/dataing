@@ -12,24 +12,52 @@ from collections.abc import AsyncIterator
 from datetime import UTC, datetime
 from enum import Enum
 from typing import Annotated, Any
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 import structlog
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
 from pydantic import BaseModel, Field
 from sse_starlette.sse import EventSourceResponse
 
+from dataing.entrypoints.api.deps import get_app_db
 from dataing.entrypoints.api.middleware.auth import (
     ApiKeyContext,
     verify_api_key,
 )
+from dataing.temporal.client import TemporalInvestigationClient
 
 logger = structlog.get_logger(__name__)
 
 router = APIRouter(prefix="/runs", tags=["runs"])
 
+
+def get_temporal_client(request: Request) -> TemporalInvestigationClient:
+    """Get the Temporal client from app state.
+
+    Args:
+        request: FastAPI request object.
+
+    Returns:
+        TemporalInvestigationClient instance.
+
+    Raises:
+        HTTPException: If Temporal client is not configured.
+    """
+    client: TemporalInvestigationClient | None = getattr(
+        request.app.state, "temporal_client", None
+    )
+    if client is None:
+        raise HTTPException(
+            status_code=503,
+            detail="Temporal client not configured. Set INVESTIGATION_ENGINE=temporal.",
+        )
+    return client
+
+
 # Annotated types for dependency injection
 AuthDep = Annotated[ApiKeyContext, Depends(verify_api_key)]
+AppDbDep = Annotated[Any, Depends(get_app_db)]
+TemporalClientDep = Annotated[TemporalInvestigationClient, Depends(get_temporal_client)]
 
 # SSE configuration
 HEARTBEAT_INTERVAL_SECONDS = 30
@@ -184,6 +212,8 @@ async def create_run(
     request: Request,
     body: CreateRunRequest,
     auth: AuthDep,
+    db: AppDbDep,
+    temporal_client: TemporalClientDep,
 ) -> RunResponse:
     """Create and start a new investigation run.
 
@@ -193,49 +223,97 @@ async def create_run(
 
     Exactly one of bundle_id or bundle must be provided.
     """
-    # Validate exactly one of bundle_id or bundle
-    if body.bundle_id and body.bundle:
+    from dataing.entrypoints.api.deps import resolve_datasource_id
+
+    # Require at least bundle (for asset info) - bundle_id is optional for caching
+    if not body.bundle:
         raise HTTPException(
             status_code=422,
-            detail="Provide exactly one of bundle_id or bundle, not both",
-        )
-    if not body.bundle_id and not body.bundle:
-        raise HTTPException(
-            status_code=422,
-            detail="Provide exactly one of bundle_id or bundle",
+            detail="bundle is required (contains asset information for investigation)",
         )
 
-    run_id = str(uuid4())
+    run_id = uuid4()
     now = datetime.now(UTC)
 
-    # Handle inline bundle
-    if body.bundle:
-        # Create bundle via bundles API
-        from dataing.entrypoints.api.routes.bundles import (
-            CreateBundleRequest,
-            create_bundle,
-        )
+    # Create bundle via bundles API
+    from dataing.entrypoints.api.routes.bundles import (
+        AssetRefRequest as BundleAssetRefRequest,
+    )
+    from dataing.entrypoints.api.routes.bundles import (
+        CreateBundleRequest,
+        create_bundle,
+    )
 
-        bundle_request = CreateBundleRequest(
-            assets=body.bundle.assets,  # type: ignore[arg-type]
-            window=body.bundle.window,
+    bundle_assets = [
+        BundleAssetRefRequest(
+            platform=a.platform,
+            name=a.name,
+            datasource_id=a.datasource_id,
         )
-        # Create a mock response object for the bundle endpoint
-        bundle_response_obj = Response()
-        bundle_result = await create_bundle(
-            request, bundle_request, auth, bundle_response_obj
-        )
-        bundle_id = bundle_result.bundle_id
-        bundle_hash = bundle_result.bundle_hash
-    else:
-        # Use existing bundle_id
-        bundle_id = body.bundle_id  # type: ignore[assignment]
-        # In a real implementation, we'd look up the bundle to get its hash
-        bundle_hash = f"hash-{bundle_id[:8]}"
+        for a in body.bundle.assets
+    ]
+    bundle_request = CreateBundleRequest(
+        assets=bundle_assets,
+        window=body.bundle.window,
+    )
+    # Create a mock response object for the bundle endpoint
+    bundle_response_obj = Response()
+    bundle_result = await create_bundle(
+        request, bundle_request, auth, bundle_response_obj
+    )
+    bundle_id = bundle_result.bundle_id
+    bundle_hash = bundle_result.bundle_hash
+    assets_list = [
+        {"platform": a.platform, "name": a.name, "datasource_id": a.datasource_id}
+        for a in body.bundle.assets
+    ]
+
+    # Resolve datasource_id from assets or use default
+    datasource_id = None
+    if assets_list:
+        for asset in assets_list:
+            if asset.get("datasource_id"):
+                datasource_id = asset["datasource_id"]
+                break
+
+    if not datasource_id:
+        try:
+            datasource_id = await resolve_datasource_id(request, auth.tenant_id, None)
+        except ValueError:
+            # No default datasource, use a placeholder for demo
+            datasource_id = UUID("00000000-0000-0000-0000-000000000003")
+
+    # Build dataset_ids from assets
+    # Extract just the table name from qualified names like "demo.main.orders" -> "orders"
+    dataset_ids = []
+    if assets_list:
+        for a in assets_list:
+            name = a.get("name", "unknown")
+            # Take the last part of qualified name (e.g., "demo.main.orders" -> "orders")
+            table_name = name.split(".")[-1] if "." in name else name
+            dataset_ids.append(table_name)
+
+    # Create a simple alert structure for goal-based investigation
+    alert_data = {
+        "dataset_ids": dataset_ids,
+        "metric_spec": {
+            "metric_type": "description",
+            "expression": body.goal,
+            "display_name": "User Query",
+            "columns_referenced": [],
+        },
+        "anomaly_type": "user_query",
+        "expected_value": 0.0,
+        "actual_value": 0.0,
+        "deviation_pct": 0.0,
+        "anomaly_date": now.date().isoformat(),
+        "severity": "medium",
+        "datasource_id": str(datasource_id),
+    }
 
     # Store run metadata
-    _run_metadata[run_id] = {
-        "run_id": run_id,
+    _run_metadata[str(run_id)] = {
+        "run_id": str(run_id),
         "bundle_id": bundle_id,
         "bundle_hash": bundle_hash,
         "status": RunStatus.RUNNING.value,
@@ -246,19 +324,56 @@ async def create_run(
 
     # Store initial event
     _store_event(
-        run_id,
+        str(run_id),
         SSEEventType.RUN_STARTED.value,
         {"goal": body.goal, "bundle_id": bundle_id},
     )
 
-    # In a real implementation, this would start the investigation workflow
-    # For now, we just return the run info
+    try:
+        # Save investigation to database
+        await db.execute(
+            """
+            INSERT INTO investigations (id, tenant_id, alert)
+            VALUES ($1, $2, $3)
+            """,
+            run_id,
+            auth.tenant_id,
+            json.dumps(alert_data),
+        )
+
+        # Start the Temporal workflow
+        alert_summary = f"User query: {body.goal}"
+        if dataset_ids:
+            alert_summary += f" (on {', '.join(dataset_ids)})"
+
+        await temporal_client.start_investigation(
+            investigation_id=str(run_id),
+            tenant_id=str(auth.tenant_id),
+            datasource_id=str(datasource_id),
+            alert_data=alert_data,
+            alert_summary=alert_summary,
+        )
+
+        logger.info(f"Started Temporal run: run_id={run_id}, tenant_id={auth.tenant_id}")
+
+    except Exception as e:
+        logger.error(f"Failed to start Temporal run: {e}")
+        _run_metadata[str(run_id)]["status"] = RunStatus.FAILED.value
+        _store_event(
+            str(run_id),
+            SSEEventType.RUN_FAILED.value,
+            {"error": str(e)},
+        )
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to start investigation: {e}",
+        ) from e
 
     # Build events URL
     events_url = f"/api/v1/runs/{run_id}/events"
 
     return RunResponse(
-        run_id=run_id,
+        run_id=str(run_id),
         bundle_id=bundle_id,
         bundle_hash=bundle_hash,
         status=RunStatus.RUNNING,
@@ -347,6 +462,7 @@ async def stream_events(
 
 @router.get("/{run_id}", response_model=dict[str, Any])
 async def get_run(
+    request: Request,
     run_id: str,
     auth: AuthDep,
 ) -> dict[str, Any]:
@@ -354,7 +470,31 @@ async def get_run(
     if run_id not in _run_metadata:
         raise HTTPException(status_code=404, detail=f"Run not found: {run_id}")
 
-    return _run_metadata[run_id]
+    metadata = _run_metadata[run_id].copy()
+
+    # Try to get real status from Temporal
+    try:
+        temporal_client: TemporalInvestigationClient | None = getattr(
+            request.app.state, "temporal_client", None
+        )
+        if temporal_client:
+            temporal_status = await temporal_client.get_status(run_id)
+            # InvestigationStatus has workflow_status field
+            workflow_status = temporal_status.workflow_status
+            if workflow_status == "completed":
+                metadata["status"] = RunStatus.COMPLETED.value
+                _run_metadata[run_id]["status"] = RunStatus.COMPLETED.value
+            elif workflow_status == "failed":
+                metadata["status"] = RunStatus.FAILED.value
+                _run_metadata[run_id]["status"] = RunStatus.FAILED.value
+            elif workflow_status == "cancelled":
+                metadata["status"] = RunStatus.CANCELLED.value
+                _run_metadata[run_id]["status"] = RunStatus.CANCELLED.value
+    except Exception as e:
+        # Log but don't fail - return cached status
+        logger.debug(f"Could not get Temporal status for {run_id}: {e}")
+
+    return metadata
 
 
 @router.post("/{run_id}/cancel")

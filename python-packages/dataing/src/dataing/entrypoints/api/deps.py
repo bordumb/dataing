@@ -510,39 +510,81 @@ async def get_default_tenant_adapter(request: Request, tenant_id: UUID) -> BaseA
 async def resolve_datasource_id(
     request: Request,
     tenant_id: UUID,
-    data_source_id: UUID | None = None,
+    explicit_id: UUID | None = None,
+    asset_id: UUID | None = None,
+    session_default: UUID | None = None,
 ) -> UUID:
-    """Resolve the datasource ID for a tenant.
+    """Resolve the datasource ID following documented precedence rules.
 
-    If data_source_id is provided, validates it exists. Otherwise returns
-    the tenant's default active data source ID.
+    Precedence order (highest to lowest):
+    1. Explicit `datasource_id` in request
+    2. Asset-level `datasource_id` (from URN or attachment)
+    3. Session/context `default_datasource_id`
+    4. Tenant's single datasource (if only one exists)
+    5. 409 Conflict if ambiguous
 
     Args:
         request: The current request (for accessing app state).
         tenant_id: The tenant's UUID.
-        data_source_id: Optional specific data source ID.
+        explicit_id: Explicit datasource ID from request.
+        asset_id: Asset-level datasource binding.
+        session_default: Session/context default datasource.
 
     Returns:
         The resolved datasource UUID.
 
     Raises:
-        ValueError: If data source not found or no active sources.
+        ValueError: If datasource not found or ambiguous.
     """
     app_db: AppDatabase = request.app.state.app_db
 
-    if data_source_id:
-        ds = await app_db.get_data_source(data_source_id, tenant_id)
+    # 1. Explicit always wins
+    if explicit_id:
+        ds = await app_db.get_data_source(explicit_id, tenant_id)
         if not ds:
-            raise ValueError(f"Data source {data_source_id} not found for tenant {tenant_id}")
-        return data_source_id
+            raise ValueError(f"Datasource {explicit_id} not found for tenant {tenant_id}")
+        return explicit_id
 
-    # Get default data source
+    # 2. Asset-level binding
+    if asset_id:
+        ds = await app_db.get_data_source(asset_id, tenant_id)
+        if not ds:
+            raise ValueError(f"Datasource {asset_id} not found for tenant {tenant_id}")
+        return asset_id
+
+    # 3. Session default
+    if session_default:
+        ds = await app_db.get_data_source(session_default, tenant_id)
+        if not ds:
+            raise ValueError(f"Datasource {session_default} not found for tenant {tenant_id}")
+        return session_default
+
+    # 4. Single datasource for tenant
     data_sources = await app_db.list_data_sources(tenant_id)
     active_sources = [d for d in data_sources if d.get("is_active", True)]
+
     if not active_sources:
-        raise ValueError(f"No active data sources found for tenant {tenant_id}")
-    result: UUID = active_sources[0]["id"]
-    return result
+        raise ValueError(f"No active datasources found for tenant {tenant_id}")
+
+    if len(active_sources) == 1:
+        result: UUID = active_sources[0]["id"]
+        return result
+
+    # 5. Ambiguous - raise with available options
+    available = [
+        {
+            "id": str(ds["id"]),
+            "name": ds.get("name", "Unknown"),
+            "platform": ds.get("platform", "Unknown"),
+            "host": ds.get("host"),
+        }
+        for ds in active_sources
+    ]
+    raise ValueError(
+        f"ambiguous_datasource:Multiple datasources available. "
+        f"Specify datasource_id or use session default. "
+        f"Available: {available}"
+    )
 
 
 async def get_tenant_lineage_adapter(

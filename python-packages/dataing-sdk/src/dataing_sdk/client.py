@@ -64,6 +64,10 @@ class DataingClient:
         self.api_key = api_key or os.environ.get(ENV_API_KEY)
         self.timeout = timeout
 
+        # Session default datasource (set via attach())
+        self._default_datasource_id: str | None = None
+        self._default_datasource_name: str | None = None
+
         # Lazy-initialized clients
         self._sync_client: httpx.Client | None = None
         self._async_client: httpx.AsyncClient | None = None
@@ -178,6 +182,49 @@ class DataingClient:
     async def __aexit__(self, *args: Any) -> None:
         """Exit context manager for async usage."""
         await self.aclose()
+
+    # --- Session and Attachment methods ---
+
+    @property
+    def default_datasource_id(self) -> str | None:
+        """Get the session default datasource ID."""
+        return self._default_datasource_id
+
+    @property
+    def default_datasource_name(self) -> str | None:
+        """Get the session default datasource name."""
+        return self._default_datasource_name
+
+    def attach(self, datasource_id: str, name: str | None = None) -> None:
+        """Set the session default datasource.
+
+        This datasource will be used for all subsequent requests unless
+        explicitly overridden.
+
+        Args:
+            datasource_id: The datasource ID to use as default.
+            name: Optional human-readable name for display.
+
+        Example:
+            client.attach("ds_prod", name="Production Analytics")
+            client.ask("Check data quality", assets=[...])  # Uses ds_prod
+        """
+        self._default_datasource_id = datasource_id
+        self._default_datasource_name = name
+
+    def detach(self) -> None:
+        """Clear the session default datasource."""
+        self._default_datasource_id = None
+        self._default_datasource_name = None
+
+    def __repr__(self) -> str:
+        """Return string representation showing connection and datasource."""
+        parts = [f"DataingClient(base_url='{self.base_url}'"]
+        if self._default_datasource_id:
+            ds_info = self._default_datasource_name or self._default_datasource_id
+            parts.append(f", datasource='{ds_info}'")
+        parts.append(")")
+        return "".join(parts)
 
     # --- Bundle and Context methods ---
 

@@ -1,14 +1,19 @@
 {
-  "assignee": null,
+  "assignee": "bordumbb@gmail.com",
   "claim_note": "",
-  "claimed_at": null,
+  "claimed_at": "2026-01-20T04:25:48.946438Z",
   "created_at": "2026-01-20T03:52:52.964182Z",
   "depends_on": [],
   "epic": "fn-21",
+  "evidence": {
+    "commits": [],
+    "prs": [],
+    "tests": []
+  },
   "id": "fn-21.4",
   "priority": null,
   "spec_path": ".flow/tasks/fn-21.4.md",
-  "status": "todo",
+  "status": "done",
   "title": "Add %dataing attach magic with session default",
-  "updated_at": "2026-01-20T03:52:52.964393Z"
+  "updated_at": "2026-01-20T04:26:05.664252Z"
 }

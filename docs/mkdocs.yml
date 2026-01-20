@@ -99,6 +99,7 @@ nav:
   - Concepts:
       - "How Investigations Work": concepts/investigations.md
       - "Safety & Guardrails": concepts/guardrails.md
+      - "Datasource Resolution": concepts/datasource-resolution.md
   - Integrations:
       - Warehouses:
           - BigQuery: integrations/warehouses/bigquery.md

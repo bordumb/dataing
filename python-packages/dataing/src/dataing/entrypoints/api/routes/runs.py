@@ -279,7 +279,9 @@ async def create_run(
 
     if not datasource_id:
         try:
-            datasource_id = await resolve_datasource_id(request, auth.tenant_id, None)
+            datasource_id = await resolve_datasource_id(
+                request, auth.tenant_id, explicit_id=None
+            )
         except ValueError:
             # No default datasource, use a placeholder for demo
             datasource_id = UUID("00000000-0000-0000-0000-000000000003")

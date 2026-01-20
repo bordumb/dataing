@@ -1,14 +1,19 @@
 {
-  "assignee": null,
+  "assignee": "bordumbb@gmail.com",
   "claim_note": "",
-  "claimed_at": null,
+  "claimed_at": "2026-01-20T04:24:40.512722Z",
   "created_at": "2026-01-20T03:52:52.762041Z",
   "depends_on": [],
   "epic": "fn-21",
+  "evidence": {
+    "commits": [],
+    "prs": [],
+    "tests": []
+  },
   "id": "fn-21.3",
   "priority": null,
   "spec_path": ".flow/tasks/fn-21.3.md",
-  "status": "todo",
+  "status": "done",
   "title": "Add attach() method to SDK client",
-  "updated_at": "2026-01-20T03:52:52.762297Z"
+  "updated_at": "2026-01-20T04:25:39.819640Z"
 }

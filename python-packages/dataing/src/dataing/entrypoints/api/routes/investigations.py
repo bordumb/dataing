@@ -283,12 +283,23 @@ async def start_investigation(
     # Resolve datasource_id (use provided or get default)
     try:
         datasource_id = await resolve_datasource_id(
-            http_request, auth.tenant_id, request.datasource_id
+            http_request, auth.tenant_id, explicit_id=request.datasource_id
         )
     except ValueError as e:
+        error_msg = str(e)
+        if error_msg.startswith("ambiguous_datasource:"):
+            # Parse the ambiguous datasource error for 409 response
+            raise HTTPException(
+                status_code=409,
+                detail={
+                    "error": "ambiguous_datasource",
+                    "message": "Multiple datasources match. Please specify which to use.",
+                    "hint": "Specify datasource_id or use %dataing attach",
+                },
+            ) from e
         raise HTTPException(
             status_code=400,
-            detail=str(e),
+            detail=error_msg,
         ) from e
 
     investigation_id = uuid4()

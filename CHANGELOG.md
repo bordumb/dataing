@@ -1,3 +1,10 @@
+## [1.2.1](https://github.com/bordumb/dataing/compare/v1.2.0...v1.2.1) (2026-01-20)
+
+
+### Bug Fixes
+
+* **docs:** use venv for Vercel docs build to avoid uv conflict ([11acdc0](https://github.com/bordumb/dataing/commit/11acdc0ec0794bae24addfc930ad948b575485ed))
+
 # [1.2.0](https://github.com/bordumb/dataing/compare/v1.1.0...v1.2.0) (2026-01-20)
 
 

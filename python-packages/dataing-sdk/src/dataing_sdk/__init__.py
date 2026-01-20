@@ -17,7 +17,10 @@ from .exceptions import (
 from .types import (
     AssetRef,
     ContextBundle,
+    DiffResult,
     EvidenceKind,
+    ExplainResult,
+    QueryResult,
     ResolvedAsset,
     Run,
     RunEvidence,
@@ -37,7 +40,10 @@ __all__ = [
     # Types
     "AssetRef",
     "ContextBundle",
+    "DiffResult",
     "EvidenceKind",
+    "ExplainResult",
+    "QueryResult",
     "ResolvedAsset",
     "Run",
     "RunEvidence",

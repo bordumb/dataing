@@ -5,7 +5,14 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any
 
 from .exceptions import ValidationError
-from .types import AssetRef, ContextBundle, ResolvedAsset
+from .types import (
+    AssetRef,
+    ContextBundle,
+    DiffResult,
+    ExplainResult,
+    QueryResult,
+    ResolvedAsset,
+)
 
 if TYPE_CHECKING:
     from .client import DataingClient
@@ -77,6 +84,311 @@ class Context:
         """String representation."""
         asset_count = len(self._bundle.resolved_assets)
         return f"<Context bundle={self.bundle_id[:8]}... assets={asset_count}>"
+
+    def _repr_html_(self) -> str:
+        """Rich HTML representation for Jupyter notebooks.
+
+        Returns:
+            HTML string for rendering.
+        """
+        try:
+            from dataing_notebook.rendering import render_context
+
+            return render_context(self)
+        except ImportError:
+            # Fallback if dataing-notebook not installed
+            return self._fallback_html()
+
+    def _fallback_html(self) -> str:
+        """Fallback HTML when dataing-notebook is not available."""
+        import html as html_module
+
+        assets_html = "".join(
+            f'<li><code>{html_module.escape(a.dataset_id)}</code></li>'
+            for a in self._bundle.resolved_assets
+        )
+        return f"""
+        <div style="font-family: monospace; padding: 10px; border: 1px solid #ccc; border-radius: 4px;">
+            <strong>Context</strong><br>
+            Bundle: {html_module.escape(self.bundle_id[:16])}...<br>
+            Hash: {html_module.escape(self.bundle_hash)}<br>
+            <strong>Assets ({len(self._bundle.resolved_assets)}):</strong>
+            <ul style="margin: 5px 0;">{assets_html}</ul>
+        </div>
+        """
+
+    # --- Action methods ---
+
+    def query(
+        self,
+        sql: str,
+        *,
+        datasource_id: str | None = None,
+        timeout_seconds: int = 30,
+        limit: int | None = None,
+        offset: int | None = None,
+    ) -> QueryResult:
+        """Execute a SQL query against the context's datasource.
+
+        Uses the default_datasource_id from the bundle unless overridden.
+
+        Args:
+            sql: SQL query to execute.
+            datasource_id: Override the default datasource. If not provided,
+                uses default_datasource_id from the bundle.
+            timeout_seconds: Query timeout in seconds.
+            limit: Maximum number of rows to return (pagination).
+            offset: Number of rows to skip (pagination).
+
+        Returns:
+            QueryResult with columns, rows, and metadata.
+
+        Raises:
+            ValidationError: If no datasource_id is available.
+
+        Example:
+            ctx = client.context("postgres://db.schema.orders")
+            result = ctx.query("SELECT COUNT(*) FROM orders WHERE status = 'pending'")
+            print(result.rows)
+        """
+        ds_id = datasource_id or self.default_datasource_id
+        if not ds_id:
+            raise ValidationError(
+                "No datasource_id available. Either provide datasource_id parameter "
+                "or ensure the context bundle has a default_datasource_id."
+            )
+
+        # Apply pagination to SQL if provided
+        query_sql = sql
+        if limit is not None or offset is not None:
+            # Basic pagination - most dialects support LIMIT/OFFSET
+            if limit is not None:
+                query_sql = f"{query_sql.rstrip(';')} LIMIT {limit}"
+            if offset is not None:
+                query_sql = f"{query_sql} OFFSET {offset}"
+
+        payload = {
+            "query": query_sql,
+            "timeout_seconds": timeout_seconds,
+        }
+
+        response = self._client._request(
+            "POST",
+            f"/api/v1/datasources/{ds_id}/query",
+            json=payload,
+        )
+        data = response.json()
+
+        return QueryResult(
+            columns=data.get("columns", []),
+            rows=data.get("rows", []),
+            row_count=data.get("row_count", 0),
+            truncated=data.get("truncated", False),
+            execution_time_ms=data.get("execution_time_ms"),
+        )
+
+    async def async_query(
+        self,
+        sql: str,
+        *,
+        datasource_id: str | None = None,
+        timeout_seconds: int = 30,
+        limit: int | None = None,
+        offset: int | None = None,
+    ) -> QueryResult:
+        """Async version of query()."""
+        ds_id = datasource_id or self.default_datasource_id
+        if not ds_id:
+            raise ValidationError(
+                "No datasource_id available. Either provide datasource_id parameter "
+                "or ensure the context bundle has a default_datasource_id."
+            )
+
+        query_sql = sql
+        if limit is not None or offset is not None:
+            if limit is not None:
+                query_sql = f"{query_sql.rstrip(';')} LIMIT {limit}"
+            if offset is not None:
+                query_sql = f"{query_sql} OFFSET {offset}"
+
+        payload = {
+            "query": query_sql,
+            "timeout_seconds": timeout_seconds,
+        }
+
+        response = await self._client._async_request(
+            "POST",
+            f"/api/v1/datasources/{ds_id}/query",
+            json=payload,
+        )
+        data = response.json()
+
+        return QueryResult(
+            columns=data.get("columns", []),
+            rows=data.get("rows", []),
+            row_count=data.get("row_count", 0),
+            truncated=data.get("truncated", False),
+            execution_time_ms=data.get("execution_time_ms"),
+        )
+
+    def diff(
+        self,
+        metric: str,
+        window: str = "7d",
+        *,
+        datasource_id: str | None = None,
+    ) -> DiffResult:
+        """Compare a metric over a time window.
+
+        Calculates the difference between current and previous values
+        for a metric within the specified time window.
+
+        Args:
+            metric: Metric to compare (e.g., "row_count", "null_rate").
+            window: Time window for comparison (e.g., "7d", "24h", "1w").
+            datasource_id: Override the default datasource.
+
+        Returns:
+            DiffResult with current/previous values and delta.
+
+        Example:
+            ctx = client.context("postgres://db.schema.orders")
+            diff = ctx.diff("row_count", "7d")
+            print(f"Row count changed by {diff.delta_percent}%")
+        """
+        ds_id = datasource_id or self.default_datasource_id
+
+        payload: dict[str, Any] = {
+            "bundle_id": self.bundle_id,
+            "metric": metric,
+            "window": window,
+        }
+        if ds_id:
+            payload["datasource_id"] = ds_id
+
+        response = self._client._request(
+            "POST",
+            "/api/v1/context/diff",
+            json=payload,
+        )
+        data = response.json()
+
+        return DiffResult(
+            metric=data.get("metric", metric),
+            window=data.get("window", window),
+            current_value=data.get("current_value"),
+            previous_value=data.get("previous_value"),
+            delta=data.get("delta"),
+            delta_percent=data.get("delta_percent"),
+            trend=data.get("trend"),
+            samples=data.get("samples", []),
+        )
+
+    async def async_diff(
+        self,
+        metric: str,
+        window: str = "7d",
+        *,
+        datasource_id: str | None = None,
+    ) -> DiffResult:
+        """Async version of diff()."""
+        ds_id = datasource_id or self.default_datasource_id
+
+        payload: dict[str, Any] = {
+            "bundle_id": self.bundle_id,
+            "metric": metric,
+            "window": window,
+        }
+        if ds_id:
+            payload["datasource_id"] = ds_id
+
+        response = await self._client._async_request(
+            "POST",
+            "/api/v1/context/diff",
+            json=payload,
+        )
+        data = response.json()
+
+        return DiffResult(
+            metric=data.get("metric", metric),
+            window=data.get("window", window),
+            current_value=data.get("current_value"),
+            previous_value=data.get("previous_value"),
+            delta=data.get("delta"),
+            delta_percent=data.get("delta_percent"),
+            trend=data.get("trend"),
+            samples=data.get("samples", []),
+        )
+
+    def explain(
+        self,
+        *,
+        focus: str | None = None,
+    ) -> ExplainResult:
+        """Get an AI-powered explanation of the context.
+
+        Analyzes the assets, lineage, and anomalies in the context
+        and provides a natural language explanation with insights.
+
+        Args:
+            focus: Optional focus area for the explanation
+                (e.g., "anomalies", "lineage", "data quality").
+
+        Returns:
+            ExplainResult with summary, insights, and recommendations.
+
+        Example:
+            ctx = client.context("postgres://db.schema.orders")
+            explanation = ctx.explain(focus="anomalies")
+            print(explanation.summary)
+            for insight in explanation.insights:
+                print(f"- {insight}")
+        """
+        payload: dict[str, Any] = {
+            "bundle_id": self.bundle_id,
+        }
+        if focus:
+            payload["focus"] = focus
+
+        response = self._client._request(
+            "POST",
+            "/api/v1/context/explain",
+            json=payload,
+        )
+        data = response.json()
+
+        return ExplainResult(
+            summary=data.get("summary", ""),
+            insights=data.get("insights", []),
+            recommendations=data.get("recommendations", []),
+            related_assets=data.get("related_assets", []),
+        )
+
+    async def async_explain(
+        self,
+        *,
+        focus: str | None = None,
+    ) -> ExplainResult:
+        """Async version of explain()."""
+        payload: dict[str, Any] = {
+            "bundle_id": self.bundle_id,
+        }
+        if focus:
+            payload["focus"] = focus
+
+        response = await self._client._async_request(
+            "POST",
+            "/api/v1/context/explain",
+            json=payload,
+        )
+        data = response.json()
+
+        return ExplainResult(
+            summary=data.get("summary", ""),
+            insights=data.get("insights", []),
+            recommendations=data.get("recommendations", []),
+            related_assets=data.get("related_assets", []),
+        )
 
 
 def from_sql(

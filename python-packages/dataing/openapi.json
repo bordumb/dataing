@@ -4526,7 +4526,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/LineageGraphResponse"
+                  "$ref": "#/components/schemas/dataing__entrypoints__api__routes__lineage__LineageGraphResponse"
                 }
               }
             }
@@ -5350,6 +5350,106 @@
             }
           }
         }
+      }
+    },
+    "/api/v1/context/diff": {
+      "post": {
+        "tags": [
+          "context"
+        ],
+        "summary": "Compute Diff",
+        "description": "Compute metric difference over a time window.\n\nCompares the current value of a metric to its historical value\nbased on the specified time window.\n\nSupported metrics:\n- row_count: Number of rows in the dataset\n- null_rate: Percentage of null values\n- distinct_count: Number of distinct values\n- freshness: Time since last update\n\nReturns the current and previous values, absolute delta,\npercentage change, and trend direction.",
+        "operationId": "compute_diff_api_v1_context_diff_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DiffRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DiffResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "APIKeyHeader": []
+          },
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/context/explain": {
+      "post": {
+        "tags": [
+          "context"
+        ],
+        "summary": "Explain Context",
+        "description": "Get an AI-powered explanation of the context bundle.\n\nAnalyzes the assets, lineage, and anomalies in the bundle\nand provides a natural language explanation with insights\nand recommendations.\n\nFocus areas:\n- anomalies: Focus on detected data quality issues\n- lineage: Focus on data dependencies and flow\n- data_quality: General data quality assessment",
+        "operationId": "explain_context_api_v1_context_explain_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExplainRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExplainResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "APIKeyHeader": []
+          },
+          {
+            "HTTPBearer": []
+          }
+        ]
       }
     },
     "/api/v1/runs": {
@@ -8911,7 +9011,7 @@
           "lineage": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/dataing__entrypoints__api__routes__bundles__LineageGraphResponse"
+                "$ref": "#/components/schemas/LineageGraphResponse"
               },
               {
                 "type": "null"
@@ -9710,6 +9810,147 @@
         "title": "DeleteCredentialsResponse",
         "description": "Response for deleting credentials."
       },
+      "DiffRequest": {
+        "properties": {
+          "bundle_id": {
+            "type": "string",
+            "title": "Bundle Id",
+            "description": "Bundle ID to analyze"
+          },
+          "metric": {
+            "type": "string",
+            "title": "Metric",
+            "description": "Metric to compare (e.g., row_count, null_rate)"
+          },
+          "window": {
+            "type": "string",
+            "title": "Window",
+            "description": "Time window for comparison (e.g., 7d, 24h)",
+            "default": "7d"
+          },
+          "datasource_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Datasource Id",
+            "description": "Optional datasource override"
+          }
+        },
+        "type": "object",
+        "required": [
+          "bundle_id",
+          "metric"
+        ],
+        "title": "DiffRequest",
+        "description": "Request to compute metric diff."
+      },
+      "DiffResponse": {
+        "properties": {
+          "metric": {
+            "type": "string",
+            "title": "Metric"
+          },
+          "window": {
+            "type": "string",
+            "title": "Window"
+          },
+          "current_value": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Current Value"
+          },
+          "previous_value": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Previous Value"
+          },
+          "delta": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Delta"
+          },
+          "delta_percent": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Delta Percent"
+          },
+          "trend": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Trend",
+            "description": "up, down, stable, or unknown"
+          },
+          "samples": {
+            "items": {
+              "$ref": "#/components/schemas/DiffSample"
+            },
+            "type": "array",
+            "title": "Samples"
+          }
+        },
+        "type": "object",
+        "required": [
+          "metric",
+          "window"
+        ],
+        "title": "DiffResponse",
+        "description": "Response for metric diff."
+      },
+      "DiffSample": {
+        "properties": {
+          "timestamp": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Timestamp"
+          },
+          "value": {
+            "type": "number",
+            "title": "Value"
+          }
+        },
+        "type": "object",
+        "required": [
+          "timestamp",
+          "value"
+        ],
+        "title": "DiffSample",
+        "description": "Time-series sample for diff."
+      },
       "DownstreamResponse": {
         "properties": {
           "datasets": {
@@ -9731,6 +9972,69 @@
         ],
         "title": "DownstreamResponse",
         "description": "Response for downstream datasets."
+      },
+      "ExplainRequest": {
+        "properties": {
+          "bundle_id": {
+            "type": "string",
+            "title": "Bundle Id",
+            "description": "Bundle ID to explain"
+          },
+          "focus": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Focus",
+            "description": "Focus area (anomalies, lineage, data_quality)"
+          }
+        },
+        "type": "object",
+        "required": [
+          "bundle_id"
+        ],
+        "title": "ExplainRequest",
+        "description": "Request for AI-powered explanation."
+      },
+      "ExplainResponse": {
+        "properties": {
+          "summary": {
+            "type": "string",
+            "title": "Summary",
+            "description": "Natural language explanation"
+          },
+          "insights": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Insights"
+          },
+          "recommendations": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Recommendations"
+          },
+          "related_assets": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Related Assets"
+          }
+        },
+        "type": "object",
+        "required": [
+          "summary"
+        ],
+        "title": "ExplainResponse",
+        "description": "Response for explanation."
       },
       "FeedbackCreate": {
         "properties": {
@@ -11181,40 +11485,35 @@
       "LineageGraphResponse": {
         "properties": {
           "root": {
-            "type": "string",
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Root"
           },
           "datasets": {
             "additionalProperties": {
-              "$ref": "#/components/schemas/DatasetResponse"
+              "additionalProperties": true,
+              "type": "object"
             },
             "type": "object",
             "title": "Datasets"
           },
           "edges": {
             "items": {
-              "$ref": "#/components/schemas/LineageEdgeResponse"
+              "$ref": "#/components/schemas/LineageEdge"
             },
             "type": "array",
             "title": "Edges"
-          },
-          "jobs": {
-            "additionalProperties": {
-              "$ref": "#/components/schemas/JobResponse"
-            },
-            "type": "object",
-            "title": "Jobs"
           }
         },
         "type": "object",
-        "required": [
-          "root",
-          "datasets",
-          "edges",
-          "jobs"
-        ],
         "title": "LineageGraphResponse",
-        "description": "Response for a lineage graph."
+        "description": "Lineage graph response."
       },
       "LineageProviderResponse": {
         "properties": {
@@ -13787,39 +14086,6 @@
         "title": "AssetRefRequest",
         "description": "Asset reference in request."
       },
-      "dataing__entrypoints__api__routes__bundles__LineageGraphResponse": {
-        "properties": {
-          "root": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Root"
-          },
-          "datasets": {
-            "additionalProperties": {
-              "additionalProperties": true,
-              "type": "object"
-            },
-            "type": "object",
-            "title": "Datasets"
-          },
-          "edges": {
-            "items": {
-              "$ref": "#/components/schemas/LineageEdge"
-            },
-            "type": "array",
-            "title": "Edges"
-          }
-        },
-        "type": "object",
-        "title": "LineageGraphResponse",
-        "description": "Lineage graph response."
-      },
       "dataing__entrypoints__api__routes__datasources__TestConnectionResponse": {
         "properties": {
           "success": {
@@ -13860,6 +14126,44 @@
         ],
         "title": "TestConnectionResponse",
         "description": "Response for testing a connection."
+      },
+      "dataing__entrypoints__api__routes__lineage__LineageGraphResponse": {
+        "properties": {
+          "root": {
+            "type": "string",
+            "title": "Root"
+          },
+          "datasets": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/DatasetResponse"
+            },
+            "type": "object",
+            "title": "Datasets"
+          },
+          "edges": {
+            "items": {
+              "$ref": "#/components/schemas/LineageEdgeResponse"
+            },
+            "type": "array",
+            "title": "Edges"
+          },
+          "jobs": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/JobResponse"
+            },
+            "type": "object",
+            "title": "Jobs"
+          }
+        },
+        "type": "object",
+        "required": [
+          "root",
+          "datasets",
+          "edges",
+          "jobs"
+        ],
+        "title": "LineageGraphResponse",
+        "description": "Response for a lineage graph."
       }
     },
     "securitySchemes": {

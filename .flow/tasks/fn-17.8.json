@@ -1,16 +1,23 @@
 {
-  "assignee": null,
+  "assignee": "bordumbb@gmail.com",
   "claim_note": "",
-  "claimed_at": null,
+  "claimed_at": "2026-01-20T00:49:23.243438Z",
   "created_at": "2026-01-20T00:22:27.481279Z",
   "depends_on": [
     "fn-17.4"
   ],
   "epic": "fn-17",
+  "evidence": {
+    "commits": [],
+    "prs": [],
+    "tests": [
+      "uv run pytest python-packages/dataing-sdk/tests python-packages/dataing-notebook/tests -v"
+    ]
+  },
   "id": "fn-17.8",
   "priority": null,
   "spec_path": ".flow/tasks/fn-17.8.md",
-  "status": "todo",
+  "status": "done",
   "title": "Rich Rendering",
-  "updated_at": "2026-01-20T00:22:27.481465Z"
+  "updated_at": "2026-01-20T00:52:31.205063Z"
 }

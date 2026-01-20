@@ -371,3 +371,214 @@ async def get_bundle(
         status_code=404,
         detail=f"Bundle not found: {bundle_id}. Bundles are currently not persisted.",
     )
+
+
+# --- Diff and Explain Request/Response Models ---
+
+
+class DiffRequest(BaseModel):
+    """Request to compute metric diff."""
+
+    bundle_id: str = Field(..., description="Bundle ID to analyze")
+    metric: str = Field(
+        ..., description="Metric to compare (e.g., row_count, null_rate)"
+    )
+    window: str = Field(
+        default="7d", description="Time window for comparison (e.g., 7d, 24h)"
+    )
+    datasource_id: str | None = Field(
+        default=None, description="Optional datasource override"
+    )
+
+
+class DiffSample(BaseModel):
+    """Time-series sample for diff."""
+
+    timestamp: datetime
+    value: float
+
+
+class DiffResponse(BaseModel):
+    """Response for metric diff."""
+
+    metric: str
+    window: str
+    current_value: float | None = None
+    previous_value: float | None = None
+    delta: float | None = None
+    delta_percent: float | None = None
+    trend: str | None = Field(
+        default=None, description="up, down, stable, or unknown"
+    )
+    samples: list[DiffSample] = Field(default_factory=list)
+
+
+class ExplainRequest(BaseModel):
+    """Request for AI-powered explanation."""
+
+    bundle_id: str = Field(..., description="Bundle ID to explain")
+    focus: str | None = Field(
+        default=None,
+        description="Focus area (anomalies, lineage, data_quality)",
+    )
+
+
+class ExplainResponse(BaseModel):
+    """Response for explanation."""
+
+    summary: str = Field(..., description="Natural language explanation")
+    insights: list[str] = Field(default_factory=list)
+    recommendations: list[str] = Field(default_factory=list)
+    related_assets: list[str] = Field(default_factory=list)
+
+
+# --- Diff and Explain Endpoints ---
+
+
+@router.post("/diff", response_model=DiffResponse)
+async def compute_diff(
+    body: DiffRequest,
+    auth: AuthDep,
+) -> DiffResponse:
+    """Compute metric difference over a time window.
+
+    Compares the current value of a metric to its historical value
+    based on the specified time window.
+
+    Supported metrics:
+    - row_count: Number of rows in the dataset
+    - null_rate: Percentage of null values
+    - distinct_count: Number of distinct values
+    - freshness: Time since last update
+
+    Returns the current and previous values, absolute delta,
+    percentage change, and trend direction.
+    """
+    # TODO: Implement actual metric computation
+    # For now, return mock data for SDK testing
+
+    # Parse window to determine comparison period
+    window = body.window.lower()
+    # Convert window to days for mock data calculation
+    days = 7  # default
+    if window.endswith("d"):
+        days = int(window[:-1])
+    elif window.endswith("h"):
+        days = int(window[:-1]) / 24
+    elif window.endswith("w"):
+        days = int(window[:-1]) * 7
+
+    # Generate mock samples
+    samples: list[DiffSample] = []
+    now = datetime.now(UTC)
+    for i in range(min(int(days), 30)):
+        samples.append(
+            DiffSample(
+                timestamp=now - timedelta(days=i),
+                value=1000.0 + (i * 10),  # Mock increasing values
+            )
+        )
+
+    # Compute mock values
+    current_value = 1000.0
+    previous_value = 950.0 if samples else None
+    delta = current_value - previous_value if previous_value else None
+    delta_percent = (delta / previous_value * 100) if delta and previous_value else None
+
+    # Determine trend
+    trend = "unknown"
+    if delta:
+        if delta > 0:
+            trend = "up"
+        elif delta < 0:
+            trend = "down"
+        else:
+            trend = "stable"
+
+    return DiffResponse(
+        metric=body.metric,
+        window=body.window,
+        current_value=current_value,
+        previous_value=previous_value,
+        delta=delta,
+        delta_percent=delta_percent,
+        trend=trend,
+        samples=samples,
+    )
+
+
+@router.post("/explain", response_model=ExplainResponse)
+async def explain_context(
+    body: ExplainRequest,
+    auth: AuthDep,
+) -> ExplainResponse:
+    """Get an AI-powered explanation of the context bundle.
+
+    Analyzes the assets, lineage, and anomalies in the bundle
+    and provides a natural language explanation with insights
+    and recommendations.
+
+    Focus areas:
+    - anomalies: Focus on detected data quality issues
+    - lineage: Focus on data dependencies and flow
+    - data_quality: General data quality assessment
+    """
+    # TODO: Implement actual LLM-powered explanation
+    # For now, return mock data for SDK testing
+
+    focus = body.focus or "general"
+
+    # Generate mock explanation based on focus
+    if focus == "anomalies":
+        summary = (
+            "Analysis of the context bundle reveals potential data quality anomalies. "
+            "The assets show patterns consistent with data freshness issues and "
+            "possible schema drift in upstream dependencies."
+        )
+        insights = [
+            "Detected 3 data freshness anomalies in the last 7 days",
+            "Schema changes detected in 2 upstream tables",
+            "Volume drop of 15% compared to historical average",
+        ]
+        recommendations = [
+            "Investigate data pipeline for delays",
+            "Review recent schema migrations",
+            "Set up volume monitoring alerts",
+        ]
+    elif focus == "lineage":
+        summary = (
+            "The lineage graph shows a complex data flow with multiple dependencies. "
+            "The target assets depend on 5 upstream sources with 3 intermediate transformations."
+        )
+        insights = [
+            "5 upstream data sources identified",
+            "3 transformation layers between source and target",
+            "2 potential single points of failure in the pipeline",
+        ]
+        recommendations = [
+            "Add redundancy for critical data flows",
+            "Document transformation logic",
+            "Consider adding data contracts",
+        ]
+    else:
+        summary = (
+            "Overall data quality assessment for the context bundle. "
+            "The assets are generally healthy with some areas for improvement."
+        )
+        insights = [
+            "Data freshness is within acceptable thresholds",
+            "Schema stability is good with minimal drift",
+            "Query performance metrics are within normal range",
+        ]
+        recommendations = [
+            "Continue monitoring key metrics",
+            "Consider adding data validation rules",
+            "Review access patterns for optimization",
+        ]
+
+    return ExplainResponse(
+        summary=summary,
+        insights=insights,
+        recommendations=recommendations,
+        related_assets=[],  # Would be populated from actual bundle
+    )

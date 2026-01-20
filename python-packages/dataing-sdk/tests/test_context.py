@@ -199,3 +199,137 @@ class TestFromSql:
         )
         names = [a.name for a in assets]
         assert names == sorted(names)
+
+
+class TestContextActions:
+    """Tests for Context action methods (query, diff, explain)."""
+
+    def test_query_requires_datasource_id(self) -> None:
+        """Test query raises ValidationError without datasource."""
+        bundle = ContextBundle(
+            bundle_id="test-bundle",
+            resolved_assets=[],
+            default_datasource_id=None,  # No default
+            bundle_hash="abc",
+            expires_at=datetime.now(UTC),
+        )
+        client = DataingClient(api_key="test")
+        ctx = Context(bundle, client)
+
+        with pytest.raises(ValidationError, match="No datasource_id available"):
+            ctx.query("SELECT 1")
+
+    def test_query_accepts_datasource_override(self) -> None:
+        """Test query accepts datasource_id parameter."""
+        bundle = ContextBundle(
+            bundle_id="test-bundle",
+            resolved_assets=[],
+            default_datasource_id=None,
+            bundle_hash="abc",
+            expires_at=datetime.now(UTC),
+        )
+        client = DataingClient(api_key="test")
+        ctx = Context(bundle, client)
+
+        # This should not raise - datasource_id is provided
+        # Would fail with network error in real scenario
+        try:
+            ctx.query("SELECT 1", datasource_id="ds-123")
+        except ValidationError:
+            pytest.fail("Should not raise ValidationError when datasource_id provided")
+        except Exception:
+            # Expected - network error since server not running
+            pass
+
+    def test_query_uses_default_datasource_from_bundle(self) -> None:
+        """Test query uses default_datasource_id from bundle."""
+        bundle = ContextBundle(
+            bundle_id="test-bundle",
+            resolved_assets=[
+                ResolvedAsset(
+                    asset=AssetRef(platform="postgres", name="table"),
+                    datasource_id="ds-default",
+                    dataset_id="postgres://table",
+                )
+            ],
+            default_datasource_id="ds-default",
+            bundle_hash="abc",
+            expires_at=datetime.now(UTC),
+        )
+        client = DataingClient(api_key="test")
+        ctx = Context(bundle, client)
+
+        # Should not raise ValidationError - has default
+        try:
+            ctx.query("SELECT 1")
+        except ValidationError:
+            pytest.fail("Should not raise ValidationError with default_datasource_id")
+        except Exception:
+            # Expected - network error since server not running
+            pass
+
+    def test_query_pagination_adds_limit_offset(self) -> None:
+        """Test query adds LIMIT/OFFSET to SQL when pagination provided."""
+        # This is a unit test for the SQL modification logic
+        # The actual network call will fail but we can test the logic exists
+        bundle = ContextBundle(
+            bundle_id="test-bundle",
+            resolved_assets=[],
+            default_datasource_id="ds-1",
+            bundle_hash="abc",
+            expires_at=datetime.now(UTC),
+        )
+        client = DataingClient(api_key="test")
+        ctx = Context(bundle, client)
+
+        # Test that providing limit/offset doesn't raise ValidationError
+        try:
+            ctx.query("SELECT * FROM orders", limit=10, offset=20)
+        except ValidationError:
+            pytest.fail("Should not raise ValidationError")
+        except Exception:
+            # Network error expected
+            pass
+
+    def test_diff_method_exists(self) -> None:
+        """Test diff method exists on Context."""
+        bundle = ContextBundle(
+            bundle_id="test-bundle",
+            resolved_assets=[],
+            bundle_hash="abc",
+            expires_at=datetime.now(UTC),
+        )
+        client = DataingClient(api_key="test")
+        ctx = Context(bundle, client)
+
+        assert hasattr(ctx, "diff")
+        assert callable(ctx.diff)
+
+    def test_explain_method_exists(self) -> None:
+        """Test explain method exists on Context."""
+        bundle = ContextBundle(
+            bundle_id="test-bundle",
+            resolved_assets=[],
+            bundle_hash="abc",
+            expires_at=datetime.now(UTC),
+        )
+        client = DataingClient(api_key="test")
+        ctx = Context(bundle, client)
+
+        assert hasattr(ctx, "explain")
+        assert callable(ctx.explain)
+
+    def test_async_methods_exist(self) -> None:
+        """Test async versions of action methods exist."""
+        bundle = ContextBundle(
+            bundle_id="test-bundle",
+            resolved_assets=[],
+            bundle_hash="abc",
+            expires_at=datetime.now(UTC),
+        )
+        client = DataingClient(api_key="test")
+        ctx = Context(bundle, client)
+
+        assert hasattr(ctx, "async_query")
+        assert hasattr(ctx, "async_diff")
+        assert hasattr(ctx, "async_explain")

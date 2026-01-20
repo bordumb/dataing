@@ -5,7 +5,10 @@ import pytest
 from dataing_sdk import (
     AssetRef,
     DataingClient,
+    DiffResult,
     EvidenceKind,
+    ExplainResult,
+    QueryResult,
     RunStatus,
     TERMINAL_STATUSES,
 )
@@ -120,3 +123,85 @@ class TestDataingClient:
         assert client.base_url == "http://localhost:8000"
         assert client.api_key is None
         assert client.timeout == 30.0
+
+
+class TestResultTypes:
+    """Tests for result types (QueryResult, DiffResult, ExplainResult)."""
+
+    def test_query_result_default_values(self) -> None:
+        """Test QueryResult default values."""
+        result = QueryResult(
+            columns=[{"name": "id", "type": "int"}],
+            rows=[{"id": 1}],
+            row_count=1,
+        )
+        assert result.truncated is False
+        assert result.execution_time_ms is None
+
+    def test_query_result_all_values(self) -> None:
+        """Test QueryResult with all values."""
+        result = QueryResult(
+            columns=[{"name": "id", "type": "int"}, {"name": "name", "type": "str"}],
+            rows=[{"id": 1, "name": "test"}],
+            row_count=1,
+            truncated=True,
+            execution_time_ms=42,
+        )
+        assert len(result.columns) == 2
+        assert len(result.rows) == 1
+        assert result.row_count == 1
+        assert result.truncated is True
+        assert result.execution_time_ms == 42
+
+    def test_diff_result_default_values(self) -> None:
+        """Test DiffResult default values."""
+        result = DiffResult(
+            metric="row_count",
+            window="7d",
+        )
+        assert result.current_value is None
+        assert result.previous_value is None
+        assert result.delta is None
+        assert result.delta_percent is None
+        assert result.trend is None
+        assert result.samples == []
+
+    def test_diff_result_all_values(self) -> None:
+        """Test DiffResult with all values."""
+        result = DiffResult(
+            metric="row_count",
+            window="7d",
+            current_value=1000.0,
+            previous_value=900.0,
+            delta=100.0,
+            delta_percent=11.1,
+            trend="up",
+            samples=[{"timestamp": "2024-01-01", "value": 900}],
+        )
+        assert result.current_value == 1000.0
+        assert result.previous_value == 900.0
+        assert result.delta == 100.0
+        assert result.delta_percent == 11.1
+        assert result.trend == "up"
+        assert len(result.samples) == 1
+
+    def test_explain_result_required_fields(self) -> None:
+        """Test ExplainResult requires summary."""
+        result = ExplainResult(summary="Test summary")
+        assert result.summary == "Test summary"
+        assert result.insights == []
+        assert result.recommendations == []
+        assert result.related_assets == []
+
+    def test_explain_result_all_values(self) -> None:
+        """Test ExplainResult with all values."""
+        result = ExplainResult(
+            summary="Data quality issues detected",
+            insights=["High null rate in column X", "Volume drop detected"],
+            recommendations=["Investigate data pipeline", "Add validation"],
+            related_assets=["postgres://db.schema.table1", "postgres://db.schema.table2"],
+        )
+        assert result.summary == "Data quality issues detected"
+        assert len(result.insights) == 2
+        assert len(result.recommendations) == 2
+        assert len(result.related_assets) == 2

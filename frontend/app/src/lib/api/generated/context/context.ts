@@ -19,6 +19,10 @@ import type {
   AmbiguousAssetsResponse,
   ContextBundleResponse,
   CreateBundleRequest,
+  DiffRequest,
+  DiffResponse,
+  ExplainRequest,
+  ExplainResponse,
   HTTPValidationError,
 } from "../../model";
 import { customInstance } from "../../client";
@@ -211,4 +215,175 @@ export const useGetBundleApiV1ContextBundlesBundleIdGet = <
   query.queryKey = queryOptions.queryKey;
 
   return query;
+};
+
+/**
+ * Compute metric difference over a time window.
+
+Compares the current value of a metric to its historical value
+based on the specified time window.
+
+Supported metrics:
+- row_count: Number of rows in the dataset
+- null_rate: Percentage of null values
+- distinct_count: Number of distinct values
+- freshness: Time since last update
+
+Returns the current and previous values, absolute delta,
+percentage change, and trend direction.
+ * @summary Compute Diff
+ */
+export const computeDiffApiV1ContextDiffPost = (diffRequest: DiffRequest) => {
+  return customInstance<DiffResponse>({
+    url: `/api/v1/context/diff`,
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    data: diffRequest,
+  });
+};
+
+export const getComputeDiffApiV1ContextDiffPostMutationOptions = <
+  TError = HTTPValidationError,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof computeDiffApiV1ContextDiffPost>>,
+    TError,
+    { data: DiffRequest },
+    TContext
+  >;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof computeDiffApiV1ContextDiffPost>>,
+  TError,
+  { data: DiffRequest },
+  TContext
+> => {
+  const { mutation: mutationOptions } = options ?? {};
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof computeDiffApiV1ContextDiffPost>>,
+    { data: DiffRequest }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return computeDiffApiV1ContextDiffPost(data);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type ComputeDiffApiV1ContextDiffPostMutationResult = NonNullable<
+  Awaited<ReturnType<typeof computeDiffApiV1ContextDiffPost>>
+>;
+export type ComputeDiffApiV1ContextDiffPostMutationBody = DiffRequest;
+export type ComputeDiffApiV1ContextDiffPostMutationError = HTTPValidationError;
+
+/**
+ * @summary Compute Diff
+ */
+export const useComputeDiffApiV1ContextDiffPost = <
+  TError = HTTPValidationError,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof computeDiffApiV1ContextDiffPost>>,
+    TError,
+    { data: DiffRequest },
+    TContext
+  >;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof computeDiffApiV1ContextDiffPost>>,
+  TError,
+  { data: DiffRequest },
+  TContext
+> => {
+  const mutationOptions =
+    getComputeDiffApiV1ContextDiffPostMutationOptions(options);
+
+  return useMutation(mutationOptions);
+};
+/**
+ * Get an AI-powered explanation of the context bundle.
+
+Analyzes the assets, lineage, and anomalies in the bundle
+and provides a natural language explanation with insights
+and recommendations.
+
+Focus areas:
+- anomalies: Focus on detected data quality issues
+- lineage: Focus on data dependencies and flow
+- data_quality: General data quality assessment
+ * @summary Explain Context
+ */
+export const explainContextApiV1ContextExplainPost = (
+  explainRequest: ExplainRequest,
+) => {
+  return customInstance<ExplainResponse>({
+    url: `/api/v1/context/explain`,
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    data: explainRequest,
+  });
+};
+
+export const getExplainContextApiV1ContextExplainPostMutationOptions = <
+  TError = HTTPValidationError,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof explainContextApiV1ContextExplainPost>>,
+    TError,
+    { data: ExplainRequest },
+    TContext
+  >;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof explainContextApiV1ContextExplainPost>>,
+  TError,
+  { data: ExplainRequest },
+  TContext
+> => {
+  const { mutation: mutationOptions } = options ?? {};
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof explainContextApiV1ContextExplainPost>>,
+    { data: ExplainRequest }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return explainContextApiV1ContextExplainPost(data);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type ExplainContextApiV1ContextExplainPostMutationResult = NonNullable<
+  Awaited<ReturnType<typeof explainContextApiV1ContextExplainPost>>
+>;
+export type ExplainContextApiV1ContextExplainPostMutationBody = ExplainRequest;
+export type ExplainContextApiV1ContextExplainPostMutationError =
+  HTTPValidationError;
+
+/**
+ * @summary Explain Context
+ */
+export const useExplainContextApiV1ContextExplainPost = <
+  TError = HTTPValidationError,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof explainContextApiV1ContextExplainPost>>,
+    TError,
+    { data: ExplainRequest },
+    TContext
+  >;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof explainContextApiV1ContextExplainPost>>,
+  TError,
+  { data: ExplainRequest },
+  TContext
+> => {
+  const mutationOptions =
+    getExplainContextApiV1ContextExplainPostMutationOptions(options);
+
+  return useMutation(mutationOptions);
 };

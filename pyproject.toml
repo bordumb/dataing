@@ -148,7 +148,7 @@ convention = "google"
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
-pythonpath = [".", "python-packages/bond/src", "python-packages/dataing/src", "python-packages/dataing-ee/src", "python-packages/dataing/tests", "python-packages/dataing-ee/tests"]
+pythonpath = [".", "python-packages/bond/src", "python-packages/dataing/src", "python-packages/dataing-ee/src", "python-packages/dataing/tests", "python-packages/dataing-ee/tests", "python-packages/dataing-sdk/src", "python-packages/dataing-notebook/src"]
 testpaths = ["python-packages/bond/tests", "python-packages/dataing/tests", "python-packages/dataing-ee/tests"]
 addopts = "-v --import-mode=importlib --cov=python-packages/bond/src/bond --cov=python-packages/dataing/src/dataing --cov=python-packages/dataing-ee/src/dataing_ee --cov-report=term-missing"
 
@@ -160,3 +160,5 @@ dev = [
 
 [tool.uv.sources]
 bond = { path = "python-packages/bond", editable = true }
+dataing-sdk = { path = "python-packages/dataing-sdk", editable = true }
+dataing-notebook = { path = "python-packages/dataing-notebook", editable = true }

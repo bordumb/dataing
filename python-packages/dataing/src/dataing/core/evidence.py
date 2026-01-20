@@ -1,25 +1,38 @@
-"""Evidence Schema - Rich, queryable, tamper-evident evidence types.
+"""Evidence Schema - Rich, queryable evidence types with optional hash chain.
 
 This module defines the evidence schema for SDK runs, providing:
 1. Kind discrimination via EvidenceKind enum
 2. Queryable fields for filtering across runs
-3. Tamper-evidence via hash chain (prev_hash + content_hash)
+3. Optional hash chain for enterprise auditability (EVIDENCE_HASH_CHAIN=true)
 
 Evidence is normalized to enable queries like:
 - "Show all runs where null_rate spike caused by schema change"
 - "Find all hypothesis verdicts for table X"
+
+Hash chain is opt-in for enterprise customers who need tamper-evidence.
+Enable via EVIDENCE_HASH_CHAIN=true environment variable.
 """
 
 from __future__ import annotations
 
 import hashlib
 import json
+import os
 from datetime import UTC, datetime
 from enum import Enum
 from typing import Annotated, Any, Literal
 from uuid import UUID, uuid4
 
 from pydantic import BaseModel, ConfigDict, Field
+
+
+def is_hash_chain_enabled() -> bool:
+    """Check if hash chain is enabled via environment variable.
+
+    Returns:
+        True if EVIDENCE_HASH_CHAIN=true, False otherwise.
+    """
+    return os.environ.get("EVIDENCE_HASH_CHAIN", "").lower() in ("true", "1", "yes")
 
 
 class EvidenceKind(str, Enum):
@@ -194,24 +207,31 @@ def create_evidence_chain(
     prev_hash: str | None = None,
     seq: int = 1,
 ) -> EvidenceBase:
-    """Create an evidence item with hash chain.
+    """Create an evidence item with optional hash chain.
 
     Args:
         run_id: Run UUID.
         kind: Evidence kind.
         content: Evidence content dict.
-        prev_hash: Hash of previous evidence in chain.
+        prev_hash: Hash of previous evidence in chain (only used if hash chain enabled).
         seq: Sequence number.
 
     Returns:
         Evidence instance with computed content_hash.
+
+    Note:
+        Hash chain is only enabled when EVIDENCE_HASH_CHAIN=true.
+        When disabled, prev_hash is always None.
     """
+    # Only include prev_hash if hash chain is enabled
+    effective_prev_hash = prev_hash if is_hash_chain_enabled() else None
+
     # Create base evidence to compute hash
     base = EvidenceBase(
         run_id=run_id,
         seq=seq,
         kind=kind,
-        prev_hash=prev_hash,
+        prev_hash=effective_prev_hash,
     )
     content_hash = base.compute_content_hash(content)
 
@@ -230,7 +250,7 @@ def create_evidence_chain(
         run_id=run_id,
         seq=seq,
         kind=kind,
-        prev_hash=prev_hash,
+        prev_hash=effective_prev_hash,
         content_hash=content_hash,
         **content,
     )

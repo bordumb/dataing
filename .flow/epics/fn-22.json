@@ -1,0 +1,13 @@
+{
+  "branch_name": "fn-22-jupyterlab-e2e",
+  "created_at": "2026-01-20T03:51:01.896700Z",
+  "depends_on_epics": [],
+  "id": "fn-22",
+  "next_task": 1,
+  "plan_review_status": "unknown",
+  "plan_reviewed_at": null,
+  "spec_path": ".flow/specs/fn-22.md",
+  "status": "open",
+  "title": "JupyterLab E2E: Sidebar \u2192 attach \u2192 stream timeline",
+  "updated_at": "2026-01-20T03:52:29.181209Z"
+}

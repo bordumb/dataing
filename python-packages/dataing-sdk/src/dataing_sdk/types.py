@@ -180,6 +180,34 @@ class StreamEvent(BaseModel):
     timestamp: datetime
 
 
+class RunEvent(BaseModel):
+    """An SSE event from a run stream.
+
+    Used by client.stream_run() for real-time event streaming.
+    """
+
+    seq: int = Field(..., description="Event sequence number for resumption")
+    event: str = Field(..., description="Event type (run_started, run_progress, etc.)")
+    run_id: str = Field(..., description="Run ID this event belongs to")
+    data: dict[str, Any] = Field(default_factory=dict, description="Event payload")
+    timestamp: str | None = Field(default=None, description="ISO timestamp")
+
+    @property
+    def is_terminal(self) -> bool:
+        """Check if this is a terminal event."""
+        return self.event in ("run_completed", "run_failed")
+
+    @property
+    def is_evidence(self) -> bool:
+        """Check if this event contains evidence."""
+        return self.event == "run_evidence"
+
+    @property
+    def is_progress(self) -> bool:
+        """Check if this is a progress event."""
+        return self.event == "run_progress"
+
+
 class RunEvidence(BaseModel):
     """Evidence attached to a run."""
 

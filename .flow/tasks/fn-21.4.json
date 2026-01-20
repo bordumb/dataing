@@ -1,0 +1,14 @@
+{
+  "assignee": null,
+  "claim_note": "",
+  "claimed_at": null,
+  "created_at": "2026-01-20T03:52:52.964182Z",
+  "depends_on": [],
+  "epic": "fn-21",
+  "id": "fn-21.4",
+  "priority": null,
+  "spec_path": ".flow/tasks/fn-21.4.md",
+  "status": "todo",
+  "title": "Add %dataing attach magic with session default",
+  "updated_at": "2026-01-20T03:52:52.964393Z"
+}

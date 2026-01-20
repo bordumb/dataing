@@ -482,6 +482,81 @@ class DataingClient:
 
             time.sleep(poll_interval)
 
+    def stream_run(
+        self,
+        run_id: str,
+        last_seq: int | None = None,
+        timeout: float = 300.0,
+    ) -> Any:
+        """Stream SSE events from a run.
+
+        Args:
+            run_id: The run ID to stream events from.
+            last_seq: Resume from this sequence number (for reconnection).
+            timeout: Request timeout in seconds.
+
+        Yields:
+            RunEvent objects as they arrive.
+
+        Example:
+            for event in client.stream_run(run.run_id):
+                print(f"{event.event}: {event.data}")
+                if event.event in ("run_completed", "run_failed"):
+                    break
+        """
+        from .types import RunEvent
+
+        url = f"{self.base_url}/api/v1/runs/{run_id}/events"
+        params = {}
+        if last_seq is not None:
+            params["seq"] = str(last_seq)
+
+        headers = self._get_headers()
+        headers["Accept"] = "text/event-stream"
+
+        # Use httpx streaming for SSE
+        with httpx.stream(
+            "GET",
+            url,
+            params=params,
+            headers=headers,
+            timeout=timeout,
+        ) as response:
+            if not response.is_success:
+                self._handle_response_error(response)
+
+            event_type = None
+            event_data = ""
+
+            for line in response.iter_lines():
+                if line.startswith("event:"):
+                    event_type = line[6:].strip()
+                elif line.startswith("data:"):
+                    event_data = line[5:].strip()
+                elif line == "" and event_type and event_data:
+                    # Complete event received
+                    import json
+
+                    try:
+                        data = json.loads(event_data)
+                        yield RunEvent(
+                            seq=data.get("seq", 0),
+                            event=event_type,
+                            run_id=data.get("run_id", run_id),
+                            data=data.get("data", {}),
+                            timestamp=data.get("timestamp"),
+                        )
+                    except json.JSONDecodeError:
+                        pass
+
+                    # Reset for next event
+                    event_type = None
+                    event_data = ""
+
+                    # Check for terminal events
+                    if event_type in ("run_completed", "run_failed"):
+                        break
+
     # --- Health check ---
 
     def health(self) -> dict[str, Any]:

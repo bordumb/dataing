@@ -289,7 +289,7 @@ Dataing Magic Commands
                 print(f"    {source} -> {target}")
 
     def _handle_ask(self, args: list[str]) -> None:
-        """Handle ask subcommand.
+        """Handle ask subcommand with streaming timeline.
 
         Args:
             args: Command arguments.
@@ -306,8 +306,20 @@ Dataing Magic Commands
         if ctx is None or self._state.client is None:
             return
 
-        # Join args as the question
-        question = " ".join(args).strip('"\'')
+        # Parse arguments
+        parser = argparse.ArgumentParser(prog="%dataing ask")
+        parser.add_argument("question", nargs="*", help="Investigation question")
+        parser.add_argument("--no-stream", action="store_true", help="Use polling instead")
+
+        try:
+            parsed = parser.parse_args(args)
+        except SystemExit:
+            return
+
+        question = " ".join(parsed.question).strip('"\'')
+        if not question:
+            print("Error: ask requires a question", file=sys.stderr)
+            return
 
         print(f"Starting investigation: {question}")
         print("---")
@@ -323,59 +335,121 @@ Dataing Magic Commands
             print(f"Run ID: {run.run_id}")
             print(f"Status: {run.status.value}")
             print("")
-            print("Waiting for results (polling every 2s)...")
 
-            # Poll for completion
-            def on_progress(r: Any) -> None:
-                print(f"  Status: {r.status.value}", end="\r")
+            # Store run for later reference
+            self._state._history.append({
+                "action": "ask",
+                "run_id": run.run_id,
+                "question": question,
+            })
 
-            try:
-                final_run = self._state.client.wait_for_run(
-                    run.run_id,
-                    poll_interval=2.0,
-                    timeout=120.0,
-                    on_progress=on_progress,
-                )
-                print("")  # Clear the status line
-                print("---")
-                print(f"Investigation {final_run.status.value}")
-
-                # Show clickable link in Jupyter
-                base_url = self._state.client.base_url.replace(":8000", ":3000")
-                ui_url = f"{base_url}/investigations/{final_run.run_id}"
-
-                # Use IPython display for clickable link
-                try:
-                    from IPython.display import HTML, display
-
-                    display(HTML(f'<a href="{ui_url}" target="_blank">View in UI: {ui_url}</a>'))
-                except ImportError:
-                    print(f"View in UI: {ui_url}")
-
-                if final_run.status.value == "completed":
-                    print("Investigation completed. Click link above to see full results.")
-                elif final_run.status.value == "failed":
-                    print("Investigation failed. Check logs for details.")
-
-            except TimeoutError:
-                print("")
-                print("---")
-                print("Investigation still running after timeout.")
-
-                # Show link even for timeout
-                base_url = self._state.client.base_url.replace(":8000", ":3000")
-                ui_url = f"{base_url}/investigations/{run.run_id}"
-                try:
-                    from IPython.display import HTML, display
-
-                    display(HTML(f'<a href="{ui_url}" target="_blank">View in UI: {ui_url}</a>'))
-                except ImportError:
-                    print(f"View in UI: {ui_url}")
-
-                print("Check status later with: %dataing status")
+            if parsed.no_stream:
+                # Fallback to polling
+                self._poll_for_completion(run)
+            else:
+                # Use streaming
+                self._stream_events(run)
 
         except Exception as e:
             print(f"Error starting investigation: {e}", file=sys.stderr)
+
+    def _stream_events(self, run: Any) -> None:
+        """Stream SSE events for a run with timeline display.
+
+        Args:
+            run: The Run object to stream events from.
+        """
+        from .rendering import render_timeline_event
+
+        print("Streaming events...")
+        print("")
+
+        events: list[dict[str, Any]] = []
+        final_status = "running"
+
+        try:
+            for event in self._state.client.stream_run(run.run_id):
+                events.append({
+                    "seq": event.seq,
+                    "event": event.event,
+                    "data": event.data,
+                    "timestamp": event.timestamp,
+                })
+
+                # Render the event
+                render_timeline_event(event)
+
+                if event.is_terminal:
+                    final_status = "completed" if event.event == "run_completed" else "failed"
+                    break
+
+        except Exception as e:
+            print(f"Stream error: {e}", file=sys.stderr)
+            final_status = "error"
+
+        print("")
+        print("---")
+        print(f"Investigation {final_status}")
+
+        # Show clickable link
+        self._show_ui_link(run.run_id)
+
+        # Store events for export
+        self._state._history.append({
+            "action": "stream_complete",
+            "run_id": run.run_id,
+            "events": events,
+            "status": final_status,
+        })
+
+    def _poll_for_completion(self, run: Any) -> None:
+        """Poll for run completion (fallback method).
+
+        Args:
+            run: The Run object to poll.
+        """
+        print("Waiting for results (polling every 2s)...")
+
+        def on_progress(r: Any) -> None:
+            print(f"  Status: {r.status.value}", end="\r")
+
+        try:
+            final_run = self._state.client.wait_for_run(
+                run.run_id,
+                poll_interval=2.0,
+                timeout=120.0,
+                on_progress=on_progress,
+            )
+            print("")
+            print("---")
+            print(f"Investigation {final_run.status.value}")
+            self._show_ui_link(run.run_id)
+
+        except TimeoutError:
+            print("")
+            print("---")
+            print("Investigation still running after timeout.")
+            self._show_ui_link(run.run_id)
+            print("Check status later with: %dataing status")
+
+    def _show_ui_link(self, run_id: str) -> None:
+        """Display a clickable link to the UI.
+
+        Args:
+            run_id: The run ID.
+        """
+        if self._state.client is None:
+            return
+
+        base_url = self._state.client.base_url.replace(":8000", ":3000")
+        ui_url = f"{base_url}/investigations/{run_id}"
+
+        try:
+            from IPython.display import HTML, display
+
+            display(HTML(f'<a href="{ui_url}" target="_blank">View in UI: {ui_url}</a>'))
+        except ImportError:
+            print(f"View in UI: {ui_url}")
 
     def _handle_status(self, args: list[str]) -> None:
         """Handle status subcommand.

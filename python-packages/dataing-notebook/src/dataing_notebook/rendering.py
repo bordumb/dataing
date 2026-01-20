@@ -11,6 +11,7 @@ from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from dataing_sdk import Context, Run, RunEvidence
+    from dataing_sdk.types import RunEvent
 
 
 def is_notebook_environment() -> bool:
@@ -338,3 +339,76 @@ def render_run(run: Run) -> str:
     ]
 
     return '\n'.join(html_parts)
+
+
+def render_timeline_event(event: RunEvent) -> None:
+    """Render an SSE event to the notebook output with styled timeline.
+
+    Args:
+        event: RunEvent from the SSE stream.
+    """
+    # Event type to icon/color mapping
+    event_styles = {
+        "run_started": ("🚀", "#3b82f6", "Investigation started"),
+        "run_progress": ("⏳", "#8b5cf6", "Progress"),
+        "run_evidence": ("📋", "#10b981", "Evidence collected"),
+        "run_completed": ("✅", "#10b981", "Investigation completed"),
+        "run_failed": ("❌", "#ef4444", "Investigation failed"),
+        "run_heartbeat": ("💓", "#6b7280", "Heartbeat"),
+    }
+
+    icon, color, label = event_styles.get(event.event, ("•", "#6b7280", event.event))
+
+    # Try to use IPython HTML display for rich output
+    try:
+        from IPython.display import HTML, display
+
+        # Build event details from data
+        details = ""
+        data = event.data
+        if data:
+            if "goal" in data:
+                details = f"Goal: {html.escape(str(data['goal']))}"
+            elif "hypothesis" in data:
+                details = f"Hypothesis: {html.escape(str(data['hypothesis']))}"
+            elif "sql" in data:
+                sql_preview = str(data["sql"])[:100]
+                details = f"SQL: <code>{html.escape(sql_preview)}...</code>"
+            elif "error" in data:
+                details = f"Error: {html.escape(str(data['error']))}"
+            elif "message" in data:
+                details = html.escape(str(data["message"]))
+            elif "query_succeeded" in data:
+                details = "Query executed successfully"
+            elif "reason" in data:
+                details = html.escape(str(data["reason"]))
+
+        html_content = f"""
+        <div style="
+            font-family: system-ui, sans-serif;
+            padding: 8px 12px;
+            margin: 4px 0;
+            border-left: 3px solid {color};
+            background: {color}10;
+            border-radius: 0 4px 4px 0;
+        ">
+            <span style="margin-right: 8px;">{icon}</span>
+            <strong style="color: {color};">[{event.seq}] {html.escape(label)}</strong>
+            {f'<span style="color: #6b7280; margin-left: 12px;">{details}</span>' if details else ''}
+        </div>
+        """
+        display(HTML(html_content))
+
+    except ImportError:
+        # Fallback to plain text
+        details = ""
+        data = event.data
+        if data:
+            if "goal" in data:
+                details = f" - Goal: {data['goal']}"
+            elif "hypothesis" in data:
+                details = f" - {data['hypothesis']}"
+            elif "error" in data:
+                details = f" - Error: {data['error']}"
+
+        print(f"{icon} [{event.seq}] {label}{details}")

@@ -2,7 +2,7 @@
   "title": "Dataing",
   "description": "Dataing JupyterLab extension settings",
   "type": "object",
-  "jupyter.lab.setting-icon": "dataing:icon",
+  "jupyter.lab.setting-icon": "ui-components:settings",
   "jupyter.lab.setting-icon-label": "Dataing",
   "properties": {
     "backendUrl": {

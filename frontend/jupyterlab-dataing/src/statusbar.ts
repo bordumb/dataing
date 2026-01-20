@@ -75,35 +75,31 @@ export class DataingStatusBar extends Widget {
       case 'connected':
         this.addClass(STATUS_CONNECTED_CLASS);
         this._text.textContent = 'Dataing';
-        this._indicator.style.backgroundColor = '#10b981'; // Green
         this.title.caption = `Connected to ${this._state.backendUrl}`;
         break;
 
       case 'disconnected':
         this.addClass(STATUS_DISCONNECTED_CLASS);
         this._text.textContent = 'Dataing';
-        this._indicator.style.backgroundColor = '#6b7280'; // Gray
         this.title.caption = 'Disconnected';
         break;
 
       case 'checking':
         this.addClass(STATUS_CHECKING_CLASS);
         this._text.textContent = 'Dataing...';
-        this._indicator.style.backgroundColor = '#3b82f6'; // Blue
         this.title.caption = 'Checking connection...';
         break;
 
       case 'error':
         this.addClass(STATUS_ERROR_CLASS);
         this._text.textContent = 'Dataing';
-        this._indicator.style.backgroundColor = '#ef4444'; // Red
         this.title.caption = `Error: ${this._state.errorMessage || 'Unknown error'}`;
         break;
     }
   }
 
   /**
-   * Show connection details in a dialog.
+   * Show connection details in a dialog (XSS-safe using textContent).
    */
   private async _showDetails(): Promise<void> {
     const statusText = this._state.connectionState === 'connected'
@@ -114,31 +110,63 @@ export class DataingStatusBar extends Widget {
           ? 'Disconnected'
           : 'Error';
 
+    // Build dialog content safely using DOM methods (no innerHTML)
     const content = document.createElement('div');
-    content.innerHTML = `
-      <style>
-        .dataing-details { font-family: var(--jp-ui-font-family); }
-        .dataing-details dl { display: grid; grid-template-columns: auto 1fr; gap: 8px; margin: 0; }
-        .dataing-details dt { font-weight: bold; color: var(--jp-ui-font-color1); }
-        .dataing-details dd { margin: 0; color: var(--jp-ui-font-color2); word-break: break-all; }
-        .dataing-details .error { color: var(--jp-error-color1); }
-        .dataing-details .settings-hint { margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--jp-border-color1); font-size: 12px; color: var(--jp-ui-font-color2); }
-      </style>
-      <div class="dataing-details">
-        <dl>
-          <dt>Backend URL</dt>
-          <dd>${this._state.backendUrl || 'Not configured'}</dd>
-          <dt>Status</dt>
-          <dd>${statusText}</dd>
-          <dt>Last Check</dt>
-          <dd>${this._state.lastCheck?.toLocaleTimeString() || 'Never'}</dd>
-          ${this._state.errorMessage ? `<dt>Error</dt><dd class="error">${this._state.errorMessage}</dd>` : ''}
-        </dl>
-        <p class="settings-hint">
-          Configure backend URL in Settings &gt; Advanced Settings Editor &gt; Dataing
-        </p>
-      </div>
-    `;
+    content.className = 'dataing-details';
+    content.style.cssText = 'font-family: var(--jp-ui-font-family);';
+
+    const dl = document.createElement('dl');
+    dl.style.cssText = 'display: grid; grid-template-columns: auto 1fr; gap: 8px; margin: 0;';
+
+    // Backend URL
+    const dtUrl = document.createElement('dt');
+    dtUrl.style.cssText = 'font-weight: bold; color: var(--jp-ui-font-color1);';
+    dtUrl.textContent = 'Backend URL';
+    const ddUrl = document.createElement('dd');
+    ddUrl.style.cssText = 'margin: 0; color: var(--jp-ui-font-color2); word-break: break-all;';
+    ddUrl.textContent = this._state.backendUrl || 'Not configured';
+    dl.appendChild(dtUrl);
+    dl.appendChild(ddUrl);
+
+    // Status
+    const dtStatus = document.createElement('dt');
+    dtStatus.style.cssText = 'font-weight: bold; color: var(--jp-ui-font-color1);';
+    dtStatus.textContent = 'Status';
+    const ddStatus = document.createElement('dd');
+    ddStatus.style.cssText = 'margin: 0; color: var(--jp-ui-font-color2);';
+    ddStatus.textContent = statusText;
+    dl.appendChild(dtStatus);
+    dl.appendChild(ddStatus);
+
+    // Last Check
+    const dtLastCheck = document.createElement('dt');
+    dtLastCheck.style.cssText = 'font-weight: bold; color: var(--jp-ui-font-color1);';
+    dtLastCheck.textContent = 'Last Check';
+    const ddLastCheck = document.createElement('dd');
+    ddLastCheck.style.cssText = 'margin: 0; color: var(--jp-ui-font-color2);';
+    ddLastCheck.textContent = this._state.lastCheck?.toLocaleTimeString() || 'Never';
+    dl.appendChild(dtLastCheck);
+    dl.appendChild(ddLastCheck);
+
+    // Error (if any)
+    if (this._state.errorMessage) {
+      const dtError = document.createElement('dt');
+      dtError.style.cssText = 'font-weight: bold; color: var(--jp-ui-font-color1);';
+      dtError.textContent = 'Error';
+      const ddError = document.createElement('dd');
+      ddError.style.cssText = 'margin: 0; color: var(--jp-error-color1);';
+      ddError.textContent = this._state.errorMessage;
+      dl.appendChild(dtError);
+      dl.appendChild(ddError);
+    }
+
+    content.appendChild(dl);
+
+    // Settings hint
+    const hint = document.createElement('p');
+    hint.style.cssText = 'margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--jp-border-color1); font-size: 12px; color: var(--jp-ui-font-color2);';
+    hint.textContent = 'Configure backend URL in Settings > Advanced Settings Editor > Dataing';
+    content.appendChild(hint);
 
     await showDialog({
       title: 'Dataing Connection Status',

@@ -45,8 +45,7 @@ def get_backend_url() -> str:
 
     Checks in order:
     1. DATAING_BACKEND_URL environment variable
-    2. JupyterHub service configuration
-    3. Default localhost URL
+    2. Default localhost URL
 
     Returns:
         Backend URL string.
@@ -228,8 +227,10 @@ class ProxyHandler(BaseHandler):
             method: HTTP method (GET, POST, etc.)
             path: Path to proxy (without /dataing/proxy prefix)
         """
-        # Build target URL
+        # Build target URL, preserving query string
         target_url = urljoin(self.backend_url + "/", path.lstrip("/"))
+        if self.request.query:
+            target_url = f"{target_url}?{self.request.query}"
 
         # Build headers - inject API key server-side
         headers = {

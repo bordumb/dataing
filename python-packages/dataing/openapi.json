@@ -5352,6 +5352,229 @@
         }
       }
     },
+    "/api/v1/runs": {
+      "post": {
+        "tags": [
+          "runs"
+        ],
+        "summary": "Create Run",
+        "description": "Create and start a new investigation run.\n\nThis is the one-call API that accepts either:\n- bundle_id: Use an existing bundle\n- bundle: Inline bundle specification (assets will be resolved)\n\nExactly one of bundle_id or bundle must be provided.",
+        "operationId": "create_run_api_v1_runs_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateRunRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RunResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "APIKeyHeader": []
+          },
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/runs/{run_id}/events": {
+      "get": {
+        "tags": [
+          "runs"
+        ],
+        "summary": "Stream Events",
+        "description": "Stream SSE events for a run.\n\nEvents have an integer `seq` field for resumption.\nUse `?seq=N` to resume from sequence N.\n\nReturns 410 Gone if the replay window has expired.",
+        "operationId": "stream_events_api_v1_runs__run_id__events_get",
+        "security": [
+          {
+            "APIKeyHeader": []
+          },
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "run_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Run Id"
+            }
+          },
+          {
+            "name": "seq",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Resume from this sequence number",
+              "title": "Seq"
+            },
+            "description": "Resume from this sequence number"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/runs/{run_id}": {
+      "get": {
+        "tags": [
+          "runs"
+        ],
+        "summary": "Get Run",
+        "description": "Get run status and metadata.",
+        "operationId": "get_run_api_v1_runs__run_id__get",
+        "security": [
+          {
+            "APIKeyHeader": []
+          },
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "run_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Run Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Get Run Api V1 Runs  Run Id  Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/runs/{run_id}/cancel": {
+      "post": {
+        "tags": [
+          "runs"
+        ],
+        "summary": "Cancel Run",
+        "description": "Cancel a running investigation.",
+        "operationId": "cancel_run_api_v1_runs__run_id__cancel_post",
+        "security": [
+          {
+            "APIKeyHeader": []
+          },
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "run_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Run Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Cancel Run Api V1 Runs  Run Id  Cancel Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/notifications": {
       "get": {
         "tags": [
@@ -8151,7 +8374,7 @@
       "AmbiguousAssetError": {
         "properties": {
           "asset": {
-            "$ref": "#/components/schemas/AssetRefRequest"
+            "$ref": "#/components/schemas/AssetRefRequest-Output"
           },
           "message": {
             "type": "string",
@@ -8433,6 +8656,36 @@
         "description": "Request to approve an investigation."
       },
       "AssetRefRequest": {
+        "properties": {
+          "platform": {
+            "type": "string",
+            "title": "Platform"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "datasource_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Datasource Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "platform",
+          "name"
+        ],
+        "title": "AssetRefRequest",
+        "description": "Asset reference in request."
+      },
+      "AssetRefRequest-Output": {
         "properties": {
           "platform": {
             "type": "string",
@@ -8741,7 +8994,7 @@
         "properties": {
           "assets": {
             "items": {
-              "$ref": "#/components/schemas/AssetRefRequest"
+              "$ref": "#/components/schemas/dataing__entrypoints__api__routes__bundles__AssetRefRequest"
             },
             "type": "array",
             "minItems": 1,
@@ -8819,6 +9072,44 @@
         ],
         "title": "CreateDataSourceRequest",
         "description": "Request to create a new data source."
+      },
+      "CreateRunRequest": {
+        "properties": {
+          "goal": {
+            "type": "string",
+            "title": "Goal",
+            "description": "Investigation goal/question"
+          },
+          "bundle_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bundle Id",
+            "description": "Existing bundle ID to use"
+          },
+          "bundle": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/InlineBundleRequest"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Inline bundle specification"
+          }
+        },
+        "type": "object",
+        "required": [
+          "goal"
+        ],
+        "title": "CreateRunRequest",
+        "description": "Request to create a run.\n\nAccepts exactly one of bundle_id or bundle (inline)."
       },
       "CreateUserRequest": {
         "properties": {
@@ -9599,6 +9890,34 @@
         },
         "type": "object",
         "title": "HTTPValidationError"
+      },
+      "InlineBundleRequest": {
+        "properties": {
+          "assets": {
+            "items": {
+              "$ref": "#/components/schemas/AssetRefRequest"
+            },
+            "type": "array",
+            "title": "Assets"
+          },
+          "window": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Window"
+          }
+        },
+        "type": "object",
+        "required": [
+          "assets"
+        ],
+        "title": "InlineBundleRequest",
+        "description": "Inline bundle specification for one-call API."
       },
       "InvestigationListItem": {
         "properties": {
@@ -11731,7 +12050,7 @@
       "ResolvedAssetResponse": {
         "properties": {
           "asset": {
-            "$ref": "#/components/schemas/AssetRefRequest"
+            "$ref": "#/components/schemas/AssetRefRequest-Output"
           },
           "datasource_id": {
             "anyOf": [
@@ -11769,6 +12088,56 @@
         ],
         "title": "ResolvedAssetResponse",
         "description": "Resolved asset in response."
+      },
+      "RunResponse": {
+        "properties": {
+          "run_id": {
+            "type": "string",
+            "title": "Run Id"
+          },
+          "bundle_id": {
+            "type": "string",
+            "title": "Bundle Id"
+          },
+          "bundle_hash": {
+            "type": "string",
+            "title": "Bundle Hash"
+          },
+          "status": {
+            "$ref": "#/components/schemas/RunStatus"
+          },
+          "events_url": {
+            "type": "string",
+            "title": "Events Url"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "run_id",
+          "bundle_id",
+          "bundle_hash",
+          "status",
+          "events_url",
+          "created_at"
+        ],
+        "title": "RunResponse",
+        "description": "Response for a created run."
+      },
+      "RunStatus": {
+        "type": "string",
+        "enum": [
+          "running",
+          "completed",
+          "failed",
+          "cancelled"
+        ],
+        "title": "RunStatus",
+        "description": "Status of a run."
       },
       "SLAPolicyCreate": {
         "properties": {
@@ -13384,6 +13753,39 @@
         ],
         "title": "WebhookIssueResponse",
         "description": "Response from webhook issue creation."
+      },
+      "dataing__entrypoints__api__routes__bundles__AssetRefRequest": {
+        "properties": {
+          "platform": {
+            "type": "string",
+            "title": "Platform",
+            "description": "Data platform (postgres, snowflake, dbt)"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "Fully qualified name (db.schema.table)"
+          },
+          "datasource_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Datasource Id",
+            "description": "Optional datasource ID for disambiguation"
+          }
+        },
+        "type": "object",
+        "required": [
+          "platform",
+          "name"
+        ],
+        "title": "AssetRefRequest",
+        "description": "Asset reference in request."
       },
       "dataing__entrypoints__api__routes__bundles__LineageGraphResponse": {
         "properties": {

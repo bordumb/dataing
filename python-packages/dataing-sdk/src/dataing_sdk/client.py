@@ -313,7 +313,7 @@ class DataingClient:
         bundle = await self.async_create_bundle(asset_list, window=window)
         return Context(bundle, self)
 
-    # --- Run methods (stub for fn-17.6) ---
+    # --- Run methods ---
 
     def run(
         self,
@@ -326,17 +326,42 @@ class DataingClient:
         This is the one-call API that resolves assets, creates a bundle,
         and starts the run in a single operation.
 
-        Stub implementation. Full implementation in fn-17.6.
-
         Args:
             assets: List of assets to investigate.
             goal: Investigation goal/question.
             bundle_id: Optional existing bundle ID to use.
 
         Returns:
-            Run object with run_id and status.
+            Run object with run_id, status, and bundle info.
         """
-        raise NotImplementedError("Full implementation in fn-17.6")
+        from .types import Run, RunStatus
+
+        payload: dict[str, Any] = {"goal": goal}
+
+        if bundle_id:
+            payload["bundle_id"] = bundle_id
+        else:
+            payload["bundle"] = {
+                "assets": [
+                    {
+                        "platform": a.platform,
+                        "name": a.name,
+                        "datasource_id": a.datasource_id,
+                    }
+                    for a in assets
+                ]
+            }
+
+        response = self._request("POST", "/api/v1/runs", json=payload)
+        data = response.json()
+
+        return Run(
+            run_id=data["run_id"],
+            bundle_id=data["bundle_id"],
+            bundle_hash=data["bundle_hash"],
+            status=RunStatus(data["status"]),
+            created_at=data["created_at"],
+        )
 
     async def async_run(
         self,
@@ -345,7 +370,34 @@ class DataingClient:
         bundle_id: str | None = None,
     ) -> Run:
         """Async version of run."""
-        raise NotImplementedError("Full implementation in fn-17.6")
+        from .types import Run, RunStatus
+
+        payload: dict[str, Any] = {"goal": goal}
+
+        if bundle_id:
+            payload["bundle_id"] = bundle_id
+        else:
+            payload["bundle"] = {
+                "assets": [
+                    {
+                        "platform": a.platform,
+                        "name": a.name,
+                        "datasource_id": a.datasource_id,
+                    }
+                    for a in assets
+                ]
+            }
+
+        response = await self._async_request("POST", "/api/v1/runs", json=payload)
+        data = response.json()
+
+        return Run(
+            run_id=data["run_id"],
+            bundle_id=data["bundle_id"],
+            bundle_hash=data["bundle_hash"],
+            status=RunStatus(data["status"]),
+            created_at=data["created_at"],
+        )
 
     # --- Health check ---
 

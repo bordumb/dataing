@@ -1,16 +1,26 @@
 {
-  "assignee": null,
+  "assignee": "bordumbb@gmail.com",
   "claim_note": "",
-  "claimed_at": null,
+  "claimed_at": "2026-01-20T00:36:17.558589Z",
   "created_at": "2026-01-20T00:21:15.515299Z",
   "depends_on": [
     "fn-17.2"
   ],
   "epic": "fn-17",
+  "evidence": {
+    "commits": [
+      "43395e2280711a99b68a267dc6964b5b55b95a63"
+    ],
+    "prs": [],
+    "tests": [
+      "just generate-client",
+      "uv run pytest python-packages/dataing-sdk/tests -v"
+    ]
+  },
   "id": "fn-17.6",
   "priority": null,
   "spec_path": ".flow/tasks/fn-17.6.md",
-  "status": "todo",
+  "status": "done",
   "title": "Runs API + SSE Streaming",
-  "updated_at": "2026-01-20T00:21:15.515508Z"
+  "updated_at": "2026-01-20T00:39:10.040286Z"
 }

@@ -6,4 +6,9 @@
  * OpenAPI spec version: 2.0.0
  */
 
-export type AssetRefRequestDatasourceId = string | null;
+export type StreamEventsApiV1RunsRunIdEventsGetParams = {
+  /**
+   * Resume from this sequence number
+   */
+  seq?: number | null;
+};

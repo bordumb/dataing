@@ -6,4 +6,7 @@
  * OpenAPI spec version: 2.0.0
  */
 
-export type AssetRefRequestDatasourceId = string | null;
+/**
+ * Existing bundle ID to use
+ */
+export type CreateRunRequestBundleId = string | null;

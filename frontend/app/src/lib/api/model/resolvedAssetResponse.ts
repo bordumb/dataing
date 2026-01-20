@@ -5,7 +5,7 @@
  * Autonomous Data Quality Investigation
  * OpenAPI spec version: 2.0.0
  */
-import type { AssetRefRequest } from "./assetRefRequest";
+import type { AssetRefRequestOutput } from "./assetRefRequestOutput";
 import type { ResolvedAssetResponseDatasetType } from "./resolvedAssetResponseDatasetType";
 import type { ResolvedAssetResponseDatasourceId } from "./resolvedAssetResponseDatasourceId";
 
@@ -13,7 +13,7 @@ import type { ResolvedAssetResponseDatasourceId } from "./resolvedAssetResponseD
  * Resolved asset in response.
  */
 export interface ResolvedAssetResponse {
-  asset: AssetRefRequest;
+  asset: AssetRefRequestOutput;
   /** Canonical URN */
   dataset_id: string;
   /** TABLE, VIEW, MODEL, etc. */

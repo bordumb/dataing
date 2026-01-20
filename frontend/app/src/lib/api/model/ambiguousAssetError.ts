@@ -5,14 +5,14 @@
  * Autonomous Data Quality Investigation
  * OpenAPI spec version: 2.0.0
  */
-import type { AssetRefRequest } from "./assetRefRequest";
+import type { AssetRefRequestOutput } from "./assetRefRequestOutput";
 import type { AmbiguousAssetCandidate } from "./ambiguousAssetCandidate";
 
 /**
  * Error response for ambiguous asset.
  */
 export interface AmbiguousAssetError {
-  asset: AssetRefRequest;
+  asset: AssetRefRequestOutput;
   candidates: AmbiguousAssetCandidate[];
   hint: string;
   message: string;

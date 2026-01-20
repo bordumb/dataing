@@ -6,4 +6,9 @@
  * OpenAPI spec version: 2.0.0
  */
 
-export type AssetRefRequestDatasourceId = string | null;
+/**
+ * Optional datasource ID for disambiguation
+ */
+export type DataingEntrypointsApiRoutesBundlesAssetRefRequestDatasourceId =
+  | string
+  | null;

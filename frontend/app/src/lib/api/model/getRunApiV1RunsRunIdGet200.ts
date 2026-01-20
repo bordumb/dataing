@@ -6,4 +6,4 @@
  * OpenAPI spec version: 2.0.0
  */
 
-export type AssetRefRequestDatasourceId = string | null;
+export type GetRunApiV1RunsRunIdGet200 = { [key: string]: unknown };

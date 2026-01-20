@@ -1,3 +1,10 @@
+# [1.2.0](https://github.com/bordumb/dataing/compare/v1.1.0...v1.2.0) (2026-01-20)
+
+
+### Features
+
+* SDK, Notebook, and JupyterLab ecosystem ([#76](https://github.com/bordumb/dataing/issues/76)) ([b952526](https://github.com/bordumb/dataing/commit/b95252645bad9d002a45655b6235716481d1b0d9))
+
 # [1.1.0](https://github.com/bordumb/dataing/compare/v1.0.0...v1.1.0) (2026-01-19)
 
 

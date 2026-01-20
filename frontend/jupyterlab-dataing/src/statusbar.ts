@@ -3,7 +3,10 @@
  */
 
 import { Widget } from '@lumino/widgets';
-import { IDataingState, ConnectionState } from './index';
+
+import { showDialog, Dialog } from '@jupyterlab/apputils';
+
+import type { IDataingState } from './types';
 
 /**
  * CSS class names
@@ -45,7 +48,7 @@ export class DataingStatusBar extends Widget {
 
     // Handle click to show details
     this.node.addEventListener('click', () => {
-      this._showDetails();
+      void this._showDetails();
     });
   }
 
@@ -102,18 +105,45 @@ export class DataingStatusBar extends Widget {
   /**
    * Show connection details in a dialog.
    */
-  private _showDetails(): void {
-    const message = `
-Dataing Connection Status
-========================
-Backend URL: ${this._state.backendUrl}
-Status: ${this._state.connectionState}
-Last Check: ${this._state.lastCheck?.toLocaleTimeString() || 'Never'}
-${this._state.errorMessage ? `Error: ${this._state.errorMessage}` : ''}
+  private async _showDetails(): Promise<void> {
+    const statusText = this._state.connectionState === 'connected'
+      ? 'Connected'
+      : this._state.connectionState === 'checking'
+        ? 'Checking...'
+        : this._state.connectionState === 'disconnected'
+          ? 'Disconnected'
+          : 'Error';
 
-Configure backend URL in Settings > Advanced Settings > Dataing
-    `.trim();
+    const content = document.createElement('div');
+    content.innerHTML = `
+      <style>
+        .dataing-details { font-family: var(--jp-ui-font-family); }
+        .dataing-details dl { display: grid; grid-template-columns: auto 1fr; gap: 8px; margin: 0; }
+        .dataing-details dt { font-weight: bold; color: var(--jp-ui-font-color1); }
+        .dataing-details dd { margin: 0; color: var(--jp-ui-font-color2); word-break: break-all; }
+        .dataing-details .error { color: var(--jp-error-color1); }
+        .dataing-details .settings-hint { margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--jp-border-color1); font-size: 12px; color: var(--jp-ui-font-color2); }
+      </style>
+      <div class="dataing-details">
+        <dl>
+          <dt>Backend URL</dt>
+          <dd>${this._state.backendUrl || 'Not configured'}</dd>
+          <dt>Status</dt>
+          <dd>${statusText}</dd>
+          <dt>Last Check</dt>
+          <dd>${this._state.lastCheck?.toLocaleTimeString() || 'Never'}</dd>
+          ${this._state.errorMessage ? `<dt>Error</dt><dd class="error">${this._state.errorMessage}</dd>` : ''}
+        </dl>
+        <p class="settings-hint">
+          Configure backend URL in Settings &gt; Advanced Settings Editor &gt; Dataing
+        </p>
+      </div>
+    `;
 
-    alert(message);
+    await showDialog({
+      title: 'Dataing Connection Status',
+      body: new Widget({ node: content }),
+      buttons: [Dialog.okButton()]
+    });
   }
 }

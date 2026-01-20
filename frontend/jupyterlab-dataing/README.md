@@ -16,13 +16,24 @@ JupyterLab extension for Dataing data quality investigation.
 
 ## Installation
 
+The JupyterLab extension is bundled with the dataing-notebook Python package:
+
 ```bash
-pip install jupyterlab-dataing
+pip install dataing-notebook
 ```
 
-Or for development:
+This installs both the server extension (for API proxying) and the JupyterLab frontend extension.
+
+### Development Installation
+
+For development, install the packages in editable mode:
 
 ```bash
+# Install the Python server extension
+cd python-packages/dataing-notebook
+pip install -e .
+
+# Build and install the JupyterLab extension
 cd frontend/jupyterlab-dataing
 jlpm install
 jlpm build
@@ -30,6 +41,17 @@ jupyter labextension develop . --overwrite
 ```
 
 ## Configuration
+
+### Backend Configuration
+
+Set the backend URL via environment variable:
+
+```bash
+export DATAING_BACKEND_URL=http://localhost:8000
+export DATAING_API_KEY=your_api_key
+```
+
+### JupyterLab Settings
 
 Settings are available in JupyterLab's Advanced Settings:
 Settings > Advanced Settings Editor > Dataing
@@ -49,6 +71,16 @@ The status bar indicator shows the current connection state:
 - **Red**: Connection error
 
 Click the status bar to see details and configuration instructions.
+
+## Architecture
+
+The extension uses a server-side proxy pattern for security:
+
+1. **Frontend**: JupyterLab extension checks connection via server extension
+2. **Server Extension**: Proxies requests to Dataing backend with API key injection
+3. **Backend**: Dataing API server
+
+This keeps API keys server-side and avoids CORS issues.
 
 ## Development
 

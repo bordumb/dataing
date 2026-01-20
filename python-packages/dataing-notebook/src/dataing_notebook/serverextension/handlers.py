@@ -4,6 +4,10 @@ Provides HTTP handlers for:
 - Token proxy (fetches/refreshes API tokens from backend)
 - Handshake (returns backend URL and configuration)
 - Request proxy (forwards requests to backend with authentication)
+
+Security: All handlers inherit from JupyterHandler which enforces
+authentication via `@tornado.web.authenticated` and XSRF protection.
+The API key is kept server-side and never exposed to the browser.
 """
 
 from __future__ import annotations
@@ -16,6 +20,15 @@ from urllib.parse import urljoin
 import tornado.httpclient
 import tornado.web
 from tornado.escape import json_decode, json_encode
+
+# Try to import Jupyter's authenticated handler base
+try:
+    from jupyter_server.base.handlers import JupyterHandler
+    HAS_JUPYTER_SERVER = True
+except ImportError:
+    # Fallback for testing without jupyter_server
+    HAS_JUPYTER_SERVER = False
+    JupyterHandler = tornado.web.RequestHandler  # type: ignore[misc,assignment]
 
 # Environment variables for configuration
 ENV_BACKEND_URL = "DATAING_BACKEND_URL"
@@ -64,28 +77,30 @@ def is_jupyterhub_environment() -> bool:
     return ENV_JUPYTERHUB_SERVICE_URL in os.environ
 
 
-class BaseHandler(tornado.web.RequestHandler):
-    """Base handler with common functionality."""
+class BaseHandler(JupyterHandler if HAS_JUPYTER_SERVER else tornado.web.RequestHandler):  # type: ignore[misc]
+    """Base handler with authentication and common functionality.
+
+    When jupyter_server is available, this inherits from JupyterHandler
+    which provides authentication via @tornado.web.authenticated and
+    XSRF protection. CORS headers are not set as requests should be
+    same-origin from the JupyterLab frontend.
+    """
 
     def set_default_headers(self) -> None:
-        """Set CORS and content-type headers."""
+        """Set content-type header. No CORS headers for security."""
         self.set_header("Content-Type", "application/json")
-        self.set_header("Access-Control-Allow-Origin", "*")
-        self.set_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
-        self.set_header("Access-Control-Allow-Headers", "Content-Type, Authorization")
-
-    def options(self, *args: Any, **kwargs: Any) -> None:
-        """Handle CORS preflight requests."""
-        self.set_status(204)
-        self.finish()
+        # Intentionally NOT setting Access-Control-Allow-Origin
+        # Requests should come from same-origin JupyterLab frontend
 
 
 class HandshakeHandler(BaseHandler):
     """Handler for /dataing/handshake endpoint.
 
     Returns backend URL and configuration for the client.
+    This is a lightweight endpoint to check server extension availability.
     """
 
+    @tornado.web.authenticated
     async def get(self) -> None:
         """Return backend URL and configuration."""
         response = {
@@ -100,23 +115,24 @@ class HandshakeHandler(BaseHandler):
 class TokenHandler(BaseHandler):
     """Handler for /dataing/token endpoint.
 
-    Proxies token requests to the backend, handling refresh transparently.
+    Provides token status without exposing the actual token.
+    Authentication is handled server-side by the proxy.
     """
 
-    _token_cache: dict[str, Any] = {}
-
+    @tornado.web.authenticated
     async def get(self) -> None:
-        """Get current token status."""
+        """Get current token status (never exposes the actual token)."""
         api_key = get_api_key()
 
         if api_key:
-            # If API key is configured, return it (masked)
+            # Report token availability without exposing it
             self.write(
                 json_encode(
                     {
                         "has_token": True,
                         "token_type": "api_key",
-                        "masked": f"{api_key[:4]}...{api_key[-4:]}" if len(api_key) > 8 else "***",
+                        # Show only length indicator, not the actual key
+                        "token_configured": True,
                     }
                 )
             )
@@ -131,40 +147,63 @@ class TokenHandler(BaseHandler):
                 )
             )
 
+    @tornado.web.authenticated
     async def post(self) -> None:
-        """Request or refresh token from backend.
+        """Validate token configuration (does not return the token).
 
-        Expects body: {"action": "refresh"} or {"credentials": {...}}
+        The API key is kept server-side and used only by the proxy handler.
+        This endpoint confirms whether the key is configured and valid.
         """
         try:
             body = json_decode(self.request.body) if self.request.body else {}
         except json.JSONDecodeError:
             body = {}
 
-        action = body.get("action", "get")
-
-        if action == "refresh":
-            # Clear cache and get new token
-            self._token_cache.clear()
+        action = body.get("action", "status")
 
         api_key = get_api_key()
         if api_key:
-            self.write(
-                json_encode(
-                    {
-                        "success": True,
-                        "token": api_key,
-                        "token_type": "api_key",
-                    }
+            if action == "validate":
+                # Test the API key against the backend
+                http_client = tornado.httpclient.AsyncHTTPClient()
+                backend_url = get_backend_url()
+                try:
+                    response = await http_client.fetch(
+                        f"{backend_url}/health",
+                        method="GET",
+                        headers={"X-API-Key": api_key, "Accept": "application/json"},
+                        raise_error=False,
+                    )
+                    is_valid = response.code == 200
+                except Exception:
+                    is_valid = False
+
+                self.write(
+                    json_encode(
+                        {
+                            "success": True,
+                            "token_configured": True,
+                            "token_valid": is_valid,
+                        }
+                    )
                 )
-            )
+            else:
+                # Just confirm configuration status
+                self.write(
+                    json_encode(
+                        {
+                            "success": True,
+                            "token_configured": True,
+                        }
+                    )
+                )
         else:
             self.set_status(401)
             self.write(
                 json_encode(
                     {
                         "success": False,
-                        "error": "No API key configured",
+                        "error": "No API key configured. Set DATAING_API_KEY environment variable.",
                     }
                 )
             )
@@ -174,6 +213,7 @@ class ProxyHandler(BaseHandler):
     """Handler for /dataing/proxy/* endpoint.
 
     Proxies requests to the Dataing backend with authentication.
+    The API key is injected server-side, never exposed to the client.
     """
 
     async def prepare(self) -> None:
@@ -191,7 +231,7 @@ class ProxyHandler(BaseHandler):
         # Build target URL
         target_url = urljoin(self.backend_url + "/", path.lstrip("/"))
 
-        # Build headers
+        # Build headers - inject API key server-side
         headers = {
             "Content-Type": self.request.headers.get("Content-Type", "application/json"),
             "Accept": "application/json",
@@ -226,7 +266,6 @@ class ProxyHandler(BaseHandler):
                 json_encode(
                     {
                         "error": str(e),
-                        "backend_url": self.backend_url,
                     }
                 )
             )
@@ -236,26 +275,34 @@ class ProxyHandler(BaseHandler):
                 json_encode(
                     {
                         "error": f"Proxy error: {str(e)}",
-                        "backend_url": self.backend_url,
                     }
                 )
             )
 
+    @tornado.web.authenticated
     async def get(self, path: str = "") -> None:
         """Handle GET requests."""
         await self._proxy_request("GET", path)
 
+    @tornado.web.authenticated
     async def post(self, path: str = "") -> None:
         """Handle POST requests."""
         await self._proxy_request("POST", path)
 
+    @tornado.web.authenticated
     async def put(self, path: str = "") -> None:
         """Handle PUT requests."""
         await self._proxy_request("PUT", path)
 
+    @tornado.web.authenticated
     async def delete(self, path: str = "") -> None:
         """Handle DELETE requests."""
         await self._proxy_request("DELETE", path)
+
+    @tornado.web.authenticated
+    async def patch(self, path: str = "") -> None:
+        """Handle PATCH requests."""
+        await self._proxy_request("PATCH", path)
 
 
 def setup_handlers(web_app: tornado.web.Application) -> None:

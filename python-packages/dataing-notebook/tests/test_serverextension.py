@@ -61,12 +61,33 @@ class TestEnvironmentFunctions:
             assert is_jupyterhub_environment() is True
 
 
+def make_test_app(handlers: list) -> tornado.web.Application:
+    """Create a test application with authentication bypassed.
+
+    In test environments, we disable authentication by providing
+    a get_current_user that always returns a test user.
+    """
+    # Create handlers that bypass auth for testing
+    test_handlers = []
+    for pattern, handler in handlers:
+        # Create a subclass that overrides get_current_user
+        class TestHandler(handler):  # type: ignore[valid-type,misc]
+            def get_current_user(self) -> str:
+                return "test_user"
+        test_handlers.append((pattern, TestHandler))
+
+    return tornado.web.Application(
+        test_handlers,
+        cookie_secret="test_secret_for_testing_only",
+    )
+
+
 class TestHandshakeHandler(tornado.testing.AsyncHTTPTestCase):
     """Tests for HandshakeHandler."""
 
     def get_app(self) -> tornado.web.Application:
         """Create test application."""
-        return tornado.web.Application([
+        return make_test_app([
             (r"/dataing/handshake", HandshakeHandler),
         ])
 
@@ -99,7 +120,7 @@ class TestTokenHandler(tornado.testing.AsyncHTTPTestCase):
 
     def get_app(self) -> tornado.web.Application:
         """Create test application."""
-        return tornado.web.Application([
+        return make_test_app([
             (r"/dataing/token", TokenHandler),
         ])
 
@@ -114,7 +135,7 @@ class TestTokenHandler(tornado.testing.AsyncHTTPTestCase):
             assert data["has_token"] is False
 
     def test_get_token_with_key(self) -> None:
-        """Test GET token when API key configured."""
+        """Test GET token when API key configured (does not expose the key)."""
         with patch.dict(os.environ, {"DATAING_API_KEY": "test-key-12345678"}):
             response = self.fetch("/dataing/token")
             assert response.code == 200
@@ -122,7 +143,10 @@ class TestTokenHandler(tornado.testing.AsyncHTTPTestCase):
             data = json.loads(response.body)
             assert data["has_token"] is True
             assert data["token_type"] == "api_key"
-            assert "test" in data["masked"]  # First 4 chars
+            assert data["token_configured"] is True
+            # Key should NOT be exposed
+            assert "token" not in data
+            assert "masked" not in data
 
     def test_post_token_no_key(self) -> None:
         """Test POST token when no API key configured."""
@@ -135,19 +159,21 @@ class TestTokenHandler(tornado.testing.AsyncHTTPTestCase):
             )
             assert response.code == 401
 
-    def test_post_token_with_key(self) -> None:
-        """Test POST token when API key configured."""
+    def test_post_token_with_key_status(self) -> None:
+        """Test POST token returns status only (not the actual token)."""
         with patch.dict(os.environ, {"DATAING_API_KEY": "test-key"}):
             response = self.fetch(
                 "/dataing/token",
                 method="POST",
-                body='{"action": "get"}',
+                body='{"action": "status"}',
             )
             assert response.code == 200
 
             data = json.loads(response.body)
             assert data["success"] is True
-            assert data["token"] == "test-key"
+            assert data["token_configured"] is True
+            # Token should NOT be returned
+            assert "token" not in data
 
 
 class TestSetupHandlers:

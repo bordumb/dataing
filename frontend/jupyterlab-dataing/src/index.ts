@@ -16,7 +16,12 @@ import { ISettingRegistry } from '@jupyterlab/settingregistry';
 
 import { IStatusBar } from '@jupyterlab/statusbar';
 
+import { PageConfig, URLExt } from '@jupyterlab/coreutils';
+
 import { DataingStatusBar } from './statusbar';
+
+import type { IDataingState, IDataingSettings } from './types';
+export type { ConnectionState, IDataingState } from './types';
 
 /**
  * Extension ID
@@ -26,52 +31,79 @@ const EXTENSION_ID = '@dataing/jupyterlab-dataing:plugin';
 /**
  * Default settings
  */
-const DEFAULT_BACKEND_URL = 'http://localhost:8000';
+const DEFAULT_SETTINGS: IDataingSettings = {
+  backendUrl: 'http://localhost:8000',
+  autoConnect: true,
+  connectionCheckInterval: 30,
+  showStatusBar: true
+};
 
 /**
- * Connection state type
+ * Build URL with Jupyter base_url
  */
-export type ConnectionState = 'connected' | 'disconnected' | 'checking' | 'error';
-
-/**
- * Dataing extension state
- */
-export interface IDataingState {
-  backendUrl: string;
-  connectionState: ConnectionState;
-  lastCheck: Date | null;
-  errorMessage: string | null;
+function buildServerUrl(path: string): string {
+  const baseUrl = PageConfig.getBaseUrl();
+  return URLExt.join(baseUrl, path);
 }
 
 /**
- * Check connection to the backend
+ * Check connection via server extension proxy
  */
-async function checkConnection(backendUrl: string): Promise<{
-  connected: boolean;
+async function checkConnection(
+  abortSignal?: AbortSignal
+): Promise<{
+  serverExtensionOk: boolean;
+  backendOk: boolean;
+  backendUrl: string;
   error?: string;
 }> {
   try {
-    // First try the server extension handshake
-    const handshakeResponse = await fetch('/dataing/handshake');
-    if (handshakeResponse.ok) {
-      const data = await handshakeResponse.json();
-      return { connected: true };
+    // Check server extension handshake
+    const handshakeUrl = buildServerUrl('dataing/handshake');
+    const handshakeResponse = await fetch(handshakeUrl, { signal: abortSignal });
+
+    if (!handshakeResponse.ok) {
+      return {
+        serverExtensionOk: false,
+        backendOk: false,
+        backendUrl: '',
+        error: `Server extension error: ${handshakeResponse.status}`
+      };
     }
 
-    // Fall back to direct backend health check
-    const healthResponse = await fetch(`${backendUrl}/health`, {
+    const handshakeData = await handshakeResponse.json();
+    const backendUrl = handshakeData.backend_url || '';
+
+    // Check backend via server extension proxy
+    const proxyUrl = buildServerUrl('dataing/proxy/health');
+    const healthResponse = await fetch(proxyUrl, {
       method: 'GET',
-      headers: { Accept: 'application/json' }
+      headers: { Accept: 'application/json' },
+      signal: abortSignal
     });
 
     if (healthResponse.ok) {
-      return { connected: true };
+      return {
+        serverExtensionOk: true,
+        backendOk: true,
+        backendUrl
+      };
     }
 
-    return { connected: false, error: `Status: ${healthResponse.status}` };
-  } catch (error) {
     return {
-      connected: false,
+      serverExtensionOk: true,
+      backendOk: false,
+      backendUrl,
+      error: `Backend status: ${healthResponse.status}`
+    };
+  } catch (error) {
+    if (error instanceof Error && error.name === 'AbortError') {
+      throw error; // Re-throw abort
+    }
+    return {
+      serverExtensionOk: false,
+      backendOk: false,
+      backendUrl: '',
       error: error instanceof Error ? error.message : 'Unknown error'
     };
   }
@@ -92,10 +124,13 @@ const plugin: JupyterFrontEndPlugin<void> = {
   ) => {
     console.log('Dataing JupyterLab extension is activating');
 
+    // Initialize settings
+    const settings: IDataingSettings = { ...DEFAULT_SETTINGS };
+
     // Initialize state
     const state: IDataingState = {
-      backendUrl: DEFAULT_BACKEND_URL,
-      connectionState: 'checking',
+      backendUrl: settings.backendUrl,
+      connectionState: 'disconnected',
       lastCheck: null,
       errorMessage: null
     };
@@ -103,43 +138,96 @@ const plugin: JupyterFrontEndPlugin<void> = {
     // Load settings if available
     if (settingRegistry) {
       try {
-        const settings = await settingRegistry.load(EXTENSION_ID);
+        const settingsObj = await settingRegistry.load(EXTENSION_ID);
 
-        // Get backend URL from settings
-        const backendUrl = settings.get('backendUrl').composite as string;
+        // Load all settings
+        const backendUrl = settingsObj.get('backendUrl').composite as string;
         if (backendUrl) {
+          settings.backendUrl = backendUrl;
           state.backendUrl = backendUrl;
         }
 
+        const autoConnect = settingsObj.get('autoConnect').composite;
+        if (typeof autoConnect === 'boolean') {
+          settings.autoConnect = autoConnect;
+        }
+
+        const checkInterval = settingsObj.get('connectionCheckInterval').composite;
+        if (typeof checkInterval === 'number' && checkInterval > 0) {
+          settings.connectionCheckInterval = checkInterval;
+        }
+
+        const showStatusBar = settingsObj.get('showStatusBar').composite;
+        if (typeof showStatusBar === 'boolean') {
+          settings.showStatusBar = showStatusBar;
+        }
+
         // Watch for settings changes
-        settings.changed.connect(() => {
-          const newUrl = settings.get('backendUrl').composite as string;
-          if (newUrl && newUrl !== state.backendUrl) {
+        settingsObj.changed.connect(() => {
+          const newUrl = settingsObj.get('backendUrl').composite as string;
+          if (newUrl && newUrl !== settings.backendUrl) {
+            settings.backendUrl = newUrl;
             state.backendUrl = newUrl;
             // Re-check connection with new URL
             updateConnectionState();
           }
         });
 
-        console.log('Dataing settings loaded:', state.backendUrl);
+        console.log('Dataing settings loaded:', settings);
       } catch (error) {
         console.warn('Could not load Dataing settings:', error);
       }
     }
 
+    // Track in-flight checks and abort controller
+    let checkInFlight = false;
+    let abortController: AbortController | null = null;
+    let checkTimerId: ReturnType<typeof setTimeout> | null = null;
+
     // Function to update connection state
     const updateConnectionState = async () => {
+      // Guard concurrent checks
+      if (checkInFlight) {
+        return;
+      }
+
+      checkInFlight = true;
       state.connectionState = 'checking';
       state.lastCheck = new Date();
 
-      const result = await checkConnection(state.backendUrl);
+      // Update status bar to show checking
+      if (statusBarWidget) {
+        statusBarWidget.updateState(state);
+      }
 
-      if (result.connected) {
-        state.connectionState = 'connected';
-        state.errorMessage = null;
-      } else {
+      // Create abort controller for this check
+      abortController = new AbortController();
+
+      try {
+        const result = await checkConnection(abortController.signal);
+
+        state.backendUrl = result.backendUrl || settings.backendUrl;
+
+        if (result.backendOk) {
+          state.connectionState = 'connected';
+          state.errorMessage = null;
+        } else if (result.serverExtensionOk) {
+          state.connectionState = 'error';
+          state.errorMessage = result.error || 'Backend unreachable';
+        } else {
+          state.connectionState = 'error';
+          state.errorMessage = result.error || 'Connection failed';
+        }
+      } catch (error) {
+        if (error instanceof Error && error.name === 'AbortError') {
+          // Check was aborted, don't update state
+          return;
+        }
         state.connectionState = 'error';
-        state.errorMessage = result.error || 'Connection failed';
+        state.errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      } finally {
+        checkInFlight = false;
+        abortController = null;
       }
 
       // Update status bar if available
@@ -148,10 +236,21 @@ const plugin: JupyterFrontEndPlugin<void> = {
       }
     };
 
-    // Add status bar widget if available
+    // Schedule next check using setTimeout (self-scheduling)
+    const scheduleNextCheck = () => {
+      if (checkTimerId !== null) {
+        clearTimeout(checkTimerId);
+      }
+      checkTimerId = setTimeout(async () => {
+        await updateConnectionState();
+        scheduleNextCheck();
+      }, settings.connectionCheckInterval * 1000);
+    };
+
+    // Add status bar widget if available and enabled
     let statusBarWidget: DataingStatusBar | null = null;
 
-    if (statusBar) {
+    if (statusBar && settings.showStatusBar) {
       statusBarWidget = new DataingStatusBar(state);
 
       statusBar.registerStatusItem(EXTENSION_ID, {
@@ -163,11 +262,30 @@ const plugin: JupyterFrontEndPlugin<void> = {
       console.log('Dataing status bar widget added');
     }
 
-    // Initial connection check
-    await updateConnectionState();
+    // Initial connection check if autoConnect enabled
+    if (settings.autoConnect) {
+      state.connectionState = 'checking';
+      if (statusBarWidget) {
+        statusBarWidget.updateState(state);
+      }
+      await updateConnectionState();
+    }
 
-    // Periodic connection check (every 30 seconds)
-    setInterval(updateConnectionState, 30000);
+    // Start periodic checks
+    scheduleNextCheck();
+
+    // Cleanup on app disposal
+    app.commands.addCommand('dataing:cleanup', {
+      execute: () => {
+        if (checkTimerId !== null) {
+          clearTimeout(checkTimerId);
+          checkTimerId = null;
+        }
+        if (abortController) {
+          abortController.abort();
+        }
+      }
+    });
 
     console.log('Dataing JupyterLab extension activated');
   }

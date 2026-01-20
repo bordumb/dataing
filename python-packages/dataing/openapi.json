@@ -1624,7 +1624,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/TestConnectionResponse"
+                  "$ref": "#/components/schemas/dataing__entrypoints__api__routes__datasources__TestConnectionResponse"
                 }
               }
             }
@@ -1849,7 +1849,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/TestConnectionResponse"
+                  "$ref": "#/components/schemas/dataing__entrypoints__api__routes__datasources__TestConnectionResponse"
                 }
               }
             }
@@ -2284,7 +2284,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/TestConnectionResponse"
+                  "$ref": "#/components/schemas/dataing__entrypoints__api__routes__datasources__TestConnectionResponse"
                 }
               }
             }
@@ -2509,7 +2509,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/TestConnectionResponse"
+                  "$ref": "#/components/schemas/dataing__entrypoints__api__routes__datasources__TestConnectionResponse"
                 }
               }
             }
@@ -3104,7 +3104,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/dataing__entrypoints__api__routes__credentials__TestConnectionResponse"
+                  "$ref": "#/components/schemas/TestConnectionResponse"
                 }
               }
             }
@@ -5224,6 +5224,117 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/DatasetResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/context/bundles": {
+      "post": {
+        "tags": [
+          "context"
+        ],
+        "summary": "Create Bundle",
+        "description": "Create a context bundle for the given assets.\n\nThis endpoint resolves asset references to concrete datasources,\ngathers context (lineage, operational facts, anomalies), and returns\na cacheable bundle.\n\nIf any asset reference is ambiguous (matches multiple datasources),\nreturns 409 with candidates and a hint for disambiguation.\n\nThe response includes:\n- bundle_id: Unique identifier for this bundle\n- resolved_assets: Per-asset resolution with datasource binding\n- bundle_hash: Server-computed cache key (also returned as ETag header)\n- Context data (lineage, operational, anomalies) based on request flags",
+        "operationId": "create_bundle_api_v1_context_bundles_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateBundleRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ContextBundleResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Ambiguous assets - multiple datasources match",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AmbiguousAssetsResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "APIKeyHeader": []
+          },
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/context/bundles/{bundle_id}": {
+      "get": {
+        "tags": [
+          "context"
+        ],
+        "summary": "Get Bundle",
+        "description": "Get an existing context bundle by ID.\n\nNote: Bundles are currently not persisted. This endpoint is a placeholder\nfor future caching implementation.",
+        "operationId": "get_bundle_api_v1_context_bundles__bundle_id__get",
+        "security": [
+          {
+            "APIKeyHeader": []
+          },
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "bundle_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Bundle Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ContextBundleResponse"
                 }
               }
             }
@@ -8002,6 +8113,129 @@
   },
   "components": {
     "schemas": {
+      "AmbiguousAssetCandidate": {
+        "properties": {
+          "datasource_id": {
+            "type": "string",
+            "title": "Datasource Id"
+          },
+          "datasource_name": {
+            "type": "string",
+            "title": "Datasource Name"
+          },
+          "platform": {
+            "type": "string",
+            "title": "Platform"
+          },
+          "connection_info": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Connection Info"
+          }
+        },
+        "type": "object",
+        "required": [
+          "datasource_id",
+          "datasource_name",
+          "platform"
+        ],
+        "title": "AmbiguousAssetCandidate",
+        "description": "Candidate when asset is ambiguous."
+      },
+      "AmbiguousAssetError": {
+        "properties": {
+          "asset": {
+            "$ref": "#/components/schemas/AssetRefRequest"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          },
+          "candidates": {
+            "items": {
+              "$ref": "#/components/schemas/AmbiguousAssetCandidate"
+            },
+            "type": "array",
+            "title": "Candidates"
+          },
+          "hint": {
+            "type": "string",
+            "title": "Hint"
+          }
+        },
+        "type": "object",
+        "required": [
+          "asset",
+          "message",
+          "candidates",
+          "hint"
+        ],
+        "title": "AmbiguousAssetError",
+        "description": "Error response for ambiguous asset."
+      },
+      "AmbiguousAssetsResponse": {
+        "properties": {
+          "detail": {
+            "type": "string",
+            "title": "Detail",
+            "default": "One or more assets matched multiple datasources"
+          },
+          "ambiguous_assets": {
+            "items": {
+              "$ref": "#/components/schemas/AmbiguousAssetError"
+            },
+            "type": "array",
+            "title": "Ambiguous Assets"
+          }
+        },
+        "type": "object",
+        "required": [
+          "ambiguous_assets"
+        ],
+        "title": "AmbiguousAssetsResponse",
+        "description": "Response when one or more assets are ambiguous."
+      },
+      "AnomalySummary": {
+        "properties": {
+          "anomaly_id": {
+            "type": "string",
+            "title": "Anomaly Id"
+          },
+          "dataset_id": {
+            "type": "string",
+            "title": "Dataset Id"
+          },
+          "anomaly_type": {
+            "type": "string",
+            "title": "Anomaly Type"
+          },
+          "severity": {
+            "type": "string",
+            "title": "Severity"
+          },
+          "detected_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Detected At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "anomaly_id",
+          "dataset_id",
+          "anomaly_type",
+          "severity",
+          "detected_at"
+        ],
+        "title": "AnomalySummary",
+        "description": "Summary of detected anomaly."
+      },
       "ApprovalDecisionResponse": {
         "properties": {
           "id": {
@@ -8198,6 +8432,39 @@
         "title": "ApproveRequest",
         "description": "Request to approve an investigation."
       },
+      "AssetRefRequest": {
+        "properties": {
+          "platform": {
+            "type": "string",
+            "title": "Platform",
+            "description": "Data platform (postgres, snowflake, dbt)"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "Fully qualified name (db.schema.table)"
+          },
+          "datasource_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Datasource Id",
+            "description": "Optional datasource ID for disambiguation"
+          }
+        },
+        "type": "object",
+        "required": [
+          "platform",
+          "name"
+        ],
+        "title": "AssetRefRequest",
+        "description": "Asset reference in request."
+      },
       "BranchStateResponse": {
         "properties": {
           "branch_id": {
@@ -8364,6 +8631,85 @@
         "title": "ColumnLineageResponse",
         "description": "Response for column lineage."
       },
+      "ContextBundleResponse": {
+        "properties": {
+          "bundle_id": {
+            "type": "string",
+            "title": "Bundle Id"
+          },
+          "resolved_assets": {
+            "items": {
+              "$ref": "#/components/schemas/ResolvedAssetResponse"
+            },
+            "type": "array",
+            "title": "Resolved Assets"
+          },
+          "default_datasource_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Default Datasource Id"
+          },
+          "lineage": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/dataing__entrypoints__api__routes__bundles__LineageGraphResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "operational": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/OperationalFactsResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "anomalies": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/AnomalySummary"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Anomalies"
+          },
+          "bundle_hash": {
+            "type": "string",
+            "title": "Bundle Hash",
+            "description": "Server-derived cache key"
+          },
+          "expires_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Expires At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "bundle_id",
+          "resolved_assets",
+          "bundle_hash",
+          "expires_at"
+        ],
+        "title": "ContextBundleResponse",
+        "description": "Context bundle response."
+      },
       "CreateApprovalRequest": {
         "properties": {
           "investigation_id": {
@@ -8390,6 +8736,55 @@
         ],
         "title": "CreateApprovalRequest",
         "description": "Request to create a new approval request."
+      },
+      "CreateBundleRequest": {
+        "properties": {
+          "assets": {
+            "items": {
+              "$ref": "#/components/schemas/AssetRefRequest"
+            },
+            "type": "array",
+            "minItems": 1,
+            "title": "Assets",
+            "description": "Assets to include in bundle"
+          },
+          "window": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Window",
+            "description": "Time window for context (e.g., '7d', '24h')"
+          },
+          "include_lineage": {
+            "type": "boolean",
+            "title": "Include Lineage",
+            "description": "Include lineage graph",
+            "default": true
+          },
+          "include_operational": {
+            "type": "boolean",
+            "title": "Include Operational",
+            "description": "Include operational facts",
+            "default": true
+          },
+          "include_anomalies": {
+            "type": "boolean",
+            "title": "Include Anomalies",
+            "description": "Include anomaly summary",
+            "default": true
+          }
+        },
+        "type": "object",
+        "required": [
+          "assets"
+        ],
+        "title": "CreateBundleRequest",
+        "description": "Request to create a context bundle."
       },
       "CreateDataSourceRequest": {
         "properties": {
@@ -10405,6 +10800,30 @@
         "title": "KnowledgeCommentUpdate",
         "description": "Request body for updating a knowledge comment."
       },
+      "LineageEdge": {
+        "properties": {
+          "source": {
+            "type": "string",
+            "title": "Source"
+          },
+          "target": {
+            "type": "string",
+            "title": "Target"
+          },
+          "edge_type": {
+            "type": "string",
+            "title": "Edge Type",
+            "default": "transforms"
+          }
+        },
+        "type": "object",
+        "required": [
+          "source",
+          "target"
+        ],
+        "title": "LineageEdge",
+        "description": "Lineage edge."
+      },
       "LineageEdgeResponse": {
         "properties": {
           "source": {
@@ -10764,6 +11183,26 @@
         ],
         "title": "NotificationResponse",
         "description": "Single notification response."
+      },
+      "OperationalFactsResponse": {
+        "properties": {
+          "recent_runs": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Recent Runs"
+          },
+          "freshness": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Freshness"
+          }
+        },
+        "type": "object",
+        "title": "OperationalFactsResponse",
+        "description": "Operational facts about assets."
       },
       "OrgMemberResponse": {
         "properties": {
@@ -11288,6 +11727,48 @@
         ],
         "title": "RejectRequest",
         "description": "Request to reject an investigation."
+      },
+      "ResolvedAssetResponse": {
+        "properties": {
+          "asset": {
+            "$ref": "#/components/schemas/AssetRefRequest"
+          },
+          "datasource_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Datasource Id"
+          },
+          "dataset_id": {
+            "type": "string",
+            "title": "Dataset Id",
+            "description": "Canonical URN"
+          },
+          "dataset_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dataset Type",
+            "description": "TABLE, VIEW, MODEL, etc."
+          }
+        },
+        "type": "object",
+        "required": [
+          "asset",
+          "dataset_id"
+        ],
+        "title": "ResolvedAssetResponse",
+        "description": "Resolved asset in response."
       },
       "SLAPolicyCreate": {
         "properties": {
@@ -12444,22 +12925,7 @@
             "type": "boolean",
             "title": "Success"
           },
-          "message": {
-            "type": "string",
-            "title": "Message"
-          },
-          "latency_ms": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Latency Ms"
-          },
-          "server_version": {
+          "error": {
             "anyOf": [
               {
                 "type": "string"
@@ -12468,16 +12934,26 @@
                 "type": "null"
               }
             ],
-            "title": "Server Version"
+            "title": "Error"
+          },
+          "tables_accessible": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tables Accessible"
           }
         },
         "type": "object",
         "required": [
-          "success",
-          "message"
+          "success"
         ],
         "title": "TestConnectionResponse",
-        "description": "Response for testing a connection."
+        "description": "Response for testing credentials."
       },
       "TokenResponse": {
         "properties": {
@@ -12909,13 +13385,9 @@
         "title": "WebhookIssueResponse",
         "description": "Response from webhook issue creation."
       },
-      "dataing__entrypoints__api__routes__credentials__TestConnectionResponse": {
+      "dataing__entrypoints__api__routes__bundles__LineageGraphResponse": {
         "properties": {
-          "success": {
-            "type": "boolean",
-            "title": "Success"
-          },
-          "error": {
+          "root": {
             "anyOf": [
               {
                 "type": "string"
@@ -12924,9 +13396,39 @@
                 "type": "null"
               }
             ],
-            "title": "Error"
+            "title": "Root"
           },
-          "tables_accessible": {
+          "datasets": {
+            "additionalProperties": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "object",
+            "title": "Datasets"
+          },
+          "edges": {
+            "items": {
+              "$ref": "#/components/schemas/LineageEdge"
+            },
+            "type": "array",
+            "title": "Edges"
+          }
+        },
+        "type": "object",
+        "title": "LineageGraphResponse",
+        "description": "Lineage graph response."
+      },
+      "dataing__entrypoints__api__routes__datasources__TestConnectionResponse": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "title": "Success"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          },
+          "latency_ms": {
             "anyOf": [
               {
                 "type": "integer"
@@ -12935,15 +13437,27 @@
                 "type": "null"
               }
             ],
-            "title": "Tables Accessible"
+            "title": "Latency Ms"
+          },
+          "server_version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Server Version"
           }
         },
         "type": "object",
         "required": [
-          "success"
+          "success",
+          "message"
         ],
         "title": "TestConnectionResponse",
-        "description": "Response for testing credentials."
+        "description": "Response for testing a connection."
       }
     },
     "securitySchemes": {

@@ -1,14 +1,21 @@
 {
-  "assignee": null,
+  "assignee": "bordumbb@gmail.com",
   "claim_note": "",
-  "claimed_at": null,
+  "claimed_at": "2026-01-20T04:03:01.537349Z",
   "created_at": "2026-01-20T03:52:48.340489Z",
   "depends_on": [],
   "epic": "fn-18",
+  "evidence": {
+    "commits": [
+      "3cb385a0a142c06603a7b15fe13d1fc0adcb5dd6"
+    ],
+    "prs": [],
+    "tests": []
+  },
   "id": "fn-18.4",
   "priority": null,
   "spec_path": ".flow/tasks/fn-18.4.md",
-  "status": "todo",
+  "status": "done",
   "title": "Build timeline renderer for notebook output",
-  "updated_at": "2026-01-20T03:52:48.340699Z"
+  "updated_at": "2026-01-20T04:03:11.630082Z"
 }

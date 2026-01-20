@@ -83,6 +83,7 @@ class DataingMagics(Magics):
             "attach": self._handle_attach,
             "lineage": self._handle_lineage,
             "ask": self._handle_ask,
+            "export": self._handle_export,
             "status": self._handle_status,
             "clear": self._handle_clear,
             "help": self._show_help,
@@ -118,6 +119,10 @@ Dataing Magic Commands
 %dataing ask "<question>"
     Start an investigation with the given question.
     Uses streaming to display progress.
+
+%dataing export [--format FORMAT] [--output FILE]
+    Export the last investigation as a markdown incident report.
+    Formats: markdown (default), json
 
 %dataing status
     Show the current context status.
@@ -450,6 +455,184 @@ Dataing Magic Commands
             display(HTML(f'<a href="{ui_url}" target="_blank">View in UI: {ui_url}</a>'))
         except ImportError:
             print(f"View in UI: {ui_url}")
+
+    def _handle_export(self, args: list[str]) -> None:
+        """Handle export subcommand - generate markdown incident report.
+
+        Args:
+            args: Command arguments.
+        """
+        from datetime import datetime
+
+        parser = argparse.ArgumentParser(prog="%dataing export")
+        parser.add_argument(
+            "--format", "-f", choices=["markdown", "json"], default="markdown",
+            help="Output format"
+        )
+        parser.add_argument("--output", "-o", help="Output file path")
+
+        try:
+            parsed = parser.parse_args(args)
+        except SystemExit:
+            return
+
+        # Find the last investigation from history
+        last_ask = None
+        last_stream = None
+        for entry in reversed(self._state._history):
+            if entry.get("action") == "stream_complete" and last_stream is None:
+                last_stream = entry
+            if entry.get("action") == "ask" and last_ask is None:
+                last_ask = entry
+            if last_ask and last_stream:
+                break
+
+        if not last_ask:
+            print("Error: No investigation found. Run '%dataing ask' first.", file=sys.stderr)
+            return
+
+        run_id = last_ask.get("run_id", "unknown")
+        question = last_ask.get("question", "Unknown question")
+        events = last_stream.get("events", []) if last_stream else []
+        status = last_stream.get("status", "unknown") if last_stream else "unknown"
+
+        if parsed.format == "json":
+            self._export_json(run_id, question, events, status, parsed.output)
+        else:
+            self._export_markdown(run_id, question, events, status, parsed.output)
+
+    def _export_markdown(
+        self,
+        run_id: str,
+        question: str,
+        events: list[dict[str, Any]],
+        status: str,
+        output_path: str | None,
+    ) -> None:
+        """Export investigation as markdown incident report.
+
+        Args:
+            run_id: Investigation run ID.
+            question: Original question.
+            events: List of SSE events.
+            status: Final status.
+            output_path: Optional output file path.
+        """
+        from datetime import datetime
+
+        lines = [
+            "# Incident Report",
+            "",
+            f"**Generated:** {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
+            f"**Run ID:** `{run_id}`",
+            f"**Status:** {status.upper()}",
+            "",
+            "## Investigation Question",
+            "",
+            f"> {question}",
+            "",
+            "## Timeline",
+            "",
+        ]
+
+        # Group events by type
+        for event in events:
+            event_type = event.get("event", "unknown")
+            data = event.get("data", {})
+            seq = event.get("seq", 0)
+
+            if event_type == "run_started":
+                lines.append(f"### Investigation Started")
+                if "goal" in data:
+                    lines.append(f"Goal: {data['goal']}")
+                lines.append("")
+
+            elif event_type == "run_progress":
+                if "hypothesis" in data:
+                    lines.append(f"- **Hypothesis:** {data['hypothesis']}")
+                elif "message" in data:
+                    lines.append(f"- {data['message']}")
+
+            elif event_type == "run_evidence":
+                lines.append(f"### Evidence #{seq}")
+                if "sql" in data:
+                    lines.append("```sql")
+                    lines.append(data["sql"])
+                    lines.append("```")
+                if "result" in data:
+                    lines.append(f"Result: {data['result']}")
+                if "conclusion" in data:
+                    lines.append(f"**Conclusion:** {data['conclusion']}")
+                lines.append("")
+
+            elif event_type == "run_completed":
+                lines.append("")
+                lines.append("### Investigation Completed")
+                if "summary" in data:
+                    lines.append(data["summary"])
+                lines.append("")
+
+            elif event_type == "run_failed":
+                lines.append("")
+                lines.append("### Investigation Failed")
+                if "error" in data:
+                    lines.append(f"Error: {data['error']}")
+                lines.append("")
+
+        lines.append("---")
+        lines.append("*Generated by Dataing Notebook*")
+
+        report = "\n".join(lines)
+
+        if output_path:
+            with open(output_path, "w") as f:
+                f.write(report)
+            print(f"Exported to: {output_path}")
+        else:
+            # Display in notebook
+            try:
+                from IPython.display import Markdown, display
+
+                display(Markdown(report))
+            except ImportError:
+                print(report)
+
+    def _export_json(
+        self,
+        run_id: str,
+        question: str,
+        events: list[dict[str, Any]],
+        status: str,
+        output_path: str | None,
+    ) -> None:
+        """Export investigation as JSON.
+
+        Args:
+            run_id: Investigation run ID.
+            question: Original question.
+            events: List of SSE events.
+            status: Final status.
+            output_path: Optional output file path.
+        """
+        import json
+        from datetime import datetime
+
+        data = {
+            "generated_at": datetime.now().isoformat(),
+            "run_id": run_id,
+            "question": question,
+            "status": status,
+            "events": events,
+        }
+
+        json_str = json.dumps(data, indent=2, default=str)
+
+        if output_path:
+            with open(output_path, "w") as f:
+                f.write(json_str)
+            print(f"Exported to: {output_path}")
+        else:
+            print(json_str)
 
     def _handle_status(self, args: list[str]) -> None:
         """Handle status subcommand.

@@ -1,0 +1,13 @@
+{
+  "branch_name": "fn-20-evidence-schema",
+  "created_at": "2026-01-20T03:50:58.500523Z",
+  "depends_on_epics": [],
+  "id": "fn-20",
+  "next_task": 1,
+  "plan_review_status": "unknown",
+  "plan_reviewed_at": null,
+  "spec_path": ".flow/specs/fn-20.md",
+  "status": "open",
+  "title": "Evidence Schema: Queryable, rich, tamper-evident",
+  "updated_at": "2026-01-20T03:52:28.825284Z"
+}

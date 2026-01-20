@@ -1,0 +1,13 @@
+{
+  "branch_name": "fn-19-persistence-layer",
+  "created_at": "2026-01-20T03:50:57.072930Z",
+  "depends_on_epics": [],
+  "id": "fn-19",
+  "next_task": 1,
+  "plan_review_status": "unknown",
+  "plan_reviewed_at": null,
+  "spec_path": ".flow/specs/fn-19.md",
+  "status": "open",
+  "title": "Persistence Layer: PostgreSQL for bundles/runs/events",
+  "updated_at": "2026-01-20T03:52:28.641923Z"
+}

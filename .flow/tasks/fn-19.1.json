@@ -1,14 +1,14 @@
 {
-  "assignee": null,
+  "assignee": "bordumbb@gmail.com",
   "claim_note": "",
-  "claimed_at": null,
+  "claimed_at": "2026-01-20T04:06:28.222723Z",
   "created_at": "2026-01-20T03:52:49.267244Z",
   "depends_on": [],
   "epic": "fn-19",
   "id": "fn-19.1",
   "priority": null,
   "spec_path": ".flow/tasks/fn-19.1.md",
-  "status": "todo",
+  "status": "in_progress",
   "title": "Create migration for bundles table",
-  "updated_at": "2026-01-20T03:52:49.267428Z"
+  "updated_at": "2026-01-20T04:06:28.222968Z"
 }

@@ -2,49 +2,256 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+import os
+from typing import TYPE_CHECKING, Any
+
+import httpx
+
+from .exceptions import (
+    AuthError,
+    DataingError,
+    NotFoundError,
+    RateLimitError,
+    ServerError,
+    ValidationError,
+)
 
 if TYPE_CHECKING:
-    from .types import AssetRef
+    from .types import AssetRef, ContextBundle, Run
+
+# Environment variable for API key
+ENV_API_KEY = "DATAING_API_KEY"
+ENV_BASE_URL = "DATAING_BASE_URL"
 
 
 class DataingClient:
     """Client for interacting with the Dataing API.
 
-    This is a stub implementation. Full implementation in fn-17.2.
+    Supports both synchronous and asynchronous methods. By default, uses
+    synchronous HTTP calls. For async usage, use the async_* methods.
+
+    Example:
+        # Sync usage
+        client = DataingClient(api_key="your-key")
+        bundle = client.create_bundle(assets=[...])
+
+        # Async usage
+        async with client:
+            bundle = await client.async_create_bundle(assets=[...])
     """
 
     def __init__(
         self,
-        base_url: str = "http://localhost:8000",
+        base_url: str | None = None,
         api_key: str | None = None,
         timeout: float = 30.0,
     ) -> None:
         """Initialize the Dataing client.
 
         Args:
-            base_url: Base URL of the Dataing API.
-            api_key: API key for authentication.
+            base_url: Base URL of the Dataing API. Defaults to DATAING_BASE_URL
+                env var or http://localhost:8000.
+            api_key: API key for authentication. Defaults to DATAING_API_KEY env var.
             timeout: Request timeout in seconds.
+
+        Raises:
+            AuthError: If no API key is provided and DATAING_API_KEY is not set.
         """
-        self.base_url = base_url.rstrip("/")
-        self.api_key = api_key
+        self.base_url = (base_url or os.environ.get(ENV_BASE_URL, "http://localhost:8000")).rstrip(
+            "/"
+        )
+        self.api_key = api_key or os.environ.get(ENV_API_KEY)
         self.timeout = timeout
+
+        # Lazy-initialized clients
+        self._sync_client: httpx.Client | None = None
+        self._async_client: httpx.AsyncClient | None = None
+
+    def _get_headers(self) -> dict[str, str]:
+        """Get headers for API requests."""
+        headers = {
+            "Content-Type": "application/json",
+            "Accept": "application/json",
+        }
+        if self.api_key:
+            headers["X-API-Key"] = self.api_key
+        return headers
+
+    def _get_sync_client(self) -> httpx.Client:
+        """Get or create sync HTTP client."""
+        if self._sync_client is None:
+            self._sync_client = httpx.Client(
+                base_url=self.base_url,
+                headers=self._get_headers(),
+                timeout=self.timeout,
+            )
+        return self._sync_client
+
+    def _get_async_client(self) -> httpx.AsyncClient:
+        """Get or create async HTTP client."""
+        if self._async_client is None:
+            self._async_client = httpx.AsyncClient(
+                base_url=self.base_url,
+                headers=self._get_headers(),
+                timeout=self.timeout,
+            )
+        return self._async_client
+
+    def _handle_response_error(self, response: httpx.Response) -> None:
+        """Handle HTTP error responses by raising appropriate exceptions."""
+        if response.status_code == 401:
+            raise AuthError("Authentication failed: invalid or missing API key")
+        elif response.status_code == 403:
+            raise AuthError("Authorization failed: insufficient permissions")
+        elif response.status_code == 404:
+            raise NotFoundError(f"Resource not found: {response.url}")
+        elif response.status_code == 422:
+            try:
+                detail = response.json().get("detail", "Validation error")
+            except Exception:
+                detail = response.text
+            raise ValidationError(f"Validation error: {detail}")
+        elif response.status_code == 429:
+            retry_after = response.headers.get("Retry-After")
+            retry_seconds = float(retry_after) if retry_after else None
+            raise RateLimitError("Rate limit exceeded", retry_after=retry_seconds)
+        elif response.status_code >= 500:
+            raise ServerError(f"Server error: {response.status_code}")
+        elif response.status_code >= 400:
+            try:
+                detail = response.json().get("detail", response.text)
+            except Exception:
+                detail = response.text
+            raise DataingError(f"Request failed: {detail}")
+
+    def _request(
+        self,
+        method: str,
+        path: str,
+        **kwargs: Any,
+    ) -> httpx.Response:
+        """Make a synchronous HTTP request."""
+        client = self._get_sync_client()
+        response = client.request(method, path, **kwargs)
+        if not response.is_success:
+            self._handle_response_error(response)
+        return response
+
+    async def _async_request(
+        self,
+        method: str,
+        path: str,
+        **kwargs: Any,
+    ) -> httpx.Response:
+        """Make an asynchronous HTTP request."""
+        client = self._get_async_client()
+        response = await client.request(method, path, **kwargs)
+        if not response.is_success:
+            self._handle_response_error(response)
+        return response
+
+    def close(self) -> None:
+        """Close the synchronous HTTP client."""
+        if self._sync_client is not None:
+            self._sync_client.close()
+            self._sync_client = None
+
+    async def aclose(self) -> None:
+        """Close the asynchronous HTTP client."""
+        if self._async_client is not None:
+            await self._async_client.aclose()
+            self._async_client = None
+
+    def __enter__(self) -> "DataingClient":
+        """Enter context manager for sync usage."""
+        return self
+
+    def __exit__(self, *args: Any) -> None:
+        """Exit context manager for sync usage."""
+        self.close()
+
+    async def __aenter__(self) -> "DataingClient":
+        """Enter context manager for async usage."""
+        return self
+
+    async def __aexit__(self, *args: Any) -> None:
+        """Exit context manager for async usage."""
+        await self.aclose()
+
+    # --- Bundle methods (stub for fn-17.3/fn-17.4) ---
+
+    def create_bundle(
+        self,
+        assets: list[AssetRef],
+        window: str | None = None,
+    ) -> ContextBundle:
+        """Create a context bundle for the given assets.
+
+        Stub implementation. Full implementation in fn-17.4.
+
+        Args:
+            assets: List of assets to include in the bundle.
+            window: Optional time window for context (e.g., "7d", "24h").
+
+        Returns:
+            ContextBundle with resolved assets and context.
+        """
+        raise NotImplementedError("Full implementation in fn-17.4")
+
+    async def async_create_bundle(
+        self,
+        assets: list[AssetRef],
+        window: str | None = None,
+    ) -> ContextBundle:
+        """Async version of create_bundle."""
+        raise NotImplementedError("Full implementation in fn-17.4")
+
+    # --- Run methods (stub for fn-17.6) ---
 
     def run(
         self,
         assets: list[AssetRef],
         goal: str,
-    ) -> None:
+        bundle_id: str | None = None,
+    ) -> Run:
         """Create and start an investigation run.
+
+        This is the one-call API that resolves assets, creates a bundle,
+        and starts the run in a single operation.
 
         Stub implementation. Full implementation in fn-17.6.
 
         Args:
             assets: List of assets to investigate.
             goal: Investigation goal/question.
+            bundle_id: Optional existing bundle ID to use.
 
         Returns:
-            RunHandle for streaming events.
+            Run object with run_id and status.
         """
         raise NotImplementedError("Full implementation in fn-17.6")
+
+    async def async_run(
+        self,
+        assets: list[AssetRef],
+        goal: str,
+        bundle_id: str | None = None,
+    ) -> Run:
+        """Async version of run."""
+        raise NotImplementedError("Full implementation in fn-17.6")
+
+    # --- Health check ---
+
+    def health(self) -> dict[str, Any]:
+        """Check API health.
+
+        Returns:
+            Health status dict.
+        """
+        response = self._request("GET", "/health")
+        return response.json()
+
+    async def async_health(self) -> dict[str, Any]:
+        """Async version of health check."""
+        response = await self._async_request("GET", "/health")
+        return response.json()

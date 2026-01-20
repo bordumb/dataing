@@ -22,14 +22,33 @@ TERMINAL_STATUSES = {RunStatus.COMPLETED, RunStatus.FAILED, RunStatus.CANCELLED}
 
 
 class EvidenceKind(str, Enum):
-    """Kind of evidence attached to a run."""
+    """Kind of evidence attached to a run.
 
+    Matches backend schema for rich, queryable evidence.
+    """
+
+    QUERY_RESULT = "query_result"
+    HYPOTHESIS = "hypothesis"
+    LINEAGE_TRACE = "lineage_trace"
+    SCHEMA_SNAPSHOT = "schema_snapshot"
+    METRIC_CALCULATION = "metric_calculation"
+    RUN_SUMMARY = "run_summary"
+
+    # Legacy values for backward compatibility
     SQL = "sql"
     LOG = "log"
     METRIC = "metric"
     SCHEMA = "schema"
     PIPELINE = "pipeline"
     NOTE = "note"
+
+
+class HypothesisVerdict(str, Enum):
+    """Verdict for a hypothesis evaluation."""
+
+    ACCEPTED = "accepted"
+    REJECTED = "rejected"
+    INCONCLUSIVE = "inconclusive"
 
 
 class AssetRef(BaseModel):
@@ -263,6 +282,103 @@ class RunEvidence(BaseModel):
             parts.append(f'<strong>Conclusion:</strong> {html_module.escape(self.conclusion)}')
         parts.append('</div>')
         return ''.join(parts)
+
+
+# --- Rich Evidence Types (matching backend schema) ---
+
+
+class RichEvidenceBase(BaseModel):
+    """Base model for rich evidence types with tamper-evidence fields."""
+
+    id: str = Field(..., description="Evidence UUID")
+    run_id: str = Field(..., description="Run this evidence belongs to")
+    seq: int = Field(..., ge=1, description="Sequence number for ordering")
+    kind: EvidenceKind = Field(..., description="Evidence type discriminator")
+    timestamp: datetime = Field(..., description="When evidence was created")
+    prev_hash: str | None = Field(
+        default=None, description="Hash of previous evidence in chain"
+    )
+    content_hash: str = Field(..., description="SHA256 hash of content")
+
+
+class QueryResultEvidence(RichEvidenceBase):
+    """Evidence from executing a SQL query."""
+
+    kind: EvidenceKind = EvidenceKind.QUERY_RESULT
+    sql: str = Field(..., description="The SQL query executed")
+    row_count: int = Field(default=0, description="Number of rows returned")
+    columns: list[str] = Field(default_factory=list, description="Column names")
+    sample_rows: list[dict[str, Any]] = Field(
+        default_factory=list, description="Sample result rows"
+    )
+    execution_ms: int = Field(default=0, description="Query execution time in ms")
+    error: str | None = Field(default=None, description="Error if query failed")
+
+
+class HypothesisEvidence(RichEvidenceBase):
+    """Evidence from evaluating a hypothesis."""
+
+    kind: EvidenceKind = EvidenceKind.HYPOTHESIS
+    hypothesis_id: str = Field(..., description="ID of the hypothesis")
+    hypothesis_text: str = Field(..., description="The hypothesis statement")
+    confidence: float = Field(..., ge=0.0, le=1.0, description="Confidence 0-1")
+    supporting_facts: list[str] = Field(
+        default_factory=list, description="Supporting facts"
+    )
+    verdict: HypothesisVerdict = Field(..., description="Evaluation verdict")
+    reasoning: str = Field(default="", description="Explanation of verdict")
+
+
+class LineageTraceEvidence(RichEvidenceBase):
+    """Evidence from lineage traversal."""
+
+    kind: EvidenceKind = EvidenceKind.LINEAGE_TRACE
+    root_dataset: str = Field(..., description="Starting dataset")
+    upstream: list[str] = Field(default_factory=list, description="Upstream datasets")
+    downstream: list[str] = Field(default_factory=list, description="Downstream datasets")
+    edges: list[dict[str, str]] = Field(
+        default_factory=list, description="Lineage edges"
+    )
+
+
+class SchemaSnapshotEvidence(RichEvidenceBase):
+    """Evidence capturing schema at a point in time."""
+
+    kind: EvidenceKind = EvidenceKind.SCHEMA_SNAPSHOT
+    dataset: str = Field(..., description="Dataset name")
+    columns: list[dict[str, Any]] = Field(
+        default_factory=list, description="Column definitions"
+    )
+    row_count: int | None = Field(default=None, description="Approximate row count")
+    last_modified: datetime | None = Field(default=None, description="Last modified")
+
+
+class MetricCalculationEvidence(RichEvidenceBase):
+    """Evidence from calculating a metric value."""
+
+    kind: EvidenceKind = EvidenceKind.METRIC_CALCULATION
+    metric_name: str = Field(..., description="Name of the metric")
+    metric_type: str = Field(..., description="Type of metric")
+    value: float = Field(..., description="Calculated value")
+    expected_value: float | None = Field(default=None, description="Expected value")
+    deviation_pct: float | None = Field(default=None, description="Deviation %")
+    dimensions: dict[str, str] = Field(
+        default_factory=dict, description="Dimension values"
+    )
+
+
+class RunSummaryEvidence(RichEvidenceBase):
+    """Evidence summarizing the entire run."""
+
+    kind: EvidenceKind = EvidenceKind.RUN_SUMMARY
+    root_cause: str | None = Field(default=None, description="Identified root cause")
+    confidence: float = Field(default=0.0, description="Confidence in finding")
+    recommendations: list[str] = Field(
+        default_factory=list, description="Recommended actions"
+    )
+    hypotheses_evaluated: int = Field(default=0, description="Hypotheses evaluated")
+    queries_executed: int = Field(default=0, description="Queries executed")
+    duration_seconds: float = Field(default=0.0, description="Total duration")
 
 
 class QueryResult(BaseModel):

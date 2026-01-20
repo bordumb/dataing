@@ -19,7 +19,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
 from pydantic import BaseModel, Field
 from sse_starlette.sse import EventSourceResponse
 
-from dataing.adapters.db import RunRepository
+from dataing.adapters.db import EvidenceRepository, RunRepository
 from dataing.entrypoints.api.deps import get_app_db
 from dataing.entrypoints.api.middleware.auth import (
     ApiKeyContext,
@@ -618,3 +618,97 @@ async def cancel_run(
     )
 
     return {"status": "cancelled", "run_id": run_id}
+
+
+# --- Evidence Storage Models ---
+
+
+class StoreEvidenceRequest(BaseModel):
+    """Request to store evidence for a run."""
+
+    kind: str = Field(..., description="Evidence kind discriminator")
+    content: dict[str, Any] = Field(..., description="Evidence content")
+
+
+class EvidenceResponse(BaseModel):
+    """Response for stored evidence."""
+
+    id: str
+    run_id: str
+    seq: int
+    kind: str
+    content_hash: str
+    prev_hash: str | None = None
+    created_at: datetime
+
+
+# --- Evidence Endpoints ---
+
+
+@router.post("/{run_id}/evidence", response_model=EvidenceResponse)
+async def store_evidence(
+    request: Request,
+    run_id: str,
+    body: StoreEvidenceRequest,
+    auth: AuthDep,
+) -> EvidenceResponse:
+    """Store evidence for a run.
+
+    Evidence is stored with tamper-evident hash chain.
+    """
+    import hashlib
+
+    app_db = request.app.state.app_db
+    run_repo = RunRepository(app_db)
+    evidence_repo = EvidenceRepository(app_db)
+    run_uuid = UUID(run_id)
+
+    # Verify run exists
+    run_record = await run_repo.get_run(run_uuid)
+    if not run_record:
+        raise HTTPException(status_code=404, detail=f"Run not found: {run_id}")
+
+    # Get next sequence number and previous hash
+    max_seq = await evidence_repo.get_max_seq(run_uuid)
+    prev_hash = await evidence_repo.get_latest_hash(run_uuid)
+    next_seq = max_seq + 1
+
+    # Compute content hash
+    content_json = json.dumps(body.content, sort_keys=True, default=str)
+    content_hash = hashlib.sha256(content_json.encode()).hexdigest()
+
+    # Store evidence
+    evidence_record = await evidence_repo.store_evidence(
+        run_id=run_uuid,
+        seq=next_seq,
+        kind=body.kind,
+        content=body.content,
+        content_hash=content_hash,
+        prev_hash=prev_hash,
+    )
+
+    return EvidenceResponse(
+        id=evidence_record["id"],
+        run_id=evidence_record["run_id"],
+        seq=evidence_record["seq"],
+        kind=evidence_record["kind"],
+        content_hash=evidence_record["content_hash"],
+        prev_hash=evidence_record["prev_hash"],
+        created_at=evidence_record["created_at"],
+    )
+
+
+@router.get("/{run_id}/evidence", response_model=list[dict[str, Any]])
+async def get_evidence(
+    request: Request,
+    run_id: str,
+    auth: AuthDep,
+    kind: str | None = Query(default=None, description="Filter by evidence kind"),
+) -> list[dict[str, Any]]:
+    """Get evidence for a run, optionally filtered by kind."""
+    app_db = request.app.state.app_db
+    evidence_repo = EvidenceRepository(app_db)
+    run_uuid = UUID(run_id)
+
+    evidence_list = await evidence_repo.get_evidence_by_run(run_uuid, kind)
+    return evidence_list

@@ -10,6 +10,12 @@ Contents:
 
 from .app_db import AppDatabase
 from .mock import MockDatabaseAdapter
-from .sdk_repository import BundleRepository, RunRepository
+from .sdk_repository import BundleRepository, EvidenceRepository, RunRepository
 
-__all__ = ["AppDatabase", "MockDatabaseAdapter", "BundleRepository", "RunRepository"]
+__all__ = [
+    "AppDatabase",
+    "MockDatabaseAdapter",
+    "BundleRepository",
+    "RunRepository",
+    "EvidenceRepository",
+]

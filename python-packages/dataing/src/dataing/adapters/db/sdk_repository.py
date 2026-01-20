@@ -352,3 +352,173 @@ class RunRepository:
             "data": data,
             "timestamp": row["timestamp"].isoformat() if row["timestamp"] else None,
         }
+
+
+class EvidenceRepository:
+    """Repository for SDK rich evidence records."""
+
+    def __init__(self, db: AppDatabase) -> None:
+        """Initialize the repository.
+
+        Args:
+            db: Application database instance.
+        """
+        self.db = db
+
+    async def store_evidence(
+        self,
+        run_id: UUID,
+        seq: int,
+        kind: str,
+        content: dict[str, Any],
+        content_hash: str,
+        prev_hash: str | None = None,
+    ) -> dict[str, Any]:
+        """Store a rich evidence record.
+
+        Args:
+            run_id: Run UUID.
+            seq: Sequence number for ordering.
+            kind: Evidence kind discriminator.
+            content: JSONB content specific to evidence kind.
+            content_hash: SHA256 hash of content for tamper-evidence.
+            prev_hash: Hash of previous evidence in chain.
+
+        Returns:
+            Evidence record dict.
+        """
+        result = await self.db.execute_returning(
+            """
+            INSERT INTO sdk_evidence (run_id, seq, kind, content, content_hash, prev_hash)
+            VALUES ($1, $2, $3, $4, $5, $6)
+            ON CONFLICT (run_id, seq) DO UPDATE SET
+                kind = EXCLUDED.kind,
+                content = EXCLUDED.content,
+                content_hash = EXCLUDED.content_hash,
+                prev_hash = EXCLUDED.prev_hash
+            RETURNING id, run_id, seq, kind, content, content_hash, prev_hash, created_at
+            """,
+            run_id,
+            seq,
+            kind,
+            to_json_string(content),
+            content_hash,
+            prev_hash,
+        )
+        if result is None:
+            raise RuntimeError("Failed to store evidence")
+        return self._row_to_evidence(result)
+
+    async def get_evidence(self, evidence_id: UUID) -> dict[str, Any] | None:
+        """Get evidence by ID.
+
+        Args:
+            evidence_id: Evidence UUID.
+
+        Returns:
+            Evidence record or None if not found.
+        """
+        result = await self.db.fetch_one(
+            """
+            SELECT id, run_id, seq, kind, content, content_hash, prev_hash, created_at
+            FROM sdk_evidence
+            WHERE id = $1
+            """,
+            evidence_id,
+        )
+        if result is None:
+            return None
+        return self._row_to_evidence(result)
+
+    async def get_evidence_by_run(
+        self,
+        run_id: UUID,
+        kind: str | None = None,
+    ) -> list[dict[str, Any]]:
+        """Get all evidence for a run, optionally filtered by kind.
+
+        Args:
+            run_id: Run UUID.
+            kind: Optional evidence kind filter.
+
+        Returns:
+            List of evidence records ordered by seq.
+        """
+        if kind:
+            results = await self.db.fetch_all(
+                """
+                SELECT id, run_id, seq, kind, content, content_hash, prev_hash, created_at
+                FROM sdk_evidence
+                WHERE run_id = $1 AND kind = $2
+                ORDER BY seq ASC
+                """,
+                run_id,
+                kind,
+            )
+        else:
+            results = await self.db.fetch_all(
+                """
+                SELECT id, run_id, seq, kind, content, content_hash, prev_hash, created_at
+                FROM sdk_evidence
+                WHERE run_id = $1
+                ORDER BY seq ASC
+                """,
+                run_id,
+            )
+        return [self._row_to_evidence(row) for row in results]
+
+    async def get_latest_hash(self, run_id: UUID) -> str | None:
+        """Get the content_hash of the latest evidence for hash chain.
+
+        Args:
+            run_id: Run UUID.
+
+        Returns:
+            Latest content_hash or None if no evidence exists.
+        """
+        result = await self.db.fetch_one(
+            """
+            SELECT content_hash
+            FROM sdk_evidence
+            WHERE run_id = $1
+            ORDER BY seq DESC
+            LIMIT 1
+            """,
+            run_id,
+        )
+        return result["content_hash"] if result else None
+
+    async def get_max_seq(self, run_id: UUID) -> int:
+        """Get the maximum sequence number for a run.
+
+        Args:
+            run_id: Run UUID.
+
+        Returns:
+            Max seq or 0 if no evidence.
+        """
+        result = await self.db.fetch_one(
+            """
+            SELECT COALESCE(MAX(seq), 0) as max_seq
+            FROM sdk_evidence
+            WHERE run_id = $1
+            """,
+            run_id,
+        )
+        return result["max_seq"] if result else 0
+
+    def _row_to_evidence(self, row: Any) -> dict[str, Any]:
+        """Convert database row to evidence dict."""
+        content = row["content"]
+        if isinstance(content, str):
+            content = json.loads(content)
+        return {
+            "id": str(row["id"]),
+            "run_id": str(row["run_id"]),
+            "seq": row["seq"],
+            "kind": row["kind"],
+            "content": content,
+            "content_hash": row["content_hash"],
+            "prev_hash": row["prev_hash"],
+            "created_at": row["created_at"],
+        }

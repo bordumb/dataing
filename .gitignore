@@ -179,6 +179,7 @@ deploy/**/Chart.lock
 coverage.xml
 reports/
 .cache/
+pr_changes.txt
 
 ############################
 # Git Worktrees

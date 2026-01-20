@@ -1,0 +1,23 @@
+{
+  "assignee": "bordumbb@gmail.com",
+  "claim_note": "",
+  "claimed_at": "2026-01-20T00:23:12.590609Z",
+  "created_at": "2026-01-20T00:18:49.167033Z",
+  "depends_on": [],
+  "epic": "fn-17",
+  "evidence": {
+    "commits": [
+      "98655628376beef21f96f1c27cf2bcb4faaa1a2f"
+    ],
+    "prs": [],
+    "tests": [
+      "uv run pytest python-packages/dataing-sdk/tests -v"
+    ]
+  },
+  "id": "fn-17.1",
+  "priority": null,
+  "spec_path": ".flow/tasks/fn-17.1.md",
+  "status": "done",
+  "title": "SDK Package Scaffold",
+  "updated_at": "2026-01-20T00:25:32.041513Z"
+}

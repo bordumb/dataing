@@ -281,6 +281,44 @@ class AppDatabase:
         )
         return "UPDATE 1" in result
 
+    async def find_datasources_by_platform(
+        self, tenant_id: UUID, platform: str
+    ) -> list[dict[str, Any]]:
+        """Find data sources by platform type.
+
+        Args:
+            tenant_id: Tenant ID.
+            platform: Platform type (e.g., 'postgresql', 'snowflake').
+
+        Returns:
+            List of matching data sources.
+        """
+        return await self.fetch_all(
+            """SELECT id, name, type as platform, is_default, is_active,
+                      last_health_check_at, created_at
+               FROM data_sources
+               WHERE tenant_id = $1 AND type = $2 AND is_active = true
+               ORDER BY is_default DESC, name""",
+            tenant_id,
+            platform,
+        )
+
+    async def get_datasource(self, datasource_id: str, tenant_id: UUID) -> dict[str, Any] | None:
+        """Get a datasource by ID (string version for SDK compatibility).
+
+        Args:
+            datasource_id: Datasource ID as string.
+            tenant_id: Tenant ID.
+
+        Returns:
+            Datasource record or None.
+        """
+        try:
+            ds_uuid = UUID(datasource_id)
+        except ValueError:
+            return None
+        return await self.get_data_source(ds_uuid, tenant_id)
+
     # Dataset operations
     async def upsert_datasets(
         self,

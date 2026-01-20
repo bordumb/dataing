@@ -1624,7 +1624,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/TestConnectionResponse"
+                  "$ref": "#/components/schemas/dataing__entrypoints__api__routes__datasources__TestConnectionResponse"
                 }
               }
             }
@@ -1849,7 +1849,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/TestConnectionResponse"
+                  "$ref": "#/components/schemas/dataing__entrypoints__api__routes__datasources__TestConnectionResponse"
                 }
               }
             }
@@ -2284,7 +2284,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/TestConnectionResponse"
+                  "$ref": "#/components/schemas/dataing__entrypoints__api__routes__datasources__TestConnectionResponse"
                 }
               }
             }
@@ -2509,7 +2509,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/TestConnectionResponse"
+                  "$ref": "#/components/schemas/dataing__entrypoints__api__routes__datasources__TestConnectionResponse"
                 }
               }
             }
@@ -3104,7 +3104,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/dataing__entrypoints__api__routes__credentials__TestConnectionResponse"
+                  "$ref": "#/components/schemas/TestConnectionResponse"
                 }
               }
             }
@@ -4526,7 +4526,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/LineageGraphResponse"
+                  "$ref": "#/components/schemas/dataing__entrypoints__api__routes__lineage__LineageGraphResponse"
                 }
               }
             }
@@ -5224,6 +5224,440 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/DatasetResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/context/bundles": {
+      "post": {
+        "tags": [
+          "context"
+        ],
+        "summary": "Create Bundle",
+        "description": "Create a context bundle for the given assets.\n\nThis endpoint resolves asset references to concrete datasources,\ngathers context (lineage, operational facts, anomalies), and returns\na cacheable bundle.\n\nIf any asset reference is ambiguous (matches multiple datasources),\nreturns 409 with candidates and a hint for disambiguation.\n\nThe response includes:\n- bundle_id: Unique identifier for this bundle\n- resolved_assets: Per-asset resolution with datasource binding\n- bundle_hash: Server-computed cache key (also returned as ETag header)\n- Context data (lineage, operational, anomalies) based on request flags",
+        "operationId": "create_bundle_api_v1_context_bundles_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateBundleRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ContextBundleResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Ambiguous assets - multiple datasources match",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AmbiguousAssetsResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "APIKeyHeader": []
+          },
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/context/bundles/{bundle_id}": {
+      "get": {
+        "tags": [
+          "context"
+        ],
+        "summary": "Get Bundle",
+        "description": "Get an existing context bundle by ID.\n\nNote: Bundles are currently not persisted. This endpoint is a placeholder\nfor future caching implementation.",
+        "operationId": "get_bundle_api_v1_context_bundles__bundle_id__get",
+        "security": [
+          {
+            "APIKeyHeader": []
+          },
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "bundle_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Bundle Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ContextBundleResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/context/diff": {
+      "post": {
+        "tags": [
+          "context"
+        ],
+        "summary": "Compute Diff",
+        "description": "Compute metric difference over a time window.\n\nCompares the current value of a metric to its historical value\nbased on the specified time window.\n\nSupported metrics:\n- row_count: Number of rows in the dataset\n- null_rate: Percentage of null values\n- distinct_count: Number of distinct values\n- freshness: Time since last update\n\nReturns the current and previous values, absolute delta,\npercentage change, and trend direction.",
+        "operationId": "compute_diff_api_v1_context_diff_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DiffRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DiffResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "APIKeyHeader": []
+          },
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/context/explain": {
+      "post": {
+        "tags": [
+          "context"
+        ],
+        "summary": "Explain Context",
+        "description": "Get an AI-powered explanation of the context bundle.\n\nAnalyzes the assets, lineage, and anomalies in the bundle\nand provides a natural language explanation with insights\nand recommendations.\n\nFocus areas:\n- anomalies: Focus on detected data quality issues\n- lineage: Focus on data dependencies and flow\n- data_quality: General data quality assessment",
+        "operationId": "explain_context_api_v1_context_explain_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExplainRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExplainResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "APIKeyHeader": []
+          },
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/runs": {
+      "post": {
+        "tags": [
+          "runs"
+        ],
+        "summary": "Create Run",
+        "description": "Create and start a new investigation run.\n\nThis is the one-call API that accepts either:\n- bundle_id: Use an existing bundle\n- bundle: Inline bundle specification (assets will be resolved)\n\nExactly one of bundle_id or bundle must be provided.",
+        "operationId": "create_run_api_v1_runs_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateRunRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RunResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "APIKeyHeader": []
+          },
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/runs/{run_id}/events": {
+      "get": {
+        "tags": [
+          "runs"
+        ],
+        "summary": "Stream Events",
+        "description": "Stream SSE events for a run.\n\nEvents have an integer `seq` field for resumption.\nUse `?seq=N` to resume from sequence N.\n\nReturns 410 Gone if the replay window has expired.",
+        "operationId": "stream_events_api_v1_runs__run_id__events_get",
+        "security": [
+          {
+            "APIKeyHeader": []
+          },
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "run_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Run Id"
+            }
+          },
+          {
+            "name": "seq",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Resume from this sequence number",
+              "title": "Seq"
+            },
+            "description": "Resume from this sequence number"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/runs/{run_id}": {
+      "get": {
+        "tags": [
+          "runs"
+        ],
+        "summary": "Get Run",
+        "description": "Get run status and metadata.",
+        "operationId": "get_run_api_v1_runs__run_id__get",
+        "security": [
+          {
+            "APIKeyHeader": []
+          },
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "run_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Run Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Get Run Api V1 Runs  Run Id  Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/runs/{run_id}/cancel": {
+      "post": {
+        "tags": [
+          "runs"
+        ],
+        "summary": "Cancel Run",
+        "description": "Cancel a running investigation.",
+        "operationId": "cancel_run_api_v1_runs__run_id__cancel_post",
+        "security": [
+          {
+            "APIKeyHeader": []
+          },
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "run_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Run Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Cancel Run Api V1 Runs  Run Id  Cancel Post"
                 }
               }
             }
@@ -8002,6 +8436,129 @@
   },
   "components": {
     "schemas": {
+      "AmbiguousAssetCandidate": {
+        "properties": {
+          "datasource_id": {
+            "type": "string",
+            "title": "Datasource Id"
+          },
+          "datasource_name": {
+            "type": "string",
+            "title": "Datasource Name"
+          },
+          "platform": {
+            "type": "string",
+            "title": "Platform"
+          },
+          "connection_info": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Connection Info"
+          }
+        },
+        "type": "object",
+        "required": [
+          "datasource_id",
+          "datasource_name",
+          "platform"
+        ],
+        "title": "AmbiguousAssetCandidate",
+        "description": "Candidate when asset is ambiguous."
+      },
+      "AmbiguousAssetError": {
+        "properties": {
+          "asset": {
+            "$ref": "#/components/schemas/AssetRefRequest-Output"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          },
+          "candidates": {
+            "items": {
+              "$ref": "#/components/schemas/AmbiguousAssetCandidate"
+            },
+            "type": "array",
+            "title": "Candidates"
+          },
+          "hint": {
+            "type": "string",
+            "title": "Hint"
+          }
+        },
+        "type": "object",
+        "required": [
+          "asset",
+          "message",
+          "candidates",
+          "hint"
+        ],
+        "title": "AmbiguousAssetError",
+        "description": "Error response for ambiguous asset."
+      },
+      "AmbiguousAssetsResponse": {
+        "properties": {
+          "detail": {
+            "type": "string",
+            "title": "Detail",
+            "default": "One or more assets matched multiple datasources"
+          },
+          "ambiguous_assets": {
+            "items": {
+              "$ref": "#/components/schemas/AmbiguousAssetError"
+            },
+            "type": "array",
+            "title": "Ambiguous Assets"
+          }
+        },
+        "type": "object",
+        "required": [
+          "ambiguous_assets"
+        ],
+        "title": "AmbiguousAssetsResponse",
+        "description": "Response when one or more assets are ambiguous."
+      },
+      "AnomalySummary": {
+        "properties": {
+          "anomaly_id": {
+            "type": "string",
+            "title": "Anomaly Id"
+          },
+          "dataset_id": {
+            "type": "string",
+            "title": "Dataset Id"
+          },
+          "anomaly_type": {
+            "type": "string",
+            "title": "Anomaly Type"
+          },
+          "severity": {
+            "type": "string",
+            "title": "Severity"
+          },
+          "detected_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Detected At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "anomaly_id",
+          "dataset_id",
+          "anomaly_type",
+          "severity",
+          "detected_at"
+        ],
+        "title": "AnomalySummary",
+        "description": "Summary of detected anomaly."
+      },
       "ApprovalDecisionResponse": {
         "properties": {
           "id": {
@@ -8198,6 +8755,72 @@
         "title": "ApproveRequest",
         "description": "Request to approve an investigation."
       },
+      "AssetRefRequest": {
+        "properties": {
+          "platform": {
+            "type": "string",
+            "title": "Platform",
+            "description": "Data platform (postgres, snowflake, dbt)"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "Fully qualified name (db.schema.table)"
+          },
+          "datasource_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Datasource Id",
+            "description": "Optional datasource ID for disambiguation"
+          }
+        },
+        "type": "object",
+        "required": [
+          "platform",
+          "name"
+        ],
+        "title": "AssetRefRequest",
+        "description": "Asset reference in request."
+      },
+      "AssetRefRequest-Output": {
+        "properties": {
+          "platform": {
+            "type": "string",
+            "title": "Platform",
+            "description": "Data platform (postgres, snowflake, dbt)"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "Fully qualified name (db.schema.table)"
+          },
+          "datasource_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Datasource Id",
+            "description": "Optional datasource ID for disambiguation"
+          }
+        },
+        "type": "object",
+        "required": [
+          "platform",
+          "name"
+        ],
+        "title": "AssetRefRequest",
+        "description": "Asset reference in request."
+      },
       "BranchStateResponse": {
         "properties": {
           "branch_id": {
@@ -8364,6 +8987,85 @@
         "title": "ColumnLineageResponse",
         "description": "Response for column lineage."
       },
+      "ContextBundleResponse": {
+        "properties": {
+          "bundle_id": {
+            "type": "string",
+            "title": "Bundle Id"
+          },
+          "resolved_assets": {
+            "items": {
+              "$ref": "#/components/schemas/ResolvedAssetResponse"
+            },
+            "type": "array",
+            "title": "Resolved Assets"
+          },
+          "default_datasource_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Default Datasource Id"
+          },
+          "lineage": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/LineageGraphResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "operational": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/OperationalFactsResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "anomalies": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/AnomalySummary"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Anomalies"
+          },
+          "bundle_hash": {
+            "type": "string",
+            "title": "Bundle Hash",
+            "description": "Server-derived cache key"
+          },
+          "expires_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Expires At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "bundle_id",
+          "resolved_assets",
+          "bundle_hash",
+          "expires_at"
+        ],
+        "title": "ContextBundleResponse",
+        "description": "Context bundle response."
+      },
       "CreateApprovalRequest": {
         "properties": {
           "investigation_id": {
@@ -8390,6 +9092,55 @@
         ],
         "title": "CreateApprovalRequest",
         "description": "Request to create a new approval request."
+      },
+      "CreateBundleRequest": {
+        "properties": {
+          "assets": {
+            "items": {
+              "$ref": "#/components/schemas/AssetRefRequest"
+            },
+            "type": "array",
+            "minItems": 1,
+            "title": "Assets",
+            "description": "Assets to include in bundle"
+          },
+          "window": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Window",
+            "description": "Time window for context (e.g., '7d', '24h')"
+          },
+          "include_lineage": {
+            "type": "boolean",
+            "title": "Include Lineage",
+            "description": "Include lineage graph",
+            "default": true
+          },
+          "include_operational": {
+            "type": "boolean",
+            "title": "Include Operational",
+            "description": "Include operational facts",
+            "default": true
+          },
+          "include_anomalies": {
+            "type": "boolean",
+            "title": "Include Anomalies",
+            "description": "Include anomaly summary",
+            "default": true
+          }
+        },
+        "type": "object",
+        "required": [
+          "assets"
+        ],
+        "title": "CreateBundleRequest",
+        "description": "Request to create a context bundle."
       },
       "CreateDataSourceRequest": {
         "properties": {
@@ -8424,6 +9175,44 @@
         ],
         "title": "CreateDataSourceRequest",
         "description": "Request to create a new data source."
+      },
+      "CreateRunRequest": {
+        "properties": {
+          "goal": {
+            "type": "string",
+            "title": "Goal",
+            "description": "Investigation goal/question"
+          },
+          "bundle_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bundle Id",
+            "description": "Existing bundle ID to use"
+          },
+          "bundle": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/InlineBundleRequest"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Inline bundle specification"
+          }
+        },
+        "type": "object",
+        "required": [
+          "goal"
+        ],
+        "title": "CreateRunRequest",
+        "description": "Request to create a run.\n\nAccepts exactly one of bundle_id or bundle (inline)."
       },
       "CreateUserRequest": {
         "properties": {
@@ -9024,6 +9813,147 @@
         "title": "DeleteCredentialsResponse",
         "description": "Response for deleting credentials."
       },
+      "DiffRequest": {
+        "properties": {
+          "bundle_id": {
+            "type": "string",
+            "title": "Bundle Id",
+            "description": "Bundle ID to analyze"
+          },
+          "metric": {
+            "type": "string",
+            "title": "Metric",
+            "description": "Metric to compare (e.g., row_count, null_rate)"
+          },
+          "window": {
+            "type": "string",
+            "title": "Window",
+            "description": "Time window for comparison (e.g., 7d, 24h)",
+            "default": "7d"
+          },
+          "datasource_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Datasource Id",
+            "description": "Optional datasource override"
+          }
+        },
+        "type": "object",
+        "required": [
+          "bundle_id",
+          "metric"
+        ],
+        "title": "DiffRequest",
+        "description": "Request to compute metric diff."
+      },
+      "DiffResponse": {
+        "properties": {
+          "metric": {
+            "type": "string",
+            "title": "Metric"
+          },
+          "window": {
+            "type": "string",
+            "title": "Window"
+          },
+          "current_value": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Current Value"
+          },
+          "previous_value": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Previous Value"
+          },
+          "delta": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Delta"
+          },
+          "delta_percent": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Delta Percent"
+          },
+          "trend": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Trend",
+            "description": "up, down, stable, or unknown"
+          },
+          "samples": {
+            "items": {
+              "$ref": "#/components/schemas/DiffSample"
+            },
+            "type": "array",
+            "title": "Samples"
+          }
+        },
+        "type": "object",
+        "required": [
+          "metric",
+          "window"
+        ],
+        "title": "DiffResponse",
+        "description": "Response for metric diff."
+      },
+      "DiffSample": {
+        "properties": {
+          "timestamp": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Timestamp"
+          },
+          "value": {
+            "type": "number",
+            "title": "Value"
+          }
+        },
+        "type": "object",
+        "required": [
+          "timestamp",
+          "value"
+        ],
+        "title": "DiffSample",
+        "description": "Time-series sample for diff."
+      },
       "DownstreamResponse": {
         "properties": {
           "datasets": {
@@ -9045,6 +9975,69 @@
         ],
         "title": "DownstreamResponse",
         "description": "Response for downstream datasets."
+      },
+      "ExplainRequest": {
+        "properties": {
+          "bundle_id": {
+            "type": "string",
+            "title": "Bundle Id",
+            "description": "Bundle ID to explain"
+          },
+          "focus": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Focus",
+            "description": "Focus area (anomalies, lineage, data_quality)"
+          }
+        },
+        "type": "object",
+        "required": [
+          "bundle_id"
+        ],
+        "title": "ExplainRequest",
+        "description": "Request for AI-powered explanation."
+      },
+      "ExplainResponse": {
+        "properties": {
+          "summary": {
+            "type": "string",
+            "title": "Summary",
+            "description": "Natural language explanation"
+          },
+          "insights": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Insights"
+          },
+          "recommendations": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Recommendations"
+          },
+          "related_assets": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Related Assets"
+          }
+        },
+        "type": "object",
+        "required": [
+          "summary"
+        ],
+        "title": "ExplainResponse",
+        "description": "Response for explanation."
       },
       "FeedbackCreate": {
         "properties": {
@@ -9204,6 +10197,34 @@
         },
         "type": "object",
         "title": "HTTPValidationError"
+      },
+      "InlineBundleRequest": {
+        "properties": {
+          "assets": {
+            "items": {
+              "$ref": "#/components/schemas/dataing__entrypoints__api__routes__runs__AssetRefRequest"
+            },
+            "type": "array",
+            "title": "Assets"
+          },
+          "window": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Window"
+          }
+        },
+        "type": "object",
+        "required": [
+          "assets"
+        ],
+        "title": "InlineBundleRequest",
+        "description": "Inline bundle specification for one-call API."
       },
       "InvestigationListItem": {
         "properties": {
@@ -10405,6 +11426,30 @@
         "title": "KnowledgeCommentUpdate",
         "description": "Request body for updating a knowledge comment."
       },
+      "LineageEdge": {
+        "properties": {
+          "source": {
+            "type": "string",
+            "title": "Source"
+          },
+          "target": {
+            "type": "string",
+            "title": "Target"
+          },
+          "edge_type": {
+            "type": "string",
+            "title": "Edge Type",
+            "default": "transforms"
+          }
+        },
+        "type": "object",
+        "required": [
+          "source",
+          "target"
+        ],
+        "title": "LineageEdge",
+        "description": "Lineage edge."
+      },
       "LineageEdgeResponse": {
         "properties": {
           "source": {
@@ -10443,40 +11488,35 @@
       "LineageGraphResponse": {
         "properties": {
           "root": {
-            "type": "string",
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Root"
           },
           "datasets": {
             "additionalProperties": {
-              "$ref": "#/components/schemas/DatasetResponse"
+              "additionalProperties": true,
+              "type": "object"
             },
             "type": "object",
             "title": "Datasets"
           },
           "edges": {
             "items": {
-              "$ref": "#/components/schemas/LineageEdgeResponse"
+              "$ref": "#/components/schemas/LineageEdge"
             },
             "type": "array",
             "title": "Edges"
-          },
-          "jobs": {
-            "additionalProperties": {
-              "$ref": "#/components/schemas/JobResponse"
-            },
-            "type": "object",
-            "title": "Jobs"
           }
         },
         "type": "object",
-        "required": [
-          "root",
-          "datasets",
-          "edges",
-          "jobs"
-        ],
         "title": "LineageGraphResponse",
-        "description": "Response for a lineage graph."
+        "description": "Lineage graph response."
       },
       "LineageProviderResponse": {
         "properties": {
@@ -10764,6 +11804,26 @@
         ],
         "title": "NotificationResponse",
         "description": "Single notification response."
+      },
+      "OperationalFactsResponse": {
+        "properties": {
+          "recent_runs": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Recent Runs"
+          },
+          "freshness": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Freshness"
+          }
+        },
+        "type": "object",
+        "title": "OperationalFactsResponse",
+        "description": "Operational facts about assets."
       },
       "OrgMemberResponse": {
         "properties": {
@@ -11288,6 +12348,98 @@
         ],
         "title": "RejectRequest",
         "description": "Request to reject an investigation."
+      },
+      "ResolvedAssetResponse": {
+        "properties": {
+          "asset": {
+            "$ref": "#/components/schemas/AssetRefRequest-Output"
+          },
+          "datasource_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Datasource Id"
+          },
+          "dataset_id": {
+            "type": "string",
+            "title": "Dataset Id",
+            "description": "Canonical URN"
+          },
+          "dataset_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dataset Type",
+            "description": "TABLE, VIEW, MODEL, etc."
+          }
+        },
+        "type": "object",
+        "required": [
+          "asset",
+          "dataset_id"
+        ],
+        "title": "ResolvedAssetResponse",
+        "description": "Resolved asset in response."
+      },
+      "RunResponse": {
+        "properties": {
+          "run_id": {
+            "type": "string",
+            "title": "Run Id"
+          },
+          "bundle_id": {
+            "type": "string",
+            "title": "Bundle Id"
+          },
+          "bundle_hash": {
+            "type": "string",
+            "title": "Bundle Hash"
+          },
+          "status": {
+            "$ref": "#/components/schemas/RunStatus"
+          },
+          "events_url": {
+            "type": "string",
+            "title": "Events Url"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "run_id",
+          "bundle_id",
+          "bundle_hash",
+          "status",
+          "events_url",
+          "created_at"
+        ],
+        "title": "RunResponse",
+        "description": "Response for a created run."
+      },
+      "RunStatus": {
+        "type": "string",
+        "enum": [
+          "running",
+          "completed",
+          "failed",
+          "cancelled"
+        ],
+        "title": "RunStatus",
+        "description": "Status of a run."
       },
       "SLAPolicyCreate": {
         "properties": {
@@ -12444,22 +13596,7 @@
             "type": "boolean",
             "title": "Success"
           },
-          "message": {
-            "type": "string",
-            "title": "Message"
-          },
-          "latency_ms": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Latency Ms"
-          },
-          "server_version": {
+          "error": {
             "anyOf": [
               {
                 "type": "string"
@@ -12468,16 +13605,26 @@
                 "type": "null"
               }
             ],
-            "title": "Server Version"
+            "title": "Error"
+          },
+          "tables_accessible": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tables Accessible"
           }
         },
         "type": "object",
         "required": [
-          "success",
-          "message"
+          "success"
         ],
         "title": "TestConnectionResponse",
-        "description": "Response for testing a connection."
+        "description": "Response for testing credentials."
       },
       "TokenResponse": {
         "properties": {
@@ -12909,24 +14056,17 @@
         "title": "WebhookIssueResponse",
         "description": "Response from webhook issue creation."
       },
-      "dataing__entrypoints__api__routes__credentials__TestConnectionResponse": {
+      "dataing__entrypoints__api__routes__datasources__TestConnectionResponse": {
         "properties": {
           "success": {
             "type": "boolean",
             "title": "Success"
           },
-          "error": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Error"
+          "message": {
+            "type": "string",
+            "title": "Message"
           },
-          "tables_accessible": {
+          "latency_ms": {
             "anyOf": [
               {
                 "type": "integer"
@@ -12935,15 +14075,95 @@
                 "type": "null"
               }
             ],
-            "title": "Tables Accessible"
+            "title": "Latency Ms"
+          },
+          "server_version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Server Version"
           }
         },
         "type": "object",
         "required": [
-          "success"
+          "success",
+          "message"
         ],
         "title": "TestConnectionResponse",
-        "description": "Response for testing credentials."
+        "description": "Response for testing a connection."
+      },
+      "dataing__entrypoints__api__routes__lineage__LineageGraphResponse": {
+        "properties": {
+          "root": {
+            "type": "string",
+            "title": "Root"
+          },
+          "datasets": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/DatasetResponse"
+            },
+            "type": "object",
+            "title": "Datasets"
+          },
+          "edges": {
+            "items": {
+              "$ref": "#/components/schemas/LineageEdgeResponse"
+            },
+            "type": "array",
+            "title": "Edges"
+          },
+          "jobs": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/JobResponse"
+            },
+            "type": "object",
+            "title": "Jobs"
+          }
+        },
+        "type": "object",
+        "required": [
+          "root",
+          "datasets",
+          "edges",
+          "jobs"
+        ],
+        "title": "LineageGraphResponse",
+        "description": "Response for a lineage graph."
+      },
+      "dataing__entrypoints__api__routes__runs__AssetRefRequest": {
+        "properties": {
+          "platform": {
+            "type": "string",
+            "title": "Platform"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "datasource_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Datasource Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "platform",
+          "name"
+        ],
+        "title": "AssetRefRequest",
+        "description": "Asset reference in request."
       }
     },
     "securitySchemes": {

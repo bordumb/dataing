@@ -1,0 +1,57 @@
+/**
+ * Dataing JupyterLab Extension Styles
+ */
+
+/* Status bar widget */
+.jp-Dataing-status {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0 8px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.jp-Dataing-status:hover {
+  background-color: var(--jp-layout-color2);
+}
+
+.jp-Dataing-status-indicator {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  transition: background-color 0.3s ease;
+}
+
+.jp-Dataing-status-text {
+  font-size: 12px;
+  color: var(--jp-ui-font-color1);
+}
+
+/* State-specific styles */
+.jp-Dataing-status-connected .jp-Dataing-status-indicator {
+  background-color: #10b981;
+}
+
+.jp-Dataing-status-disconnected .jp-Dataing-status-indicator {
+  background-color: #6b7280;
+}
+
+.jp-Dataing-status-checking .jp-Dataing-status-indicator {
+  background-color: #3b82f6;
+  animation: pulse 1s infinite;
+}
+
+.jp-Dataing-status-error .jp-Dataing-status-indicator {
+  background-color: #ef4444;
+}
+
+/* Pulse animation for checking state */
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}

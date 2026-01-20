@@ -1,0 +1,24 @@
+{
+  "assignee": "bordumbb@gmail.com",
+  "claim_note": "",
+  "claimed_at": "2026-01-20T00:44:52.968298Z",
+  "created_at": "2026-01-20T00:21:25.239507Z",
+  "depends_on": [
+    "fn-17.4",
+    "fn-17.6"
+  ],
+  "epic": "fn-17",
+  "evidence": {
+    "commits": [],
+    "prs": [],
+    "tests": [
+      "uv run pytest python-packages/dataing-notebook/tests -v"
+    ]
+  },
+  "id": "fn-17.7",
+  "priority": null,
+  "spec_path": ".flow/tasks/fn-17.7.md",
+  "status": "done",
+  "title": "Notebook IPython Magics",
+  "updated_at": "2026-01-20T00:49:10.791948Z"
+}

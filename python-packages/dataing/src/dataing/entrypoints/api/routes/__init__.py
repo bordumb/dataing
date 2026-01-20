@@ -7,6 +7,8 @@ from fastapi import APIRouter
 
 from dataing.entrypoints.api.routes.approvals import router as approvals_router
 from dataing.entrypoints.api.routes.auth import router as auth_router
+from dataing.entrypoints.api.routes.bundles import router as bundles_router
+from dataing.entrypoints.api.routes.runs import router as runs_router
 from dataing.entrypoints.api.routes.comment_votes import router as comment_votes_router
 from dataing.entrypoints.api.routes.credentials import router as credentials_router
 from dataing.entrypoints.api.routes.dashboard import router as dashboard_router
@@ -58,6 +60,8 @@ api_router.include_router(users_router)
 api_router.include_router(dashboard_router)
 api_router.include_router(usage_router)
 api_router.include_router(lineage_router)
+api_router.include_router(bundles_router)  # Context bundles API
+api_router.include_router(runs_router)  # Runs API with SSE streaming
 api_router.include_router(notifications_router)
 api_router.include_router(investigation_feedback_router)
 api_router.include_router(schema_comments_router)

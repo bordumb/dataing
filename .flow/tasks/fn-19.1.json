@@ -1,0 +1,14 @@
+{
+  "assignee": null,
+  "claim_note": "",
+  "claimed_at": null,
+  "created_at": "2026-01-20T03:52:49.267244Z",
+  "depends_on": [],
+  "epic": "fn-19",
+  "id": "fn-19.1",
+  "priority": null,
+  "spec_path": ".flow/tasks/fn-19.1.md",
+  "status": "todo",
+  "title": "Create migration for bundles table",
+  "updated_at": "2026-01-20T03:52:49.267428Z"
+}

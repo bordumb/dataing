@@ -208,6 +208,66 @@ class TokenHandler(BaseHandler):
             )
 
 
+class SSEProxyHandler(BaseHandler):
+    """Handler for /dataing/sse/* endpoint.
+
+    Proxies Server-Sent Events (SSE) streams from the Dataing backend.
+    This handler streams events from the backend to the client in real-time,
+    solving CORS issues when the backend and JupyterLab are on different origins.
+    """
+
+    def set_default_headers(self) -> None:
+        """Set headers for SSE streaming."""
+        self.set_header("Content-Type", "text/event-stream")
+        self.set_header("Cache-Control", "no-cache")
+        self.set_header("Connection", "keep-alive")
+
+    @tornado.web.authenticated
+    async def get(self, path: str = "") -> None:
+        """Stream SSE events from backend."""
+        backend_url = get_backend_url()
+        api_key = get_api_key()
+
+        # Build target URL
+        target_url = urljoin(backend_url + "/", path.lstrip("/"))
+        if self.request.query:
+            target_url = f"{target_url}?{self.request.query}"
+
+        # Build headers
+        headers = {
+            "Accept": "text/event-stream",
+        }
+        if api_key:
+            headers["X-API-Key"] = api_key
+
+        http_client = tornado.httpclient.AsyncHTTPClient()
+
+        # Use streaming callback to forward events
+        try:
+            def handle_chunk(chunk: bytes) -> None:
+                """Forward chunks to client."""
+                try:
+                    self.write(chunk)
+                    self.flush()
+                except Exception:
+                    pass  # Connection may be closed
+
+            await http_client.fetch(
+                target_url,
+                method="GET",
+                headers=headers,
+                streaming_callback=handle_chunk,
+                request_timeout=0,  # No timeout for SSE
+                raise_error=False,
+            )
+        except tornado.httpclient.HTTPClientError as e:
+            self.set_status(e.code)
+            self.write(f"event: error\ndata: {str(e)}\n\n")
+        except Exception as e:
+            self.set_status(500)
+            self.write(f"event: error\ndata: Proxy error: {str(e)}\n\n")
+
+
 class ProxyHandler(BaseHandler):
     """Handler for /dataing/proxy/* endpoint.
 
@@ -318,6 +378,7 @@ def setup_handlers(web_app: tornado.web.Application) -> None:
     handlers = [
         (urljoin(base_url, "dataing/handshake"), HandshakeHandler),
         (urljoin(base_url, "dataing/token"), TokenHandler),
+        (urljoin(base_url, r"dataing/sse/(.*)"), SSEProxyHandler),
         (urljoin(base_url, r"dataing/proxy/(.*)"), ProxyHandler),
     ]
 

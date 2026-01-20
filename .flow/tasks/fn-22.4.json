@@ -1,14 +1,19 @@
 {
-  "assignee": null,
+  "assignee": "bordumbb@gmail.com",
   "claim_note": "",
-  "claimed_at": null,
+  "claimed_at": "2026-01-20T18:53:02.438283Z",
   "created_at": "2026-01-20T03:52:54.420232Z",
   "depends_on": [],
   "epic": "fn-22",
+  "evidence": {
+    "commits": [],
+    "prs": [],
+    "tests": []
+  },
   "id": "fn-22.4",
   "priority": null,
   "spec_path": ".flow/tasks/fn-22.4.md",
-  "status": "todo",
+  "status": "done",
   "title": "Add datasource attach UI to sidebar",
-  "updated_at": "2026-01-20T03:52:54.420452Z"
+  "updated_at": "2026-01-20T18:53:02.652689Z"
 }

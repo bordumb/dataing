@@ -1,14 +1,19 @@
 {
-  "assignee": null,
+  "assignee": "bordumbb@gmail.com",
   "claim_note": "",
-  "claimed_at": null,
+  "claimed_at": "2026-01-20T18:53:02.023501Z",
   "created_at": "2026-01-20T03:52:54.233446Z",
   "depends_on": [],
   "epic": "fn-22",
+  "evidence": {
+    "commits": [],
+    "prs": [],
+    "tests": []
+  },
   "id": "fn-22.3",
   "priority": null,
   "spec_path": ".flow/tasks/fn-22.3.md",
-  "status": "todo",
+  "status": "done",
   "title": "Implement connection status display in sidebar",
-  "updated_at": "2026-01-20T03:52:54.233637Z"
+  "updated_at": "2026-01-20T18:53:02.238028Z"
 }

@@ -19,6 +19,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
 from pydantic import BaseModel, Field
 from sse_starlette.sse import EventSourceResponse
 
+from dataing.adapters.db import RunRepository
 from dataing.entrypoints.api.deps import get_app_db
 from dataing.entrypoints.api.middleware.auth import (
     ApiKeyContext,
@@ -311,7 +312,20 @@ async def create_run(
         "datasource_id": str(datasource_id),
     }
 
-    # Store run metadata
+    # Persist run via repository
+    app_db = request.app.state.app_db
+    run_repo = RunRepository(app_db)
+
+    # Create run record in database
+    await run_repo.create_run(
+        run_id=run_id,
+        tenant_id=auth.tenant_id,
+        bundle_id=UUID(bundle_id) if bundle_id else None,
+        bundle_hash=bundle_hash,
+        goal=body.goal,
+    )
+
+    # Store in-memory cache for real-time streaming
     _run_metadata[str(run_id)] = {
         "run_id": str(run_id),
         "bundle_id": bundle_id,
@@ -322,11 +336,17 @@ async def create_run(
         "tenant_id": str(auth.tenant_id),
     }
 
-    # Store initial event
+    # Store initial event (both in-memory and database)
     _store_event(
         str(run_id),
         SSEEventType.RUN_STARTED.value,
         {"goal": body.goal, "bundle_id": bundle_id},
+    )
+    await run_repo.store_event(
+        run_id=run_id,
+        seq=1,
+        event_type=SSEEventType.RUN_STARTED.value,
+        data={"goal": body.goal, "bundle_id": bundle_id},
     )
 
     try:
@@ -364,6 +384,15 @@ async def create_run(
             SSEEventType.RUN_FAILED.value,
             {"error": str(e)},
         )
+        # Update database
+        await run_repo.update_run_status(run_id, RunStatus.FAILED.value)
+        max_seq = await run_repo.get_max_seq(run_id)
+        await run_repo.store_event(
+            run_id=run_id,
+            seq=max_seq + 1,
+            event_type=SSEEventType.RUN_FAILED.value,
+            data={"error": str(e)},
+        )
         raise HTTPException(
             status_code=500,
             detail=f"Failed to start investigation: {e}",
@@ -384,6 +413,7 @@ async def create_run(
 
 @router.get("/{run_id}/events")
 async def stream_events(
+    request: Request,
     run_id: str,
     auth: AuthDep,
     last_event_id: int | None = Query(
@@ -397,12 +427,20 @@ async def stream_events(
 
     Returns 410 Gone if the replay window has expired.
     """
-    # Check if run exists
-    if run_id not in _run_metadata:
+    # Get repository for database access
+    app_db = request.app.state.app_db
+    run_repo = RunRepository(app_db)
+
+    # Check if run exists (in memory or database)
+    run_uuid = UUID(run_id)
+    run_record = await run_repo.get_run(run_uuid)
+    in_memory = run_id in _run_metadata
+
+    if not run_record and not in_memory:
         raise HTTPException(status_code=404, detail=f"Run not found: {run_id}")
 
-    # Check replay window
-    if _is_replay_window_expired(run_id):
+    # Check replay window (only for in-memory runs)
+    if in_memory and _is_replay_window_expired(run_id):
         raise HTTPException(
             status_code=410,
             detail="Replay window expired. Events are no longer available.",
@@ -415,12 +453,16 @@ async def stream_events(
 
         while True:
             # Check if replay window expired (for completed runs)
-            if _is_replay_window_expired(run_id):
+            if in_memory and _is_replay_window_expired(run_id):
                 logger.info("run_events_replay_expired", run_id=run_id)
                 break
 
-            # Get new events
-            new_events = _get_events_after(run_id, last_seq)
+            # Try database first, fall back to in-memory
+            db_events = await run_repo.get_events_after(run_uuid, last_seq)
+            if db_events:
+                new_events = db_events
+            else:
+                new_events = _get_events_after(run_id, last_seq)
 
             for event in new_events:
                 last_seq = event["seq"]
@@ -430,12 +472,16 @@ async def stream_events(
                     "data": json.dumps(event),
                 }
 
-            # Check if run is complete
-            metadata = _run_metadata.get(run_id, {})
-            status = metadata.get("status")
-            if status in [s.value for s in TERMINAL_STATUSES]:
-                # Send final event and close
+            # Check if run is complete (check database first, then in-memory)
+            current_run = await run_repo.get_run(run_uuid)
+            if current_run and current_run["status"] in [s.value for s in TERMINAL_STATUSES]:
                 break
+
+            if in_memory:
+                metadata = _run_metadata.get(run_id, {})
+                status = metadata.get("status")
+                if status in [s.value for s in TERMINAL_STATUSES]:
+                    break
 
             # Send heartbeat if needed
             now = datetime.now(UTC)
@@ -467,29 +513,57 @@ async def get_run(
     auth: AuthDep,
 ) -> dict[str, Any]:
     """Get run status and metadata."""
-    if run_id not in _run_metadata:
+    # Get repository for database access
+    app_db = request.app.state.app_db
+    run_repo = RunRepository(app_db)
+    run_uuid = UUID(run_id)
+
+    # Check database first
+    run_record = await run_repo.get_run(run_uuid)
+    in_memory = run_id in _run_metadata
+
+    if not run_record and not in_memory:
         raise HTTPException(status_code=404, detail=f"Run not found: {run_id}")
 
-    metadata = _run_metadata[run_id].copy()
+    # Build metadata from database record or in-memory
+    if run_record:
+        metadata = {
+            "run_id": run_record["run_id"],
+            "bundle_id": run_record["bundle_id"],
+            "bundle_hash": run_record["bundle_hash"],
+            "status": run_record["status"],
+            "goal": run_record["goal"],
+            "created_at": (
+                run_record["created_at"].isoformat() if run_record["created_at"] else None
+            ),
+            "tenant_id": run_record["tenant_id"],
+        }
+    else:
+        metadata = _run_metadata[run_id].copy()
 
-    # Try to get real status from Temporal
+    # Try to get real status from Temporal and sync to database
     try:
         temporal_client: TemporalInvestigationClient | None = getattr(
             request.app.state, "temporal_client", None
         )
         if temporal_client:
             temporal_status = await temporal_client.get_status(run_id)
-            # InvestigationStatus has workflow_status field
             workflow_status = temporal_status.workflow_status
+            new_status = None
             if workflow_status == "completed":
-                metadata["status"] = RunStatus.COMPLETED.value
-                _run_metadata[run_id]["status"] = RunStatus.COMPLETED.value
+                new_status = RunStatus.COMPLETED.value
             elif workflow_status == "failed":
-                metadata["status"] = RunStatus.FAILED.value
-                _run_metadata[run_id]["status"] = RunStatus.FAILED.value
+                new_status = RunStatus.FAILED.value
             elif workflow_status == "cancelled":
-                metadata["status"] = RunStatus.CANCELLED.value
-                _run_metadata[run_id]["status"] = RunStatus.CANCELLED.value
+                new_status = RunStatus.CANCELLED.value
+
+            if new_status and new_status != metadata.get("status"):
+                metadata["status"] = new_status
+                # Update in-memory cache
+                if in_memory:
+                    _run_metadata[run_id]["status"] = new_status
+                # Update database
+                await run_repo.update_run_status(run_uuid, new_status)
     except Exception as e:
         # Log but don't fail - return cached status
         logger.debug(f"Could not get Temporal status for {run_id}: {e}")
@@ -499,26 +573,48 @@ async def get_run(
 
 @router.post("/{run_id}/cancel")
 async def cancel_run(
+    request: Request,
     run_id: str,
     auth: AuthDep,
 ) -> dict[str, Any]:
     """Cancel a running investigation."""
-    if run_id not in _run_metadata:
+    # Get repository for database access
+    app_db = request.app.state.app_db
+    run_repo = RunRepository(app_db)
+    run_uuid = UUID(run_id)
+
+    # Check database and in-memory
+    run_record = await run_repo.get_run(run_uuid)
+    in_memory = run_id in _run_metadata
+
+    if not run_record and not in_memory:
         raise HTTPException(status_code=404, detail=f"Run not found: {run_id}")
 
-    metadata = _run_metadata[run_id]
-    if metadata["status"] in [s.value for s in TERMINAL_STATUSES]:
+    # Check current status
+    current_status = run_record["status"] if run_record else _run_metadata[run_id]["status"]
+    if current_status in [s.value for s in TERMINAL_STATUSES]:
         return {"status": "already_complete", "run_id": run_id}
 
-    # Update status
-    metadata["status"] = RunStatus.CANCELLED.value
-    metadata["completed_at"] = datetime.now(UTC).isoformat()
+    # Update in-memory status
+    if in_memory:
+        _run_metadata[run_id]["status"] = RunStatus.CANCELLED.value
+        _run_metadata[run_id]["completed_at"] = datetime.now(UTC).isoformat()
 
-    # Store cancelled event
+    # Store cancelled event in memory
     _store_event(
         run_id,
         SSEEventType.RUN_FAILED.value,
         {"reason": "cancelled"},
+    )
+
+    # Update database
+    await run_repo.update_run_status(run_uuid, RunStatus.CANCELLED.value)
+    max_seq = await run_repo.get_max_seq(run_uuid)
+    await run_repo.store_event(
+        run_id=run_uuid,
+        seq=max_seq + 1,
+        event_type=SSEEventType.RUN_FAILED.value,
+        data={"reason": "cancelled"},
     )
 
     return {"status": "cancelled", "run_id": run_id}

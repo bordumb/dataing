@@ -246,7 +246,7 @@ def create_evidence_chain(
     }
 
     cls = evidence_classes.get(kind, EvidenceBase)
-    return cls(
+    result: EvidenceBase = cls(
         run_id=run_id,
         seq=seq,
         kind=kind,
@@ -254,3 +254,4 @@ def create_evidence_chain(
         content_hash=content_hash,
         **content,
     )
+    return result

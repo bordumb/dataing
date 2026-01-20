@@ -11,6 +11,8 @@ from .domain_types import (
 )
 from .evidence import (
     Evidence as RichEvidence,
+)
+from .evidence import (
     EvidenceBase,
     EvidenceKind,
     HypothesisEvidence,

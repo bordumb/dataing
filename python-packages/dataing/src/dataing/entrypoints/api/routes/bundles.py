@@ -554,7 +554,7 @@ async def compute_diff(
     if window.endswith("d"):
         days = int(window[:-1])
     elif window.endswith("h"):
-        days = int(window[:-1]) / 24
+        days = int(window[:-1]) // 24 or 1  # At least 1 day
     elif window.endswith("w"):
         days = int(window[:-1]) * 7
 

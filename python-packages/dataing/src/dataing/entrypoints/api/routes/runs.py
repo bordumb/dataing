@@ -270,11 +270,12 @@ async def create_run(
     ]
 
     # Resolve datasource_id from assets or use default
-    datasource_id = None
+    datasource_id: UUID | None = None
     if assets_list:
         for asset in assets_list:
-            if asset.get("datasource_id"):
-                datasource_id = asset["datasource_id"]
+            ds_id = asset.get("datasource_id")
+            if ds_id:
+                datasource_id = UUID(ds_id) if isinstance(ds_id, str) else ds_id
                 break
 
     if not datasource_id:
@@ -288,10 +289,10 @@ async def create_run(
 
     # Build dataset_ids from assets
     # Extract just the table name from qualified names like "demo.main.orders" -> "orders"
-    dataset_ids = []
+    dataset_ids: list[str] = []
     if assets_list:
         for a in assets_list:
-            name = a.get("name", "unknown")
+            name = a.get("name") or "unknown"
             # Take the last part of qualified name (e.g., "demo.main.orders" -> "orders")
             table_name = name.split(".")[-1] if "." in name else name
             dataset_ids.append(table_name)

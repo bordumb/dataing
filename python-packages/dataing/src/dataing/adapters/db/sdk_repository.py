@@ -59,11 +59,13 @@ class BundleRepository:
 
         result = await self.db.execute_returning(
             """
-            INSERT INTO sdk_bundles (tenant_id, bundle_hash, assets, window, lineage, operational, anomalies)
+            INSERT INTO sdk_bundles
+                (tenant_id, bundle_hash, assets, window, lineage, operational, anomalies)
             VALUES ($1, $2, $3, $4, $5, $6, $7)
             ON CONFLICT (tenant_id, bundle_hash) DO UPDATE SET
                 tenant_id = EXCLUDED.tenant_id
-            RETURNING id, tenant_id, bundle_hash, assets, window, lineage, operational, anomalies, created_at, expires_at
+            RETURNING id, tenant_id, bundle_hash, assets, window, lineage,
+                operational, anomalies, created_at, expires_at
             """,
             tenant_id,
             bundle_hash,
@@ -88,7 +90,8 @@ class BundleRepository:
         """
         result = await self.db.fetch_one(
             """
-            SELECT id, tenant_id, bundle_hash, assets, window, lineage, operational, anomalies, created_at, expires_at
+            SELECT id, tenant_id, bundle_hash, assets, window, lineage,
+                operational, anomalies, created_at, expires_at
             FROM sdk_bundles
             WHERE id = $1
             """,
@@ -112,7 +115,8 @@ class BundleRepository:
         """
         result = await self.db.fetch_one(
             """
-            SELECT id, tenant_id, bundle_hash, assets, window, lineage, operational, anomalies, created_at, expires_at
+            SELECT id, tenant_id, bundle_hash, assets, window, lineage,
+                operational, anomalies, created_at, expires_at
             FROM sdk_bundles
             WHERE tenant_id = $1 AND bundle_hash = $2
             """,
@@ -125,15 +129,31 @@ class BundleRepository:
 
     def _row_to_bundle(self, row: Any) -> dict[str, Any]:
         """Convert database row to bundle dict."""
+        assets = row["assets"]
+        if isinstance(assets, str):
+            assets = json.loads(assets)
+
+        lineage = row["lineage"]
+        if lineage and isinstance(lineage, str):
+            lineage = json.loads(lineage)
+
+        operational = row["operational"]
+        if operational and isinstance(operational, str):
+            operational = json.loads(operational)
+
+        anomalies = row["anomalies"]
+        if anomalies and isinstance(anomalies, str):
+            anomalies = json.loads(anomalies)
+
         return {
             "id": str(row["id"]),
             "tenant_id": str(row["tenant_id"]),
             "bundle_hash": row["bundle_hash"],
-            "assets": json.loads(row["assets"]) if isinstance(row["assets"], str) else row["assets"],
+            "assets": assets,
             "window": row["window"],
-            "lineage": json.loads(row["lineage"]) if row["lineage"] and isinstance(row["lineage"], str) else row["lineage"],
-            "operational": json.loads(row["operational"]) if row["operational"] and isinstance(row["operational"], str) else row["operational"],
-            "anomalies": json.loads(row["anomalies"]) if row["anomalies"] and isinstance(row["anomalies"], str) else row["anomalies"],
+            "lineage": lineage,
+            "operational": operational,
+            "anomalies": anomalies,
             "created_at": row["created_at"],
             "expires_at": row["expires_at"],
         }

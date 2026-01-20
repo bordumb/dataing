@@ -184,16 +184,3 @@ class TestDataingClientStubs:
         client = DataingClient(api_key="key")
         with pytest.raises(NotImplementedError, match="fn-17.6"):
             await client.async_run(assets=[], goal="test")
-
-    def test_create_bundle_not_implemented(self) -> None:
-        """Test that create_bundle() raises NotImplementedError."""
-        client = DataingClient(api_key="key")
-        with pytest.raises(NotImplementedError, match="fn-17.4"):
-            client.create_bundle(assets=[])
-
-    @pytest.mark.asyncio
-    async def test_async_create_bundle_not_implemented(self) -> None:
-        """Test that async_create_bundle() raises NotImplementedError."""
-        client = DataingClient(api_key="key")
-        with pytest.raises(NotImplementedError, match="fn-17.4"):
-            await client.async_create_bundle(assets=[])

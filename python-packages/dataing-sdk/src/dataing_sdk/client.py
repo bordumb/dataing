@@ -17,6 +17,7 @@ from .exceptions import (
 )
 
 if TYPE_CHECKING:
+    from .context import Context
     from .types import AssetRef, ContextBundle, Run
 
 # Environment variable for API key
@@ -178,33 +179,139 @@ class DataingClient:
         """Exit context manager for async usage."""
         await self.aclose()
 
-    # --- Bundle methods (stub for fn-17.3/fn-17.4) ---
+    # --- Bundle and Context methods ---
 
     def create_bundle(
         self,
         assets: list[AssetRef],
         window: str | None = None,
+        include_lineage: bool = True,
+        include_operational: bool = True,
+        include_anomalies: bool = True,
     ) -> ContextBundle:
         """Create a context bundle for the given assets.
-
-        Stub implementation. Full implementation in fn-17.4.
 
         Args:
             assets: List of assets to include in the bundle.
             window: Optional time window for context (e.g., "7d", "24h").
+            include_lineage: Include lineage graph in response.
+            include_operational: Include operational facts in response.
+            include_anomalies: Include anomaly summaries in response.
 
         Returns:
             ContextBundle with resolved assets and context.
         """
-        raise NotImplementedError("Full implementation in fn-17.4")
+        from .types import ContextBundle
+
+        payload = {
+            "assets": [
+                {
+                    "platform": a.platform,
+                    "name": a.name,
+                    "datasource_id": a.datasource_id,
+                }
+                for a in assets
+            ],
+            "window": window,
+            "include_lineage": include_lineage,
+            "include_operational": include_operational,
+            "include_anomalies": include_anomalies,
+        }
+        response = self._request("POST", "/api/v1/context/bundles", json=payload)
+        data = response.json()
+        return ContextBundle.model_validate(data)
 
     async def async_create_bundle(
         self,
         assets: list[AssetRef],
         window: str | None = None,
+        include_lineage: bool = True,
+        include_operational: bool = True,
+        include_anomalies: bool = True,
     ) -> ContextBundle:
         """Async version of create_bundle."""
-        raise NotImplementedError("Full implementation in fn-17.4")
+        from .types import ContextBundle
+
+        payload = {
+            "assets": [
+                {
+                    "platform": a.platform,
+                    "name": a.name,
+                    "datasource_id": a.datasource_id,
+                }
+                for a in assets
+            ],
+            "window": window,
+            "include_lineage": include_lineage,
+            "include_operational": include_operational,
+            "include_anomalies": include_anomalies,
+        }
+        response = await self._async_request("POST", "/api/v1/context/bundles", json=payload)
+        data = response.json()
+        return ContextBundle.model_validate(data)
+
+    def context(
+        self,
+        *urns: str,
+        assets: list[AssetRef] | None = None,
+        window: str | None = None,
+    ) -> Context:
+        """Create a Context for the given assets.
+
+        Convenience method that creates a bundle and wraps it in a Context object.
+
+        Args:
+            *urns: URN strings (e.g., "postgres://db.schema.table").
+            assets: List of AssetRef objects (alternative to URNs).
+            window: Optional time window for context.
+
+        Returns:
+            Context object with resolved assets and context data.
+
+        Example:
+            ctx = client.context("postgres://db.schema.orders")
+            ctx = client.context(
+                "postgres://db.schema.orders",
+                "postgres://db.schema.customers"
+            )
+        """
+        from .context import Context
+        from .types import AssetRef as AssetRefType
+
+        # Build asset list from URNs and/or assets parameter
+        asset_list: list[AssetRefType] = []
+        for urn in urns:
+            asset_list.append(AssetRefType.from_urn(urn))
+        if assets:
+            asset_list.extend(assets)
+
+        if not asset_list:
+            raise ValidationError("At least one asset URN or AssetRef is required")
+
+        bundle = self.create_bundle(asset_list, window=window)
+        return Context(bundle, self)
+
+    async def async_context(
+        self,
+        *urns: str,
+        assets: list[AssetRef] | None = None,
+        window: str | None = None,
+    ) -> Context:
+        """Async version of context()."""
+        from .context import Context
+        from .types import AssetRef as AssetRefType
+
+        asset_list: list[AssetRefType] = []
+        for urn in urns:
+            asset_list.append(AssetRefType.from_urn(urn))
+        if assets:
+            asset_list.extend(assets)
+
+        if not asset_list:
+            raise ValidationError("At least one asset URN or AssetRef is required")
+
+        bundle = await self.async_create_bundle(asset_list, window=window)
+        return Context(bundle, self)
 
     # --- Run methods (stub for fn-17.6) ---
 

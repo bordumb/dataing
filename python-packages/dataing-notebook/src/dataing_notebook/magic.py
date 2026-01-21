@@ -22,6 +22,9 @@ from .state import get_state, reset_state
 if TYPE_CHECKING:
     from IPython.core.interactiveshell import InteractiveShell
 
+# Server extension state endpoint for JupyterLab sync
+STATE_ENDPOINT = "dataing/state"
+
 
 @magics_class
 class DataingMagics(Magics):
@@ -61,6 +64,82 @@ class DataingMagics(Magics):
         super().__init__(shell)
         self._state = get_state()
 
+    def _get_jupyter_server_url(self) -> str | None:
+        """Get the Jupyter server URL from environment.
+
+        Returns:
+            Server URL or None if not in Jupyter environment.
+        """
+        import os
+
+        # In JupyterLab, JUPYTER_SERVER_URL or notebook app URL
+        # Try common environment variables
+        for var in ["JUPYTER_SERVER_URL", "JPY_SESSION_NAME"]:
+            if var in os.environ:
+                # Construct from session name
+                pass
+
+        # Fallback: use localhost with default port
+        # The server extension is at the same origin as the notebook
+        return "http://localhost:8888"
+
+    def _send_state_update(self) -> None:
+        """Send current state to JupyterLab frontend via HTTP POST."""
+        import json
+        import urllib.request
+        import urllib.error
+
+        state_data = {
+            "attached_datasource": None,
+            "bundle_id": None,
+            "bundle_hash": None,
+            "current_run_id": None,
+        }
+
+        if self._state.is_attached and self._state.context:
+            ctx = self._state.context
+            # Get datasource name from first resolved asset
+            if ctx.resolved_assets:
+                first_asset = ctx.resolved_assets[0]
+                state_data["attached_datasource"] = first_asset.dataset_id
+            state_data["bundle_id"] = ctx.bundle_id
+            state_data["bundle_hash"] = ctx.bundle_hash
+
+        # Get current run if any
+        for entry in reversed(self._state._history):
+            if entry.get("action") == "ask":
+                state_data["current_run_id"] = entry.get("run_id")
+                break
+
+        try:
+            # Get Jupyter server URL
+            server_url = self._get_jupyter_server_url()
+            if not server_url:
+                return
+
+            # Build URL to state endpoint
+            url = f"{server_url.rstrip('/')}/{STATE_ENDPOINT}"
+
+            # POST state to server extension
+            data = json.dumps(state_data).encode("utf-8")
+            req = urllib.request.Request(
+                url,
+                data=data,
+                headers={"Content-Type": "application/json"},
+                method="POST",
+            )
+
+            with urllib.request.urlopen(req, timeout=5) as response:
+                # State update sent successfully
+                pass
+
+        except urllib.error.URLError:
+            # Server extension not available - that's OK
+            pass
+        except Exception:
+            # Any other error - silent fail
+            pass
+
     @line_magic
     def dataing(self, line: str) -> None:
         """Main dataing magic command.
@@ -83,6 +162,7 @@ class DataingMagics(Magics):
             "attach": self._handle_attach,
             "lineage": self._handle_lineage,
             "ask": self._handle_ask,
+            "export": self._handle_export,
             "status": self._handle_status,
             "clear": self._handle_clear,
             "help": self._show_help,
@@ -118,6 +198,10 @@ Dataing Magic Commands
 %dataing ask "<question>"
     Start an investigation with the given question.
     Uses streaming to display progress.
+
+%dataing export [--format FORMAT] [--output FILE]
+    Export the last investigation as a markdown incident report.
+    Formats: markdown (default), json
 
 %dataing status
     Show the current context status.
@@ -229,6 +313,9 @@ Dataing Magic Commands
             print(f"Attached context: {len(ctx.resolved_assets)} asset(s)")
             print(f"Bundle hash: {ctx.bundle_hash}")
 
+            # Notify JupyterLab frontend
+            self._send_state_update()
+
         except ValidationError as e:
             print(f"Validation error: {e}", file=sys.stderr)
         except Exception as e:
@@ -289,7 +376,7 @@ Dataing Magic Commands
                 print(f"    {source} -> {target}")
 
     def _handle_ask(self, args: list[str]) -> None:
-        """Handle ask subcommand.
+        """Handle ask subcommand with streaming timeline.
 
         Args:
             args: Command arguments.
@@ -306,8 +393,20 @@ Dataing Magic Commands
         if ctx is None or self._state.client is None:
             return
 
-        # Join args as the question
-        question = " ".join(args).strip('"\'')
+        # Parse arguments
+        parser = argparse.ArgumentParser(prog="%dataing ask")
+        parser.add_argument("question", nargs="*", help="Investigation question")
+        parser.add_argument("--no-stream", action="store_true", help="Use polling instead")
+
+        try:
+            parsed = parser.parse_args(args)
+        except SystemExit:
+            return
+
+        question = " ".join(parsed.question).strip('"\'')
+        if not question:
+            print("Error: ask requires a question", file=sys.stderr)
+            return
 
         print(f"Starting investigation: {question}")
         print("---")
@@ -323,59 +422,302 @@ Dataing Magic Commands
             print(f"Run ID: {run.run_id}")
             print(f"Status: {run.status.value}")
             print("")
-            print("Waiting for results (polling every 2s)...")
 
-            # Poll for completion
-            def on_progress(r: Any) -> None:
-                print(f"  Status: {r.status.value}", end="\r")
+            # Store run for later reference
+            self._state._history.append({
+                "action": "ask",
+                "run_id": run.run_id,
+                "question": question,
+            })
 
-            try:
-                final_run = self._state.client.wait_for_run(
-                    run.run_id,
-                    poll_interval=2.0,
-                    timeout=120.0,
-                    on_progress=on_progress,
-                )
-                print("")  # Clear the status line
-                print("---")
-                print(f"Investigation {final_run.status.value}")
+            # Notify JupyterLab frontend about new run
+            self._send_state_update()
 
-                # Show clickable link in Jupyter
-                base_url = self._state.client.base_url.replace(":8000", ":3000")
-                ui_url = f"{base_url}/investigations/{final_run.run_id}"
-
-                # Use IPython display for clickable link
-                try:
-                    from IPython.display import HTML, display
-
-                    display(HTML(f'<a href="{ui_url}" target="_blank">View in UI: {ui_url}</a>'))
-                except ImportError:
-                    print(f"View in UI: {ui_url}")
-
-                if final_run.status.value == "completed":
-                    print("Investigation completed. Click link above to see full results.")
-                elif final_run.status.value == "failed":
-                    print("Investigation failed. Check logs for details.")
-
-            except TimeoutError:
-                print("")
-                print("---")
-                print("Investigation still running after timeout.")
-
-                # Show link even for timeout
-                base_url = self._state.client.base_url.replace(":8000", ":3000")
-                ui_url = f"{base_url}/investigations/{run.run_id}"
-                try:
-                    from IPython.display import HTML, display
-
-                    display(HTML(f'<a href="{ui_url}" target="_blank">View in UI: {ui_url}</a>'))
-                except ImportError:
-                    print(f"View in UI: {ui_url}")
-
-                print("Check status later with: %dataing status")
+            if parsed.no_stream:
+                # Fallback to polling
+                self._poll_for_completion(run)
+            else:
+                # Use streaming
+                self._stream_events(run)
 
         except Exception as e:
             print(f"Error starting investigation: {e}", file=sys.stderr)
+
+    def _stream_events(self, run: Any) -> None:
+        """Stream SSE events for a run with timeline display.
+
+        Args:
+            run: The Run object to stream events from.
+        """
+        from .rendering import render_timeline_event
+
+        print("Streaming events...")
+        print("")
+
+        events: list[dict[str, Any]] = []
+        final_status = "running"
+
+        try:
+            for event in self._state.client.stream_run(run.run_id):
+                events.append({
+                    "seq": event.seq,
+                    "event": event.event,
+                    "data": event.data,
+                    "timestamp": event.timestamp,
+                })
+
+                # Render the event
+                render_timeline_event(event)
+
+                if event.is_terminal:
+                    final_status = "completed" if event.event == "run_completed" else "failed"
+                    break
+
+        except Exception as e:
+            print(f"Stream error: {e}", file=sys.stderr)
+            final_status = "error"
+
+        print("")
+        print("---")
+        print(f"Investigation {final_status}")
+
+        # Show clickable link
+        self._show_ui_link(run.run_id)
+
+        # Store events for export
+        self._state._history.append({
+            "action": "stream_complete",
+            "run_id": run.run_id,
+            "events": events,
+            "status": final_status,
+        })
+
+    def _poll_for_completion(self, run: Any) -> None:
+        """Poll for run completion (fallback method).
+
+        Args:
+            run: The Run object to poll.
+        """
+        print("Waiting for results (polling every 2s)...")
+
+        def on_progress(r: Any) -> None:
+            print(f"  Status: {r.status.value}", end="\r")
+
+        try:
+            final_run = self._state.client.wait_for_run(
+                run.run_id,
+                poll_interval=2.0,
+                timeout=120.0,
+                on_progress=on_progress,
+            )
+            print("")
+            print("---")
+            print(f"Investigation {final_run.status.value}")
+            self._show_ui_link(run.run_id)
+
+        except TimeoutError:
+            print("")
+            print("---")
+            print("Investigation still running after timeout.")
+            self._show_ui_link(run.run_id)
+            print("Check status later with: %dataing status")
+
+    def _show_ui_link(self, run_id: str) -> None:
+        """Display a clickable link to the UI.
+
+        Args:
+            run_id: The run ID.
+        """
+        if self._state.client is None:
+            return
+
+        base_url = self._state.client.base_url.replace(":8000", ":3000")
+        ui_url = f"{base_url}/investigations/{run_id}"
+
+        try:
+            from IPython.display import HTML, display
+
+            display(HTML(f'<a href="{ui_url}" target="_blank">View in UI: {ui_url}</a>'))
+        except ImportError:
+            print(f"View in UI: {ui_url}")
+
+    def _handle_export(self, args: list[str]) -> None:
+        """Handle export subcommand - generate markdown incident report.
+
+        Args:
+            args: Command arguments.
+        """
+        from datetime import datetime
+
+        parser = argparse.ArgumentParser(prog="%dataing export")
+        parser.add_argument(
+            "--format", "-f", choices=["markdown", "json"], default="markdown",
+            help="Output format"
+        )
+        parser.add_argument("--output", "-o", help="Output file path")
+
+        try:
+            parsed = parser.parse_args(args)
+        except SystemExit:
+            return
+
+        # Find the last investigation from history
+        last_ask = None
+        last_stream = None
+        for entry in reversed(self._state._history):
+            if entry.get("action") == "stream_complete" and last_stream is None:
+                last_stream = entry
+            if entry.get("action") == "ask" and last_ask is None:
+                last_ask = entry
+            if last_ask and last_stream:
+                break
+
+        if not last_ask:
+            print("Error: No investigation found. Run '%dataing ask' first.", file=sys.stderr)
+            return
+
+        run_id = last_ask.get("run_id", "unknown")
+        question = last_ask.get("question", "Unknown question")
+        events = last_stream.get("events", []) if last_stream else []
+        status = last_stream.get("status", "unknown") if last_stream else "unknown"
+
+        if parsed.format == "json":
+            self._export_json(run_id, question, events, status, parsed.output)
+        else:
+            self._export_markdown(run_id, question, events, status, parsed.output)
+
+    def _export_markdown(
+        self,
+        run_id: str,
+        question: str,
+        events: list[dict[str, Any]],
+        status: str,
+        output_path: str | None,
+    ) -> None:
+        """Export investigation as markdown incident report.
+
+        Args:
+            run_id: Investigation run ID.
+            question: Original question.
+            events: List of SSE events.
+            status: Final status.
+            output_path: Optional output file path.
+        """
+        from datetime import datetime
+
+        lines = [
+            "# Incident Report",
+            "",
+            f"**Generated:** {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
+            f"**Run ID:** `{run_id}`",
+            f"**Status:** {status.upper()}",
+            "",
+            "## Investigation Question",
+            "",
+            f"> {question}",
+            "",
+            "## Timeline",
+            "",
+        ]
+
+        # Group events by type
+        for event in events:
+            event_type = event.get("event", "unknown")
+            data = event.get("data", {})
+            seq = event.get("seq", 0)
+
+            if event_type == "run_started":
+                lines.append(f"### Investigation Started")
+                if "goal" in data:
+                    lines.append(f"Goal: {data['goal']}")
+                lines.append("")
+
+            elif event_type == "run_progress":
+                if "hypothesis" in data:
+                    lines.append(f"- **Hypothesis:** {data['hypothesis']}")
+                elif "message" in data:
+                    lines.append(f"- {data['message']}")
+
+            elif event_type == "run_evidence":
+                lines.append(f"### Evidence #{seq}")
+                if "sql" in data:
+                    lines.append("```sql")
+                    lines.append(data["sql"])
+                    lines.append("```")
+                if "result" in data:
+                    lines.append(f"Result: {data['result']}")
+                if "conclusion" in data:
+                    lines.append(f"**Conclusion:** {data['conclusion']}")
+                lines.append("")
+
+            elif event_type == "run_completed":
+                lines.append("")
+                lines.append("### Investigation Completed")
+                if "summary" in data:
+                    lines.append(data["summary"])
+                lines.append("")
+
+            elif event_type == "run_failed":
+                lines.append("")
+                lines.append("### Investigation Failed")
+                if "error" in data:
+                    lines.append(f"Error: {data['error']}")
+                lines.append("")
+
+        lines.append("---")
+        lines.append("*Generated by Dataing Notebook*")
+
+        report = "\n".join(lines)
+
+        if output_path:
+            with open(output_path, "w") as f:
+                f.write(report)
+            print(f"Exported to: {output_path}")
+        else:
+            # Display in notebook
+            try:
+                from IPython.display import Markdown, display
+
+                display(Markdown(report))
+            except ImportError:
+                print(report)
+
+    def _export_json(
+        self,
+        run_id: str,
+        question: str,
+        events: list[dict[str, Any]],
+        status: str,
+        output_path: str | None,
+    ) -> None:
+        """Export investigation as JSON.
+
+        Args:
+            run_id: Investigation run ID.
+            question: Original question.
+            events: List of SSE events.
+            status: Final status.
+            output_path: Optional output file path.
+        """
+        import json
+        from datetime import datetime
+
+        data = {
+            "generated_at": datetime.now().isoformat(),
+            "run_id": run_id,
+            "question": question,
+            "status": status,
+            "events": events,
+        }
+
+        json_str = json.dumps(data, indent=2, default=str)
+
+        if output_path:
+            with open(output_path, "w") as f:
+                f.write(json_str)
+            print(f"Exported to: {output_path}")
+        else:
+            print(json_str)
 
     def _handle_status(self, args: list[str]) -> None:
         """Handle status subcommand.
@@ -434,6 +776,9 @@ Dataing Magic Commands
             if parsed.cache:
                 self._state.clear_cache()
                 print("Cleared cache")
+
+        # Notify JupyterLab frontend
+        self._send_state_update()
 
 
 def load_ipython_extension(ipython: InteractiveShell) -> None:

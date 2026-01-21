@@ -1,6 +1,6 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "buildCommand": "ls -la && pip install mkdocs mkdocs-material mkdocs-mermaid2-plugin 'mkdocstrings[python]' && python -m mkdocs build -f mkdocs.yml",
+  "buildCommand": "python -m venv .venv && . .venv/bin/activate && pip install mkdocs mkdocs-material mkdocs-mermaid2-plugin 'mkdocstrings[python]' && mkdocs build -f mkdocs.yml",
   "outputDirectory": "site",
   "framework": null
 }

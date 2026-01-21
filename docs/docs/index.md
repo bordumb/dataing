@@ -52,6 +52,14 @@ Dataing autonomously investigates data quality issues in your data. It doesn't j
 
     [Try Quickstart](quickstart.md)
 
+-   :material-notebook: **Notebook Native**
+
+    ---
+
+    Interactive investigations in Jupyter with magic commands, streaming timelines, and one-click report export.
+
+    [Notebook Workflow](guides/notebook-workflow.md)
+
 </div>
 
 ---

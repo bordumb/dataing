@@ -9,12 +9,15 @@
 
 import {
   JupyterFrontEnd,
-  JupyterFrontEndPlugin
+  JupyterFrontEndPlugin,
+  ILayoutRestorer
 } from '@jupyterlab/application';
 
 import { ISettingRegistry } from '@jupyterlab/settingregistry';
 
 import { IStatusBar } from '@jupyterlab/statusbar';
+
+import { ICommandPalette } from '@jupyterlab/apputils';
 
 import { ServerConnection } from '@jupyterlab/services';
 
@@ -22,8 +25,20 @@ import { URLExt } from '@jupyterlab/coreutils';
 
 import { DataingStatusBar } from './statusbar';
 
+import { DataingWidget } from './widget';
+
 import type { IDataingState, IDataingSettings } from './types';
 export type { ConnectionState, IDataingState } from './types';
+
+/**
+ * State endpoint for notebook magic sync
+ */
+const STATE_ENDPOINT = 'dataing/state';
+
+/**
+ * State poll interval in milliseconds
+ */
+const STATE_POLL_INTERVAL = 2000;
 
 /**
  * Extension ID
@@ -124,15 +139,24 @@ async function checkConnection(
 /**
  * Main extension plugin
  */
+/**
+ * Command IDs
+ */
+const CommandIDs = {
+  open: 'dataing:open'
+};
+
 const plugin: JupyterFrontEndPlugin<void> = {
   id: EXTENSION_ID,
   description: 'JupyterLab extension for Dataing data quality investigation',
   autoStart: true,
-  optional: [ISettingRegistry, IStatusBar],
+  optional: [ISettingRegistry, IStatusBar, ICommandPalette, ILayoutRestorer],
   activate: async (
     app: JupyterFrontEnd,
     settingRegistry: ISettingRegistry | null,
-    statusBar: IStatusBar | null
+    statusBar: IStatusBar | null,
+    palette: ICommandPalette | null,
+    restorer: ILayoutRestorer | null
   ) => {
     console.log('Dataing JupyterLab extension is activating');
 
@@ -150,8 +174,9 @@ const plugin: JupyterFrontEndPlugin<void> = {
       errorMessage: null
     };
 
-    // DECLARE statusBarWidget BEFORE any callbacks that might reference it
+    // DECLARE widgets BEFORE any callbacks that might reference them
     let statusBarWidget: DataingStatusBar | null = null;
+    let sidebarWidget: DataingWidget | null = null;
 
     // Track in-flight checks and abort controller
     let checkInFlight = false;
@@ -169,9 +194,12 @@ const plugin: JupyterFrontEndPlugin<void> = {
       state.connectionState = 'checking';
       state.lastCheck = new Date();
 
-      // Update status bar to show checking
+      // Update widgets to show checking
       if (statusBarWidget) {
         statusBarWidget.updateState(state);
+      }
+      if (sidebarWidget) {
+        sidebarWidget.updateFromState(state);
       }
 
       // Create abort controller for this check
@@ -209,9 +237,12 @@ const plugin: JupyterFrontEndPlugin<void> = {
         abortController = null;
       }
 
-      // Update status bar if available
+      // Update widgets if available
       if (statusBarWidget) {
         statusBarWidget.updateState(state);
+      }
+      if (sidebarWidget) {
+        sidebarWidget.updateFromState(state);
       }
     };
 
@@ -311,19 +342,156 @@ const plugin: JupyterFrontEndPlugin<void> = {
       console.log('Dataing status bar widget added');
     }
 
+    // Create and add sidebar widget
+    sidebarWidget = new DataingWidget();
+    sidebarWidget.id = 'dataing-sidebar';
+    sidebarWidget.title.iconClass = 'jp-DataingIcon';
+    sidebarWidget.title.caption = 'Dataing';
+
+    // Track widget for restoration
+    if (restorer) {
+      restorer.add(sidebarWidget, 'dataing-sidebar');
+    }
+
+    // Add widget to left sidebar
+    app.shell.add(sidebarWidget!, 'left', { rank: 200 });
+
+    // Add command to open/toggle sidebar
+    app.commands.addCommand(CommandIDs.open, {
+      label: 'Open Dataing Sidebar',
+      caption: 'Open the Dataing investigation sidebar',
+      execute: () => {
+        if (sidebarWidget && !sidebarWidget.isAttached) {
+          app.shell.add(sidebarWidget, 'left', { rank: 200 });
+        }
+        if (sidebarWidget) {
+          app.shell.activateById(sidebarWidget.id);
+        }
+      }
+    });
+
+    // Add to command palette
+    if (palette) {
+      palette.addItem({
+        command: CommandIDs.open,
+        category: 'Dataing'
+      });
+    }
+
+    console.log('Dataing sidebar widget added');
+
+    // Track state polling timer
+    let statePollingTimerId: ReturnType<typeof setTimeout> | null = null;
+    let lastAttachedDatasource: string | null = null;
+
+    // Clear server state when user detaches from UI
+    const clearServerState = async () => {
+      try {
+        const stateUrl = URLExt.join(serverSettings.baseUrl, STATE_ENDPOINT);
+        await ServerConnection.makeRequest(
+          stateUrl,
+          { method: 'DELETE' },
+          serverSettings
+        );
+        // Reset tracking so next attach is detected
+        lastAttachedDatasource = null;
+        console.log('Dataing: Server state cleared');
+      } catch (error) {
+        console.debug('Dataing: Failed to clear server state:', error);
+      }
+    };
+
+    // Listen for widget state changes (e.g., user clicking Detach)
+    sidebarWidget.stateChanged.connect((_, widgetState) => {
+      // If user detached from UI (not from polling), clear server state
+      if (widgetState.attachedDatasource === null && lastAttachedDatasource !== null) {
+        void clearServerState();
+      }
+    });
+
+    // Poll notebook state from server extension
+    const pollNotebookState = async () => {
+      try {
+        const stateUrl = URLExt.join(serverSettings.baseUrl, STATE_ENDPOINT);
+        const response = await ServerConnection.makeRequest(
+          stateUrl,
+          { method: 'GET' },
+          serverSettings
+        );
+
+        if (response.ok) {
+          const stateData = await response.json();
+          const attachedDatasource = stateData.attached_datasource as string | null;
+
+          // Only update if changed to avoid unnecessary re-renders
+          if (attachedDatasource !== lastAttachedDatasource && sidebarWidget) {
+            lastAttachedDatasource = attachedDatasource;
+
+            if (attachedDatasource) {
+              console.log('Dataing: Attached datasource updated:', attachedDatasource);
+              sidebarWidget.attach(attachedDatasource);
+            } else {
+              console.log('Dataing: Datasource detached');
+              sidebarWidget.detach();
+            }
+          }
+
+          // Log current run if present
+          const currentRunId = stateData.current_run_id as string | null;
+          if (currentRunId) {
+            console.log('Dataing: Current run:', currentRunId);
+          }
+        }
+      } catch (error) {
+        // State endpoint not available - that's OK, it's optional
+        console.debug('Dataing state poll failed:', error);
+      }
+    };
+
+    // Schedule state polling
+    const scheduleStatePoll = () => {
+      if (statePollingTimerId !== null) {
+        clearTimeout(statePollingTimerId);
+        statePollingTimerId = null;
+      }
+
+      statePollingTimerId = setTimeout(async () => {
+        await pollNotebookState();
+        scheduleStatePoll();
+      }, STATE_POLL_INTERVAL);
+    };
+
+    // Cleanup function for state polling
+    const cleanupStatePoll = () => {
+      if (statePollingTimerId !== null) {
+        clearTimeout(statePollingTimerId);
+        statePollingTimerId = null;
+      }
+    };
+
     // Initial connection check if autoConnect enabled
     if (settings.autoConnect) {
       state.connectionState = 'checking';
       if (statusBarWidget) {
         statusBarWidget.updateState(state);
       }
+      if (sidebarWidget) {
+        sidebarWidget.updateFromState(state);
+      }
       await updateConnectionState();
       // Start periodic checks only if autoConnect is true
       scheduleNextCheck();
     }
 
+    // Start polling notebook state (regardless of autoConnect)
+    await pollNotebookState();
+    scheduleStatePoll();
+
     // Register cleanup on shell disposed
-    app.shell.disposed.connect(cleanup);
+    app.shell.disposed.connect(() => {
+      cleanup();
+      cleanupStatePoll();
+    });
 
     console.log('Dataing JupyterLab extension activated');
   }

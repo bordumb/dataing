@@ -10,11 +10,12 @@ import hashlib
 import json
 from datetime import UTC, datetime, timedelta
 from typing import Annotated, Any
-from uuid import uuid4
+from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from pydantic import BaseModel, Field
 
+from dataing.adapters.db import BundleRepository
 from dataing.entrypoints.api.middleware.auth import (
     ApiKeyContext,
     verify_api_key,
@@ -326,28 +327,58 @@ async def create_bundle(
             },
         )
 
-    # Generate bundle ID and hash
-    bundle_id = str(uuid4())
+    # Compute hash for content-addressable deduplication
     bundle_hash = _compute_bundle_hash(body.assets, body.window, resolved_assets)
-
-    # Compute expiry
-    expires_at = datetime.now(UTC) + timedelta(seconds=BUNDLE_EXPIRY_SECONDS)
 
     # Get default datasource from first resolved asset (if available)
     default_datasource_id = (
         resolved_assets[0].datasource_id if resolved_assets else None
     )
 
-    # Build response
+    # Build context data
+    lineage_data = LineageGraphResponse() if body.include_lineage else None
+    operational_data = OperationalFactsResponse() if body.include_operational else None
+    anomalies_data: list[AnomalySummary] | None = [] if body.include_anomalies else None
+
+    # Persist via repository (content-addressable - returns existing if hash matches)
+    app_db = request.app.state.app_db
+    bundle_repo = BundleRepository(app_db)
+
+    # Convert resolved assets to dict for storage
+    assets_for_storage = [
+        {
+            "asset": {
+                "platform": r.asset.platform,
+                "name": r.asset.name,
+                "datasource_id": r.asset.datasource_id,
+            },
+            "datasource_id": r.datasource_id,
+            "dataset_id": r.dataset_id,
+            "dataset_type": r.dataset_type,
+        }
+        for r in resolved_assets
+    ]
+
+    bundle_record = await bundle_repo.create_bundle(
+        tenant_id=auth.tenant_id,
+        bundle_hash=bundle_hash,
+        assets=assets_for_storage,
+        window=body.window,
+        lineage=lineage_data.model_dump() if lineage_data else None,
+        operational=operational_data.model_dump() if operational_data else None,
+        anomalies=[a.model_dump() for a in anomalies_data] if anomalies_data else None,
+    )
+
+    # Build response from persisted record
     bundle_response = ContextBundleResponse(
-        bundle_id=bundle_id,
+        bundle_id=bundle_record["id"],
         resolved_assets=resolved_assets,
         default_datasource_id=default_datasource_id,
-        lineage=LineageGraphResponse() if body.include_lineage else None,
-        operational=OperationalFactsResponse() if body.include_operational else None,
-        anomalies=[] if body.include_anomalies else None,
+        lineage=lineage_data,
+        operational=operational_data,
+        anomalies=anomalies_data,
         bundle_hash=bundle_hash,
-        expires_at=expires_at,
+        expires_at=bundle_record["expires_at"],
     )
 
     # Set ETag header
@@ -359,17 +390,76 @@ async def create_bundle(
 @router.get("/bundles/{bundle_id}", response_model=ContextBundleResponse)
 async def get_bundle(
     bundle_id: str,
+    request: Request,
     auth: AuthDep,
     response: Response,
 ) -> ContextBundleResponse:
     """Get an existing context bundle by ID.
 
-    Note: Bundles are currently not persisted. This endpoint is a placeholder
-    for future caching implementation.
+    Returns the bundle if found and belongs to the authenticated tenant.
     """
-    raise HTTPException(
-        status_code=404,
-        detail=f"Bundle not found: {bundle_id}. Bundles are currently not persisted.",
+    app_db = request.app.state.app_db
+    bundle_repo = BundleRepository(app_db)
+
+    try:
+        bundle_uuid = UUID(bundle_id)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=f"Invalid bundle ID: {bundle_id}") from e
+
+    bundle_record = await bundle_repo.get_bundle(bundle_uuid)
+    if bundle_record is None:
+        raise HTTPException(status_code=404, detail=f"Bundle not found: {bundle_id}")
+
+    # Verify tenant ownership
+    if bundle_record["tenant_id"] != str(auth.tenant_id):
+        raise HTTPException(status_code=404, detail=f"Bundle not found: {bundle_id}")
+
+    # Reconstruct resolved assets from stored data
+    stored_assets = bundle_record.get("assets", [])
+    resolved_assets = [
+        ResolvedAssetResponse(
+            asset=AssetRefRequest(
+                platform=a["asset"]["platform"],
+                name=a["asset"]["name"],
+                datasource_id=a["asset"].get("datasource_id"),
+            ),
+            datasource_id=a.get("datasource_id"),
+            dataset_id=a["dataset_id"],
+            dataset_type=a.get("dataset_type"),
+        )
+        for a in stored_assets
+    ]
+
+    # Get default datasource from first asset
+    default_datasource_id = (
+        resolved_assets[0].datasource_id if resolved_assets else None
+    )
+
+    # Reconstruct context data
+    lineage_data = None
+    if bundle_record.get("lineage"):
+        lineage_data = LineageGraphResponse(**bundle_record["lineage"])
+
+    operational_data = None
+    if bundle_record.get("operational"):
+        operational_data = OperationalFactsResponse(**bundle_record["operational"])
+
+    anomalies_data = None
+    if bundle_record.get("anomalies") is not None:
+        anomalies_data = [AnomalySummary(**a) for a in bundle_record["anomalies"]]
+
+    # Set ETag header
+    response.headers["ETag"] = f'"{bundle_record["bundle_hash"]}"'
+
+    return ContextBundleResponse(
+        bundle_id=bundle_record["id"],
+        resolved_assets=resolved_assets,
+        default_datasource_id=default_datasource_id,
+        lineage=lineage_data,
+        operational=operational_data,
+        anomalies=anomalies_data,
+        bundle_hash=bundle_record["bundle_hash"],
+        expires_at=bundle_record["expires_at"],
     )
 
 
@@ -464,7 +554,7 @@ async def compute_diff(
     if window.endswith("d"):
         days = int(window[:-1])
     elif window.endswith("h"):
-        days = int(window[:-1]) / 24
+        days = int(window[:-1]) // 24 or 1  # At least 1 day
     elif window.endswith("w"):
         days = int(window[:-1]) * 7
 

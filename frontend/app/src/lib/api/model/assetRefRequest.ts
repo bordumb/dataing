@@ -11,10 +11,7 @@ import type { AssetRefRequestDatasourceId } from "./assetRefRequestDatasourceId"
  * Asset reference in request.
  */
 export interface AssetRefRequest {
-  /** Optional datasource ID for disambiguation */
   datasource_id?: AssetRefRequestDatasourceId;
-  /** Fully qualified name (db.schema.table) */
   name: string;
-  /** Data platform (postgres, snowflake, dbt) */
   platform: string;
 }

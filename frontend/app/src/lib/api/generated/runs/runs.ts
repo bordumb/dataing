@@ -18,9 +18,13 @@ import type {
 import type {
   CancelRunApiV1RunsRunIdCancelPost200,
   CreateRunRequest,
+  EvidenceResponse,
+  GetEvidenceApiV1RunsRunIdEvidenceGet200Item,
+  GetEvidenceApiV1RunsRunIdEvidenceGetParams,
   GetRunApiV1RunsRunIdGet200,
   HTTPValidationError,
   RunResponse,
+  StoreEvidenceRequest,
   StreamEventsApiV1RunsRunIdEventsGetParams,
 } from "../../model";
 import { customInstance } from "../../client";
@@ -370,4 +374,189 @@ export const useCancelRunApiV1RunsRunIdCancelPost = <
     getCancelRunApiV1RunsRunIdCancelPostMutationOptions(options);
 
   return useMutation(mutationOptions);
+};
+/**
+ * Store evidence for a run.
+
+Evidence is stored with tamper-evident hash chain.
+ * @summary Store Evidence
+ */
+export const storeEvidenceApiV1RunsRunIdEvidencePost = (
+  runId: string,
+  storeEvidenceRequest: StoreEvidenceRequest,
+) => {
+  return customInstance<EvidenceResponse>({
+    url: `/api/v1/runs/${runId}/evidence`,
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    data: storeEvidenceRequest,
+  });
+};
+
+export const getStoreEvidenceApiV1RunsRunIdEvidencePostMutationOptions = <
+  TError = HTTPValidationError,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof storeEvidenceApiV1RunsRunIdEvidencePost>>,
+    TError,
+    { runId: string; data: StoreEvidenceRequest },
+    TContext
+  >;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof storeEvidenceApiV1RunsRunIdEvidencePost>>,
+  TError,
+  { runId: string; data: StoreEvidenceRequest },
+  TContext
+> => {
+  const { mutation: mutationOptions } = options ?? {};
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof storeEvidenceApiV1RunsRunIdEvidencePost>>,
+    { runId: string; data: StoreEvidenceRequest }
+  > = (props) => {
+    const { runId, data } = props ?? {};
+
+    return storeEvidenceApiV1RunsRunIdEvidencePost(runId, data);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type StoreEvidenceApiV1RunsRunIdEvidencePostMutationResult = NonNullable<
+  Awaited<ReturnType<typeof storeEvidenceApiV1RunsRunIdEvidencePost>>
+>;
+export type StoreEvidenceApiV1RunsRunIdEvidencePostMutationBody =
+  StoreEvidenceRequest;
+export type StoreEvidenceApiV1RunsRunIdEvidencePostMutationError =
+  HTTPValidationError;
+
+/**
+ * @summary Store Evidence
+ */
+export const useStoreEvidenceApiV1RunsRunIdEvidencePost = <
+  TError = HTTPValidationError,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof storeEvidenceApiV1RunsRunIdEvidencePost>>,
+    TError,
+    { runId: string; data: StoreEvidenceRequest },
+    TContext
+  >;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof storeEvidenceApiV1RunsRunIdEvidencePost>>,
+  TError,
+  { runId: string; data: StoreEvidenceRequest },
+  TContext
+> => {
+  const mutationOptions =
+    getStoreEvidenceApiV1RunsRunIdEvidencePostMutationOptions(options);
+
+  return useMutation(mutationOptions);
+};
+/**
+ * Get evidence for a run, optionally filtered by kind.
+ * @summary Get Evidence
+ */
+export const getEvidenceApiV1RunsRunIdEvidenceGet = (
+  runId: string,
+  params?: GetEvidenceApiV1RunsRunIdEvidenceGetParams,
+  signal?: AbortSignal,
+) => {
+  return customInstance<GetEvidenceApiV1RunsRunIdEvidenceGet200Item[]>({
+    url: `/api/v1/runs/${runId}/evidence`,
+    method: "GET",
+    params,
+    signal,
+  });
+};
+
+export const getGetEvidenceApiV1RunsRunIdEvidenceGetQueryKey = (
+  runId: string,
+  params?: GetEvidenceApiV1RunsRunIdEvidenceGetParams,
+) => {
+  return [
+    `/api/v1/runs/${runId}/evidence`,
+    ...(params ? [params] : []),
+  ] as const;
+};
+
+export const getGetEvidenceApiV1RunsRunIdEvidenceGetQueryOptions = <
+  TData = Awaited<ReturnType<typeof getEvidenceApiV1RunsRunIdEvidenceGet>>,
+  TError = HTTPValidationError,
+>(
+  runId: string,
+  params?: GetEvidenceApiV1RunsRunIdEvidenceGetParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof getEvidenceApiV1RunsRunIdEvidenceGet>>,
+        TError,
+        TData
+      >
+    >;
+  },
+) => {
+  const { query: queryOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ??
+    getGetEvidenceApiV1RunsRunIdEvidenceGetQueryKey(runId, params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getEvidenceApiV1RunsRunIdEvidenceGet>>
+  > = ({ signal }) =>
+    getEvidenceApiV1RunsRunIdEvidenceGet(runId, params, signal);
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!runId,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof getEvidenceApiV1RunsRunIdEvidenceGet>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetEvidenceApiV1RunsRunIdEvidenceGetQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getEvidenceApiV1RunsRunIdEvidenceGet>>
+>;
+export type GetEvidenceApiV1RunsRunIdEvidenceGetQueryError =
+  HTTPValidationError;
+
+/**
+ * @summary Get Evidence
+ */
+export const useGetEvidenceApiV1RunsRunIdEvidenceGet = <
+  TData = Awaited<ReturnType<typeof getEvidenceApiV1RunsRunIdEvidenceGet>>,
+  TError = HTTPValidationError,
+>(
+  runId: string,
+  params?: GetEvidenceApiV1RunsRunIdEvidenceGetParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof getEvidenceApiV1RunsRunIdEvidenceGet>>,
+        TError,
+        TData
+      >
+    >;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } => {
+  const queryOptions = getGetEvidenceApiV1RunsRunIdEvidenceGetQueryOptions(
+    runId,
+    params,
+    options,
+  );
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  query.queryKey = queryOptions.queryKey;
+
+  return query;
 };

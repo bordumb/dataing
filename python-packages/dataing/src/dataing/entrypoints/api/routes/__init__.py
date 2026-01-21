@@ -8,7 +8,6 @@ from fastapi import APIRouter
 from dataing.entrypoints.api.routes.approvals import router as approvals_router
 from dataing.entrypoints.api.routes.auth import router as auth_router
 from dataing.entrypoints.api.routes.bundles import router as bundles_router
-from dataing.entrypoints.api.routes.runs import router as runs_router
 from dataing.entrypoints.api.routes.comment_votes import router as comment_votes_router
 from dataing.entrypoints.api.routes.credentials import router as credentials_router
 from dataing.entrypoints.api.routes.dashboard import router as dashboard_router
@@ -32,6 +31,7 @@ from dataing.entrypoints.api.routes.permissions import (
 from dataing.entrypoints.api.routes.permissions import (
     router as permissions_router,
 )
+from dataing.entrypoints.api.routes.runs import router as runs_router
 from dataing.entrypoints.api.routes.schema_comments import router as schema_comments_router
 from dataing.entrypoints.api.routes.sla_policies import router as sla_policies_router
 from dataing.entrypoints.api.routes.tags import (

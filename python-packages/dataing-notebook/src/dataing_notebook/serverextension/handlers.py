@@ -309,6 +309,112 @@ class CredentialHandler(BaseHandler):
         )
 
 
+class ConnectionTestHandler(BaseHandler):
+    """Handler for /dataing/connection/test endpoint.
+
+    Tests connection to a Dataing backend before saving credentials.
+    This allows the wizard to validate URL and API key before committing.
+    """
+
+    async def post(self) -> None:
+        """Test connection to a backend.
+
+        Request body:
+            {base_url: "https://...", api_key: "..."}
+
+        Returns:
+            {success: true} on success
+            {success: false, error: "message"} on failure
+        """
+        try:
+            body = json_decode(self.request.body) if self.request.body else {}
+        except json.JSONDecodeError:
+            self.set_status(400)
+            self.write(json_encode({"success": False, "error": "Invalid JSON"}))
+            return
+
+        base_url = body.get("base_url")
+        api_key = body.get("api_key")
+
+        if not base_url:
+            self.set_status(400)
+            self.write(json_encode({"success": False, "error": "base_url is required"}))
+            return
+
+        if not api_key:
+            self.set_status(400)
+            self.write(json_encode({"success": False, "error": "api_key is required"}))
+            return
+
+        # Normalize URL
+        base_url = base_url.rstrip("/")
+
+        # Test connection by calling /health endpoint
+        http_client = tornado.httpclient.AsyncHTTPClient()
+        try:
+            response = await http_client.fetch(
+                f"{base_url}/health",
+                method="GET",
+                headers={
+                    "X-API-Key": api_key,
+                    "Accept": "application/json",
+                },
+                raise_error=False,
+                request_timeout=10,  # 10 second timeout
+            )
+
+            if response.code == 200:
+                self.write(json_encode({"success": True}))
+            elif response.code == 401:
+                self.write(
+                    json_encode({"success": False, "error": "Invalid API key"})
+                )
+            elif response.code == 403:
+                self.write(
+                    json_encode({"success": False, "error": "API key not authorized"})
+                )
+            elif response.code == 404:
+                self.write(
+                    json_encode(
+                        {"success": False, "error": "Backend not found at this URL"}
+                    )
+                )
+            else:
+                self.write(
+                    json_encode(
+                        {
+                            "success": False,
+                            "error": f"Backend returned error: {response.code}",
+                        }
+                    )
+                )
+
+        except tornado.httpclient.HTTPClientError as e:
+            # Connection errors
+            error_msg = self._get_friendly_error(str(e))
+            self.write(json_encode({"success": False, "error": error_msg}))
+        except Exception as e:
+            # Other errors
+            error_msg = self._get_friendly_error(str(e))
+            self.write(json_encode({"success": False, "error": error_msg}))
+
+    def _get_friendly_error(self, error: str) -> str:
+        """Convert technical errors to user-friendly messages."""
+        error_lower = error.lower()
+
+        if "connection refused" in error_lower:
+            return "Cannot connect to backend. Is the server running?"
+        if "name or service not known" in error_lower or "nodename nor servname" in error_lower:
+            return "Cannot resolve backend hostname. Check the URL."
+        if "timed out" in error_lower or "timeout" in error_lower:
+            return "Connection timed out. Backend may be unreachable."
+        if "ssl" in error_lower or "certificate" in error_lower:
+            return "SSL/TLS error. Check if HTTPS is configured correctly."
+
+        # Generic fallback - avoid exposing raw errors
+        return f"Connection failed: {error[:100]}"
+
+
 class SSEProxyHandler(BaseHandler):
     """Handler for /dataing/sse/* endpoint.
 
@@ -534,6 +640,7 @@ def setup_handlers(web_app: tornado.web.Application) -> None:
         (url_path_join(base_url, "dataing", "handshake"), HandshakeHandler),
         (url_path_join(base_url, "dataing", "token"), TokenHandler),
         (url_path_join(base_url, "dataing", "credentials"), CredentialHandler),
+        (url_path_join(base_url, "dataing", "connection", "test"), ConnectionTestHandler),
         (url_path_join(base_url, "dataing", "state"), StateHandler),
         (url_path_join(base_url, r"dataing/sse/(.*)"), SSEProxyHandler),
         (url_path_join(base_url, r"dataing/proxy/(.*)"), ProxyHandler),

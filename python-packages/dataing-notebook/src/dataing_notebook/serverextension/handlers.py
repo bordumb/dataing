@@ -64,10 +64,17 @@ def get_backend_url() -> str:
 def get_api_key() -> str | None:
     """Get the API key for backend authentication.
 
+    Uses the credential module's precedence order:
+    1. Session-only memory store
+    2. OS keyring
+    3. Environment variable
+
     Returns:
         API key string or None.
     """
-    return os.environ.get(ENV_API_KEY)
+    from dataing_notebook.serverextension.credentials import get_credential
+
+    return get_credential()
 
 
 def is_jupyterhub_environment() -> bool:
@@ -145,7 +152,7 @@ class TokenHandler(BaseHandler):
                     {
                         "has_token": False,
                         "token_type": None,
-                        "message": "No API key configured. Set DATAING_API_KEY environment variable.",
+                        "message": "No API key configured. Set DATAING_API_KEY env var.",
                     }
                 )
             )
@@ -209,6 +216,97 @@ class TokenHandler(BaseHandler):
                     }
                 )
             )
+
+
+class CredentialHandler(BaseHandler):
+    """Handler for /dataing/credentials endpoint.
+
+    Manages credential storage with three modes:
+    - keychain: Stored in OS keychain via keyring library
+    - env_var: Read from DATAING_API_KEY environment variable
+    - session: Stored in memory only (cleared on server restart)
+
+    Security:
+    - Actual credential values are NEVER returned
+    - XSRF protection is ENABLED (unlike StateHandler)
+    """
+
+    async def get(self) -> None:
+        """Get current credential status (never returns actual key).
+
+        Returns:
+            {mode: "keychain"|"env_var"|"session", stored: bool, explanation: str}
+        """
+        from dataing_notebook.serverextension.credentials import get_credential_status
+
+        status = get_credential_status()
+        self.write(
+            json_encode(
+                {
+                    "mode": status.mode.value,
+                    "stored": status.stored,
+                    "explanation": status.explanation,
+                }
+            )
+        )
+
+    async def post(self) -> None:
+        """Store a credential.
+
+        Request body:
+            {api_key: "...", persist: bool}
+
+        persist=true: Use keychain if available, else session
+        persist=false: Force session-only storage
+        """
+        from dataing_notebook.serverextension.credentials import store_credential
+
+        try:
+            body = json_decode(self.request.body) if self.request.body else {}
+        except json.JSONDecodeError:
+            self.set_status(400)
+            self.write(json_encode({"error": "Invalid JSON"}))
+            return
+
+        api_key = body.get("api_key")
+        if not api_key:
+            self.set_status(400)
+            self.write(json_encode({"error": "api_key is required"}))
+            return
+
+        persist = body.get("persist", True)
+
+        status = store_credential(api_key, persist=persist)
+        self.write(
+            json_encode(
+                {
+                    "success": True,
+                    "mode": status.mode.value,
+                    "stored": status.stored,
+                    "explanation": status.explanation,
+                }
+            )
+        )
+
+    async def delete(self) -> None:
+        """Clear stored credentials (both keychain and session).
+
+        Returns:
+            Updated credential status.
+        """
+        from dataing_notebook.serverextension.credentials import delete_credential
+
+        status = delete_credential()
+        self.write(
+            json_encode(
+                {
+                    "success": True,
+                    "mode": status.mode.value,
+                    "stored": status.stored,
+                    "explanation": status.explanation,
+                }
+            )
+        )
 
 
 class SSEProxyHandler(BaseHandler):
@@ -435,6 +533,7 @@ def setup_handlers(web_app: tornado.web.Application) -> None:
     handlers = [
         (url_path_join(base_url, "dataing", "handshake"), HandshakeHandler),
         (url_path_join(base_url, "dataing", "token"), TokenHandler),
+        (url_path_join(base_url, "dataing", "credentials"), CredentialHandler),
         (url_path_join(base_url, "dataing", "state"), StateHandler),
         (url_path_join(base_url, r"dataing/sse/(.*)"), SSEProxyHandler),
         (url_path_join(base_url, r"dataing/proxy/(.*)"), ProxyHandler),

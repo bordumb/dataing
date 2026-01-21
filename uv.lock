@@ -1096,12 +1096,13 @@ requires-dist = [
     { name = "dataing-sdk", specifier = ">=0.1.0" },
     { name = "ipython", specifier = ">=8.0.0" },
     { name = "jupyter-server", marker = "extra == 'server'", specifier = ">=2.0.0" },
+    { name = "keyring", marker = "extra == 'keyring'", specifier = ">=24.0.0" },
     { name = "pytest", marker = "extra == 'dev'", specifier = ">=8.0.0" },
     { name = "pytest-asyncio", marker = "extra == 'dev'", specifier = ">=0.23.0" },
     { name = "rich", marker = "extra == 'rich'", specifier = ">=13.0.0" },
     { name = "tornado", specifier = ">=6.0.0" },
 ]
-provides-extras = ["dev", "rich", "server"]
+provides-extras = ["dev", "rich", "server", "keyring"]
 
 [[package]]
 name = "dataing-sdk"

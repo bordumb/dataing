@@ -37,6 +37,9 @@ rich = [
 server = [
     "jupyter-server>=2.0.0",
 ]
+keyring = [
+    "keyring>=24.0.0",
+]
 
 [project.entry-points."jupyter_server.extensions"]
 dataing_notebook = "dataing_notebook.serverextension"

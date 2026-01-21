@@ -1,3 +1,10 @@
+# [1.3.0](https://github.com/bordumb/dataing/compare/v1.2.1...v1.3.0) (2026-01-21)
+
+
+### Features
+
+* SDK Notebook Ecosystem - Epics fn-18 through fn-22 ([#77](https://github.com/bordumb/dataing/issues/77)) ([490dcbf](https://github.com/bordumb/dataing/commit/490dcbf5be6a0b59f16ac8915345e458462c0c51))
+
 ## [1.2.1](https://github.com/bordumb/dataing/compare/v1.2.0...v1.2.1) (2026-01-20)
 
 

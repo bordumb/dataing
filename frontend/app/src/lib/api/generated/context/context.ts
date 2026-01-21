@@ -121,8 +121,7 @@ export const useCreateBundleApiV1ContextBundlesPost = <
 /**
  * Get an existing context bundle by ID.
 
-Note: Bundles are currently not persisted. This endpoint is a placeholder
-for future caching implementation.
+Returns the bundle if found and belongs to the authenticated tenant.
  * @summary Get Bundle
  */
 export const getBundleApiV1ContextBundlesBundleIdGet = (

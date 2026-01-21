@@ -7,7 +7,7 @@ CREATE TABLE IF NOT EXISTS sdk_bundles (
     tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
     bundle_hash VARCHAR(64) NOT NULL,
     assets JSONB NOT NULL,
-    window VARCHAR(50),
+    time_window VARCHAR(50),
     lineage JSONB,
     operational JSONB,
     anomalies JSONB,

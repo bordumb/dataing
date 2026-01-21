@@ -1,4 +1,28 @@
-"""Core types for Dataing SDK."""
+"""Core types for the Dataing SDK.
+
+This module defines the data models used throughout the SDK for representing
+assets, runs, evidence, and query results. All models use Pydantic for
+validation and serialization.
+
+Key Types:
+    - `AssetRef`: Reference to a data asset (table, view, model)
+    - `Run`: An investigation run with status tracking
+    - `RunEvent`: Real-time event from SSE streaming
+    - `ContextBundle`: Cached context snapshot for an asset
+    - `QueryResult`: Results from SQL query execution
+    - Evidence types: `QueryResultEvidence`, `HypothesisEvidence`, etc.
+
+Example:
+    ```python
+    from dataing_sdk.types import AssetRef, RunStatus
+
+    # Create an asset reference
+    asset = AssetRef(platform="postgres", name="analytics.public.orders")
+
+    # Or parse from URN
+    asset = AssetRef.from_urn("postgres://analytics.public.orders")
+    ```
+"""
 
 from __future__ import annotations
 
@@ -10,62 +34,188 @@ from pydantic import BaseModel, Field
 
 
 class RunStatus(str, Enum):
-    """Status of an investigation run."""
+    """Status of an investigation run.
+
+    Investigation runs progress through these states:
+
+    - ``RUNNING``: Investigation is actively executing (gathering context,
+      testing hypotheses, executing queries)
+    - ``COMPLETED``: Investigation finished successfully with findings
+    - ``FAILED``: Investigation encountered an error and stopped
+    - ``CANCELLED``: Investigation was manually cancelled by user
+
+    Example:
+        ```python
+        run = client.run(assets=[...], goal="Why nulls?")
+        if run.status == RunStatus.RUNNING:
+            print("Investigation in progress...")
+        ```
+    """
 
     RUNNING = "running"
+    """Investigation is actively executing."""
+
     COMPLETED = "completed"
+    """Investigation finished successfully with findings."""
+
     FAILED = "failed"
+    """Investigation encountered an error and stopped."""
+
     CANCELLED = "cancelled"
+    """Investigation was manually cancelled by user."""
 
 
 TERMINAL_STATUSES = {RunStatus.COMPLETED, RunStatus.FAILED, RunStatus.CANCELLED}
 
 
 class EvidenceKind(str, Enum):
-    """Kind of evidence attached to a run.
+    """Type discriminator for evidence collected during investigations.
 
-    Matches backend schema for rich, queryable evidence.
+    Evidence is the structured output of investigation steps. Each kind has
+    a specific schema that enables type-safe rendering and cross-run queries.
+
+    Primary Evidence Types:
+        - ``QUERY_RESULT``: SQL query execution with results
+        - ``HYPOTHESIS``: Evaluated hypothesis with verdict
+        - ``LINEAGE_TRACE``: Data lineage traversal
+        - ``SCHEMA_SNAPSHOT``: Table schema at a point in time
+        - ``METRIC_CALCULATION``: Calculated data quality metric
+        - ``RUN_SUMMARY``: Final investigation synthesis
+
+    Example:
+        ```python
+        for event in client.stream_run(run.run_id):
+            if event.is_evidence:
+                kind = event.data.get("kind")
+                if kind == EvidenceKind.HYPOTHESIS:
+                    print(f"Hypothesis: {event.data['hypothesis_text']}")
+        ```
     """
 
     QUERY_RESULT = "query_result"
+    """SQL query was executed; contains sql, row_count, sample_rows."""
+
     HYPOTHESIS = "hypothesis"
+    """Hypothesis was evaluated; contains verdict, confidence, reasoning."""
+
     LINEAGE_TRACE = "lineage_trace"
+    """Lineage was traversed; contains upstream/downstream datasets."""
+
     SCHEMA_SNAPSHOT = "schema_snapshot"
+    """Schema was captured; contains columns, types, nullability."""
+
     METRIC_CALCULATION = "metric_calculation"
+    """Metric was calculated; contains value, expected, deviation."""
+
     RUN_SUMMARY = "run_summary"
+    """Investigation completed; contains root_cause, recommendations."""
 
     # Legacy values for backward compatibility
     SQL = "sql"
+    """Legacy: Use QUERY_RESULT instead."""
+
     LOG = "log"
+    """Legacy: General log entry."""
+
     METRIC = "metric"
+    """Legacy: Use METRIC_CALCULATION instead."""
+
     SCHEMA = "schema"
+    """Legacy: Use SCHEMA_SNAPSHOT instead."""
+
     PIPELINE = "pipeline"
+    """Legacy: Pipeline execution info."""
+
     NOTE = "note"
+    """Legacy: Free-form note."""
 
 
 class HypothesisVerdict(str, Enum):
-    """Verdict for a hypothesis evaluation."""
+    """Verdict from evaluating a hypothesis during investigation.
+
+    When Dataing tests a hypothesis (e.g., "The null spike is channel-specific"),
+    it assigns a verdict based on the evidence collected.
+
+    Example:
+        ```python
+        if evidence.verdict == HypothesisVerdict.ACCEPTED:
+            print(f"Root cause found: {evidence.hypothesis_text}")
+        ```
+    """
 
     ACCEPTED = "accepted"
+    """Hypothesis is supported by evidence with high confidence."""
+
     REJECTED = "rejected"
+    """Evidence contradicts the hypothesis."""
+
     INCONCLUSIVE = "inconclusive"
+    """Insufficient evidence to accept or reject."""
 
 
 class AssetRef(BaseModel):
-    """Reference to a data asset.
+    """Reference to a data asset (table, view, model, etc.).
 
-    Aligned with DatasetId from lineage types. The URN format is
-    `{platform}://{name}` where:
-    - platform: connector type ("postgres", "snowflake", "dbt", etc.)
-    - name: fully qualified name ("database.schema.table")
+    AssetRef identifies a data asset using a platform and fully-qualified name.
+    The URN format is ``{platform}://{name}`` where:
 
-    The datasource_id is separate and never embedded in the URN.
+    - **platform**: The data platform type (e.g., "postgres", "snowflake", "dbt")
+    - **name**: Fully qualified name (e.g., "database.schema.table")
+
+    The optional ``datasource_id`` disambiguates when multiple datasources
+    exist for the same platform. It is never embedded in the URN.
+
+    Attributes:
+        platform: Data platform identifier. Common values:
+            - ``postgres``, ``snowflake``, ``bigquery``, ``redshift`` (warehouses)
+            - ``dbt`` (dbt models)
+            - ``s3``, ``gcs`` (object storage)
+        name: Fully qualified asset name, typically ``database.schema.table``
+            or ``catalog.schema.table`` depending on the platform.
+        datasource_id: Optional datasource UUID for disambiguation when
+            a tenant has multiple datasources of the same platform type.
+
+    Example:
+        ```python
+        # Direct construction
+        asset = AssetRef(
+            platform="postgres",
+            name="analytics.public.orders",
+            datasource_id="ds-prod-123"
+        )
+
+        # Parse from URN string
+        asset = AssetRef.from_urn("postgres://analytics.public.orders")
+
+        # Convert back to URN
+        urn = asset.to_urn()  # "postgres://analytics.public.orders"
+
+        # DataHub URN format also supported
+        asset = AssetRef.from_urn(
+            "urn:li:dataset:(urn:li:dataPlatform:snowflake,db.schema.table,PROD)"
+        )
+        ```
+
+    See Also:
+        - `from_urn`: Parse from URN string
+        - `to_urn`: Convert to URN string
+        - :doc:`/concepts/datasource-resolution`: How datasources are resolved
     """
 
-    platform: str = Field(..., description="Data platform (postgres, snowflake, dbt)")
-    name: str = Field(..., description="Fully qualified name (db.schema.table)")
+    platform: str = Field(
+        ...,
+        description="Data platform (postgres, snowflake, bigquery, dbt, etc.)",
+        examples=["postgres", "snowflake", "dbt"],
+    )
+    name: str = Field(
+        ...,
+        description="Fully qualified asset name (database.schema.table)",
+        examples=["analytics.public.orders", "warehouse.schema.customers"],
+    )
     datasource_id: str | None = Field(
-        default=None, description="Optional datasource ID for disambiguation"
+        default=None,
+        description="Optional datasource UUID for disambiguation",
+        examples=["ds-prod-123", "550e8400-e29b-41d4-a716-446655440000"],
     )
 
     def to_urn(self) -> str:
@@ -134,27 +284,130 @@ class ResolvedAsset(BaseModel):
 
 
 class ContextBundle(BaseModel):
-    """Snapshot of resolved context (cacheable)."""
+    """Cacheable snapshot of resolved context for data assets.
 
-    bundle_id: str
-    resolved_assets: list[ResolvedAsset] = Field(default_factory=list)
-    default_datasource_id: str | None = None
-    lineage: dict | None = None
-    operational: dict | None = None
-    anomalies: list[dict] | None = None
-    bundle_hash: str = Field(..., description="Server-derived cache key")
-    expires_at: datetime
+    A ContextBundle contains all the context needed to investigate assets:
+    resolved asset references, lineage graphs, operational facts, and
+    detected anomalies. Bundles are cached by ``bundle_hash`` to avoid
+    redundant context gathering.
+
+    Bundles are created via `DataingClient.create_bundle` or
+    `DataingClient.context` and can be reused across multiple
+    investigation runs.
+
+    Attributes:
+        bundle_id: Unique identifier for this bundle.
+        resolved_assets: List of assets with datasource bindings resolved.
+        default_datasource_id: The datasource used when not explicitly specified.
+        lineage: Data lineage graph (upstream/downstream dependencies).
+        operational: Operational facts (freshness, job status, SLAs).
+        anomalies: Detected anomalies for the assets.
+        bundle_hash: Content-addressable hash for caching (SHA256).
+        expires_at: When the cached bundle expires and needs refresh.
+
+    Example:
+        ```python
+        # Create a bundle for investigation
+        bundle = client.create_bundle(
+            assets=[AssetRef(platform="postgres", name="db.schema.orders")],
+            window="7d"
+        )
+
+        print(f"Bundle ID: {bundle.bundle_id}")
+        print(f"Hash: {bundle.bundle_hash}")
+        print(f"Assets: {len(bundle.resolved_assets)}")
+
+        # Access lineage if available
+        if bundle.lineage:
+            print(f"Upstream tables: {bundle.lineage.get('upstream', [])}")
+        ```
+    """
+
+    bundle_id: str = Field(..., description="Unique bundle identifier")
+    resolved_assets: list[ResolvedAsset] = Field(
+        default_factory=list,
+        description="Assets with datasource bindings resolved",
+    )
+    default_datasource_id: str | None = Field(
+        default=None,
+        description="Datasource used when not explicitly specified",
+    )
+    lineage: dict | None = Field(
+        default=None,
+        description="Data lineage graph (upstream/downstream dependencies)",
+    )
+    operational: dict | None = Field(
+        default=None,
+        description="Operational facts (freshness, job status, SLAs)",
+    )
+    anomalies: list[dict] | None = Field(
+        default=None,
+        description="Detected anomalies for the assets",
+    )
+    bundle_hash: str = Field(
+        ...,
+        description="Content-addressable hash for caching (SHA256)",
+    )
+    expires_at: datetime = Field(
+        ...,
+        description="When the cached bundle expires",
+    )
 
 
 class Run(BaseModel):
-    """An investigation run."""
+    """An investigation run that diagnoses data quality issues.
 
-    run_id: str
-    bundle_id: str
-    bundle_hash: str
-    status: RunStatus
-    error_code: str | None = None
-    created_at: datetime
+    A Run represents a single investigation execution. It starts in ``RUNNING``
+    state and progresses through hypothesis generation, SQL execution, and
+    evidence collection until it reaches a terminal state (``COMPLETED``,
+    ``FAILED``, or ``CANCELLED``).
+
+    Runs can be monitored via polling (`DataingClient.get_run`) or
+    real-time streaming (`DataingClient.stream_run`).
+
+    Attributes:
+        run_id: Unique identifier for this run.
+        bundle_id: ID of the context bundle used for this run.
+        bundle_hash: Content hash of the bundle (for cache invalidation).
+        status: Current run status (RUNNING, COMPLETED, FAILED, CANCELLED).
+        error_code: Structured error code if failed (e.g., "timeout", "rate_limit").
+        created_at: When the run was created.
+
+    Example:
+        ```python
+        # Start an investigation
+        run = client.run(
+            assets=[AssetRef(platform="postgres", name="db.schema.orders")],
+            goal="Why has the null rate increased from 1% to 15%?"
+        )
+
+        print(f"Run ID: {run.run_id}")
+        print(f"Status: {run.status}")
+
+        # Poll for completion
+        while run.status == RunStatus.RUNNING:
+            time.sleep(2)
+            run = client.get_run(run.run_id)
+
+        if run.status == RunStatus.COMPLETED:
+            print("Investigation complete!")
+        elif run.status == RunStatus.FAILED:
+            print(f"Failed: {run.error_code}")
+        ```
+
+    Note:
+        Runs render nicely in Jupyter notebooks via ``_repr_html_()``.
+    """
+
+    run_id: str = Field(..., description="Unique run identifier")
+    bundle_id: str = Field(..., description="Context bundle used for this run")
+    bundle_hash: str = Field(..., description="Content hash for cache invalidation")
+    status: RunStatus = Field(..., description="Current run status")
+    error_code: str | None = Field(
+        default=None,
+        description="Structured error code if failed (timeout, rate_limit, etc.)",
+    )
+    created_at: datetime = Field(..., description="When the run was created")
 
     def _repr_html_(self) -> str:
         """Rich HTML representation for Jupyter notebooks."""
@@ -200,16 +453,67 @@ class StreamEvent(BaseModel):
 
 
 class RunEvent(BaseModel):
-    """An SSE event from a run stream.
+    """Real-time event from an investigation run SSE stream.
 
-    Used by client.stream_run() for real-time event streaming.
+    RunEvents are emitted during `DataingClient.stream_run` to provide
+    live updates on investigation progress. The ``seq`` field enables
+    resumption if the connection drops.
+
+    Event Types:
+        - ``run_started``: Investigation began
+        - ``run_progress``: Progress update (hypothesis being tested, etc.)
+        - ``run_evidence``: Evidence collected (query result, hypothesis verdict)
+        - ``run_completed``: Investigation finished successfully
+        - ``run_failed``: Investigation encountered an error
+        - ``run_heartbeat``: Keep-alive signal
+
+    Attributes:
+        seq: Sequence number for resumption. Pass to ``last_seq`` to resume.
+        event: Event type string (run_started, run_progress, run_evidence, etc.).
+        run_id: ID of the run this event belongs to.
+        data: Event payload (varies by event type).
+        timestamp: ISO 8601 timestamp when the event occurred.
+
+    Example:
+        ```python
+        for event in client.stream_run(run.run_id):
+            print(f"[{event.seq}] {event.event}")
+
+            if event.is_evidence:
+                print(f"  Evidence: {event.data.get('kind')}")
+
+            if event.is_terminal:
+                print(f"  Final status: {event.event}")
+                break
+
+        # Resume from last sequence on reconnection
+        for event in client.stream_run(run.run_id, last_seq=last_event.seq):
+            ...
+        ```
+
+    See Also:
+        - `DataingClient.stream_run`: Stream events from a run
+        - `is_terminal`: Check if event ends the stream
+        - `is_evidence`: Check if event contains evidence
     """
 
-    seq: int = Field(..., description="Event sequence number for resumption")
-    event: str = Field(..., description="Event type (run_started, run_progress, etc.)")
-    run_id: str = Field(..., description="Run ID this event belongs to")
-    data: dict[str, Any] = Field(default_factory=dict, description="Event payload")
-    timestamp: str | None = Field(default=None, description="ISO timestamp")
+    seq: int = Field(
+        ...,
+        description="Sequence number for resumption (pass to last_seq)",
+    )
+    event: str = Field(
+        ...,
+        description="Event type (run_started, run_progress, run_evidence, etc.)",
+    )
+    run_id: str = Field(..., description="ID of the run this event belongs to")
+    data: dict[str, Any] = Field(
+        default_factory=dict,
+        description="Event payload (varies by event type)",
+    )
+    timestamp: str | None = Field(
+        default=None,
+        description="ISO 8601 timestamp when the event occurred",
+    )
 
     @property
     def is_terminal(self) -> bool:
@@ -382,18 +686,59 @@ class RunSummaryEvidence(RichEvidenceBase):
 
 
 class QueryResult(BaseModel):
-    """Result of a SQL query execution."""
+    """Result from executing a SQL query via the SDK.
+
+    QueryResult is returned by `Context.query` and contains the query
+    results along with column metadata and execution statistics.
+
+    Results render as HTML tables in Jupyter notebooks via ``_repr_html_()``.
+
+    Attributes:
+        columns: Column metadata with name, type, and nullability.
+        rows: Result rows as list of dictionaries (column name -> value).
+        row_count: Total number of rows returned.
+        truncated: True if results were truncated due to row limits.
+        execution_time_ms: Query execution time in milliseconds.
+
+    Example:
+        ```python
+        ctx = client.context("postgres://db.schema.orders")
+        result = ctx.query("SELECT channel, COUNT(*) as cnt FROM orders GROUP BY 1")
+
+        print(f"Returned {result.row_count} rows")
+        print(f"Execution time: {result.execution_time_ms}ms")
+
+        for row in result.rows:
+            print(f"{row['channel']}: {row['cnt']}")
+
+        # In Jupyter, just display the result for a nice table
+        result  # Renders as HTML table
+        ```
+
+    Note:
+        Results over 50 rows are truncated in the HTML display but all
+        rows are available via the ``rows`` attribute.
+    """
 
     columns: list[dict[str, Any]] = Field(
-        default_factory=list, description="Column metadata"
+        default_factory=list,
+        description="Column metadata (name, type, nullable)",
     )
-    rows: list[dict[str, Any]] = Field(default_factory=list, description="Result rows")
-    row_count: int = Field(default=0, description="Number of rows returned")
+    rows: list[dict[str, Any]] = Field(
+        default_factory=list,
+        description="Result rows as list of {column: value} dicts",
+    )
+    row_count: int = Field(
+        default=0,
+        description="Total number of rows returned",
+    )
     truncated: bool = Field(
-        default=False, description="Whether results were truncated"
+        default=False,
+        description="True if results were truncated due to row limits",
     )
     execution_time_ms: int | None = Field(
-        default=None, description="Query execution time in milliseconds"
+        default=None,
+        description="Query execution time in milliseconds",
     )
 
     def _repr_html_(self) -> str:
@@ -436,32 +781,90 @@ class QueryResult(BaseModel):
 
 
 class DiffResult(BaseModel):
-    """Result of a metric diff operation."""
+    """Result from comparing a metric over a time window.
 
-    metric: str
-    window: str
-    current_value: float | None = None
-    previous_value: float | None = None
-    delta: float | None = None
-    delta_percent: float | None = None
+    DiffResult is returned by `Context.diff` and shows how a metric
+    has changed between the current period and a previous period.
+
+    Attributes:
+        metric: Name of the metric compared (e.g., "row_count", "null_rate").
+        window: Time window for comparison (e.g., "7d", "24h").
+        current_value: Current metric value.
+        previous_value: Previous period metric value.
+        delta: Absolute change (current - previous).
+        delta_percent: Percentage change ((current - previous) / previous * 100).
+        trend: Direction of change ("up", "down", "stable", or "unknown").
+        samples: Time-series data points for visualization.
+
+    Example:
+        ```python
+        ctx = client.context("postgres://db.schema.orders")
+        diff = ctx.diff("null_rate", "7d")
+
+        print(f"Null rate: {diff.current_value:.2%}")
+        print(f"Change: {diff.delta_percent:+.1f}% ({diff.trend})")
+
+        if diff.trend == "up" and diff.delta_percent > 100:
+            print("WARNING: Significant increase detected!")
+        ```
+    """
+
+    metric: str = Field(..., description="Name of the metric compared")
+    window: str = Field(..., description="Time window for comparison (7d, 24h, etc.)")
+    current_value: float | None = Field(default=None, description="Current metric value")
+    previous_value: float | None = Field(default=None, description="Previous period value")
+    delta: float | None = Field(default=None, description="Absolute change")
+    delta_percent: float | None = Field(default=None, description="Percentage change")
     trend: str | None = Field(
-        default=None, description="up, down, stable, or unknown"
+        default=None,
+        description="Direction: 'up', 'down', 'stable', or 'unknown'",
     )
     samples: list[dict[str, Any]] = Field(
-        default_factory=list, description="Time-series samples"
+        default_factory=list,
+        description="Time-series data points for visualization",
     )
 
 
 class ExplainResult(BaseModel):
-    """Result of an explain operation."""
+    """Natural language explanation of context with insights.
+
+    ExplainResult is returned by `Context.explain` and provides an
+    LLM-generated analysis of the assets, lineage, and any anomalies.
+
+    Attributes:
+        summary: Natural language explanation of the current state.
+        insights: Key observations from analyzing the context.
+        recommendations: Suggested actions based on the analysis.
+        related_assets: URNs of related assets that may be relevant.
+
+    Example:
+        ```python
+        ctx = client.context("postgres://db.schema.orders")
+        explanation = ctx.explain(focus="anomalies")
+
+        print("Summary:")
+        print(explanation.summary)
+
+        print("\\nKey Insights:")
+        for insight in explanation.insights:
+            print(f"  - {insight}")
+
+        print("\\nRecommendations:")
+        for rec in explanation.recommendations:
+            print(f"  - {rec}")
+        ```
+    """
 
     summary: str = Field(..., description="Natural language explanation")
     insights: list[str] = Field(
-        default_factory=list, description="Key insights discovered"
+        default_factory=list,
+        description="Key observations from analyzing the context",
     )
     recommendations: list[str] = Field(
-        default_factory=list, description="Recommended actions"
+        default_factory=list,
+        description="Suggested actions based on the analysis",
     )
     related_assets: list[str] = Field(
-        default_factory=list, description="URNs of related assets"
+        default_factory=list,
+        description="URNs of related assets that may be relevant",
     )

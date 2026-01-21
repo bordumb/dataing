@@ -22,6 +22,9 @@ from .state import get_state, reset_state
 if TYPE_CHECKING:
     from IPython.core.interactiveshell import InteractiveShell
 
+# Server extension state endpoint for JupyterLab sync
+STATE_ENDPOINT = "dataing/state"
+
 
 @magics_class
 class DataingMagics(Magics):
@@ -60,6 +63,82 @@ class DataingMagics(Magics):
         """
         super().__init__(shell)
         self._state = get_state()
+
+    def _get_jupyter_server_url(self) -> str | None:
+        """Get the Jupyter server URL from environment.
+
+        Returns:
+            Server URL or None if not in Jupyter environment.
+        """
+        import os
+
+        # In JupyterLab, JUPYTER_SERVER_URL or notebook app URL
+        # Try common environment variables
+        for var in ["JUPYTER_SERVER_URL", "JPY_SESSION_NAME"]:
+            if var in os.environ:
+                # Construct from session name
+                pass
+
+        # Fallback: use localhost with default port
+        # The server extension is at the same origin as the notebook
+        return "http://localhost:8888"
+
+    def _send_state_update(self) -> None:
+        """Send current state to JupyterLab frontend via HTTP POST."""
+        import json
+        import urllib.request
+        import urllib.error
+
+        state_data = {
+            "attached_datasource": None,
+            "bundle_id": None,
+            "bundle_hash": None,
+            "current_run_id": None,
+        }
+
+        if self._state.is_attached and self._state.context:
+            ctx = self._state.context
+            # Get datasource name from first resolved asset
+            if ctx.resolved_assets:
+                first_asset = ctx.resolved_assets[0]
+                state_data["attached_datasource"] = first_asset.dataset_id
+            state_data["bundle_id"] = ctx.bundle_id
+            state_data["bundle_hash"] = ctx.bundle_hash
+
+        # Get current run if any
+        for entry in reversed(self._state._history):
+            if entry.get("action") == "ask":
+                state_data["current_run_id"] = entry.get("run_id")
+                break
+
+        try:
+            # Get Jupyter server URL
+            server_url = self._get_jupyter_server_url()
+            if not server_url:
+                return
+
+            # Build URL to state endpoint
+            url = f"{server_url.rstrip('/')}/{STATE_ENDPOINT}"
+
+            # POST state to server extension
+            data = json.dumps(state_data).encode("utf-8")
+            req = urllib.request.Request(
+                url,
+                data=data,
+                headers={"Content-Type": "application/json"},
+                method="POST",
+            )
+
+            with urllib.request.urlopen(req, timeout=5) as response:
+                # State update sent successfully
+                pass
+
+        except urllib.error.URLError:
+            # Server extension not available - that's OK
+            pass
+        except Exception:
+            # Any other error - silent fail
+            pass
 
     @line_magic
     def dataing(self, line: str) -> None:
@@ -234,6 +313,9 @@ Dataing Magic Commands
             print(f"Attached context: {len(ctx.resolved_assets)} asset(s)")
             print(f"Bundle hash: {ctx.bundle_hash}")
 
+            # Notify JupyterLab frontend
+            self._send_state_update()
+
         except ValidationError as e:
             print(f"Validation error: {e}", file=sys.stderr)
         except Exception as e:
@@ -347,6 +429,9 @@ Dataing Magic Commands
                 "run_id": run.run_id,
                 "question": question,
             })
+
+            # Notify JupyterLab frontend about new run
+            self._send_state_update()
 
             if parsed.no_stream:
                 # Fallback to polling
@@ -691,6 +776,9 @@ Dataing Magic Commands
             if parsed.cache:
                 self._state.clear_cache()
                 print("Cleared cache")
+
+        # Notify JupyterLab frontend
+        self._send_state_update()
 
 
 def load_ipython_extension(ipython: InteractiveShell) -> None:

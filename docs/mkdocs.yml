@@ -44,10 +44,13 @@ theme:
 
 plugins:
   - search
+  - autorefs
   - mkdocstrings:
       handlers:
         python:
-          paths: [../dataing/src]
+          paths:
+            - ../python-packages/dataing/src
+            - ../python-packages/dataing-sdk/src
           options:
             docstring_style: google
             show_source: true
@@ -88,6 +91,8 @@ nav:
   - Quickstart: quickstart.md
   - Guides:
       - "Interpreting Results": guides/interpreting-results.md
+      - "Notebook Workflow": guides/notebook-workflow.md
+      - "SDK Reference": guides/sdk-reference.md
   - Architecture:
       - Overview: architecture.md
       - "Deep Dive": architecture/overview.md
@@ -100,6 +105,7 @@ nav:
       - "How Investigations Work": concepts/investigations.md
       - "Safety & Guardrails": concepts/guardrails.md
       - "Datasource Resolution": concepts/datasource-resolution.md
+      - "Evidence Types": concepts/evidence.md
   - Integrations:
       - Warehouses:
           - BigQuery: integrations/warehouses/bigquery.md
@@ -127,6 +133,8 @@ nav:
           - OpenLineage: integrations/lineage/openlineage.md
       - Notifications:
           - Slack: integrations/notifications/slack.md
+      - Developer Tools:
+          - JupyterLab: integrations/jupyter.md
   - Security:
       - "Data Privacy": security/data-privacy.md
       - "RBAC & SSO": security/rbac.md

@@ -60,11 +60,11 @@ class BundleRepository:
         result = await self.db.execute_returning(
             """
             INSERT INTO sdk_bundles
-                (tenant_id, bundle_hash, assets, window, lineage, operational, anomalies)
+                (tenant_id, bundle_hash, assets, time_window, lineage, operational, anomalies)
             VALUES ($1, $2, $3, $4, $5, $6, $7)
             ON CONFLICT (tenant_id, bundle_hash) DO UPDATE SET
                 tenant_id = EXCLUDED.tenant_id
-            RETURNING id, tenant_id, bundle_hash, assets, window, lineage,
+            RETURNING id, tenant_id, bundle_hash, assets, time_window, lineage,
                 operational, anomalies, created_at, expires_at
             """,
             tenant_id,
@@ -90,7 +90,7 @@ class BundleRepository:
         """
         result = await self.db.fetch_one(
             """
-            SELECT id, tenant_id, bundle_hash, assets, window, lineage,
+            SELECT id, tenant_id, bundle_hash, assets, time_window, lineage,
                 operational, anomalies, created_at, expires_at
             FROM sdk_bundles
             WHERE id = $1
@@ -115,7 +115,7 @@ class BundleRepository:
         """
         result = await self.db.fetch_one(
             """
-            SELECT id, tenant_id, bundle_hash, assets, window, lineage,
+            SELECT id, tenant_id, bundle_hash, assets, time_window, lineage,
                 operational, anomalies, created_at, expires_at
             FROM sdk_bundles
             WHERE tenant_id = $1 AND bundle_hash = $2
@@ -150,7 +150,7 @@ class BundleRepository:
             "tenant_id": str(row["tenant_id"]),
             "bundle_hash": row["bundle_hash"],
             "assets": assets,
-            "window": row["window"],
+            "window": row["time_window"],
             "lineage": lineage,
             "operational": operational,
             "anomalies": anomalies,

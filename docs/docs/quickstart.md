@@ -188,6 +188,29 @@ async def trigger_investigation():
 asyncio.run(trigger_investigation())
 ```
 
+### Using Jupyter Notebooks
+
+For an interactive experience with streaming timelines:
+
+```python
+# Load the notebook extension
+%load_ext dataing_notebook
+
+# Connect to the API
+%dataing connect --api-key dd_demo_12345
+
+# Attach context to a table
+%dataing attach postgres://db.schema.orders
+
+# Start an investigation with streaming output
+%dataing ask "Why are nulls spiking in customer_id?"
+
+# Export a report
+%dataing export --format markdown
+```
+
+See the [Notebook Workflow Guide](guides/notebook-workflow.md) for the complete tutorial.
+
 ---
 
 ## Step 5: View Results
@@ -285,6 +308,12 @@ Now that you've run your first investigation:
     ---
 
     Deep dive into investigation workflows
+
+-   :material-notebook: **[Notebook Workflow](guides/notebook-workflow.md)**
+
+    ---
+
+    Interactive investigations in Jupyter
 
 </div>
 

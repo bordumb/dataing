@@ -398,6 +398,10 @@ demo: demo-fixtures
     PGPASSWORD=dataing psql -h localhost -U dataing -d dataing_demo -f python-packages/dataing/migrations/021_automation_rules.sql 2>&1 | grep -v "^NOTICE:" || true
     PGPASSWORD=dataing psql -h localhost -U dataing -d dataing_demo -f python-packages/dataing/migrations/022_runbooks.sql 2>&1 | grep -v "^NOTICE:" || true
     PGPASSWORD=dataing psql -h localhost -U dataing -d dataing_demo -f python-packages/dataing/migrations/023_drop_investigation_jobs.sql 2>&1 | grep -v "^NOTICE:" || true
+    PGPASSWORD=dataing psql -h localhost -U dataing -d dataing_demo -f python-packages/dataing/migrations/024_user_credentials.sql 2>&1 | grep -v "^NOTICE:" || true
+    PGPASSWORD=dataing psql -h localhost -U dataing -d dataing_demo -f python-packages/dataing/migrations/025_sdk_bundles_runs.sql 2>&1 | grep -v "^NOTICE:" || true
+    PGPASSWORD=dataing psql -h localhost -U dataing -d dataing_demo -f python-packages/dataing/migrations/026_sdk_evidence.sql 2>&1 | grep -v "^NOTICE:" || true
+    PGPASSWORD=dataing psql -h localhost -U dataing -d dataing_demo -f python-packages/dataing/migrations/027_sdk_vp_fields.sql 2>&1 | grep -v "^NOTICE:" || true
 
     trap 'kill 0' EXIT
 
@@ -411,7 +415,7 @@ demo: demo-fixtures
     echo "    - Backend:   http://localhost:8000/docs"
     echo "    - Temporal:  http://localhost:8233"
     echo "    - Telemetry: http://localhost:16686"
-    echo "    - Notebook:  http://localhost:8888/notebooks/demo_notebook.ipynb"
+    echo "    - JupyterLab: http://localhost:8888/lab/tree/demo_notebook.ipynb"
     echo ""
     echo "  Login credentials:"
     echo "    Email:    demo@dataing.io"
@@ -468,14 +472,14 @@ demo: demo-fixtures
         done
     ) &
 
-    # Start Jupyter notebook with dataing extension
+    # Start JupyterLab with dataing extension (sidebar + magics)
     (
-        echo "Starting Jupyter notebook on port 8888..."
+        echo "Starting JupyterLab on port 8888..."
         sleep 2
         DATAING_BACKEND_URL=http://localhost:8000 \
         DATAING_API_KEY=dd_demo_12345 \
-        uv run jupyter notebook demo/demo_notebook.ipynb --port 8888 --no-browser \
-            --NotebookApp.token='' --NotebookApp.password='' 2>&1 | \
+        uv run jupyter lab --notebook-dir=demo --port 8888 --no-browser \
+            --IdentityProvider.token='' 2>&1 | \
             grep -v "^\[" || true
     ) &
 
@@ -493,14 +497,14 @@ demo: demo-fixtures
                     open "http://localhost:8000/docs"                         # Backend API docs
                     open "http://localhost:8233"                              # Temporal UI
                     open "http://localhost:16686"                             # Jaeger UI
-                    open "http://localhost:8888/notebooks/demo_notebook.ipynb" # Demo notebook
+                    open "http://localhost:8888/lab/tree/demo_notebook.ipynb" # Demo notebook
                 elif command -v xdg-open &> /dev/null; then
                     # Linux
                     xdg-open "http://localhost:3000" &
                     xdg-open "http://localhost:8000/docs" &
                     xdg-open "http://localhost:8233" &
                     xdg-open "http://localhost:16686" &
-                    xdg-open "http://localhost:8888/notebooks/demo_notebook.ipynb" &
+                    xdg-open "http://localhost:8888/lab/tree/demo_notebook.ipynb" &
                 fi
                 break
             fi
@@ -538,6 +542,7 @@ demo-stop:
     pkill -f "fastapi dev" 2>/dev/null || true
     pkill -f "vite.*3000" 2>/dev/null || true
     pkill -f "pnpm dev" 2>/dev/null || true
+    pkill -f "jupyter lab" 2>/dev/null || true
     pkill -f "jupyter notebook" 2>/dev/null || true
     sleep 1
 

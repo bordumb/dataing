@@ -4526,7 +4526,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/dataing__entrypoints__api__routes__lineage__LineageGraphResponse"
+                  "$ref": "#/components/schemas/LineageGraphResponse"
                 }
               }
             }
@@ -5307,7 +5307,7 @@
           "context"
         ],
         "summary": "Get Bundle",
-        "description": "Get an existing context bundle by ID.\n\nNote: Bundles are currently not persisted. This endpoint is a placeholder\nfor future caching implementation.",
+        "description": "Get an existing context bundle by ID.\n\nReturns the bundle if found and belongs to the authenticated tenant.",
         "operationId": "get_bundle_api_v1_context_bundles__bundle_id__get",
         "security": [
           {
@@ -5658,6 +5658,139 @@
                   "type": "object",
                   "additionalProperties": true,
                   "title": "Response Cancel Run Api V1 Runs  Run Id  Cancel Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/runs/{run_id}/evidence": {
+      "post": {
+        "tags": [
+          "runs"
+        ],
+        "summary": "Store Evidence",
+        "description": "Store evidence for a run.\n\nEvidence is stored with tamper-evident hash chain.",
+        "operationId": "store_evidence_api_v1_runs__run_id__evidence_post",
+        "security": [
+          {
+            "APIKeyHeader": []
+          },
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "run_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Run Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StoreEvidenceRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EvidenceResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "runs"
+        ],
+        "summary": "Get Evidence",
+        "description": "Get evidence for a run, optionally filtered by kind.",
+        "operationId": "get_evidence_api_v1_runs__run_id__evidence_get",
+        "security": [
+          {
+            "APIKeyHeader": []
+          },
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "run_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Run Id"
+            }
+          },
+          {
+            "name": "kind",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filter by evidence kind",
+              "title": "Kind"
+            },
+            "description": "Filter by evidence kind"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": true
+                  },
+                  "title": "Response Get Evidence Api V1 Runs  Run Id  Evidence Get"
                 }
               }
             }
@@ -8759,13 +8892,11 @@
         "properties": {
           "platform": {
             "type": "string",
-            "title": "Platform",
-            "description": "Data platform (postgres, snowflake, dbt)"
+            "title": "Platform"
           },
           "name": {
             "type": "string",
-            "title": "Name",
-            "description": "Fully qualified name (db.schema.table)"
+            "title": "Name"
           },
           "datasource_id": {
             "anyOf": [
@@ -8776,8 +8907,7 @@
                 "type": "null"
               }
             ],
-            "title": "Datasource Id",
-            "description": "Optional datasource ID for disambiguation"
+            "title": "Datasource Id"
           }
         },
         "type": "object",
@@ -9014,7 +9144,7 @@
           "lineage": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/LineageGraphResponse"
+                "$ref": "#/components/schemas/dataing__entrypoints__api__routes__bundles__LineageGraphResponse"
               },
               {
                 "type": "null"
@@ -9097,7 +9227,7 @@
         "properties": {
           "assets": {
             "items": {
-              "$ref": "#/components/schemas/AssetRefRequest"
+              "$ref": "#/components/schemas/dataing__entrypoints__api__routes__bundles__AssetRefRequest"
             },
             "type": "array",
             "minItems": 1,
@@ -9976,6 +10106,57 @@
         "title": "DownstreamResponse",
         "description": "Response for downstream datasets."
       },
+      "EvidenceResponse": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "run_id": {
+            "type": "string",
+            "title": "Run Id"
+          },
+          "seq": {
+            "type": "integer",
+            "title": "Seq"
+          },
+          "kind": {
+            "type": "string",
+            "title": "Kind"
+          },
+          "content_hash": {
+            "type": "string",
+            "title": "Content Hash"
+          },
+          "prev_hash": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Prev Hash"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "run_id",
+          "seq",
+          "kind",
+          "content_hash",
+          "created_at"
+        ],
+        "title": "EvidenceResponse",
+        "description": "Response for stored evidence."
+      },
       "ExplainRequest": {
         "properties": {
           "bundle_id": {
@@ -10202,7 +10383,7 @@
         "properties": {
           "assets": {
             "items": {
-              "$ref": "#/components/schemas/dataing__entrypoints__api__routes__runs__AssetRefRequest"
+              "$ref": "#/components/schemas/AssetRefRequest"
             },
             "type": "array",
             "title": "Assets"
@@ -11488,35 +11669,40 @@
       "LineageGraphResponse": {
         "properties": {
           "root": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
+            "type": "string",
             "title": "Root"
           },
           "datasets": {
             "additionalProperties": {
-              "additionalProperties": true,
-              "type": "object"
+              "$ref": "#/components/schemas/DatasetResponse"
             },
             "type": "object",
             "title": "Datasets"
           },
           "edges": {
             "items": {
-              "$ref": "#/components/schemas/LineageEdge"
+              "$ref": "#/components/schemas/LineageEdgeResponse"
             },
             "type": "array",
             "title": "Edges"
+          },
+          "jobs": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/JobResponse"
+            },
+            "type": "object",
+            "title": "Jobs"
           }
         },
         "type": "object",
+        "required": [
+          "root",
+          "datasets",
+          "edges",
+          "jobs"
+        ],
         "title": "LineageGraphResponse",
-        "description": "Lineage graph response."
+        "description": "Response for a lineage graph."
       },
       "LineageProviderResponse": {
         "properties": {
@@ -13231,6 +13417,28 @@
         "title": "StepHistoryItemResponse",
         "description": "A step in the branch history."
       },
+      "StoreEvidenceRequest": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "title": "Kind",
+            "description": "Evidence kind discriminator"
+          },
+          "content": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Content",
+            "description": "Evidence content"
+          }
+        },
+        "type": "object",
+        "required": [
+          "kind",
+          "content"
+        ],
+        "title": "StoreEvidenceRequest",
+        "description": "Request to store evidence for a run."
+      },
       "SyncResponse": {
         "properties": {
           "datasets_synced": {
@@ -14056,6 +14264,72 @@
         "title": "WebhookIssueResponse",
         "description": "Response from webhook issue creation."
       },
+      "dataing__entrypoints__api__routes__bundles__AssetRefRequest": {
+        "properties": {
+          "platform": {
+            "type": "string",
+            "title": "Platform",
+            "description": "Data platform (postgres, snowflake, dbt)"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "Fully qualified name (db.schema.table)"
+          },
+          "datasource_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Datasource Id",
+            "description": "Optional datasource ID for disambiguation"
+          }
+        },
+        "type": "object",
+        "required": [
+          "platform",
+          "name"
+        ],
+        "title": "AssetRefRequest",
+        "description": "Asset reference in request."
+      },
+      "dataing__entrypoints__api__routes__bundles__LineageGraphResponse": {
+        "properties": {
+          "root": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Root"
+          },
+          "datasets": {
+            "additionalProperties": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "object",
+            "title": "Datasets"
+          },
+          "edges": {
+            "items": {
+              "$ref": "#/components/schemas/LineageEdge"
+            },
+            "type": "array",
+            "title": "Edges"
+          }
+        },
+        "type": "object",
+        "title": "LineageGraphResponse",
+        "description": "Lineage graph response."
+      },
       "dataing__entrypoints__api__routes__datasources__TestConnectionResponse": {
         "properties": {
           "success": {
@@ -14096,74 +14370,6 @@
         ],
         "title": "TestConnectionResponse",
         "description": "Response for testing a connection."
-      },
-      "dataing__entrypoints__api__routes__lineage__LineageGraphResponse": {
-        "properties": {
-          "root": {
-            "type": "string",
-            "title": "Root"
-          },
-          "datasets": {
-            "additionalProperties": {
-              "$ref": "#/components/schemas/DatasetResponse"
-            },
-            "type": "object",
-            "title": "Datasets"
-          },
-          "edges": {
-            "items": {
-              "$ref": "#/components/schemas/LineageEdgeResponse"
-            },
-            "type": "array",
-            "title": "Edges"
-          },
-          "jobs": {
-            "additionalProperties": {
-              "$ref": "#/components/schemas/JobResponse"
-            },
-            "type": "object",
-            "title": "Jobs"
-          }
-        },
-        "type": "object",
-        "required": [
-          "root",
-          "datasets",
-          "edges",
-          "jobs"
-        ],
-        "title": "LineageGraphResponse",
-        "description": "Response for a lineage graph."
-      },
-      "dataing__entrypoints__api__routes__runs__AssetRefRequest": {
-        "properties": {
-          "platform": {
-            "type": "string",
-            "title": "Platform"
-          },
-          "name": {
-            "type": "string",
-            "title": "Name"
-          },
-          "datasource_id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Datasource Id"
-          }
-        },
-        "type": "object",
-        "required": [
-          "platform",
-          "name"
-        ],
-        "title": "AssetRefRequest",
-        "description": "Asset reference in request."
       }
     },
     "securitySchemes": {

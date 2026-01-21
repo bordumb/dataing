@@ -1,4 +1,57 @@
-"""Dataing API client."""
+"""Dataing API client for Python.
+
+This module provides the main entry point for interacting with the Dataing API.
+The `DataingClient` class supports both synchronous and asynchronous
+operations for creating context bundles, running investigations, and streaming
+real-time events.
+
+Environment Variables:
+    DATAING_API_KEY: API key for authentication (required if not passed to client).
+    DATAING_BASE_URL: Base URL for the API (default: http://localhost:8000).
+
+Example:
+    Basic synchronous usage:
+
+    ```python
+    from dataing_sdk import DataingClient
+    from dataing_sdk.types import AssetRef
+
+    # Create client (uses DATAING_API_KEY env var)
+    client = DataingClient()
+
+    # Attach a default datasource for the session
+    client.attach("ds_prod", name="Production Analytics")
+
+    # Create context for an asset
+    ctx = client.context("postgres://analytics.public.orders")
+
+    # Run an investigation
+    run = client.run(
+        assets=[AssetRef(platform="postgres", name="analytics.public.orders")],
+        goal="Investigate the recent null spike in customer_id"
+    )
+
+    # Stream events in real-time
+    for event in client.stream_run(run.run_id):
+        print(f"[{event.event}] {event.data}")
+    ```
+
+    Async usage with context manager:
+
+    ```python
+    async with DataingClient() as client:
+        ctx = await client.async_context("snowflake://db.schema.table")
+        run = await client.async_run(
+            assets=ctx.assets,
+            goal="Check for schema drift"
+        )
+    ```
+
+See Also:
+    - `dataing_sdk.context.Context`: Rich context wrapper with query methods
+    - `dataing_sdk.types.Run`: Investigation run status and metadata
+    - `dataing_sdk.exceptions`: Exception types for error handling
+"""
 
 from __future__ import annotations
 
@@ -28,17 +81,59 @@ ENV_BASE_URL = "DATAING_BASE_URL"
 class DataingClient:
     """Client for interacting with the Dataing API.
 
-    Supports both synchronous and asynchronous methods. By default, uses
-    synchronous HTTP calls. For async usage, use the async_* methods.
+    The DataingClient is the primary interface for all Dataing operations. It
+    supports both synchronous and asynchronous methods, uses connection pooling
+    for efficiency, and can be used as a context manager for proper resource cleanup.
+
+    The client provides methods for:
+
+    - **Context Creation**: Build context bundles from asset references
+    - **Investigation Runs**: Start and monitor automated data quality investigations
+    - **Event Streaming**: Real-time SSE streaming of investigation progress
+    - **Session Management**: Attach a default datasource for convenience
+
+    Attributes:
+        base_url: The base URL of the Dataing API server.
+        api_key: The API key used for authentication.
+        timeout: Request timeout in seconds.
+        default_datasource_id: Currently attached datasource ID (via `attach`).
+        default_datasource_name: Human-readable name of attached datasource.
 
     Example:
-        # Sync usage
-        client = DataingClient(api_key="your-key")
-        bundle = client.create_bundle(assets=[...])
+        Synchronous usage with explicit cleanup:
 
-        # Async usage
-        async with client:
+        ```python
+        client = DataingClient(api_key="your-key")
+        try:
+            bundle = client.create_bundle(assets=[...])
+            run = client.run(assets=[...], goal="Investigate nulls")
+        finally:
+            client.close()
+        ```
+
+        Using as a context manager (recommended):
+
+        ```python
+        with DataingClient() as client:
+            ctx = client.context("postgres://db.schema.orders")
+            result = ctx.query("SELECT COUNT(*) FROM orders")
+        ```
+
+        Async context manager:
+
+        ```python
+        async with DataingClient() as client:
             bundle = await client.async_create_bundle(assets=[...])
+        ```
+
+    Note:
+        The client lazily initializes HTTP connections on first use. Use
+        `close` or `aclose` to release resources, or use the
+        context manager pattern for automatic cleanup.
+
+    See Also:
+        - `dataing_sdk.context.Context`: Rich wrapper for context bundles
+        - `attach`: Set a default datasource for the session
     """
 
     def __init__(
@@ -49,14 +144,37 @@ class DataingClient:
     ) -> None:
         """Initialize the Dataing client.
 
+        Creates a new client instance configured for the specified API endpoint.
+        The client does not establish connections until the first request is made.
+
         Args:
-            base_url: Base URL of the Dataing API. Defaults to DATAING_BASE_URL
-                env var or http://localhost:8000.
-            api_key: API key for authentication. Defaults to DATAING_API_KEY env var.
-            timeout: Request timeout in seconds.
+            base_url: Base URL of the Dataing API. Falls back to the
+                ``DATAING_BASE_URL`` environment variable, then to
+                ``http://localhost:8000`` if not set.
+            api_key: API key for authentication. Falls back to the
+                ``DATAING_API_KEY`` environment variable if not provided.
+            timeout: Request timeout in seconds. Increase this for long-running
+                operations like large context bundle creation.
 
         Raises:
-            AuthError: If no API key is provided and DATAING_API_KEY is not set.
+            AuthError: Raised on first API call if no API key is available.
+
+        Example:
+            ```python
+            # Use environment variables (recommended)
+            client = DataingClient()
+
+            # Explicit configuration
+            client = DataingClient(
+                base_url="https://api.dataing.io",
+                api_key="dk_live_abc123",
+                timeout=60.0,
+            )
+            ```
+
+        Note:
+            API keys can be created in the Dataing dashboard under
+            Settings > API Keys.
         """
         self.base_url = (base_url or os.environ.get(ENV_BASE_URL, "http://localhost:8000")).rstrip(
             "/"
@@ -198,22 +316,61 @@ class DataingClient:
     def attach(self, datasource_id: str, name: str | None = None) -> None:
         """Set the session default datasource.
 
-        This datasource will be used for all subsequent requests unless
-        explicitly overridden.
+        Attaching a datasource sets it as the default for all subsequent
+        operations that require a datasource. This is particularly useful in
+        notebook environments where you want to work with a single data source
+        across multiple operations.
+
+        The attached datasource is used when:
+
+        - Creating context bundles without explicit ``datasource_id``
+        - Running queries through `Context.query`
+        - Resolving asset URNs that don't specify a datasource
 
         Args:
-            datasource_id: The datasource ID to use as default.
-            name: Optional human-readable name for display.
+            datasource_id: The datasource ID to use as default. This should
+                match a datasource configured in your Dataing account.
+            name: Optional human-readable name for display in notebooks
+                and logs. If not provided, the ``datasource_id`` is used.
 
         Example:
+            ```python
+            # Attach for the session
             client.attach("ds_prod", name="Production Analytics")
-            client.ask("Check data quality", assets=[...])  # Uses ds_prod
+            print(client)  # DataingClient(base_url='...', datasource='Production Analytics')
+
+            # Subsequent operations use ds_prod automatically
+            ctx = client.context("postgres://db.public.orders")
+            result = ctx.query("SELECT * FROM orders LIMIT 10")
+
+            # Clear attachment when done
+            client.detach()
+            ```
+
+        See Also:
+            - `detach`: Clear the attached datasource
+            - `default_datasource_id`: Access the current attachment
         """
         self._default_datasource_id = datasource_id
         self._default_datasource_name = name
 
     def detach(self) -> None:
-        """Clear the session default datasource."""
+        """Clear the session default datasource.
+
+        After calling this method, operations that require a datasource will
+        need to have it explicitly specified via parameter or asset URN.
+
+        Example:
+            ```python
+            client.attach("ds_prod")
+            # ... work with ds_prod ...
+            client.detach()
+            print(client.default_datasource_id)  # None
+            ```
+
+        See Also:
+            - `attach`: Set the default datasource
+        """
         self._default_datasource_id = None
         self._default_datasource_name = None
 
@@ -238,15 +395,56 @@ class DataingClient:
     ) -> ContextBundle:
         """Create a context bundle for the given assets.
 
+        A context bundle is a snapshot of all relevant information about a set
+        of data assets, including their schemas, statistics, lineage relationships,
+        and any detected anomalies. Bundles are cached server-side based on their
+        content hash (``bundle_hash``), so repeated requests with the same assets
+        return quickly.
+
         Args:
-            assets: List of assets to include in the bundle.
-            window: Optional time window for context (e.g., "7d", "24h").
-            include_lineage: Include lineage graph in response.
-            include_operational: Include operational facts in response.
-            include_anomalies: Include anomaly summaries in response.
+            assets: List of `dataing_sdk.types.AssetRef` objects
+                identifying the data assets to include.
+            window: Time window for historical context. Supports formats like
+                ``"7d"`` (7 days), ``"24h"`` (24 hours), ``"1w"`` (1 week).
+                If not specified, uses the server default.
+            include_lineage: Whether to fetch and include the lineage graph
+                showing upstream and downstream dependencies.
+            include_operational: Whether to include operational metadata like
+                last update times, job run history, and freshness metrics.
+            include_anomalies: Whether to include any detected anomalies
+                for the assets from the configured anomaly detection system.
 
         Returns:
-            ContextBundle with resolved assets and context.
+            A `dataing_sdk.types.ContextBundle` containing resolved
+            assets, schemas, and requested context data.
+
+        Example:
+            ```python
+            from dataing_sdk.types import AssetRef
+
+            bundle = client.create_bundle(
+                assets=[
+                    AssetRef(platform="postgres", name="analytics.public.orders"),
+                    AssetRef(platform="postgres", name="analytics.public.customers"),
+                ],
+                window="7d",
+                include_lineage=True,
+            )
+
+            print(f"Bundle ID: {bundle.bundle_id}")
+            print(f"Hash (cache key): {bundle.bundle_hash}")
+            for asset in bundle.resolved_assets:
+                print(f"  - {asset.dataset_id}")
+            ```
+
+        Note:
+            For most use cases, prefer `context` which wraps the bundle
+            in a `dataing_sdk.context.Context` object with convenient
+            query and analysis methods.
+
+        See Also:
+            - `context`: Higher-level context creation with URN support
+            - `async_create_bundle`: Async version of this method
         """
         from .types import ContextBundle
 
@@ -276,7 +474,10 @@ class DataingClient:
         include_operational: bool = True,
         include_anomalies: bool = True,
     ) -> ContextBundle:
-        """Async version of create_bundle."""
+        """Async version of `create_bundle`.
+
+        See `create_bundle` for full documentation.
+        """
         from .types import ContextBundle
 
         payload = {
@@ -305,22 +506,75 @@ class DataingClient:
     ) -> Context:
         """Create a Context for the given assets.
 
-        Convenience method that creates a bundle and wraps it in a Context object.
+        This is the primary method for building investigation context. It accepts
+        URN strings for convenience, creates a context bundle server-side, and
+        returns a `dataing_sdk.context.Context` object with methods for
+        querying, diffing, and explaining the data.
+
+        The Context object provides:
+
+        - `dataing_sdk.context.Context.query`: Execute SQL queries
+        - `dataing_sdk.context.Context.diff`: Compare metrics over time
+        - `dataing_sdk.context.Context.explain`: Get AI-powered explanations
 
         Args:
-            *urns: URN strings (e.g., "postgres://db.schema.table").
-            assets: List of AssetRef objects (alternative to URNs).
-            window: Optional time window for context.
+            *urns: URN strings identifying assets. Format varies by platform:
+
+                - PostgreSQL: ``postgres://database.schema.table``
+                - Snowflake: ``snowflake://database.schema.table``
+                - BigQuery: ``bigquery://project.dataset.table``
+                - DuckDB: ``duckdb://database.schema.table``
+
+            assets: List of `dataing_sdk.types.AssetRef` objects.
+                Can be combined with URN arguments.
+            window: Time window for historical context (e.g., ``"7d"``, ``"24h"``).
 
         Returns:
-            Context object with resolved assets and context data.
+            A `dataing_sdk.context.Context` object wrapping the bundle
+            with additional query and analysis methods.
+
+        Raises:
+            ValidationError: If no assets are provided (neither URNs nor assets list).
+            AmbiguousAssetError: If a URN matches multiple datasources and no
+                ``datasource_id`` is specified.
 
         Example:
-            ctx = client.context("postgres://db.schema.orders")
+            Single asset with URN:
+
+            ```python
+            ctx = client.context("postgres://analytics.public.orders")
+            print(ctx.resolved_assets)
+            ```
+
+            Multiple assets:
+
+            ```python
             ctx = client.context(
-                "postgres://db.schema.orders",
-                "postgres://db.schema.customers"
+                "postgres://analytics.public.orders",
+                "postgres://analytics.public.customers",
+                window="7d",
             )
+            for asset in ctx.resolved_assets:
+                print(f"- {asset.dataset_id}")
+            ```
+
+            Using AssetRef objects:
+
+            ```python
+            from dataing_sdk.types import AssetRef
+
+            ctx = client.context(
+                assets=[
+                    AssetRef(platform="postgres", name="db.schema.orders"),
+                    AssetRef(platform="postgres", name="db.schema.customers"),
+                ]
+            )
+            ```
+
+        See Also:
+            - `dataing_sdk.context.Context`: The returned context object
+            - `dataing_sdk.context.from_sql`: Extract assets from SQL queries
+            - `async_context`: Async version of this method
         """
         from .context import Context
         from .types import AssetRef as AssetRefType
@@ -344,7 +598,10 @@ class DataingClient:
         assets: list[AssetRef] | None = None,
         window: str | None = None,
     ) -> Context:
-        """Async version of context()."""
+        """Async version of `context`.
+
+        See `context` for full documentation.
+        """
         from .context import Context
         from .types import AssetRef as AssetRefType
 
@@ -370,16 +627,75 @@ class DataingClient:
     ) -> Run:
         """Create and start an investigation run.
 
-        This is the one-call API that resolves assets, creates a bundle,
-        and starts the run in a single operation.
+        This is the primary method for launching autonomous data quality
+        investigations. It resolves the specified assets, creates or reuses
+        a context bundle, and starts an investigation workflow that:
+
+        1. Gathers context (schemas, statistics, lineage)
+        2. Generates hypotheses about potential root causes
+        3. Tests each hypothesis with SQL queries
+        4. Synthesizes findings into a conclusion
+
+        The run executes asynchronously on the server. Use `get_run` to
+        poll for status, `wait_for_run` to block until completion, or
+        `stream_run` for real-time event streaming.
 
         Args:
-            assets: List of assets to investigate.
-            goal: Investigation goal/question.
-            bundle_id: Optional existing bundle ID to use.
+            assets: List of `dataing_sdk.types.AssetRef` objects
+                identifying the data assets to investigate.
+            goal: Natural language description of what to investigate.
+                Be specific about the issue or question, e.g.,
+                ``"Why are there null values spiking in customer_id?"``
+            bundle_id: Optional ID of an existing context bundle to reuse.
+                If provided, skips bundle creation for faster startup.
 
         Returns:
-            Run object with run_id, status, and bundle info.
+            A `dataing_sdk.types.Run` object with the ``run_id``,
+            initial ``status``, and associated ``bundle_id``.
+
+        Raises:
+            ValidationError: If ``goal`` is empty or ``assets`` is empty.
+            AuthError: If authentication fails.
+            ServerError: If the server encounters an error starting the run.
+
+        Example:
+            Basic investigation:
+
+            ```python
+            from dataing_sdk.types import AssetRef
+
+            run = client.run(
+                assets=[AssetRef(platform="postgres", name="db.public.orders")],
+                goal="Investigate the 40% drop in order volume yesterday"
+            )
+            print(f"Started run: {run.run_id}")
+            print(f"Status: {run.status}")  # RunStatus.PENDING or RUNNING
+            ```
+
+            With context reuse:
+
+            ```python
+            # Create context once
+            ctx = client.context("postgres://db.public.orders")
+
+            # Reuse for multiple investigations
+            run1 = client.run(
+                assets=ctx.assets,
+                goal="Check for null spikes",
+                bundle_id=ctx.bundle_id,
+            )
+            run2 = client.run(
+                assets=ctx.assets,
+                goal="Check for schema changes",
+                bundle_id=ctx.bundle_id,
+            )
+            ```
+
+        See Also:
+            - `get_run`: Check run status
+            - `wait_for_run`: Block until run completes
+            - `stream_run`: Stream real-time events
+            - `async_run`: Async version of this method
         """
         from .types import Run, RunStatus
 
@@ -418,7 +734,10 @@ class DataingClient:
         goal: str,
         bundle_id: str | None = None,
     ) -> Run:
-        """Async version of run."""
+        """Async version of `run`.
+
+        See `run` for full documentation.
+        """
         from .types import Run, RunStatus
 
         payload: dict[str, Any] = {"goal": goal}
@@ -453,13 +772,37 @@ class DataingClient:
     # --- Run status methods ---
 
     def get_run(self, run_id: str) -> Run:
-        """Get run status and metadata.
+        """Get the current status and metadata of a run.
+
+        Use this method to check whether a run has completed, is still running,
+        or has failed. For waiting until completion, consider `wait_for_run`
+        or `stream_run` instead.
 
         Args:
-            run_id: The run ID to check.
+            run_id: The unique identifier of the run to check.
 
         Returns:
-            Run object with current status.
+            A `dataing_sdk.types.Run` object with the current status
+            and metadata.
+
+        Raises:
+            NotFoundError: If the run ID does not exist.
+            AuthError: If not authorized to access this run.
+
+        Example:
+            ```python
+            run = client.run(assets=[...], goal="...")
+            # Later...
+            status = client.get_run(run.run_id)
+            if status.status == RunStatus.COMPLETED:
+                print("Investigation complete!")
+            elif status.status == RunStatus.FAILED:
+                print("Investigation failed")
+            ```
+
+        See Also:
+            - `wait_for_run`: Block until run completes
+            - `stream_run`: Stream events in real-time
         """
         from .types import Run, RunStatus
 
@@ -475,7 +818,10 @@ class DataingClient:
         )
 
     async def async_get_run(self, run_id: str) -> Run:
-        """Async version of get_run."""
+        """Async version of `get_run`.
+
+        See `get_run` for full documentation.
+        """
         from .types import Run, RunStatus
 
         response = await self._async_request("GET", f"/api/v1/runs/{run_id}")
@@ -498,17 +844,56 @@ class DataingClient:
     ) -> Run:
         """Wait for a run to complete by polling.
 
+        Blocks the current thread until the run reaches a terminal state
+        (completed, failed, or cancelled). For real-time event streaming,
+        use `stream_run` instead.
+
         Args:
-            run_id: The run ID to wait for.
-            poll_interval: Seconds between status checks.
-            timeout: Max seconds to wait (None = no timeout).
-            on_progress: Optional callback called with Run on each poll.
+            run_id: The unique identifier of the run to wait for.
+            poll_interval: Seconds between status checks. Lower values
+                provide faster detection but more API calls.
+            timeout: Maximum seconds to wait before raising TimeoutError.
+                Set to ``None`` for no timeout (not recommended).
+            on_progress: Optional callback function that receives the
+                `dataing_sdk.types.Run` object on each poll.
+                Useful for progress updates in CLI applications.
 
         Returns:
-            Final Run object.
+            The final `dataing_sdk.types.Run` object with terminal status.
 
         Raises:
-            TimeoutError: If timeout exceeded.
+            TimeoutError: If the run does not complete within the timeout.
+            NotFoundError: If the run ID does not exist.
+
+        Example:
+            Basic waiting:
+
+            ```python
+            run = client.run(assets=[...], goal="...")
+            final = client.wait_for_run(run.run_id, timeout=120)
+            print(f"Final status: {final.status}")
+            ```
+
+            With progress callback:
+
+            ```python
+            def show_progress(run):
+                print(f"Status: {run.status.value}...")
+
+            final = client.wait_for_run(
+                run.run_id,
+                poll_interval=2.0,
+                on_progress=show_progress,
+            )
+            ```
+
+        Note:
+            For long-running investigations, consider using `stream_run`
+            which provides real-time event streaming without polling overhead.
+
+        See Also:
+            - `stream_run`: Real-time SSE event streaming
+            - `get_run`: Single status check
         """
         import time
 
@@ -535,21 +920,81 @@ class DataingClient:
         last_seq: int | None = None,
         timeout: float = 300.0,
     ) -> Any:
-        """Stream SSE events from a run.
+        """Stream SSE events from a run in real-time.
+
+        Opens a Server-Sent Events (SSE) connection to receive investigation
+        events as they occur. This is the recommended approach for monitoring
+        long-running investigations, as it provides immediate feedback without
+        polling overhead.
+
+        Event Types:
+            - ``run_started``: Investigation has begun
+            - ``context_gathered``: Context bundle created
+            - ``hypothesis_generated``: New hypothesis proposed
+            - ``hypothesis_testing``: Testing a hypothesis with SQL
+            - ``hypothesis_result``: Test result received
+            - ``synthesis_started``: Beginning to synthesize findings
+            - ``run_completed``: Investigation finished successfully
+            - ``run_failed``: Investigation encountered an error
 
         Args:
-            run_id: The run ID to stream events from.
-            last_seq: Resume from this sequence number (for reconnection).
-            timeout: Request timeout in seconds.
+            run_id: The unique identifier of the run to stream.
+            last_seq: Sequence number to resume from after a disconnection.
+                The server keeps events for a limited replay window (typically
+                30 seconds). If the window has expired, raises
+                `dataing_sdk.exceptions.ReplayWindowExpiredError`.
+            timeout: Connection timeout in seconds. The SSE connection may
+                remain open for the entire investigation duration.
 
         Yields:
-            RunEvent objects as they arrive.
+            `dataing_sdk.types.RunEvent` objects as they arrive from
+            the server.
+
+        Raises:
+            NotFoundError: If the run ID does not exist.
+            ReplayWindowExpiredError: If ``last_seq`` is too old for replay.
+            StreamError: If the SSE connection encounters an error.
 
         Example:
+            Basic streaming:
+
+            ```python
+            run = client.run(assets=[...], goal="...")
+
             for event in client.stream_run(run.run_id):
-                print(f"{event.event}: {event.data}")
-                if event.event in ("run_completed", "run_failed"):
+                print(f"[{event.event}] {event.data}")
+                if event.event == "run_completed":
+                    print("Investigation complete!")
                     break
+                elif event.event == "run_failed":
+                    print(f"Failed: {event.data.get('error')}")
+                    break
+            ```
+
+            With reconnection handling:
+
+            ```python
+            last_seq = None
+            while True:
+                try:
+                    for event in client.stream_run(run.run_id, last_seq=last_seq):
+                        last_seq = event.seq
+                        process_event(event)
+                        if event.event in ("run_completed", "run_failed"):
+                            break
+                    break  # Normal completion
+                except StreamError:
+                    print("Connection lost, reconnecting...")
+                    continue
+            ```
+
+        Note:
+            In Jupyter notebooks, consider using the ``dataing-notebook``
+            extension which provides a rich timeline widget for streaming events.
+
+        See Also:
+            - `dataing_sdk.types.RunEvent`: Event data structure
+            - `wait_for_run`: Simple polling alternative
         """
         from .types import RunEvent
 
@@ -607,15 +1052,40 @@ class DataingClient:
     # --- Health check ---
 
     def health(self) -> dict[str, Any]:
-        """Check API health.
+        """Check API health and connectivity.
+
+        Verifies that the Dataing API is reachable and responding. This is
+        useful for connection testing before starting longer operations.
 
         Returns:
-            Health status dict.
+            A dictionary containing health status information, typically
+            including ``status`` (``"ok"`` or ``"degraded"``), ``version``,
+            and component health details.
+
+        Raises:
+            AuthError: If the API key is invalid (health endpoint may require auth).
+            ServerError: If the server is unreachable or unhealthy.
+
+        Example:
+            ```python
+            try:
+                health = client.health()
+                print(f"API Status: {health['status']}")
+                print(f"Version: {health.get('version', 'unknown')}")
+            except ServerError:
+                print("API is unreachable")
+            ```
+
+        See Also:
+            - `async_health`: Async version of this method
         """
         response = self._request("GET", "/health")
         return response.json()
 
     async def async_health(self) -> dict[str, Any]:
-        """Async version of health check."""
+        """Async version of `health`.
+
+        See `health` for full documentation.
+        """
         response = await self._async_request("GET", "/health")
         return response.json()

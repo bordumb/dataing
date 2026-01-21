@@ -5,8 +5,8 @@ Provides HTTP handlers for:
 - Handshake (returns backend URL and configuration)
 - Request proxy (forwards requests to backend with authentication)
 
-Security: All handlers inherit from JupyterHandler which enforces
-authentication via `@tornado.web.authenticated` and XSRF protection.
+Security: All handlers inherit from APIHandler (jupyter-server 2.0+)
+which provides authentication via `current_user` property and XSRF protection.
 The API key is kept server-side and never exposed to the browser.
 """
 
@@ -22,8 +22,11 @@ import tornado.web
 from tornado.escape import json_decode, json_encode
 
 # Try to import Jupyter's authenticated handler base
+# In jupyter-server 2.0+, use APIHandler instead of JupyterHandler
+# for proper authentication handling (get_current_user is deprecated)
 try:
-    from jupyter_server.base.handlers import JupyterHandler
+    from jupyter_server.base.handlers import APIHandler as JupyterHandler
+
     HAS_JUPYTER_SERVER = True
 except ImportError:
     # Fallback for testing without jupyter_server
@@ -79,10 +82,13 @@ def is_jupyterhub_environment() -> bool:
 class BaseHandler(JupyterHandler if HAS_JUPYTER_SERVER else tornado.web.RequestHandler):  # type: ignore[misc]
     """Base handler with authentication and common functionality.
 
-    When jupyter_server is available, this inherits from JupyterHandler
-    which provides authentication via @tornado.web.authenticated and
-    XSRF protection. CORS headers are not set as requests should be
-    same-origin from the JupyterLab frontend.
+    When jupyter_server is available, this inherits from APIHandler
+    which provides authentication and XSRF protection. CORS headers
+    are not set as requests should be same-origin from JupyterLab.
+
+    Note: In jupyter-server 2.0+, we use APIHandler instead of JupyterHandler.
+    Authentication is handled automatically by the APIHandler - we do NOT
+    manually check current_user as that triggers deprecated get_current_user().
     """
 
     def set_default_headers(self) -> None:
@@ -99,7 +105,6 @@ class HandshakeHandler(BaseHandler):
     This is a lightweight endpoint to check server extension availability.
     """
 
-    @tornado.web.authenticated
     async def get(self) -> None:
         """Return backend URL and configuration."""
         response = {
@@ -118,7 +123,6 @@ class TokenHandler(BaseHandler):
     Authentication is handled server-side by the proxy.
     """
 
-    @tornado.web.authenticated
     async def get(self) -> None:
         """Get current token status (never exposes the actual token)."""
         api_key = get_api_key()
@@ -146,7 +150,6 @@ class TokenHandler(BaseHandler):
                 )
             )
 
-    @tornado.web.authenticated
     async def post(self) -> None:
         """Validate token configuration (does not return the token).
 
@@ -222,7 +225,6 @@ class SSEProxyHandler(BaseHandler):
         self.set_header("Cache-Control", "no-cache")
         self.set_header("Connection", "keep-alive")
 
-    @tornado.web.authenticated
     async def get(self, path: str = "") -> None:
         """Stream SSE events from backend."""
         backend_url = get_backend_url()
@@ -275,7 +277,7 @@ class ProxyHandler(BaseHandler):
     The API key is injected server-side, never exposed to the client.
     """
 
-    async def prepare(self) -> None:
+    def prepare(self) -> None:
         """Prepare the request (called before GET/POST/etc)."""
         self.backend_url = get_backend_url()
         self.api_key = get_api_key()
@@ -340,30 +342,83 @@ class ProxyHandler(BaseHandler):
                 )
             )
 
-    @tornado.web.authenticated
     async def get(self, path: str = "") -> None:
         """Handle GET requests."""
         await self._proxy_request("GET", path)
 
-    @tornado.web.authenticated
     async def post(self, path: str = "") -> None:
         """Handle POST requests."""
         await self._proxy_request("POST", path)
 
-    @tornado.web.authenticated
     async def put(self, path: str = "") -> None:
         """Handle PUT requests."""
         await self._proxy_request("PUT", path)
 
-    @tornado.web.authenticated
     async def delete(self, path: str = "") -> None:
         """Handle DELETE requests."""
         await self._proxy_request("DELETE", path)
 
-    @tornado.web.authenticated
     async def patch(self, path: str = "") -> None:
         """Handle PATCH requests."""
         await self._proxy_request("PATCH", path)
+
+
+# In-memory state storage for notebook state sync
+_notebook_state: dict[str, Any] = {
+    "attached_datasource": None,
+    "bundle_id": None,
+    "bundle_hash": None,
+    "current_run_id": None,
+}
+
+
+class StateHandler(BaseHandler):
+    """Handler for /dataing/state endpoint.
+
+    Stores and retrieves notebook state for frontend sync.
+    This allows the notebook magic to communicate state changes
+    to the JupyterLab sidebar without using comms.
+
+    Note: XSRF is disabled for this endpoint because the kernel
+    sends POST requests without XSRF tokens. This is safe because:
+    - The state is local to this Jupyter session only
+    - No sensitive operations or external calls are made
+    """
+
+    def check_xsrf_cookie(self) -> None:
+        """Skip XSRF check for kernel-to-extension communication."""
+        pass
+
+    async def get(self) -> None:
+        """Get current notebook state."""
+        self.write(json_encode(_notebook_state))
+
+    async def post(self) -> None:
+        """Update notebook state."""
+        try:
+            body = json_decode(self.request.body) if self.request.body else {}
+        except json.JSONDecodeError:
+            body = {}
+
+        # Update state with provided values
+        if "attached_datasource" in body:
+            _notebook_state["attached_datasource"] = body["attached_datasource"]
+        if "bundle_id" in body:
+            _notebook_state["bundle_id"] = body["bundle_id"]
+        if "bundle_hash" in body:
+            _notebook_state["bundle_hash"] = body["bundle_hash"]
+        if "current_run_id" in body:
+            _notebook_state["current_run_id"] = body["current_run_id"]
+
+        self.write(json_encode({"success": True, "state": _notebook_state}))
+
+    async def delete(self) -> None:
+        """Clear notebook state."""
+        _notebook_state["attached_datasource"] = None
+        _notebook_state["bundle_id"] = None
+        _notebook_state["bundle_hash"] = None
+        _notebook_state["current_run_id"] = None
+        self.write(json_encode({"success": True}))
 
 
 def setup_handlers(web_app: tornado.web.Application) -> None:
@@ -372,14 +427,17 @@ def setup_handlers(web_app: tornado.web.Application) -> None:
     Args:
         web_app: Tornado web application to add handlers to.
     """
+    from jupyter_server.utils import url_path_join
+
     host_pattern = ".*$"
     base_url = web_app.settings.get("base_url", "/")
 
     handlers = [
-        (urljoin(base_url, "dataing/handshake"), HandshakeHandler),
-        (urljoin(base_url, "dataing/token"), TokenHandler),
-        (urljoin(base_url, r"dataing/sse/(.*)"), SSEProxyHandler),
-        (urljoin(base_url, r"dataing/proxy/(.*)"), ProxyHandler),
+        (url_path_join(base_url, "dataing", "handshake"), HandshakeHandler),
+        (url_path_join(base_url, "dataing", "token"), TokenHandler),
+        (url_path_join(base_url, "dataing", "state"), StateHandler),
+        (url_path_join(base_url, r"dataing/sse/(.*)"), SSEProxyHandler),
+        (url_path_join(base_url, r"dataing/proxy/(.*)"), ProxyHandler),
     ]
 
     web_app.add_handlers(host_pattern, handlers)

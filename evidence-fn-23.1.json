@@ -1,0 +1,31 @@
+{
+  "tests": [
+    "python-packages/dataing/tests/unit/api/test_asset_instances_routes.py::TestAssetInstancesSearch::test_search_returns_results",
+    "python-packages/dataing/tests/unit/api/test_asset_instances_routes.py::TestAssetInstancesSearch::test_search_with_pagination_cursor",
+    "python-packages/dataing/tests/unit/api/test_asset_instances_routes.py::TestAssetInstancesSearch::test_search_with_datasource_filter",
+    "python-packages/dataing/tests/unit/api/test_asset_instances_routes.py::TestAssetInstancesSearch::test_search_requires_query_param",
+    "python-packages/dataing/tests/unit/api/test_asset_instances_routes.py::TestAssetInstancesSearch::test_search_query_min_length",
+    "python-packages/dataing/tests/unit/api/test_asset_instances_routes.py::TestAssetInstancesSearch::test_search_limit_max_100",
+    "python-packages/dataing/tests/unit/api/test_asset_instances_routes.py::TestAssetInstancesSearch::test_search_returns_cross_datasource_results",
+    "python-packages/dataing/tests/unit/api/test_asset_instances_routes.py::TestAssetInstancesSearch::test_search_requires_auth",
+    "python-packages/dataing/tests/unit/adapters/db/test_app_db_asset_search.py::TestSearchAssetInstances::test_search_returns_results_with_datasource_context",
+    "python-packages/dataing/tests/unit/adapters/db/test_app_db_asset_search.py::TestSearchAssetInstances::test_search_pagination_cursor",
+    "python-packages/dataing/tests/unit/adapters/db/test_app_db_asset_search.py::TestSearchAssetInstances::test_search_with_cursor_uses_cursor_filter",
+    "python-packages/dataing/tests/unit/adapters/db/test_app_db_asset_search.py::TestSearchAssetInstances::test_search_with_datasource_filter",
+    "python-packages/dataing/tests/unit/adapters/db/test_app_db_asset_search.py::TestSearchAssetInstances::test_search_limit_capped_at_100",
+    "python-packages/dataing/tests/unit/adapters/db/test_app_db_asset_search.py::TestSearchAssetInstances::test_search_match_reason_priority"
+  ],
+  "files_created": [
+    "python-packages/dataing/src/dataing/entrypoints/api/routes/asset_instances.py",
+    "python-packages/dataing/tests/unit/api/test_asset_instances_routes.py",
+    "python-packages/dataing/tests/unit/adapters/db/test_app_db_asset_search.py"
+  ],
+  "files_modified": [
+    "python-packages/dataing/src/dataing/adapters/db/app_db.py",
+    "python-packages/dataing/src/dataing/entrypoints/api/routes/__init__.py"
+  ],
+  "linting": {
+    "ruff": "pass",
+    "mypy": "pass"
+  }
+}

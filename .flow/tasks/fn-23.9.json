@@ -1,0 +1,17 @@
+{
+  "assignee": null,
+  "claim_note": "",
+  "claimed_at": null,
+  "created_at": "2026-01-21T11:52:43.922162Z",
+  "depends_on": [
+    "fn-23.4",
+    "fn-23.6"
+  ],
+  "epic": "fn-23",
+  "id": "fn-23.9",
+  "priority": null,
+  "spec_path": ".flow/tasks/fn-23.9.md",
+  "status": "todo",
+  "title": "Unified Workspace Context",
+  "updated_at": "2026-01-21T11:55:50.474914Z"
+}

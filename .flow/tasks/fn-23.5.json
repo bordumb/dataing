@@ -1,0 +1,14 @@
+{
+  "assignee": null,
+  "claim_note": "",
+  "claimed_at": null,
+  "created_at": "2026-01-21T11:52:43.174078Z",
+  "depends_on": [],
+  "epic": "fn-23",
+  "id": "fn-23.5",
+  "priority": null,
+  "spec_path": ".flow/tasks/fn-23.5.md",
+  "status": "todo",
+  "title": "Settings Persistence via ISettingRegistry",
+  "updated_at": "2026-01-21T11:55:30.271355Z"
+}

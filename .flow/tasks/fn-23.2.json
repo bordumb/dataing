@@ -1,0 +1,14 @@
+{
+  "assignee": null,
+  "claim_note": "",
+  "claimed_at": null,
+  "created_at": "2026-01-21T11:52:42.590171Z",
+  "depends_on": [],
+  "epic": "fn-23",
+  "id": "fn-23.2",
+  "priority": null,
+  "spec_path": ".flow/tasks/fn-23.2.md",
+  "status": "todo",
+  "title": "Server Extension Credential Storage",
+  "updated_at": "2026-01-21T11:55:16.731373Z"
+}

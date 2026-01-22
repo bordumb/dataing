@@ -1,5 +1,5 @@
 import * as React from 'react'
-import { Plus, Users, Lock, Trash2, Loader2 } from 'lucide-react'
+import { Plus, Users, Lock, Trash2, Loader2, Settings } from 'lucide-react'
 import { toast } from 'sonner'
 import { useQueryClient } from '@tanstack/react-query'
 
@@ -24,12 +24,14 @@ import {
   getListTeamsApiV1TeamsGetQueryKey,
 } from '@/lib/api/generated/teams/teams'
 import type { TeamResponse } from '@/lib/api/model'
+import { TeamPolicyEditor } from './team-policy-editor'
 
 export function TeamsSettings() {
   const queryClient = useQueryClient()
   const [showCreateDialog, setShowCreateDialog] = React.useState(false)
   const [newTeamName, setNewTeamName] = React.useState('')
   const [teamToDelete, setTeamToDelete] = React.useState<TeamResponse | null>(null)
+  const [teamForPolicy, setTeamForPolicy] = React.useState<TeamResponse | null>(null)
 
   const { data: teamsData, isLoading, error } = useListTeamsApiV1TeamsGet()
   const teams = teamsData?.teams ?? []
@@ -159,6 +161,14 @@ export function TeamsSettings() {
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => setTeamForPolicy(team)}
+                      title="Configure Policy"
+                    >
+                      <Settings className="h-4 w-4" />
+                    </Button>
                     {!team.is_scim_managed && (
                       <Button
                         variant="ghost"
@@ -234,6 +244,15 @@ export function TeamsSettings() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Team Policy Editor */}
+      {teamForPolicy && (
+        <TeamPolicyEditor
+          teamId={teamForPolicy.id}
+          teamName={teamForPolicy.name}
+          onClose={() => setTeamForPolicy(null)}
+        />
+      )}
     </>
   )
 }

@@ -5,6 +5,6 @@
  * Autonomous Data Quality Investigation
  * OpenAPI spec version: 2.0.0
  */
-import type { DatasetResponse } from "./datasetResponse";
+import type { TeamPolicyResponse } from "./teamPolicyResponse";
 
-export type LineageGraphResponseDatasets = { [key: string]: DatasetResponse };
+export type TeamPolicyFullResponsePolicy = TeamPolicyResponse | null;

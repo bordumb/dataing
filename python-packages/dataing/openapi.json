@@ -4632,7 +4632,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/dataing__entrypoints__api__routes__lineage__LineageGraphResponse"
+                  "$ref": "#/components/schemas/LineageGraphResponse"
                 }
               }
             }
@@ -7653,6 +7653,367 @@
         }
       }
     },
+    "/api/v1/teams/teams/{team_id}/policy": {
+      "get": {
+        "tags": [
+          "teams"
+        ],
+        "summary": "Get Team Policy",
+        "description": "Get the full policy configuration for a team.\n\nReturns the team policy, all overrides, and queue limits.",
+        "operationId": "get_team_policy_api_v1_teams_teams__team_id__policy_get",
+        "security": [
+          {
+            "APIKeyHeader": []
+          },
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "team_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Team Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TeamPolicyFullResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "teams"
+        ],
+        "summary": "Update Team Policy",
+        "description": "Update or create the team policy.\n\nRequires admin scope.",
+        "operationId": "update_team_policy_api_v1_teams_teams__team_id__policy_put",
+        "security": [
+          {
+            "APIKeyHeader": []
+          },
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "team_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Team Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TeamPolicyUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TeamPolicyResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/teams/teams/{team_id}/policy/overrides": {
+      "post": {
+        "tags": [
+          "teams"
+        ],
+        "summary": "Create Policy Override",
+        "description": "Create a policy override for a dataset or tag.\n\nRequires admin scope.",
+        "operationId": "create_policy_override_api_v1_teams_teams__team_id__policy_overrides_post",
+        "security": [
+          {
+            "APIKeyHeader": []
+          },
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "team_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Team Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TeamPolicyOverrideCreate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TeamPolicyOverrideResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/teams/teams/{team_id}/policy/overrides/{override_id}": {
+      "put": {
+        "tags": [
+          "teams"
+        ],
+        "summary": "Update Policy Override",
+        "description": "Update a policy override.\n\nRequires admin scope.",
+        "operationId": "update_policy_override_api_v1_teams_teams__team_id__policy_overrides__override_id__put",
+        "security": [
+          {
+            "APIKeyHeader": []
+          },
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "team_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Team Id"
+            }
+          },
+          {
+            "name": "override_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Override Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TeamPolicyOverrideUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TeamPolicyOverrideResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "teams"
+        ],
+        "summary": "Delete Policy Override",
+        "description": "Delete a policy override.\n\nRequires admin scope.",
+        "operationId": "delete_policy_override_api_v1_teams_teams__team_id__policy_overrides__override_id__delete",
+        "security": [
+          {
+            "APIKeyHeader": []
+          },
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "team_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Team Id"
+            }
+          },
+          {
+            "name": "override_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Override Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/teams/teams/{team_id}/policy/queue-limits": {
+      "put": {
+        "tags": [
+          "teams"
+        ],
+        "summary": "Update Queue Limits",
+        "description": "Update or create queue limits for a team.\n\nRequires admin scope.",
+        "operationId": "update_queue_limits_api_v1_teams_teams__team_id__policy_queue_limits_put",
+        "security": [
+          {
+            "APIKeyHeader": []
+          },
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "team_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Team Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TeamQueueLimitsUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TeamQueueLimitsResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/teams/": {
       "get": {
         "tags": [
@@ -8048,6 +8409,367 @@
         "responses": {
           "204": {
             "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/teams/{team_id}/policy": {
+      "get": {
+        "tags": [
+          "teams"
+        ],
+        "summary": "Get Team Policy",
+        "description": "Get the full policy configuration for a team.\n\nReturns the team policy, all overrides, and queue limits.",
+        "operationId": "get_team_policy_api_v1_teams__team_id__policy_get",
+        "security": [
+          {
+            "APIKeyHeader": []
+          },
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "team_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Team Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TeamPolicyFullResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "teams"
+        ],
+        "summary": "Update Team Policy",
+        "description": "Update or create the team policy.\n\nRequires admin scope.",
+        "operationId": "update_team_policy_api_v1_teams__team_id__policy_put",
+        "security": [
+          {
+            "APIKeyHeader": []
+          },
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "team_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Team Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TeamPolicyUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TeamPolicyResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/teams/{team_id}/policy/overrides": {
+      "post": {
+        "tags": [
+          "teams"
+        ],
+        "summary": "Create Policy Override",
+        "description": "Create a policy override for a dataset or tag.\n\nRequires admin scope.",
+        "operationId": "create_policy_override_api_v1_teams__team_id__policy_overrides_post",
+        "security": [
+          {
+            "APIKeyHeader": []
+          },
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "team_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Team Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TeamPolicyOverrideCreate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TeamPolicyOverrideResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/teams/{team_id}/policy/overrides/{override_id}": {
+      "put": {
+        "tags": [
+          "teams"
+        ],
+        "summary": "Update Policy Override",
+        "description": "Update a policy override.\n\nRequires admin scope.",
+        "operationId": "update_policy_override_api_v1_teams__team_id__policy_overrides__override_id__put",
+        "security": [
+          {
+            "APIKeyHeader": []
+          },
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "team_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Team Id"
+            }
+          },
+          {
+            "name": "override_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Override Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TeamPolicyOverrideUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TeamPolicyOverrideResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "teams"
+        ],
+        "summary": "Delete Policy Override",
+        "description": "Delete a policy override.\n\nRequires admin scope.",
+        "operationId": "delete_policy_override_api_v1_teams__team_id__policy_overrides__override_id__delete",
+        "security": [
+          {
+            "APIKeyHeader": []
+          },
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "team_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Team Id"
+            }
+          },
+          {
+            "name": "override_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Override Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/teams/{team_id}/policy/queue-limits": {
+      "put": {
+        "tags": [
+          "teams"
+        ],
+        "summary": "Update Queue Limits",
+        "description": "Update or create queue limits for a team.\n\nRequires admin scope.",
+        "operationId": "update_queue_limits_api_v1_teams__team_id__policy_queue_limits_put",
+        "security": [
+          {
+            "APIKeyHeader": []
+          },
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "team_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Team Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TeamQueueLimitsUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TeamQueueLimitsResponse"
+                }
+              }
+            }
           },
           "422": {
             "description": "Validation Error",
@@ -9102,11 +9824,13 @@
         "properties": {
           "platform": {
             "type": "string",
-            "title": "Platform"
+            "title": "Platform",
+            "description": "Data platform (postgres, snowflake, dbt)"
           },
           "name": {
             "type": "string",
-            "title": "Name"
+            "title": "Name",
+            "description": "Fully qualified name (db.schema.table)"
           },
           "datasource_id": {
             "anyOf": [
@@ -9117,7 +9841,8 @@
                 "type": "null"
               }
             ],
-            "title": "Datasource Id"
+            "title": "Datasource Id",
+            "description": "Optional datasource ID for disambiguation"
           }
         },
         "type": "object",
@@ -9354,7 +10079,7 @@
           "lineage": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/LineageGraphResponse"
+                "$ref": "#/components/schemas/dataing__entrypoints__api__routes__bundles__LineageGraphResponse"
               },
               {
                 "type": "null"
@@ -9437,7 +10162,7 @@
         "properties": {
           "assets": {
             "items": {
-              "$ref": "#/components/schemas/dataing__entrypoints__api__routes__bundles__AssetRefRequest"
+              "$ref": "#/components/schemas/AssetRefRequest"
             },
             "type": "array",
             "minItems": 1,
@@ -10593,7 +11318,7 @@
         "properties": {
           "assets": {
             "items": {
-              "$ref": "#/components/schemas/AssetRefRequest"
+              "$ref": "#/components/schemas/dataing__entrypoints__api__routes__runs__AssetRefRequest"
             },
             "type": "array",
             "title": "Assets"
@@ -11879,35 +12604,40 @@
       "LineageGraphResponse": {
         "properties": {
           "root": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
+            "type": "string",
             "title": "Root"
           },
           "datasets": {
             "additionalProperties": {
-              "additionalProperties": true,
-              "type": "object"
+              "$ref": "#/components/schemas/DatasetResponse"
             },
             "type": "object",
             "title": "Datasets"
           },
           "edges": {
             "items": {
-              "$ref": "#/components/schemas/LineageEdge"
+              "$ref": "#/components/schemas/LineageEdgeResponse"
             },
             "type": "array",
             "title": "Edges"
+          },
+          "jobs": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/JobResponse"
+            },
+            "type": "object",
+            "title": "Jobs"
           }
         },
         "type": "object",
+        "required": [
+          "root",
+          "datasets",
+          "edges",
+          "jobs"
+        ],
         "title": "LineageGraphResponse",
-        "description": "Lineage graph response."
+        "description": "Response for a lineage graph."
       },
       "LineageProviderResponse": {
         "properties": {
@@ -13814,6 +14544,436 @@
         "title": "TeamMemberAdd",
         "description": "Add member request."
       },
+      "TeamPolicyFullResponse": {
+        "properties": {
+          "policy": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TeamPolicyResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "overrides": {
+            "items": {
+              "$ref": "#/components/schemas/TeamPolicyOverrideResponse"
+            },
+            "type": "array",
+            "title": "Overrides"
+          },
+          "queue_limits": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TeamQueueLimitsResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "title": "TeamPolicyFullResponse",
+        "description": "Full team policy response including overrides and queue limits."
+      },
+      "TeamPolicyOverrideCreate": {
+        "properties": {
+          "dataset_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dataset Id"
+          },
+          "tag_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tag Id"
+          },
+          "default_action": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Default Action"
+          },
+          "auto_investigate_min_severity": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Auto Investigate Min Severity"
+          },
+          "review_required_max_severity": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Review Required Max Severity"
+          }
+        },
+        "type": "object",
+        "title": "TeamPolicyOverrideCreate",
+        "description": "Create a policy override."
+      },
+      "TeamPolicyOverrideResponse": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "team_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Team Id"
+          },
+          "dataset_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dataset Id"
+          },
+          "tag_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tag Id"
+          },
+          "default_action": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Default Action"
+          },
+          "auto_investigate_min_severity": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Auto Investigate Min Severity"
+          },
+          "review_required_max_severity": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Review Required Max Severity"
+          },
+          "is_active": {
+            "type": "boolean",
+            "title": "Is Active",
+            "default": true
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "team_id"
+        ],
+        "title": "TeamPolicyOverrideResponse",
+        "description": "Team policy override response."
+      },
+      "TeamPolicyOverrideUpdate": {
+        "properties": {
+          "default_action": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Default Action"
+          },
+          "auto_investigate_min_severity": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Auto Investigate Min Severity"
+          },
+          "review_required_max_severity": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Review Required Max Severity"
+          }
+        },
+        "type": "object",
+        "title": "TeamPolicyOverrideUpdate",
+        "description": "Update a policy override."
+      },
+      "TeamPolicyResponse": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "team_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Team Id"
+          },
+          "sources": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Sources"
+          },
+          "default_action": {
+            "type": "string",
+            "title": "Default Action"
+          },
+          "auto_investigate_min_severity": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Auto Investigate Min Severity"
+          },
+          "review_required_max_severity": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Review Required Max Severity"
+          },
+          "is_active": {
+            "type": "boolean",
+            "title": "Is Active",
+            "default": true
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "team_id",
+          "default_action"
+        ],
+        "title": "TeamPolicyResponse",
+        "description": "Team policy response."
+      },
+      "TeamPolicyUpdate": {
+        "properties": {
+          "sources": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sources"
+          },
+          "default_action": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Default Action"
+          },
+          "auto_investigate_min_severity": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Auto Investigate Min Severity"
+          },
+          "review_required_max_severity": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Review Required Max Severity"
+          }
+        },
+        "type": "object",
+        "title": "TeamPolicyUpdate",
+        "description": "Team policy update request."
+      },
+      "TeamQueueLimitsResponse": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "team_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Team Id"
+          },
+          "rate_limit_per_minute": {
+            "type": "integer",
+            "title": "Rate Limit Per Minute",
+            "default": 60
+          },
+          "burst_size": {
+            "type": "integer",
+            "title": "Burst Size",
+            "default": 10
+          },
+          "max_concurrent": {
+            "type": "integer",
+            "title": "Max Concurrent",
+            "default": 5
+          },
+          "batch_size": {
+            "type": "integer",
+            "title": "Batch Size",
+            "default": 5
+          },
+          "is_active": {
+            "type": "boolean",
+            "title": "Is Active",
+            "default": true
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "team_id"
+        ],
+        "title": "TeamQueueLimitsResponse",
+        "description": "Team queue limits response."
+      },
+      "TeamQueueLimitsUpdate": {
+        "properties": {
+          "rate_limit_per_minute": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rate Limit Per Minute"
+          },
+          "burst_size": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Burst Size"
+          },
+          "max_concurrent": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Concurrent"
+          },
+          "batch_size": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Batch Size"
+          }
+        },
+        "type": "object",
+        "title": "TeamQueueLimitsUpdate",
+        "description": "Team queue limits update request."
+      },
       "TeamResponse": {
         "properties": {
           "id": {
@@ -14457,6 +15617,29 @@
           "created": {
             "type": "boolean",
             "title": "Created"
+          },
+          "policy_action": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Policy Action"
+          },
+          "investigation_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Investigation Id"
           }
         },
         "type": "object",
@@ -14469,19 +15652,9 @@
         "title": "WebhookIssueResponse",
         "description": "Response from webhook issue creation."
       },
-      "dataing__entrypoints__api__routes__bundles__AssetRefRequest": {
+      "dataing__entrypoints__api__routes__bundles__LineageGraphResponse": {
         "properties": {
-          "platform": {
-            "type": "string",
-            "title": "Platform",
-            "description": "Data platform (postgres, snowflake, dbt)"
-          },
-          "name": {
-            "type": "string",
-            "title": "Name",
-            "description": "Fully qualified name (db.schema.table)"
-          },
-          "datasource_id": {
+          "root": {
             "anyOf": [
               {
                 "type": "string"
@@ -14490,17 +15663,27 @@
                 "type": "null"
               }
             ],
-            "title": "Datasource Id",
-            "description": "Optional datasource ID for disambiguation"
+            "title": "Root"
+          },
+          "datasets": {
+            "additionalProperties": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "object",
+            "title": "Datasets"
+          },
+          "edges": {
+            "items": {
+              "$ref": "#/components/schemas/LineageEdge"
+            },
+            "type": "array",
+            "title": "Edges"
           }
         },
         "type": "object",
-        "required": [
-          "platform",
-          "name"
-        ],
-        "title": "AssetRefRequest",
-        "description": "Asset reference in request."
+        "title": "LineageGraphResponse",
+        "description": "Lineage graph response."
       },
       "dataing__entrypoints__api__routes__datasources__TestConnectionResponse": {
         "properties": {
@@ -14543,43 +15726,35 @@
         "title": "TestConnectionResponse",
         "description": "Response for testing a connection."
       },
-      "dataing__entrypoints__api__routes__lineage__LineageGraphResponse": {
+      "dataing__entrypoints__api__routes__runs__AssetRefRequest": {
         "properties": {
-          "root": {
+          "platform": {
             "type": "string",
-            "title": "Root"
+            "title": "Platform"
           },
-          "datasets": {
-            "additionalProperties": {
-              "$ref": "#/components/schemas/DatasetResponse"
-            },
-            "type": "object",
-            "title": "Datasets"
+          "name": {
+            "type": "string",
+            "title": "Name"
           },
-          "edges": {
-            "items": {
-              "$ref": "#/components/schemas/LineageEdgeResponse"
-            },
-            "type": "array",
-            "title": "Edges"
-          },
-          "jobs": {
-            "additionalProperties": {
-              "$ref": "#/components/schemas/JobResponse"
-            },
-            "type": "object",
-            "title": "Jobs"
+          "datasource_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Datasource Id"
           }
         },
         "type": "object",
         "required": [
-          "root",
-          "datasets",
-          "edges",
-          "jobs"
+          "platform",
+          "name"
         ],
-        "title": "LineageGraphResponse",
-        "description": "Response for a lineage graph."
+        "title": "AssetRefRequest",
+        "description": "Asset reference in request."
       }
     },
     "securitySchemes": {

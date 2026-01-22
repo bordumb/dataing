@@ -1,0 +1,16 @@
+{
+  "assignee": null,
+  "claim_note": "",
+  "claimed_at": null,
+  "created_at": "2026-01-22T18:02:44.208277Z",
+  "depends_on": [
+    "fn-24.2"
+  ],
+  "epic": "fn-24",
+  "id": "fn-24.4",
+  "priority": null,
+  "spec_path": ".flow/tasks/fn-24.4.md",
+  "status": "todo",
+  "title": "Investigation queue + per-team rate limits (Redis)",
+  "updated_at": "2026-01-22T18:02:44.208459Z"
+}

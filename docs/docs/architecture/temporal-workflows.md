@@ -260,5 +260,4 @@ Set alerts for:
 ## See Also
 
 - [How Investigations Work](../concepts/investigations.md) - User-facing investigation docs
-- [The Agent Engine (Maistro)](../concepts/agent-workflows.md) - Step/signal protocol
 - [Temporal Documentation](https://docs.temporal.io) - Official Temporal docs

@@ -29,10 +29,16 @@ Evidence is:
 
 ## Evidence Kinds
 
-::: dataing.core.evidence.EvidenceKind
-    options:
-      show_source: false
-      show_root_heading: false
+The `EvidenceKind` enum defines the types of evidence that can be collected:
+
+| Kind | Value | Description |
+|------|-------|-------------|
+| `QUERY_RESULT` | `query_result` | SQL query execution results |
+| `HYPOTHESIS` | `hypothesis` | Hypothesis evaluation outcome |
+| `LINEAGE_TRACE` | `lineage_trace` | Data lineage traversal |
+| `SCHEMA_SNAPSHOT` | `schema_snapshot` | Table schema capture |
+| `METRIC_CALCULATION` | `metric_calculation` | Calculated metric value |
+| `RUN_SUMMARY` | `run_summary` | Investigation summary |
 
 ---
 
@@ -40,10 +46,15 @@ Evidence is:
 
 All evidence types share these common fields:
 
-::: dataing.core.evidence.EvidenceBase
-    options:
-      show_source: false
-      show_root_heading: true
+| Field | Type | Description |
+|-------|------|-------------|
+| `id` | `UUID` | Unique identifier |
+| `run_id` | `UUID` | Parent run ID |
+| `seq` | `int` | Sequence number for ordering (>= 1) |
+| `kind` | `EvidenceKind` | Discriminator for evidence type |
+| `timestamp` | `datetime` | When evidence was created |
+| `prev_hash` | `str \| None` | Hash of previous evidence (for chain) |
+| `content_hash` | `str` | SHA256 hash of content |
 
 ---
 
@@ -51,10 +62,14 @@ All evidence types share these common fields:
 
 Captured when a SQL query is executed during investigation.
 
-::: dataing.core.evidence.QueryResultEvidence
-    options:
-      show_source: false
-      show_root_heading: true
+| Field | Type | Description |
+|-------|------|-------------|
+| `sql` | `str` | The SQL query executed |
+| `row_count` | `int` | Number of rows returned |
+| `columns` | `list[str]` | Column names |
+| `sample_rows` | `list[dict]` | Sample of result rows |
+| `execution_ms` | `int` | Query execution time in ms |
+| `error` | `str \| None` | Error message if query failed |
 
 **Example:**
 
@@ -78,17 +93,22 @@ Captured when a SQL query is executed during investigation.
 
 Captured when a hypothesis is evaluated.
 
-::: dataing.core.evidence.HypothesisEvidence
-    options:
-      show_source: false
-      show_root_heading: true
+| Field | Type | Description |
+|-------|------|-------------|
+| `hypothesis_id` | `str` | ID of the hypothesis |
+| `hypothesis_text` | `str` | The hypothesis statement |
+| `confidence` | `float` | Confidence score 0-1 |
+| `supporting_facts` | `list[str]` | Facts supporting the hypothesis |
+| `verdict` | `HypothesisVerdict` | Evaluation verdict |
+| `reasoning` | `str` | Explanation of verdict |
 
 **Verdicts:**
 
-::: dataing.core.evidence.HypothesisVerdict
-    options:
-      show_source: false
-      show_root_heading: false
+| Verdict | Description |
+|---------|-------------|
+| `accepted` | Hypothesis confirmed by evidence |
+| `rejected` | Hypothesis disproven by evidence |
+| `inconclusive` | Insufficient evidence to decide |
 
 **Example:**
 
@@ -113,10 +133,12 @@ Captured when a hypothesis is evaluated.
 
 Captured when data lineage is traversed.
 
-::: dataing.core.evidence.LineageTraceEvidence
-    options:
-      show_source: false
-      show_root_heading: true
+| Field | Type | Description |
+|-------|------|-------------|
+| `root_dataset` | `str` | Starting dataset for trace |
+| `upstream` | `list[str]` | Upstream datasets |
+| `downstream` | `list[str]` | Downstream datasets |
+| `edges` | `list[dict]` | Lineage edges with source/target |
 
 **Example:**
 
@@ -139,10 +161,12 @@ Captured when data lineage is traversed.
 
 Captured when a table schema is recorded.
 
-::: dataing.core.evidence.SchemaSnapshotEvidence
-    options:
-      show_source: false
-      show_root_heading: true
+| Field | Type | Description |
+|-------|------|-------------|
+| `dataset` | `str` | Dataset name |
+| `columns` | `list[dict]` | Column definitions (name, type, nullable) |
+| `row_count` | `int \| None` | Approximate row count |
+| `last_modified` | `datetime \| None` | Last modification time |
 
 **Example:**
 
@@ -166,10 +190,14 @@ Captured when a table schema is recorded.
 
 Captured when a data quality metric is calculated.
 
-::: dataing.core.evidence.MetricCalculationEvidence
-    options:
-      show_source: false
-      show_root_heading: true
+| Field | Type | Description |
+|-------|------|-------------|
+| `metric_name` | `str` | Name of the metric |
+| `metric_type` | `str` | Type of metric (count, rate, etc.) |
+| `value` | `float` | Calculated metric value |
+| `expected_value` | `float \| None` | Expected/baseline value |
+| `deviation_pct` | `float \| None` | Percentage deviation from expected |
+| `dimensions` | `dict[str, str]` | Dimension values for this calculation |
 
 **Example:**
 
@@ -191,10 +219,14 @@ Captured when a data quality metric is calculated.
 
 Captured at the end of an investigation run.
 
-::: dataing.core.evidence.RunSummaryEvidence
-    options:
-      show_source: false
-      show_root_heading: true
+| Field | Type | Description |
+|-------|------|-------------|
+| `root_cause` | `str \| None` | Identified root cause |
+| `confidence` | `float` | Confidence in finding (0-1) |
+| `recommendations` | `list[str]` | Recommended actions |
+| `hypotheses_evaluated` | `int` | Number of hypotheses evaluated |
+| `queries_executed` | `int` | Number of queries executed |
+| `duration_seconds` | `float` | Total run duration |
 
 **Example:**
 

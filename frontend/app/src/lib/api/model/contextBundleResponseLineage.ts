@@ -5,7 +5,6 @@
  * Autonomous Data Quality Investigation
  * OpenAPI spec version: 2.0.0
  */
-import type { DataingEntrypointsApiRoutesBundlesLineageGraphResponse } from "./dataingEntrypointsApiRoutesBundlesLineageGraphResponse";
+import type { LineageGraphResponse } from "./lineageGraphResponse";
 
-export type ContextBundleResponseLineage =
-  DataingEntrypointsApiRoutesBundlesLineageGraphResponse | null;
+export type ContextBundleResponseLineage = LineageGraphResponse | null;

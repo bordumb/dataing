@@ -3,16 +3,18 @@
  *
  * Provides:
  * - Connection status display
+ * - Connection wizard for configuring backend
  * - Datasource attach UI
  * - SSE streaming for run events
  * - Timeline rendering
  */
-import { Widget } from '@lumino/widgets';
+import { Widget, Panel } from '@lumino/widgets';
 import { Signal } from '@lumino/signaling';
+import { createConnectionWizardWidget } from './connectionWizard';
 /**
  * DataingWidget - Main sidebar widget
  */
-export class DataingWidget extends Widget {
+export class DataingWidget extends Panel {
     /**
      * Construct a new DataingWidget
      */
@@ -20,6 +22,8 @@ export class DataingWidget extends Widget {
         super();
         this._eventSource = null;
         this._stateChanged = new Signal(this);
+        this._wizardWidget = null;
+        this._serverBaseUrl = '';
         this.id = 'dataing-widget';
         this.title.label = 'Dataing';
         this.title.closable = true;
@@ -27,12 +31,53 @@ export class DataingWidget extends Widget {
         this._state = {
             connectionState: 'disconnected',
             backendUrl: '',
+            credentialMode: null,
+            showWizard: false,
             attachedDatasource: null,
             currentRunId: null,
             timeline: [],
-            errorMessage: null
+            errorMessage: null,
+            workspaceId: null,
+            kernelId: null
         };
+        // Create content widget for main UI
+        this._contentWidget = new Widget();
+        this._contentWidget.addClass('jp-DataingWidget-main');
+        this.addWidget(this._contentWidget);
         this._render();
+    }
+    /**
+     * Set the server base URL (used for wizard API calls)
+     */
+    setServerBaseUrl(url) {
+        this._serverBaseUrl = url;
+    }
+    /**
+     * Set the workspace ID (generated on first launch, persisted)
+     */
+    setWorkspaceId(workspaceId) {
+        this._state.workspaceId = workspaceId;
+    }
+    /**
+     * Set the active kernel ID (from current notebook)
+     * Pass null when no notebook is active or no kernel is running
+     */
+    setActiveKernel(kernelId) {
+        const changed = this._state.kernelId !== kernelId;
+        this._state.kernelId = kernelId;
+        if (changed) {
+            this._render();
+            this._stateChanged.emit(this._state);
+        }
+    }
+    /**
+     * Get current workspace context (workspace_id + kernel_id)
+     */
+    getWorkspaceContext() {
+        return {
+            workspaceId: this._state.workspaceId,
+            kernelId: this._state.kernelId
+        };
     }
     /**
      * Signal emitted when state changes
@@ -55,6 +100,92 @@ export class DataingWidget extends Widget {
         this._state.errorMessage = appState.errorMessage;
         this._render();
         this._stateChanged.emit(this._state);
+    }
+    /**
+     * Show the connection wizard
+     */
+    showWizard() {
+        if (this._wizardWidget) {
+            return; // Already showing
+        }
+        this._state.showWizard = true;
+        // Hide main content
+        this._contentWidget.hide();
+        // Create and show wizard
+        this._wizardWidget = createConnectionWizardWidget({
+            initialUrl: this._state.backendUrl || 'http://localhost:8000',
+            recentUrls: this._getRecentUrls?.() || [],
+            serverBaseUrl: this._serverBaseUrl,
+            onConnect: this._handleWizardConnect.bind(this),
+            onCancel: this._handleWizardCancel.bind(this)
+        });
+        this.addWidget(this._wizardWidget);
+        this._stateChanged.emit(this._state);
+    }
+    /**
+     * Hide the connection wizard
+     */
+    hideWizard() {
+        if (!this._wizardWidget) {
+            return;
+        }
+        this._state.showWizard = false;
+        // Remove wizard
+        this._wizardWidget.dispose();
+        this._wizardWidget = null;
+        // Show main content
+        this._contentWidget.show();
+        this._render();
+        this._stateChanged.emit(this._state);
+    }
+    /**
+     * Handle wizard connect callback
+     */
+    _handleWizardConnect(url, mode) {
+        this._state.backendUrl = url;
+        this._state.credentialMode = mode;
+        // Persist URL to settings if function available
+        if (this._updateBackendUrl) {
+            void this._updateBackendUrl(url);
+        }
+        this.hideWizard();
+    }
+    /**
+     * Handle wizard cancel callback
+     */
+    _handleWizardCancel() {
+        this.hideWizard();
+    }
+    /**
+     * Copy connection snippet to clipboard
+     *
+     * Fetches the snippet from the server to include attach commands
+     * and proper credential mode comments.
+     */
+    async _copySnippet() {
+        try {
+            const response = await fetch(`${this._serverBaseUrl}dataing/snippet`, {
+                credentials: 'same-origin'
+            });
+            if (response.ok) {
+                const data = await response.json();
+                const snippet = data.snippet;
+                await navigator.clipboard.writeText(snippet);
+                console.log('Copied to clipboard:', snippet);
+            }
+            else {
+                // Fallback to simple snippet
+                const fallback = `%dataing connect --base-url ${this._state.backendUrl}`;
+                await navigator.clipboard.writeText(fallback);
+                console.log('Copied fallback to clipboard:', fallback);
+            }
+        }
+        catch (error) {
+            // Fallback on error
+            const fallback = `%dataing connect --base-url ${this._state.backendUrl}`;
+            await navigator.clipboard.writeText(fallback);
+            console.log('Copied fallback to clipboard:', fallback);
+        }
     }
     /**
      * Attach to a datasource
@@ -133,10 +264,27 @@ export class DataingWidget extends Widget {
         this._state.currentRunId = null;
     }
     /**
+     * Format credential mode for display
+     */
+    _formatCredentialMode(mode) {
+        if (!mode)
+            return 'Unknown';
+        switch (mode) {
+            case 'keychain':
+                return 'OS Keychain';
+            case 'env_var':
+                return 'Environment Variable';
+            case 'session':
+                return 'Session Only';
+            default:
+                return mode;
+        }
+    }
+    /**
      * Render the widget
      */
     _render() {
-        const { connectionState, backendUrl, attachedDatasource, errorMessage } = this._state;
+        const { connectionState, backendUrl, credentialMode, attachedDatasource, errorMessage, kernelId } = this._state;
         // Status badge color
         const statusColors = {
             connected: '#10b981',
@@ -144,7 +292,10 @@ export class DataingWidget extends Widget {
             checking: '#f59e0b',
             error: '#ef4444'
         };
-        this.node.innerHTML = `
+        const isConnected = connectionState === 'connected';
+        const isDisconnected = connectionState === 'disconnected' || connectionState === 'error';
+        const hasKernel = kernelId !== null;
+        this._contentWidget.node.innerHTML = `
       <div class="jp-DataingWidget-content">
         <div class="jp-DataingWidget-header">
           <h3>Dataing</h3>
@@ -156,24 +307,65 @@ export class DataingWidget extends Widget {
           </span>
         </div>
 
-        <div class="jp-DataingWidget-section">
-          <label>Backend URL</label>
-          <div class="jp-DataingWidget-value">${backendUrl || 'Not configured'}</div>
-        </div>
-
-        <div class="jp-DataingWidget-section">
-          <label>Attached Datasource</label>
-          <div class="jp-DataingWidget-value">
-            ${attachedDatasource || 'None'}
-            ${attachedDatasource ? '<button class="jp-DataingWidget-detach">Detach</button>' : ''}
+        ${isDisconnected
+            ? `
+          <div class="jp-DataingWidget-connect-section">
+            <p>Not connected to Dataing backend.</p>
+            <button class="jp-DataingWidget-connect-btn">Connect</button>
           </div>
-        </div>
+        `
+            : ''}
 
-        ${errorMessage ? `
+        ${isConnected
+            ? `
+          <div class="jp-DataingWidget-section">
+            <label>Backend URL</label>
+            <div class="jp-DataingWidget-value">${backendUrl || 'Not configured'}</div>
+          </div>
+
+          <div class="jp-DataingWidget-section">
+            <label>Credential Storage</label>
+            <div class="jp-DataingWidget-value">${this._formatCredentialMode(credentialMode)}</div>
+          </div>
+
+          <div class="jp-DataingWidget-actions">
+            <button class="jp-DataingWidget-edit-btn">Edit Connection</button>
+            <button class="jp-DataingWidget-copy-btn">Copy Snippet</button>
+          </div>
+
+          <div class="jp-DataingWidget-section">
+            <label>Notebook Kernel</label>
+            <div class="jp-DataingWidget-value">
+              ${hasKernel ? '<span style="color: #10b981;">Active</span>' : '<span style="color: #6b7280;">Select a notebook to run investigations</span>'}
+            </div>
+          </div>
+
+          <div class="jp-DataingWidget-section">
+            <label>Attached Datasource</label>
+            <div class="jp-DataingWidget-value">
+              ${attachedDatasource || 'None'}
+              ${attachedDatasource ? '<button class="jp-DataingWidget-detach">Detach</button>' : ''}
+            </div>
+          </div>
+        `
+            : ''}
+
+        ${connectionState === 'checking'
+            ? `
+          <div class="jp-DataingWidget-checking">
+            <span class="jp-DataingWidget-spinner"></span>
+            <span>Checking connection...</span>
+          </div>
+        `
+            : ''}
+
+        ${errorMessage
+            ? `
           <div class="jp-DataingWidget-error">
             ${errorMessage}
           </div>
-        ` : ''}
+        `
+            : ''}
 
         <div class="jp-DataingWidget-timeline" id="dataing-timeline">
           <!-- Timeline events rendered here -->
@@ -181,7 +373,19 @@ export class DataingWidget extends Widget {
       </div>
     `;
         // Add event listeners
-        const detachBtn = this.node.querySelector('.jp-DataingWidget-detach');
+        const connectBtn = this._contentWidget.node.querySelector('.jp-DataingWidget-connect-btn');
+        if (connectBtn) {
+            connectBtn.addEventListener('click', () => this.showWizard());
+        }
+        const editBtn = this._contentWidget.node.querySelector('.jp-DataingWidget-edit-btn');
+        if (editBtn) {
+            editBtn.addEventListener('click', () => this.showWizard());
+        }
+        const copyBtn = this._contentWidget.node.querySelector('.jp-DataingWidget-copy-btn');
+        if (copyBtn) {
+            copyBtn.addEventListener('click', () => this._copySnippet());
+        }
+        const detachBtn = this._contentWidget.node.querySelector('.jp-DataingWidget-detach');
         if (detachBtn) {
             detachBtn.addEventListener('click', () => this.detach());
         }
@@ -190,7 +394,7 @@ export class DataingWidget extends Widget {
      * Render timeline events
      */
     _renderTimeline() {
-        const timelineEl = this.node.querySelector('#dataing-timeline');
+        const timelineEl = this._contentWidget.node.querySelector('#dataing-timeline');
         if (!timelineEl)
             return;
         const eventColors = {

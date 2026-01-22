@@ -53,7 +53,7 @@ __webpack_require__.d(exports, {
 /************************************************************************/
 /******/ 	// The module cache
 /******/ 	var __webpack_module_cache__ = {};
-/******/ 	
+/******/
 /******/ 	// The require function
 /******/ 	function __webpack_require__(moduleId) {
 /******/ 		// Check if module is in cache
@@ -73,20 +73,20 @@ __webpack_require__.d(exports, {
 /******/ 			// no module.loaded needed
 /******/ 			exports: {}
 /******/ 		};
-/******/ 	
+/******/
 /******/ 		// Execute the module function
 /******/ 		__webpack_modules__[moduleId](module, module.exports, __webpack_require__);
-/******/ 	
+/******/
 /******/ 		// Return the exports of the module
 /******/ 		return module.exports;
 /******/ 	}
-/******/ 	
+/******/
 /******/ 	// expose the modules object (__webpack_modules__)
 /******/ 	__webpack_require__.m = __webpack_modules__;
-/******/ 	
+/******/
 /******/ 	// expose the module cache
 /******/ 	__webpack_require__.c = __webpack_module_cache__;
-/******/ 	
+/******/
 /************************************************************************/
 /******/ 	/* webpack/runtime/compat get default export */
 /******/ 	(() => {
@@ -99,7 +99,7 @@ __webpack_require__.d(exports, {
 /******/ 			return getter;
 /******/ 		};
 /******/ 	})();
-/******/ 	
+/******/
 /******/ 	/* webpack/runtime/define property getters */
 /******/ 	(() => {
 /******/ 		// define getter functions for harmony exports
@@ -111,7 +111,7 @@ __webpack_require__.d(exports, {
 /******/ 			}
 /******/ 		};
 /******/ 	})();
-/******/ 	
+/******/
 /******/ 	/* webpack/runtime/ensure chunk */
 /******/ 	(() => {
 /******/ 		__webpack_require__.f = {};
@@ -124,16 +124,16 @@ __webpack_require__.d(exports, {
 /******/ 			}, []));
 /******/ 		};
 /******/ 	})();
-/******/ 	
+/******/
 /******/ 	/* webpack/runtime/get javascript chunk filename */
 /******/ 	(() => {
 /******/ 		// This function allow to reference async chunks
 /******/ 		__webpack_require__.u = (chunkId) => {
 /******/ 			// return url for filenames based on template
-/******/ 			return "" + chunkId + "." + {"lib_index_js":"c035019edfa20b0f5224","style_index_js":"4a481d18747b9ce62e5b"}[chunkId] + ".js";
+/******/ 			return "" + chunkId + "." + {"lib_index_js":"cf88658e5418c4390d83","style_index_js":"20dbd831d502cb913b89"}[chunkId] + ".js";
 /******/ 		};
 /******/ 	})();
-/******/ 	
+/******/
 /******/ 	/* webpack/runtime/global */
 /******/ 	(() => {
 /******/ 		__webpack_require__.g = (function() {
@@ -145,12 +145,12 @@ __webpack_require__.d(exports, {
 /******/ 			}
 /******/ 		})();
 /******/ 	})();
-/******/ 	
+/******/
 /******/ 	/* webpack/runtime/hasOwnProperty shorthand */
 /******/ 	(() => {
 /******/ 		__webpack_require__.o = (obj, prop) => (Object.prototype.hasOwnProperty.call(obj, prop))
 /******/ 	})();
-/******/ 	
+/******/
 /******/ 	/* webpack/runtime/load script */
 /******/ 	(() => {
 /******/ 		var inProgress = {};
@@ -169,13 +169,13 @@ __webpack_require__.d(exports, {
 /******/ 			if(!script) {
 /******/ 				needAttach = true;
 /******/ 				script = document.createElement('script');
-/******/ 		
+/******/
 /******/ 				script.charset = 'utf-8';
 /******/ 				if (__webpack_require__.nc) {
 /******/ 					script.setAttribute("nonce", __webpack_require__.nc);
 /******/ 				}
 /******/ 				script.setAttribute("data-webpack", dataWebpackPrefix + key);
-/******/ 		
+/******/
 /******/ 				script.src = url;
 /******/ 			}
 /******/ 			inProgress[url] = [done];
@@ -195,7 +195,7 @@ __webpack_require__.d(exports, {
 /******/ 			needAttach && document.head.appendChild(script);
 /******/ 		};
 /******/ 	})();
-/******/ 	
+/******/
 /******/ 	/* webpack/runtime/make namespace object */
 /******/ 	(() => {
 /******/ 		// define __esModule on exports
@@ -206,7 +206,7 @@ __webpack_require__.d(exports, {
 /******/ 			Object.defineProperty(exports, '__esModule', { value: true });
 /******/ 		};
 /******/ 	})();
-/******/ 	
+/******/
 /******/ 	/* webpack/runtime/sharing */
 /******/ 	(() => {
 /******/ 		__webpack_require__.S = {};
@@ -256,7 +256,7 @@ __webpack_require__.d(exports, {
 /******/ 			return initPromises[name] = Promise.all(promises).then(() => (initPromises[name] = 1));
 /******/ 		};
 /******/ 	})();
-/******/ 	
+/******/
 /******/ 	/* webpack/runtime/publicPath */
 /******/ 	(() => {
 /******/ 		var scriptUrl;
@@ -279,7 +279,7 @@ __webpack_require__.d(exports, {
 /******/ 		scriptUrl = scriptUrl.replace(/^blob:/, "").replace(/#.*$/, "").replace(/\?.*$/, "").replace(/\/[^\/]+$/, "/");
 /******/ 		__webpack_require__.p = scriptUrl;
 /******/ 	})();
-/******/ 	
+/******/
 /******/ 	/* webpack/runtime/consumes */
 /******/ 	(() => {
 /******/ 		var parseVersion = (str) => {
@@ -360,7 +360,7 @@ __webpack_require__.d(exports, {
 /******/ 			}
 /******/ 			return fn(scopeName, __webpack_require__.S[scopeName], key, eager, c, d);
 /******/ 		});
-/******/ 		
+/******/
 /******/ 		var useFallback = (scopeName, key, fallback) => {
 /******/ 			return fallback ? fallback() : failAsNotExist(scopeName, key);
 /******/ 		}
@@ -410,9 +410,12 @@ __webpack_require__.d(exports, {
 /******/ 			"webpack/sharing/consume/default/@jupyterlab/statusbar": () => (loadSingletonVersion("default", "@jupyterlab/statusbar", false, [1,4,5,2])),
 /******/ 			"webpack/sharing/consume/default/@jupyterlab/apputils": () => (loadSingletonVersion("default", "@jupyterlab/apputils", false, [1,4,6,2])),
 /******/ 			"webpack/sharing/consume/default/@jupyterlab/services": () => (loadSingletonVersion("default", "@jupyterlab/services", false, [1,7,5,2])),
+/******/ 			"webpack/sharing/consume/default/@jupyterlab/notebook": () => (loadSingletonVersion("default", "@jupyterlab/notebook", false, [1,4,5,2])),
 /******/ 			"webpack/sharing/consume/default/@jupyterlab/coreutils": () => (loadSingletonVersion("default", "@jupyterlab/coreutils", false, [1,6,5,2])),
+/******/ 			"webpack/sharing/consume/default/@lumino/coreutils": () => (loadSingletonVersion("default", "@lumino/coreutils", false, [1,2,0,0])),
 /******/ 			"webpack/sharing/consume/default/@lumino/widgets": () => (loadSingletonVersion("default", "@lumino/widgets", false, [1,2,3,1,,"alpha",1])),
-/******/ 			"webpack/sharing/consume/default/@lumino/signaling": () => (loadSingletonVersion("default", "@lumino/signaling", false, [1,2,0,0]))
+/******/ 			"webpack/sharing/consume/default/@lumino/signaling": () => (loadSingletonVersion("default", "@lumino/signaling", false, [1,2,0,0])),
+/******/ 			"webpack/sharing/consume/default/react": () => (loadSingletonVersion("default", "react", false, [1,18,2,0]))
 /******/ 		};
 /******/ 		// no consumes in initial chunks
 /******/ 		var chunkMapping = {
@@ -422,9 +425,12 @@ __webpack_require__.d(exports, {
 /******/ 				"webpack/sharing/consume/default/@jupyterlab/statusbar",
 /******/ 				"webpack/sharing/consume/default/@jupyterlab/apputils",
 /******/ 				"webpack/sharing/consume/default/@jupyterlab/services",
+/******/ 				"webpack/sharing/consume/default/@jupyterlab/notebook",
 /******/ 				"webpack/sharing/consume/default/@jupyterlab/coreutils",
+/******/ 				"webpack/sharing/consume/default/@lumino/coreutils",
 /******/ 				"webpack/sharing/consume/default/@lumino/widgets",
-/******/ 				"webpack/sharing/consume/default/@lumino/signaling"
+/******/ 				"webpack/sharing/consume/default/@lumino/signaling",
+/******/ 				"webpack/sharing/consume/default/react"
 /******/ 			]
 /******/ 		};
 /******/ 		var startedInstallModules = {};
@@ -459,23 +465,23 @@ __webpack_require__.d(exports, {
 /******/ 			}
 /******/ 		}
 /******/ 	})();
-/******/ 	
+/******/
 /******/ 	/* webpack/runtime/jsonp chunk loading */
 /******/ 	(() => {
 /******/ 		// no baseURI
-/******/ 		
+/******/
 /******/ 		// object to store loaded and loading chunks
 /******/ 		// undefined = chunk not loaded, null = chunk preloaded/prefetched
 /******/ 		// [resolve, reject, Promise] = chunk loading, 0 = chunk loaded
 /******/ 		var installedChunks = {
 /******/ 			"@dataing/jupyterlab-dataing": 0
 /******/ 		};
-/******/ 		
+/******/
 /******/ 		__webpack_require__.f.j = (chunkId, promises) => {
 /******/ 				// JSONP chunk loading for javascript
 /******/ 				var installedChunkData = __webpack_require__.o(installedChunks, chunkId) ? installedChunks[chunkId] : undefined;
 /******/ 				if(installedChunkData !== 0) { // 0 means "already installed".
-/******/ 		
+/******/
 /******/ 					// a Promise means "currently loading".
 /******/ 					if(installedChunkData) {
 /******/ 						promises.push(installedChunkData[2]);
@@ -484,7 +490,7 @@ __webpack_require__.d(exports, {
 /******/ 							// setup Promise in chunk cache
 /******/ 							var promise = new Promise((resolve, reject) => (installedChunkData = installedChunks[chunkId] = [resolve, reject]));
 /******/ 							promises.push(installedChunkData[2] = promise);
-/******/ 		
+/******/
 /******/ 							// start chunk loading
 /******/ 							var url = __webpack_require__.p + __webpack_require__.u(chunkId);
 /******/ 							// create error before stack unwound to get useful stacktrace later
@@ -509,17 +515,17 @@ __webpack_require__.d(exports, {
 /******/ 					}
 /******/ 				}
 /******/ 		};
-/******/ 		
+/******/
 /******/ 		// no prefetching
-/******/ 		
+/******/
 /******/ 		// no preloaded
-/******/ 		
+/******/
 /******/ 		// no HMR
-/******/ 		
+/******/
 /******/ 		// no HMR manifest
-/******/ 		
+/******/
 /******/ 		// no on chunks loaded
-/******/ 		
+/******/
 /******/ 		// install a JSONP callback for chunk loading
 /******/ 		var webpackJsonpCallback = (parentChunkLoadingFunction, data) => {
 /******/ 			var [chunkIds, moreModules, runtime] = data;
@@ -542,27 +548,27 @@ __webpack_require__.d(exports, {
 /******/ 				}
 /******/ 				installedChunks[chunkId] = 0;
 /******/ 			}
-/******/ 		
+/******/
 /******/ 		}
-/******/ 		
+/******/
 /******/ 		var chunkLoadingGlobal = self["webpackChunk_dataing_jupyterlab_dataing"] = self["webpackChunk_dataing_jupyterlab_dataing"] || [];
 /******/ 		chunkLoadingGlobal.forEach(webpackJsonpCallback.bind(null, 0));
 /******/ 		chunkLoadingGlobal.push = webpackJsonpCallback.bind(null, chunkLoadingGlobal.push.bind(chunkLoadingGlobal));
 /******/ 	})();
-/******/ 	
+/******/
 /******/ 	/* webpack/runtime/nonce */
 /******/ 	(() => {
 /******/ 		__webpack_require__.nc = undefined;
 /******/ 	})();
-/******/ 	
+/******/
 /************************************************************************/
-/******/ 	
+/******/
 /******/ 	// module cache are used so entry inlining is disabled
 /******/ 	// startup
 /******/ 	// Load entry module and return exports
 /******/ 	var __webpack_exports__ = __webpack_require__("webpack/container/entry/@dataing/jupyterlab-dataing");
 /******/ 	(_JUPYTERLAB = typeof _JUPYTERLAB === "undefined" ? {} : _JUPYTERLAB)["@dataing/jupyterlab-dataing"] = __webpack_exports__;
-/******/ 	
+/******/
 /******/ })()
 ;
-//# sourceMappingURL=remoteEntry.47fe51a2cf152736ec56.js.map
+//# sourceMappingURL=remoteEntry.faf38cfae8b867c07139.js.map

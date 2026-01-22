@@ -3,6 +3,8 @@
  */
 
 import * as React from 'react';
+import { URLExt } from '@jupyterlab/coreutils';
+import { ServerConnection } from '@jupyterlab/services';
 
 /**
  * Credential mode detected from server
@@ -329,6 +331,32 @@ export function ConnectionWizard({
     error: null
   });
 
+  const serverSettings = React.useMemo(() => {
+    return serverBaseUrl
+      ? ServerConnection.makeSettings({ baseUrl: serverBaseUrl })
+      : ServerConnection.makeSettings();
+  }, [serverBaseUrl]);
+
+  const makeServerRequest = async (
+    path: string,
+    init: RequestInit
+  ): Promise<Response> => {
+    const url = URLExt.join(serverSettings.baseUrl, path);
+    return ServerConnection.makeRequest(url, init, serverSettings);
+  };
+
+  const getErrorMessage = async (response: Response): Promise<string> => {
+    try {
+      const data = await response.json();
+      if (data && typeof data.error === 'string' && data.error.length > 0) {
+        return data.error;
+      }
+    } catch {
+      // Ignore JSON parse errors.
+    }
+    return response.statusText || `Request failed (${response.status})`;
+  };
+
   // Fetch credential mode when URL changes
   React.useEffect(() => {
     if (state.step === 2 && state.backendUrl) {
@@ -339,8 +367,8 @@ export function ConnectionWizard({
 
   const fetchCredentialMode = async (): Promise<void> => {
     try {
-      const response = await fetch(`${serverBaseUrl}dataing/credentials`, {
-        credentials: 'same-origin'
+      const response = await makeServerRequest('dataing/credentials', {
+        method: 'GET'
       });
       if (response.ok) {
         const data = await response.json();
@@ -360,15 +388,27 @@ export function ConnectionWizard({
     setState(s => ({ ...s, testing: true, testResult: null, error: null }));
 
     try {
-      const response = await fetch(`${serverBaseUrl}dataing/connection/test`, {
+      const response = await makeServerRequest('dataing/connection/test', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        credentials: 'same-origin',
         body: JSON.stringify({
           base_url: state.backendUrl,
           api_key: state.apiKey
         })
       });
+
+      if (!response.ok) {
+        const errorMessage = await getErrorMessage(response);
+        setState(s => ({
+          ...s,
+          testing: false,
+          testResult: {
+            success: false,
+            error: errorMessage
+          }
+        }));
+        return;
+      }
 
       const data = await response.json();
       setState(s => ({
@@ -397,10 +437,9 @@ export function ConnectionWizard({
     try {
       const effectiveMode = state.sessionOnly ? 'session' : state.credentialMode;
 
-      const response = await fetch(`${serverBaseUrl}dataing/credentials`, {
+      const response = await makeServerRequest('dataing/credentials', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        credentials: 'same-origin',
         body: JSON.stringify({
           base_url: state.backendUrl,
           api_key: state.apiKey,
@@ -409,8 +448,8 @@ export function ConnectionWizard({
       });
 
       if (!response.ok) {
-        const data = await response.json();
-        throw new Error(data.error || 'Failed to save credentials');
+        const errorMessage = await getErrorMessage(response);
+        throw new Error(errorMessage || 'Failed to save credentials');
       }
 
       setState(s => ({ ...s, saving: false }));

@@ -10,8 +10,8 @@
         {
           "test": "/(?<!\\.raw)\\.css$/",
           "use": [
-            "/Users/bordumb/workspace/repositories/dataing/.worktrees/fn-18-to-fn-22/frontend/jupyterlab-dataing/node_modules/style-loader/dist/cjs.js",
-            "/Users/bordumb/workspace/repositories/dataing/.worktrees/fn-18-to-fn-22/frontend/jupyterlab-dataing/node_modules/css-loader/dist/cjs.js"
+            "/Users/bordumb/workspace/repositories/dataing/.worktrees/fn-23/frontend/jupyterlab-dataing/node_modules/style-loader/dist/cjs.js",
+            "/Users/bordumb/workspace/repositories/dataing/.worktrees/fn-23/frontend/jupyterlab-dataing/node_modules/css-loader/dist/cjs.js"
           ]
         },
         {
@@ -81,7 +81,7 @@
           "test": "/\\.js$/",
           "enforce": "pre",
           "use": [
-            "/Users/bordumb/workspace/repositories/dataing/.worktrees/fn-18-to-fn-22/frontend/jupyterlab-dataing/node_modules/source-map-loader/dist/cjs.js"
+            "/Users/bordumb/workspace/repositories/dataing/.worktrees/fn-23/frontend/jupyterlab-dataing/node_modules/source-map-loader/dist/cjs.js"
           ]
         }
       ]
@@ -91,8 +91,8 @@
         "url": false,
         "buffer": false,
         "crypto": false,
-        "path": "/Users/bordumb/workspace/repositories/dataing/.worktrees/fn-18-to-fn-22/frontend/jupyterlab-dataing/node_modules/path-browserify/index.js",
-        "process": "/Users/bordumb/workspace/repositories/dataing/.worktrees/fn-18-to-fn-22/frontend/jupyterlab-dataing/node_modules/process/browser.js"
+        "path": "/Users/bordumb/workspace/repositories/dataing/.worktrees/fn-23/frontend/jupyterlab-dataing/node_modules/path-browserify/index.js",
+        "process": "/Users/bordumb/workspace/repositories/dataing/.worktrees/fn-23/frontend/jupyterlab-dataing/node_modules/process/browser.js"
       }
     },
     "watchOptions": {
@@ -102,7 +102,7 @@
     "output": {
       "hashFunction": "sha256",
       "filename": "[name].[contenthash].js",
-      "path": "/Users/bordumb/workspace/repositories/dataing/.worktrees/fn-18-to-fn-22/frontend/jupyterlab-dataing/jupyterlab_dataing/labextension/static",
+      "path": "/Users/bordumb/workspace/repositories/dataing/.worktrees/fn-23/frontend/jupyterlab-dataing/jupyterlab_dataing/labextension/static",
       "publicPath": "auto"
     },
     "plugins": [
@@ -123,9 +123,9 @@
           },
           "filename": "remoteEntry.[contenthash].js",
           "exposes": {
-            "./index": "/Users/bordumb/workspace/repositories/dataing/.worktrees/fn-18-to-fn-22/frontend/jupyterlab-dataing/lib/index.js",
-            "./extension": "/Users/bordumb/workspace/repositories/dataing/.worktrees/fn-18-to-fn-22/frontend/jupyterlab-dataing/lib/index.js",
-            "./style": "/Users/bordumb/workspace/repositories/dataing/.worktrees/fn-18-to-fn-22/frontend/jupyterlab-dataing/style/index.js"
+            "./index": "/Users/bordumb/workspace/repositories/dataing/.worktrees/fn-23/frontend/jupyterlab-dataing/lib/index.js",
+            "./extension": "/Users/bordumb/workspace/repositories/dataing/.worktrees/fn-23/frontend/jupyterlab-dataing/lib/index.js",
+            "./style": "/Users/bordumb/workspace/repositories/dataing/.worktrees/fn-23/frontend/jupyterlab-dataing/style/index.js"
           },
           "shared": {
             "@jupyterlab/application": {
@@ -714,7 +714,7 @@
             "@dataing/jupyterlab-dataing": {
               "version": "0.1.0",
               "singleton": true,
-              "import": "/Users/bordumb/workspace/repositories/dataing/.worktrees/fn-18-to-fn-22/frontend/jupyterlab-dataing/lib/index.js"
+              "import": "/Users/bordumb/workspace/repositories/dataing/.worktrees/fn-23/frontend/jupyterlab-dataing/lib/index.js"
             }
           }
         }

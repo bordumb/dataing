@@ -299,6 +299,27 @@ jupyter labextension list
 jupyter lab
 ```
 
+### Local Dev Notes
+
+If you are running `just demo`, JupyterLab uses the repo `.venv`. Make sure the
+labextension symlink is created in that environment and points at the worktree
+build.
+
+```bash
+cd frontend/jupyterlab-dataing
+jlpm build
+uv run jupyter labextension develop . --overwrite
+```
+
+Verify the symlink target and that the new bundle is loaded:
+
+```bash
+ls -l .venv/share/jupyter/labextensions/@dataing/jupyterlab-dataing
+```
+
+In the browser console, `window.__dataingJupyterlabActivated === true` confirms
+the new bundle is running and you should see "Dataing JupyterLab extension activated".
+
 ---
 
 ## See Also

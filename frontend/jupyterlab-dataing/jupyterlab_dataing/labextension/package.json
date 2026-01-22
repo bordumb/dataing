@@ -50,6 +50,7 @@
     "@jupyterlab/application": "^4.0.0",
     "@jupyterlab/apputils": "^4.0.0",
     "@jupyterlab/coreutils": "^6.0.0",
+    "@jupyterlab/notebook": "^4.0.0",
     "@jupyterlab/services": "^7.0.0",
     "@jupyterlab/settingregistry": "^4.0.0",
     "@jupyterlab/statusbar": "^4.0.0"
@@ -71,7 +72,7 @@
     "outputDir": "jupyterlab_dataing/labextension",
     "schemaDir": "schema",
     "_build": {
-      "load": "static/remoteEntry.47fe51a2cf152736ec56.js",
+      "load": "static/remoteEntry.faf38cfae8b867c07139.js",
       "extension": "./extension",
       "style": "./style"
     }

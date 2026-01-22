@@ -11,7 +11,9 @@ import { ISettingRegistry } from '@jupyterlab/settingregistry';
 import { IStatusBar } from '@jupyterlab/statusbar';
 import { ICommandPalette } from '@jupyterlab/apputils';
 import { ServerConnection } from '@jupyterlab/services';
+import { INotebookTracker } from '@jupyterlab/notebook';
 import { URLExt } from '@jupyterlab/coreutils';
+import { JSONExt } from '@lumino/coreutils';
 import { DataingStatusBar } from './statusbar';
 import { DataingWidget } from './widget';
 /**
@@ -33,8 +35,34 @@ const DEFAULT_SETTINGS = {
     backendUrl: 'http://localhost:8000',
     autoConnect: true,
     connectionCheckInterval: 30,
-    showStatusBar: true
+    showStatusBar: true,
+    recentUrls: [],
+    workspaceId: ''
 };
+const MIN_CONNECTION_CHECK_INTERVAL = 5;
+const MAX_CONNECTION_CHECK_INTERVAL = 300;
+/**
+ * Generate a UUID v4 for workspace identification
+ */
+function generateUUID() {
+    // Use crypto.randomUUID if available, otherwise fallback
+    if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+        return crypto.randomUUID();
+    }
+    // Fallback for older browsers
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+        const r = (Math.random() * 16) | 0;
+        const v = c === 'x' ? r : (r & 0x3) | 0x8;
+        return v.toString(16);
+    });
+}
+/**
+ * Maximum number of recent URLs to store
+ */
+const MAX_RECENT_URLS = 10;
+function normalizeBackendUrl(url) {
+    return url.replace(/\/+$/, '');
+}
 /**
  * Check connection via server extension proxy using ServerConnection
  */
@@ -108,8 +136,16 @@ const plugin = {
     id: EXTENSION_ID,
     description: 'JupyterLab extension for Dataing data quality investigation',
     autoStart: true,
-    optional: [ISettingRegistry, IStatusBar, ICommandPalette, ILayoutRestorer],
-    activate: async (app, settingRegistry, statusBar, palette, restorer) => {
+    optional: [ISettingRegistry, IStatusBar, ICommandPalette, ILayoutRestorer, INotebookTracker],
+    activate: async (app, settingRegistry, statusBar, palette, restorer, notebookTracker) => {
+        if (typeof window !== 'undefined') {
+            const globalWindow = window;
+            if (globalWindow.__dataingJupyterlabActivated) {
+                console.warn('Dataing: extension already activated, skipping duplicate instance.');
+                return;
+            }
+            globalWindow.__dataingJupyterlabActivated = true;
+        }
         console.log('Dataing JupyterLab extension is activating');
         // Get server connection settings (includes auth token handling)
         const serverSettings = ServerConnection.makeSettings();
@@ -129,15 +165,72 @@ const plugin = {
         let checkInFlight = false;
         let abortController = null;
         let checkTimerId = null;
+        let lastCheckedBackendUrl = null;
+        let lastConnectionCheckCallMs = 0;
+        const globalCheckState = (() => {
+            if (typeof window === 'undefined') {
+                return { inFlight: false, lastCheckMs: 0 };
+            }
+            const globalWindow = window;
+            if (!globalWindow.__dataingGlobalCheckState) {
+                globalWindow.__dataingGlobalCheckState = { inFlight: false, lastCheckMs: 0 };
+            }
+            return globalWindow.__dataingGlobalCheckState;
+        })();
+        // Callback to add URL to recent list (set when settings loaded)
+        let onConnectionSuccess = null;
+        // Function to update backend URL (set when settings loaded, used by wizard)
+        let updateBackendUrlFn = null;
+        // Function to get recent URLs (set when settings loaded, used by wizard)
+        let getRecentUrlsFn = null;
         // Function to update connection state
-        const updateConnectionState = async () => {
+        const updateConnectionState = async (force = false, source = 'unknown') => {
+            const now = Date.now();
+            const normalizedCurrentUrl = normalizeBackendUrl(settings.backendUrl);
+            const normalizedLastCheckedUrl = lastCheckedBackendUrl
+                ? normalizeBackendUrl(lastCheckedBackendUrl)
+                : null;
+            const hasSameUrl = normalizedLastCheckedUrl !== null &&
+                normalizedLastCheckedUrl === normalizedCurrentUrl;
+            const intervalSeconds = Number.isFinite(settings.connectionCheckInterval)
+                ? settings.connectionCheckInterval
+                : MIN_CONNECTION_CHECK_INTERVAL;
+            const minIntervalMs = Math.max(intervalSeconds * 1000, MIN_CONNECTION_CHECK_INTERVAL * 1000);
+            const callDeltaMs = lastConnectionCheckCallMs ? now - lastConnectionCheckCallMs : null;
+            lastConnectionCheckCallMs = now;
+            if (callDeltaMs !== null && callDeltaMs < 1000) {
+                console.warn('Dataing: rapid connection check call', {
+                    source,
+                    callDeltaMs,
+                    force,
+                    checkInFlight,
+                    lastCheck: state.lastCheck ? state.lastCheck.toISOString() : null,
+                    minIntervalMs
+                });
+            }
+            if (globalCheckState.lastCheckMs &&
+                now - globalCheckState.lastCheckMs < minIntervalMs) {
+                return;
+            }
+            if (globalCheckState.inFlight) {
+                return;
+            }
+            if ((!force || hasSameUrl) &&
+                state.lastCheck &&
+                now - state.lastCheck.getTime() < minIntervalMs) {
+                return;
+            }
             // Guard concurrent checks
             if (checkInFlight) {
                 return;
             }
             checkInFlight = true;
+            globalCheckState.inFlight = true;
+            globalCheckState.lastCheckMs = now;
+            const previousState = state.connectionState; // Track for state transition detection
             state.connectionState = 'checking';
             state.lastCheck = new Date();
+            lastCheckedBackendUrl = settings.backendUrl;
             // Update widgets to show checking
             if (statusBarWidget) {
                 statusBarWidget.updateState(state);
@@ -149,11 +242,20 @@ const plugin = {
             abortController = new AbortController();
             try {
                 const result = await checkConnection(serverSettings, abortController.signal);
-                state.backendUrl = result.backendUrl || settings.backendUrl;
+                const resolvedBackendUrl = result.backendUrl || settings.backendUrl;
+                state.backendUrl = normalizeBackendUrl(resolvedBackendUrl);
                 if (result.backendOk) {
-                    // Fully connected
                     state.connectionState = 'connected';
                     state.errorMessage = null;
+                    // Add to recent URLs only on state transition TO connected (not every periodic check)
+                    if (previousState !== 'connected' && onConnectionSuccess && state.backendUrl) {
+                        try {
+                            await onConnectionSuccess(state.backendUrl);
+                        }
+                        catch (error) {
+                            console.warn('Failed to save recent Dataing URL:', error);
+                        }
+                    }
                 }
                 else if (result.serverExtensionOk) {
                     // Server extension ok but backend unreachable = disconnected
@@ -178,6 +280,7 @@ const plugin = {
             }
             finally {
                 checkInFlight = false;
+                globalCheckState.inFlight = false;
                 abortController = null;
             }
             // Update widgets if available
@@ -198,10 +301,14 @@ const plugin = {
             if (!settings.autoConnect) {
                 return;
             }
+            const intervalSeconds = Number.isFinite(settings.connectionCheckInterval)
+                ? settings.connectionCheckInterval
+                : MIN_CONNECTION_CHECK_INTERVAL;
+            const intervalMs = Math.max(intervalSeconds * 1000, MIN_CONNECTION_CHECK_INTERVAL * 1000);
             checkTimerId = setTimeout(async () => {
-                await updateConnectionState();
+                await updateConnectionState(false, 'timer');
                 scheduleNextCheck();
-            }, settings.connectionCheckInterval * 1000);
+            }, intervalMs);
         };
         // Cleanup function
         const cleanup = () => {
@@ -221,35 +328,123 @@ const plugin = {
                 const loadAllSettings = () => {
                     const backendUrl = settingsObj.get('backendUrl').composite;
                     if (backendUrl) {
-                        settings.backendUrl = backendUrl;
-                        state.backendUrl = backendUrl;
+                        const normalizedUrl = normalizeBackendUrl(backendUrl);
+                        settings.backendUrl = normalizedUrl;
+                        state.backendUrl = normalizedUrl;
                     }
                     const autoConnect = settingsObj.get('autoConnect').composite;
                     if (typeof autoConnect === 'boolean') {
                         settings.autoConnect = autoConnect;
                     }
                     const checkInterval = settingsObj.get('connectionCheckInterval').composite;
-                    if (typeof checkInterval === 'number' && checkInterval > 0) {
-                        settings.connectionCheckInterval = checkInterval;
+                    if (typeof checkInterval === 'number' && Number.isFinite(checkInterval)) {
+                        const clampedInterval = Math.min(Math.max(checkInterval, MIN_CONNECTION_CHECK_INTERVAL), MAX_CONNECTION_CHECK_INTERVAL);
+                        settings.connectionCheckInterval = clampedInterval;
                     }
                     const showStatusBar = settingsObj.get('showStatusBar').composite;
                     if (typeof showStatusBar === 'boolean') {
                         settings.showStatusBar = showStatusBar;
                     }
+                    const recentUrls = settingsObj.get('recentUrls').composite;
+                    if (Array.isArray(recentUrls)) {
+                        settings.recentUrls = recentUrls;
+                    }
+                    const workspaceId = settingsObj.get('workspaceId').composite;
+                    if (typeof workspaceId === 'string' && workspaceId) {
+                        settings.workspaceId = workspaceId;
+                    }
                 };
+                const internalSaveKeys = new Set(['recentUrls', 'workspaceId']);
+                const pendingSettingWrites = new Map();
+                let pendingInternalSaveCount = 0;
+                // Function to save a single setting (tracks key to prevent re-check loop)
+                const saveSetting = async (key, value) => {
+                    const existingValue = settingsObj.get(key).composite;
+                    if (existingValue !== undefined && JSONExt.deepEqual(existingValue, value)) {
+                        return;
+                    }
+                    const pendingValue = pendingSettingWrites.get(key);
+                    if (pendingValue !== undefined && JSONExt.deepEqual(pendingValue, value)) {
+                        return;
+                    }
+                    pendingSettingWrites.set(key, value);
+                    const isInternalKey = internalSaveKeys.has(key);
+                    if (isInternalKey) {
+                        pendingInternalSaveCount += 1;
+                    }
+                    try {
+                        await settingsObj.set(key, value);
+                    }
+                    catch (error) {
+                        if (isInternalKey) {
+                            pendingInternalSaveCount = Math.max(0, pendingInternalSaveCount - 1);
+                        }
+                        console.warn(`Failed to save Dataing setting '${key}':`, error);
+                    }
+                    finally {
+                        pendingSettingWrites.delete(key);
+                    }
+                };
+                // Function to update backendUrl - expose via outer variable for wizard
+                updateBackendUrlFn = async (newUrl) => {
+                    const normalizedUrl = normalizeBackendUrl(newUrl);
+                    if (!normalizedUrl) {
+                        return;
+                    }
+                    await saveSetting('backendUrl', normalizedUrl);
+                    settings.backendUrl = normalizedUrl;
+                    state.backendUrl = normalizedUrl;
+                };
+                // Function to get recent URLs - expose via outer variable for wizard
+                getRecentUrlsFn = () => [...settings.recentUrls];
+                // Function to add URL to recent URLs list
+                const addToRecentUrls = async (url) => {
+                    const normalizedUrl = normalizeBackendUrl(url);
+                    const filtered = settings.recentUrls.filter(u => u !== normalizedUrl);
+                    const updated = [normalizedUrl, ...filtered].slice(0, MAX_RECENT_URLS);
+                    const isSame = updated.length === settings.recentUrls.length &&
+                        updated.every((value, index) => value === settings.recentUrls[index]);
+                    if (isSame) {
+                        return;
+                    }
+                    await saveSetting('recentUrls', updated);
+                    settings.recentUrls = updated;
+                };
+                // Wire up callback for connection success
+                onConnectionSuccess = addToRecentUrls;
                 // Initial load
                 loadAllSettings();
+                // Generate workspaceId on first launch if not set
+                if (!settings.workspaceId) {
+                    const newWorkspaceId = generateUUID();
+                    settings.workspaceId = newWorkspaceId;
+                    void saveSetting('workspaceId', newWorkspaceId);
+                    console.log('Dataing: Generated new workspace ID:', newWorkspaceId);
+                }
+                else {
+                    console.log('Dataing: Using existing workspace ID:', settings.workspaceId);
+                }
                 // Watch for settings changes - reload all and reschedule
                 settingsObj.changed.connect(() => {
+                    // Skip connection re-check if this is an internal save (e.g., recentUrls, workspaceId)
+                    const isInternalSave = pendingInternalSaveCount > 0;
+                    if (isInternalSave) {
+                        pendingInternalSaveCount = Math.max(0, pendingInternalSaveCount - 1);
+                    }
                     const oldAutoConnect = settings.autoConnect;
                     const oldInterval = settings.connectionCheckInterval;
+                    const oldBackendUrl = settings.backendUrl;
                     loadAllSettings();
                     // If autoConnect changed or interval changed, reschedule
                     if (oldAutoConnect !== settings.autoConnect || oldInterval !== settings.connectionCheckInterval) {
                         scheduleNextCheck(); // Will clear old timer and respect new settings
                     }
-                    // Re-check connection if settings changed
-                    void updateConnectionState();
+                    // Only re-check connection if backendUrl changed by user (not internal save)
+                    const normalizedOldBackendUrl = normalizeBackendUrl(oldBackendUrl);
+                    const normalizedNewBackendUrl = normalizeBackendUrl(settings.backendUrl);
+                    if (!isInternalSave && normalizedOldBackendUrl !== normalizedNewBackendUrl) {
+                        void updateConnectionState(true, 'settings-changed');
+                    }
                 });
                 console.log('Dataing settings loaded:', settings);
             }
@@ -272,6 +467,57 @@ const plugin = {
         sidebarWidget.id = 'dataing-sidebar';
         sidebarWidget.title.iconClass = 'jp-DataingIcon';
         sidebarWidget.title.caption = 'Dataing';
+        // Set server base URL for wizard API calls
+        sidebarWidget.setServerBaseUrl(serverSettings.baseUrl);
+        // Expose settings functions on widget for Connection Wizard to use
+        if (updateBackendUrlFn) {
+            sidebarWidget._updateBackendUrl = updateBackendUrlFn;
+        }
+        if (getRecentUrlsFn) {
+            sidebarWidget._getRecentUrls = getRecentUrlsFn;
+        }
+        // Set workspace ID on widget
+        sidebarWidget.setWorkspaceId(settings.workspaceId);
+        // Track active kernel for workspace state
+        let currentKernelId = null;
+        // Function to update kernel tracking
+        const updateActiveKernel = () => {
+            if (!sidebarWidget) {
+                return;
+            }
+            const notebookPanel = notebookTracker?.currentWidget ?? null;
+            const kernel = notebookPanel?.sessionContext?.session?.kernel ?? null;
+            const newKernelId = kernel?.id ?? null;
+            if (newKernelId !== currentKernelId) {
+                currentKernelId = newKernelId;
+                sidebarWidget.setActiveKernel(newKernelId);
+                console.log('Dataing: Active kernel changed:', newKernelId || '(none)');
+            }
+        };
+        // Listen for notebook changes if tracker available
+        if (notebookTracker) {
+            // Track when current notebook changes
+            notebookTracker.currentChanged.connect(() => {
+                updateActiveKernel();
+            });
+            // Track when any notebook's kernel status changes
+            notebookTracker.widgetAdded.connect((_tracker, panel) => {
+                panel.sessionContext.statusChanged.connect(() => {
+                    // Only update if this is the current notebook
+                    if (panel === notebookTracker.currentWidget) {
+                        updateActiveKernel();
+                    }
+                });
+                // Track kernel changes (e.g., restart, shutdown)
+                panel.sessionContext.kernelChanged.connect(() => {
+                    if (panel === notebookTracker.currentWidget) {
+                        updateActiveKernel();
+                    }
+                });
+            });
+            // Initial update
+            updateActiveKernel();
+        }
         // Track widget for restoration
         if (restorer) {
             restorer.add(sidebarWidget, 'dataing-sidebar');
@@ -381,7 +627,7 @@ const plugin = {
             if (sidebarWidget) {
                 sidebarWidget.updateFromState(state);
             }
-            await updateConnectionState();
+            await updateConnectionState(false, 'initial');
             // Start periodic checks only if autoConnect is true
             scheduleNextCheck();
         }

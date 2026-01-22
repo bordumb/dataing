@@ -1,5 +1,5 @@
 import * as React from 'react'
-import { Plus, Trash2, Loader2, AlertTriangle } from 'lucide-react'
+import { Plus, Trash2, Loader2, AlertTriangle, Database, Search, Table as TableIcon } from 'lucide-react'
 import { toast } from 'sonner'
 import { useQueryClient } from '@tanstack/react-query'
 
@@ -33,6 +33,7 @@ import {
   getGetTeamPolicyApiV1TeamsTeamIdPolicyGetQueryKey,
 } from '@/lib/api/generated/teams/teams'
 import type { TeamPolicyOverrideResponse } from '@/lib/api/model'
+import { useDataSources, useTableSearch } from '@/lib/api/datasources'
 
 const ALERT_SOURCES = ['monte_carlo', 'great_expectations', 'dbt', 'pagerduty', 'jira', 'custom']
 const POLICY_ACTIONS = ['auto', 'review', 'issue_only']
@@ -48,11 +49,54 @@ export function TeamPolicyEditor({ teamId, teamName, onClose }: TeamPolicyEditor
   const queryClient = useQueryClient()
   const [showOverrideDialog, setShowOverrideDialog] = React.useState(false)
   const [newOverride, setNewOverride] = React.useState({
+    datasourceId: '',
     datasetId: '',
     defaultAction: '',
     autoInvestigateMinSeverity: '',
     reviewRequiredMaxSeverity: '',
   })
+  const [datasetSearchTerm, setDatasetSearchTerm] = React.useState('')
+  const [isDatasetDropdownOpen, setIsDatasetDropdownOpen] = React.useState(false)
+  const datasetInputRef = React.useRef<HTMLInputElement>(null)
+  const datasetDropdownRef = React.useRef<HTMLDivElement>(null)
+
+  // Fetch datasources for the picker
+  const { data: dataSources } = useDataSources()
+
+  // Search tables when typing in dataset field
+  const { data: tables, isLoading: isLoadingTables } = useTableSearch(
+    newOverride.datasourceId,
+    datasetSearchTerm
+  )
+
+  // Auto-select first datasource when dialog opens
+  React.useEffect(() => {
+    if (showOverrideDialog && dataSources && dataSources.length > 0 && !newOverride.datasourceId) {
+      setNewOverride((prev) => ({ ...prev, datasourceId: dataSources[0].id }))
+    }
+  }, [showOverrideDialog, dataSources, newOverride.datasourceId])
+
+  // Debounce search term
+  React.useEffect(() => {
+    const timer = setTimeout(() => setDatasetSearchTerm(newOverride.datasetId), 300)
+    return () => clearTimeout(timer)
+  }, [newOverride.datasetId])
+
+  // Close dropdown on outside click
+  React.useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (
+        datasetDropdownRef.current &&
+        !datasetDropdownRef.current.contains(event.target as Node) &&
+        datasetInputRef.current &&
+        !datasetInputRef.current.contains(event.target as Node)
+      ) {
+        setIsDatasetDropdownOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [])
 
   const { data: policyData, isLoading, error } = useGetTeamPolicyApiV1TeamsTeamIdPolicyGet(teamId)
 
@@ -79,11 +123,14 @@ export function TeamPolicyEditor({ teamId, teamName, onClose }: TeamPolicyEditor
         toast.success('Override created successfully')
         setShowOverrideDialog(false)
         setNewOverride({
+          datasourceId: dataSources?.[0]?.id || '',
           datasetId: '',
           defaultAction: '',
           autoInvestigateMinSeverity: '',
           reviewRequiredMaxSeverity: '',
         })
+        setDatasetSearchTerm('')
+        setIsDatasetDropdownOpen(false)
       },
       onError: (error: Error) => {
         toast.error(`Failed to create override: ${error.message || 'Unknown error'}`)
@@ -444,15 +491,95 @@ export function TeamPolicyEditor({ teamId, teamName, onClose }: TeamPolicyEditor
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
+            {/* Datasource and Dataset Picker */}
             <div className="space-y-2">
-              <Label htmlFor="dataset-id">Dataset ID</Label>
-              <Input
-                id="dataset-id"
-                placeholder="e.g., orders, users, transactions"
-                value={newOverride.datasetId}
-                onChange={(e) => setNewOverride({ ...newOverride, datasetId: e.target.value })}
-              />
+              <Label>Dataset</Label>
+              <div className="flex items-center gap-2 rounded-lg border border-border bg-muted/30 p-2">
+                <div className="flex items-center gap-2">
+                  <Database className="h-4 w-4 text-muted-foreground" />
+                  <select
+                    value={newOverride.datasourceId}
+                    onChange={(e) => {
+                      setNewOverride({ ...newOverride, datasourceId: e.target.value, datasetId: '' })
+                      setDatasetSearchTerm('')
+                    }}
+                    disabled={!dataSources || dataSources.length === 0}
+                    className="w-32 rounded-lg border border-border bg-background px-2 py-1.5 text-sm outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    {!dataSources || dataSources.length === 0 ? (
+                      <option value="">No sources</option>
+                    ) : (
+                      dataSources.map((ds) => (
+                        <option key={ds.id} value={ds.id}>
+                          {ds.name}
+                        </option>
+                      ))
+                    )}
+                  </select>
+                </div>
+
+                <div className="relative flex-1">
+                  <Input
+                    ref={datasetInputRef}
+                    value={newOverride.datasetId}
+                    onChange={(e) => {
+                      setNewOverride({ ...newOverride, datasetId: e.target.value })
+                      setIsDatasetDropdownOpen(true)
+                    }}
+                    onFocus={() => setIsDatasetDropdownOpen(true)}
+                    disabled={!newOverride.datasourceId}
+                    placeholder={newOverride.datasourceId ? 'Search for table...' : 'Select a data source first'}
+                    className="pr-8"
+                  />
+                  <Search className="absolute right-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+
+                  {isDatasetDropdownOpen && newOverride.datasourceId && (
+                    <div
+                      ref={datasetDropdownRef}
+                      className="absolute z-50 mt-1 max-h-48 w-full overflow-auto rounded-lg border border-border bg-popover shadow-lg"
+                    >
+                      {isLoadingTables ? (
+                        <div className="flex items-center justify-center p-4">
+                          <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                        </div>
+                      ) : tables && tables.length > 0 ? (
+                        <div className="py-1">
+                          {tables.slice(0, 10).map((table) => (
+                            <button
+                              key={table.native_path}
+                              type="button"
+                              className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-accent"
+                              onClick={() => {
+                                setNewOverride({ ...newOverride, datasetId: table.native_path })
+                                setIsDatasetDropdownOpen(false)
+                              }}
+                            >
+                              <TableIcon className="h-4 w-4 text-muted-foreground" />
+                              <span className="font-mono">{table.native_path}</span>
+                              <span className="ml-auto text-xs text-muted-foreground">
+                                {table.columns.length} cols
+                              </span>
+                            </button>
+                          ))}
+                          {tables.length > 10 && (
+                            <div className="border-t border-border px-3 py-2 text-xs text-muted-foreground">
+                              +{tables.length - 10} more...
+                            </div>
+                          )}
+                        </div>
+                      ) : newOverride.datasetId.length >= 2 ? (
+                        <div className="p-3 text-sm text-muted-foreground">No tables found</div>
+                      ) : (
+                        <div className="p-3 text-sm text-muted-foreground">
+                          Type at least 2 characters to search...
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
             </div>
+
             <div className="space-y-2">
               <Label>Override Action</Label>
               <Select

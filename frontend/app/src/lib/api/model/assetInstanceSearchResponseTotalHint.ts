@@ -7,6 +7,6 @@
  */
 
 /**
- * Optional datasource ID for disambiguation
+ * Approximate total matching results (may be expensive to compute exactly)
  */
-export type AssetRefRequestDatasourceId = string | null;
+export type AssetInstanceSearchResponseTotalHint = number | null;

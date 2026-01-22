@@ -7,3 +7,6 @@ fixtures/**/*.parquet
 # DuckDB databases
 *.db
 *.duckdb
+
+# Allow demo notebook (overrides root .gitignore)
+!demo_notebook.ipynb

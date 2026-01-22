@@ -7,6 +7,6 @@
  */
 
 /**
- * Optional datasource ID for disambiguation
+ * Database schema name
  */
-export type AssetRefRequestDatasourceId = string | null;
+export type AssetInstanceResultSchemaName = string | null;

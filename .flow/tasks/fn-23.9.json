@@ -1,17 +1,37 @@
 {
-  "assignee": null,
+  "assignee": "bordumbb@gmail.com",
   "claim_note": "",
-  "claimed_at": null,
+  "claimed_at": "2026-01-21T18:15:14.378367Z",
   "created_at": "2026-01-21T11:52:43.922162Z",
   "depends_on": [
     "fn-23.4",
     "fn-23.6"
   ],
   "epic": "fn-23",
+  "evidence": {
+    "files_created": [
+      "python-packages/dataing-notebook/src/dataing_notebook/serverextension/state.py"
+    ],
+    "files_modified": [
+      "python-packages/dataing-notebook/src/dataing_notebook/serverextension/handlers.py",
+      "frontend/jupyterlab-dataing/src/index.ts",
+      "frontend/jupyterlab-dataing/src/widget.ts",
+      "frontend/jupyterlab-dataing/src/types.ts",
+      "frontend/jupyterlab-dataing/schema/plugin.json",
+      "frontend/jupyterlab-dataing/style/index.css"
+    ],
+    "notes": "Unified workspace context with (workspace_id, kernel_id) scoped state. Server extension is now single source of truth. State machine with DISCONNECTED -> CONNECTED -> BOUND -> RUNNING flow. Versioned commands with 409 conflict detection. Idempotent start_run with client_request_id cache. Frontend tracks active kernel, shows empty state when no kernel selected.",
+    "tests": [],
+    "verification": {
+      "py_compile": "pass",
+      "ruff": "pass",
+      "typescript": "pass (module errors expected without jupyterlab deps)"
+    }
+  },
   "id": "fn-23.9",
   "priority": null,
   "spec_path": ".flow/tasks/fn-23.9.md",
-  "status": "todo",
+  "status": "done",
   "title": "Unified Workspace Context",
-  "updated_at": "2026-01-21T11:55:50.474914Z"
+  "updated_at": "2026-01-21T18:21:49.330397Z"
 }

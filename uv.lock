@@ -993,7 +993,7 @@ dependencies = [
 
 [package.optional-dependencies]
 demo = [
-    { name = "dataing-notebook" },
+    { name = "dataing-notebook", extra = ["keyring", "server"] },
     { name = "dataing-sdk" },
     { name = "duckdb" },
     { name = "faker" },
@@ -1030,7 +1030,7 @@ requires-dist = [
     { name = "bcrypt", specifier = ">=5.0.0" },
     { name = "bond", editable = "python-packages/bond" },
     { name = "cryptography", specifier = ">=41.0.0" },
-    { name = "dataing-notebook", marker = "extra == 'demo'", editable = "python-packages/dataing-notebook" },
+    { name = "dataing-notebook", extras = ["server", "keyring"], marker = "extra == 'demo'", editable = "python-packages/dataing-notebook" },
     { name = "dataing-sdk", marker = "extra == 'demo'", editable = "python-packages/dataing-sdk" },
     { name = "duckdb", specifier = ">=0.9.0" },
     { name = "duckdb", marker = "extra == 'demo'", specifier = ">=0.9.0" },
@@ -1089,6 +1089,14 @@ dependencies = [
     { name = "dataing-sdk" },
     { name = "ipython" },
     { name = "tornado" },
+]
+
+[package.optional-dependencies]
+keyring = [
+    { name = "keyring" },
+]
+server = [
+    { name = "jupyter-server" },
 ]
 
 [package.metadata]

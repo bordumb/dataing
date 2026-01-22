@@ -1,17 +1,32 @@
 {
-  "assignee": null,
+  "assignee": "bordumbb@gmail.com",
   "claim_note": "",
-  "claimed_at": null,
+  "claimed_at": "2026-01-21T18:11:39.403506Z",
   "created_at": "2026-01-21T11:52:43.383446Z",
   "depends_on": [
     "fn-23.2",
     "fn-23.5"
   ],
   "epic": "fn-23",
+  "evidence": {
+    "files_created": [],
+    "files_modified": [
+      "python-packages/dataing-notebook/src/dataing_notebook/magic.py",
+      "python-packages/dataing-notebook/src/dataing_notebook/serverextension/handlers.py",
+      "frontend/jupyterlab-dataing/src/widget.ts"
+    ],
+    "notes": "Magic integration with GUI config implemented. %dataing connect now reads saved config, prints reproducible snippets. Snippet endpoint added for sidebar Copy button. Backward compatible with existing syntax.",
+    "tests": [],
+    "verification": {
+      "py_compile": "pass",
+      "ruff": "pass",
+      "typescript": "pass"
+    }
+  },
   "id": "fn-23.6",
   "priority": null,
   "spec_path": ".flow/tasks/fn-23.6.md",
-  "status": "todo",
+  "status": "done",
   "title": "Magic Integration with GUI Config",
-  "updated_at": "2026-01-21T11:55:49.562544Z"
+  "updated_at": "2026-01-21T18:14:53.284023Z"
 }

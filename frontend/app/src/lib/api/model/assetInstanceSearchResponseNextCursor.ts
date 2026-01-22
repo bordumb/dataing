@@ -7,6 +7,6 @@
  */
 
 /**
- * Optional datasource ID for disambiguation
+ * Opaque cursor for fetching next page, null if no more results
  */
-export type AssetRefRequestDatasourceId = string | null;
+export type AssetInstanceSearchResponseNextCursor = string | null;

@@ -327,6 +327,112 @@
         }
       }
     },
+    "/api/v1/asset-instances/search": {
+      "get": {
+        "tags": [
+          "asset-instances"
+        ],
+        "summary": "Search Asset Instances",
+        "description": "Search for asset instances (tables/views) across all tenant datasources.\n\nReturns fully qualified asset instances with datasource context,\nsuitable for binding to a notebook context.\n\nResults are ranked by match quality:\n- name_prefix: Query matches start of table name\n- path_match: Query matches in native path\n- fuzzy: Query appears anywhere in name or path",
+        "operationId": "search_asset_instances_api_v1_asset_instances_search_get",
+        "security": [
+          {
+            "APIKeyHeader": []
+          },
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200,
+              "description": "Search query (min 1 char)",
+              "title": "Q"
+            },
+            "description": "Search query (min 1 char)"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "description": "Max results (default 10, max 100)",
+              "default": 10,
+              "title": "Limit"
+            },
+            "description": "Max results (default 10, max 100)"
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Opaque pagination cursor",
+              "title": "Cursor"
+            },
+            "description": "Opaque pagination cursor"
+          },
+          {
+            "name": "datasource_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filter to single datasource",
+              "title": "Datasource Id"
+            },
+            "description": "Filter to single datasource"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AssetInstanceSearchResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/investigations": {
       "get": {
         "tags": [
@@ -8888,15 +8994,121 @@
         "title": "ApproveRequest",
         "description": "Request to approve an investigation."
       },
+      "AssetInstanceResult": {
+        "properties": {
+          "asset_urn": {
+            "type": "string",
+            "title": "Asset Urn",
+            "description": "Fully qualified URN: urn:dataing:{platform}:{datasource_id}:{native_path}"
+          },
+          "display_name": {
+            "type": "string",
+            "title": "Display Name",
+            "description": "Human-readable table/view name"
+          },
+          "type": {
+            "type": "string",
+            "title": "Type",
+            "description": "Asset type: table, view, materialized_view"
+          },
+          "schema_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Schema Name",
+            "description": "Database schema name"
+          },
+          "datasource_id": {
+            "type": "string",
+            "title": "Datasource Id",
+            "description": "Datasource ID"
+          },
+          "datasource_name": {
+            "type": "string",
+            "title": "Datasource Name",
+            "description": "Human-readable datasource name"
+          },
+          "platform": {
+            "type": "string",
+            "title": "Platform",
+            "description": "Database platform type (postgres, snowflake, etc.)"
+          },
+          "match_reason": {
+            "type": "string",
+            "title": "Match Reason",
+            "description": "Why this result matched: name_prefix, path_match, fuzzy"
+          }
+        },
+        "type": "object",
+        "required": [
+          "asset_urn",
+          "display_name",
+          "type",
+          "datasource_id",
+          "datasource_name",
+          "platform",
+          "match_reason"
+        ],
+        "title": "AssetInstanceResult",
+        "description": "Single asset instance in search results."
+      },
+      "AssetInstanceSearchResponse": {
+        "properties": {
+          "results": {
+            "items": {
+              "$ref": "#/components/schemas/AssetInstanceResult"
+            },
+            "type": "array",
+            "title": "Results"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor",
+            "description": "Opaque cursor for fetching next page, null if no more results"
+          },
+          "total_hint": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Total Hint",
+            "description": "Approximate total matching results (may be expensive to compute exactly)"
+          }
+        },
+        "type": "object",
+        "required": [
+          "results"
+        ],
+        "title": "AssetInstanceSearchResponse",
+        "description": "Response from asset instances search endpoint."
+      },
       "AssetRefRequest": {
         "properties": {
           "platform": {
             "type": "string",
-            "title": "Platform"
+            "title": "Platform",
+            "description": "Data platform (postgres, snowflake, dbt)"
           },
           "name": {
             "type": "string",
-            "title": "Name"
+            "title": "Name",
+            "description": "Fully qualified name (db.schema.table)"
           },
           "datasource_id": {
             "anyOf": [
@@ -8907,7 +9119,8 @@
                 "type": "null"
               }
             ],
-            "title": "Datasource Id"
+            "title": "Datasource Id",
+            "description": "Optional datasource ID for disambiguation"
           }
         },
         "type": "object",
@@ -9227,7 +9440,7 @@
         "properties": {
           "assets": {
             "items": {
-              "$ref": "#/components/schemas/dataing__entrypoints__api__routes__bundles__AssetRefRequest"
+              "$ref": "#/components/schemas/AssetRefRequest"
             },
             "type": "array",
             "minItems": 1,
@@ -10383,7 +10596,7 @@
         "properties": {
           "assets": {
             "items": {
-              "$ref": "#/components/schemas/AssetRefRequest"
+              "$ref": "#/components/schemas/dataing__entrypoints__api__routes__runs__AssetRefRequest"
             },
             "type": "array",
             "title": "Assets"
@@ -14264,39 +14477,6 @@
         "title": "WebhookIssueResponse",
         "description": "Response from webhook issue creation."
       },
-      "dataing__entrypoints__api__routes__bundles__AssetRefRequest": {
-        "properties": {
-          "platform": {
-            "type": "string",
-            "title": "Platform",
-            "description": "Data platform (postgres, snowflake, dbt)"
-          },
-          "name": {
-            "type": "string",
-            "title": "Name",
-            "description": "Fully qualified name (db.schema.table)"
-          },
-          "datasource_id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Datasource Id",
-            "description": "Optional datasource ID for disambiguation"
-          }
-        },
-        "type": "object",
-        "required": [
-          "platform",
-          "name"
-        ],
-        "title": "AssetRefRequest",
-        "description": "Asset reference in request."
-      },
       "dataing__entrypoints__api__routes__bundles__LineageGraphResponse": {
         "properties": {
           "root": {
@@ -14370,6 +14550,36 @@
         ],
         "title": "TestConnectionResponse",
         "description": "Response for testing a connection."
+      },
+      "dataing__entrypoints__api__routes__runs__AssetRefRequest": {
+        "properties": {
+          "platform": {
+            "type": "string",
+            "title": "Platform"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "datasource_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Datasource Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "platform",
+          "name"
+        ],
+        "title": "AssetRefRequest",
+        "description": "Asset reference in request."
       }
     },
     "securitySchemes": {

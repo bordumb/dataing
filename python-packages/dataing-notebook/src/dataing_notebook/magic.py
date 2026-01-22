@@ -86,8 +86,8 @@ class DataingMagics(Magics):
     def _send_state_update(self) -> None:
         """Send current state to JupyterLab frontend via HTTP POST."""
         import json
-        import urllib.request
         import urllib.error
+        import urllib.request
 
         state_data = {
             "attached_datasource": None,
@@ -129,7 +129,7 @@ class DataingMagics(Magics):
                 method="POST",
             )
 
-            with urllib.request.urlopen(req, timeout=5) as response:
+            with urllib.request.urlopen(req, timeout=5):
                 # State update sent successfully
                 pass
 
@@ -184,6 +184,8 @@ Dataing Magic Commands
 
 %dataing connect [--api-key KEY] [--base-url URL]
     Connect to the Dataing API.
+    Without arguments, uses saved GUI configuration if available.
+    Prints reproducible snippet after connection.
 
 %dataing attach <URN|SQL> [--datasource ID] [--platform PLATFORM]
     Attach context from a URN or SQL query.
@@ -204,7 +206,7 @@ Dataing Magic Commands
     Formats: markdown (default), json
 
 %dataing status
-    Show the current context status.
+    Show the current context status (same info as sidebar).
 
 %dataing clear
     Clear the current context.
@@ -216,6 +218,9 @@ Dataing Magic Commands
 
     def _handle_connect(self, args: list[str]) -> None:
         """Handle connect subcommand.
+
+        If no args provided, tries to use saved GUI config from server extension.
+        Prints reproducible snippet after successful connection.
 
         Args:
             args: Command arguments.
@@ -232,15 +237,92 @@ Dataing Magic Commands
         except SystemExit:
             return
 
+        base_url = parsed.base_url
+        api_key = parsed.api_key
+        credential_mode = None
+
+        # If no args provided, try to read from server extension
+        if not base_url and not api_key:
+            gui_config = self._get_gui_config()
+            if gui_config:
+                base_url = gui_config.get("base_url")
+                api_key = gui_config.get("api_key")
+                credential_mode = gui_config.get("mode")
+
+                if base_url and api_key:
+                    print("Using saved GUI configuration")
+
         # Create client
         client = DataingClient(
-            base_url=parsed.base_url,
-            api_key=parsed.api_key,
+            base_url=base_url,
+            api_key=api_key,
             timeout=parsed.timeout,
         )
 
         self._state.client = client
+        self._state._credential_mode = credential_mode
+
+        # Print connection info with reproducible snippet
         print(f"Connected to {client.base_url}")
+        self._print_connect_snippet(client.base_url, credential_mode)
+
+    def _get_gui_config(self) -> dict[str, Any] | None:
+        """Get saved config from JupyterLab server extension.
+
+        Returns:
+            Dictionary with base_url, api_key, mode or None if not available.
+        """
+        import json
+        import urllib.error
+        import urllib.request
+
+        try:
+            server_url = self._get_jupyter_server_url()
+            if not server_url:
+                return None
+
+            # Fetch credentials from server extension
+            url = f"{server_url.rstrip('/')}/dataing/credentials"
+            req = urllib.request.Request(url, method="GET")
+
+            with urllib.request.urlopen(req, timeout=5) as response:
+                data = json.loads(response.read().decode("utf-8"))
+                if data.get("has_api_key"):
+                    return {
+                        "base_url": data.get("base_url"),
+                        "api_key": data.get("api_key"),
+                        "mode": data.get("mode"),
+                    }
+                return None
+
+        except (urllib.error.URLError, json.JSONDecodeError):
+            return None
+        except Exception:
+            return None
+
+    def _print_connect_snippet(self, base_url: str, credential_mode: str | None) -> None:
+        """Print reproducible snippet after connection.
+
+        Args:
+            base_url: The connected backend URL.
+            credential_mode: The credential storage mode (keychain/env_var/session).
+        """
+        mode_descriptions = {
+            "keychain": "OS Keychain",
+            "env_var": "DATAING_API_KEY environment variable",
+            "session": "session storage (not persisted)",
+        }
+
+        mode_desc = mode_descriptions.get(credential_mode or "", "unknown")
+
+        print("")
+        print("# Reproducible snippet:")
+        print(f"#   %dataing connect --base-url {base_url}")
+        print(f"# Auth: using {mode_desc}")
+        if credential_mode == "env_var":
+            print("# (API key loaded from DATAING_API_KEY)")
+        elif credential_mode == "keychain":
+            print("# (API key stored securely in OS keychain)")
 
     def _handle_attach(self, args: list[str]) -> None:
         """Handle attach subcommand.
@@ -403,7 +485,7 @@ Dataing Magic Commands
         except SystemExit:
             return
 
-        question = " ".join(parsed.question).strip('"\'')
+        question = " ".join(parsed.question).strip("\"'")
         if not question:
             print("Error: ask requires a question", file=sys.stderr)
             return
@@ -424,11 +506,13 @@ Dataing Magic Commands
             print("")
 
             # Store run for later reference
-            self._state._history.append({
-                "action": "ask",
-                "run_id": run.run_id,
-                "question": question,
-            })
+            self._state._history.append(
+                {
+                    "action": "ask",
+                    "run_id": run.run_id,
+                    "question": question,
+                }
+            )
 
             # Notify JupyterLab frontend about new run
             self._send_state_update()
@@ -459,12 +543,14 @@ Dataing Magic Commands
 
         try:
             for event in self._state.client.stream_run(run.run_id):
-                events.append({
-                    "seq": event.seq,
-                    "event": event.event,
-                    "data": event.data,
-                    "timestamp": event.timestamp,
-                })
+                events.append(
+                    {
+                        "seq": event.seq,
+                        "event": event.event,
+                        "data": event.data,
+                        "timestamp": event.timestamp,
+                    }
+                )
 
                 # Render the event
                 render_timeline_event(event)
@@ -485,12 +571,14 @@ Dataing Magic Commands
         self._show_ui_link(run.run_id)
 
         # Store events for export
-        self._state._history.append({
-            "action": "stream_complete",
-            "run_id": run.run_id,
-            "events": events,
-            "status": final_status,
-        })
+        self._state._history.append(
+            {
+                "action": "stream_complete",
+                "run_id": run.run_id,
+                "events": events,
+                "status": final_status,
+            }
+        )
 
     def _poll_for_completion(self, run: Any) -> None:
         """Poll for run completion (fallback method).
@@ -547,12 +635,9 @@ Dataing Magic Commands
         Args:
             args: Command arguments.
         """
-        from datetime import datetime
-
         parser = argparse.ArgumentParser(prog="%dataing export")
         parser.add_argument(
-            "--format", "-f", choices=["markdown", "json"], default="markdown",
-            help="Output format"
+            "--format", "-f", choices=["markdown", "json"], default="markdown", help="Output format"
         )
         parser.add_argument("--output", "-o", help="Output file path")
 
@@ -627,7 +712,7 @@ Dataing Magic Commands
             seq = event.get("seq", 0)
 
             if event_type == "run_started":
-                lines.append(f"### Investigation Started")
+                lines.append("### Investigation Started")
                 if "goal" in data:
                     lines.append(f"Goal: {data['goal']}")
                 lines.append("")
@@ -722,6 +807,8 @@ Dataing Magic Commands
     def _handle_status(self, args: list[str]) -> None:
         """Handle status subcommand.
 
+        Shows same connection info as the JupyterLab sidebar.
+
         Args:
             args: Command arguments.
         """
@@ -730,10 +817,21 @@ Dataing Magic Commands
 
         # Client status
         if self._state.client:
-            print(f"API: {self._state.client.base_url}")
+            print(f"Backend URL: {self._state.client.base_url}")
             print(f"API Key: {'***' if self._state.client.api_key else 'Not set'}")
+
+            # Show credential mode if known
+            credential_mode = getattr(self._state, "_credential_mode", None)
+            if credential_mode:
+                mode_descriptions = {
+                    "keychain": "OS Keychain",
+                    "env_var": "Environment Variable",
+                    "session": "Session Only",
+                }
+                mode_display = mode_descriptions.get(credential_mode, credential_mode)
+                print(f"Credential Storage: {mode_display}")
         else:
-            print("API: Not connected")
+            print("Backend: Not connected")
 
         # Context status
         if self._state.is_attached and self._state.context:

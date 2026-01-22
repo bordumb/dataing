@@ -62,7 +62,7 @@ demo = [
     "jupyterlab>=4.0.0",
     # SDK and notebook packages for demo/testing
     "dataing-sdk",
-    "dataing-notebook",
+    "dataing-notebook[server,keyring]",
     "jupyterlab-dataing",
 ]
 

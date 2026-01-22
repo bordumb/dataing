@@ -5,13 +5,13 @@
  * Autonomous Data Quality Investigation
  * OpenAPI spec version: 2.0.0
  */
-import type { AssetRefRequest } from "./assetRefRequest";
+import type { DataingEntrypointsApiRoutesRunsAssetRefRequest } from "./dataingEntrypointsApiRoutesRunsAssetRefRequest";
 import type { InlineBundleRequestWindow } from "./inlineBundleRequestWindow";
 
 /**
  * Inline bundle specification for one-call API.
  */
 export interface InlineBundleRequest {
-  assets: AssetRefRequest[];
+  assets: DataingEntrypointsApiRoutesRunsAssetRefRequest[];
   window?: InlineBundleRequestWindow;
 }

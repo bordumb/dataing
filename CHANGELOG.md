@@ -1,3 +1,10 @@
+# [1.4.0](https://github.com/bordumb/dataing/compare/v1.3.0...v1.4.0) (2026-01-22)
+
+
+### Features
+
+* **ui:** add datasource/dataset picker to policy override dialog ([#79](https://github.com/bordumb/dataing/issues/79)) ([2856769](https://github.com/bordumb/dataing/commit/28567694173f2987aab9ccac45fdd0ed189c2591))
+
 # [1.3.0](https://github.com/bordumb/dataing/compare/v1.2.1...v1.3.0) (2026-01-21)
 
 

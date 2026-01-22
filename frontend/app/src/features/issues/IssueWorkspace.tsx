@@ -15,6 +15,8 @@ import {
   Tag,
   MessageSquare,
   Search,
+  Lightbulb,
+  ArrowRight,
 } from 'lucide-react'
 import {
   useIssue,
@@ -138,6 +140,61 @@ function CommentsSection({ issueId }: CommentsSectionProps) {
             )}
           </Button>
         </form>
+      </CardContent>
+    </Card>
+  )
+}
+
+interface InvestigationSummaryCardProps {
+  issueId: string
+}
+
+function InvestigationSummaryCard({ issueId }: InvestigationSummaryCardProps) {
+  const query = useIssueInvestigationRuns(issueId)
+
+  // Get the latest completed investigation run
+  const latestRun = query.data?.items?.find(
+    (run: InvestigationRunResponse) =>
+      run.synthesis_summary && run.completed_at
+  ) || query.data?.items?.[0]
+
+  if (query.isLoading) {
+    return null // Don't show loading state, will show when data arrives
+  }
+
+  if (!latestRun?.synthesis_summary) {
+    return null // No summary available
+  }
+
+  return (
+    <Card className="border-l-4 border-l-primary bg-primary/5">
+      <CardHeader className="pb-3">
+        <div className="flex items-center justify-between">
+          <CardTitle className="text-base flex items-center gap-2">
+            <Lightbulb className="h-4 w-4 text-primary" />
+            Investigation Summary
+          </CardTitle>
+          {latestRun.confidence && (
+            <Badge variant="outline" className="text-xs">
+              {Math.round(latestRun.confidence * 100)}% confidence
+            </Badge>
+          )}
+        </div>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        {latestRun.root_cause_tag && (
+          <Badge variant="secondary">{latestRun.root_cause_tag}</Badge>
+        )}
+        <p className="text-sm leading-relaxed">
+          {latestRun.synthesis_summary}
+        </p>
+        <Link
+          to={`/investigations/${latestRun.investigation_id}`}
+          className="inline-flex items-center gap-1 text-sm text-primary hover:underline"
+        >
+          View full investigation
+          <ArrowRight className="h-3 w-3" />
+        </Link>
       </CardContent>
     </Card>
   )
@@ -471,6 +528,9 @@ function IssueWorkspaceContent({ issue }: IssueWorkspaceContentProps) {
       <div className="grid gap-6 lg:grid-cols-3">
         {/* Main content */}
         <div className="lg:col-span-2 space-y-6">
+          {/* Investigation Summary - prominent placement */}
+          <InvestigationSummaryCard issueId={issue.id} />
+
           {/* Description */}
           <Card>
             <CardHeader className="pb-3">

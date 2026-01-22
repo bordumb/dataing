@@ -16,6 +16,7 @@ import {
 } from 'lucide-react'
 import { Badge } from '@/components/ui/Badge'
 import { Card, CardContent } from '@/components/ui/Card'
+import { InvestigationFeedbackButtons } from './InvestigationFeedbackButtons'
 
 // Evidence can come in various formats from the API
 type EvidenceItem = Record<string, unknown>
@@ -115,6 +116,10 @@ export function EvidenceCard({ evidence, index }: EvidenceCardProps) {
                     {formatConfidence(confidence)} confidence
                   </Badge>
                 )}
+                <InvestigationFeedbackButtons
+                  targetType="evidence"
+                  targetId={hypothesisId}
+                />
               </div>
               <p className="text-sm line-clamp-2">
                 {interpretation || resultSummary || 'Click to view details'}

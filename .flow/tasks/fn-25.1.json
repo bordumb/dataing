@@ -1,0 +1,23 @@
+{
+  "assignee": "bordumbb@gmail.com",
+  "claim_note": "",
+  "claimed_at": "2026-01-22T21:04:32.006062Z",
+  "created_at": "2026-01-22T20:46:53.712878Z",
+  "depends_on": [],
+  "epic": "fn-25",
+  "evidence": {
+    "commits": [
+      "942052bf52d3316244d378e7d1170f3d98e2bf04"
+    ],
+    "prs": [],
+    "tests": [
+      "just test-frontend"
+    ]
+  },
+  "id": "fn-25.1",
+  "priority": null,
+  "spec_path": ".flow/tasks/fn-25.1.md",
+  "status": "done",
+  "title": "Wire investigation feedback UI (synthesis + evidence)",
+  "updated_at": "2026-01-22T21:07:05.216271Z"
+}

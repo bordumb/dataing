@@ -1730,7 +1730,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/dataing__entrypoints__api__routes__datasources__TestConnectionResponse"
+                  "$ref": "#/components/schemas/TestConnectionResponse"
                 }
               }
             }
@@ -1955,7 +1955,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/dataing__entrypoints__api__routes__datasources__TestConnectionResponse"
+                  "$ref": "#/components/schemas/TestConnectionResponse"
                 }
               }
             }
@@ -2390,7 +2390,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/dataing__entrypoints__api__routes__datasources__TestConnectionResponse"
+                  "$ref": "#/components/schemas/TestConnectionResponse"
                 }
               }
             }
@@ -2615,7 +2615,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/dataing__entrypoints__api__routes__datasources__TestConnectionResponse"
+                  "$ref": "#/components/schemas/TestConnectionResponse"
                 }
               }
             }
@@ -3210,7 +3210,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/TestConnectionResponse"
+                  "$ref": "#/components/schemas/dataing__entrypoints__api__routes__credentials__TestConnectionResponse"
                 }
               }
             }
@@ -4257,6 +4257,189 @@
                 }
               }
             }
+          }
+        },
+        "security": [
+          {
+            "APIKeyHeader": []
+          },
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/analytics/weekly-usage": {
+      "get": {
+        "tags": [
+          "analytics"
+        ],
+        "summary": "Get Weekly Usage",
+        "description": "Get weekly usage statistics for the current tenant.\n\nReturns aggregated metrics per week including:\n- Issues created\n- Investigations started and completed\n- Issues resolved\n- Active teams count\n- Issue resolution rate",
+        "operationId": "get_weekly_usage_api_v1_analytics_weekly_usage_get",
+        "security": [
+          {
+            "APIKeyHeader": []
+          },
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "weeks",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 52,
+              "minimum": 1,
+              "description": "Number of weeks to return",
+              "default": 4,
+              "title": "Weeks"
+            },
+            "description": "Number of weeks to return"
+          },
+          {
+            "name": "team_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filter by team ID",
+              "title": "Team Id"
+            },
+            "description": "Filter by team ID"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WeeklyUsageListResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/analytics/activation": {
+      "get": {
+        "tags": [
+          "analytics"
+        ],
+        "summary": "Get Activation Status",
+        "description": "Get activation status for the current tenant.\n\nActivation is defined as having both:\n- Created at least one issue\n- Completed at least one investigation\n\nWithin the first 7 days of account creation.",
+        "operationId": "get_activation_status_api_v1_analytics_activation_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ActivationStatusResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "APIKeyHeader": []
+          },
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/analytics/activation/funnel": {
+      "get": {
+        "tags": [
+          "analytics"
+        ],
+        "summary": "Get Activation Funnel",
+        "description": "Get activation funnel statistics.\n\nReturns aggregated funnel metrics showing:\n- Total tenants created in period\n- Tenants that created at least one issue\n- Tenants that completed at least one investigation\n- Tenants that achieved activation\n\nNote: This endpoint requires admin permissions in production.",
+        "operationId": "get_activation_funnel_api_v1_analytics_activation_funnel_get",
+        "security": [
+          {
+            "APIKeyHeader": []
+          },
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "days",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 365,
+              "minimum": 1,
+              "description": "Look back period in days",
+              "default": 90,
+              "title": "Days"
+            },
+            "description": "Look back period in days"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ActivationFunnelResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/analytics/refresh": {
+      "post": {
+        "tags": [
+          "analytics"
+        ],
+        "summary": "Refresh Weekly Stats",
+        "description": "Refresh the weekly usage statistics materialized view.\n\nThis is typically called by a scheduled job but can be triggered manually.",
+        "operationId": "refresh_weekly_stats_api_v1_analytics_refresh_post",
+        "responses": {
+          "204": {
+            "description": "Successful Response"
           }
         },
         "security": [
@@ -9397,6 +9580,126 @@
   },
   "components": {
     "schemas": {
+      "ActivationFunnelResponse": {
+        "properties": {
+          "total_tenants": {
+            "type": "integer",
+            "title": "Total Tenants"
+          },
+          "tenants_with_issue": {
+            "type": "integer",
+            "title": "Tenants With Issue"
+          },
+          "tenants_with_investigation": {
+            "type": "integer",
+            "title": "Tenants With Investigation"
+          },
+          "tenants_activated": {
+            "type": "integer",
+            "title": "Tenants Activated"
+          },
+          "issue_rate": {
+            "type": "number",
+            "title": "Issue Rate"
+          },
+          "investigation_rate": {
+            "type": "number",
+            "title": "Investigation Rate"
+          },
+          "activation_rate": {
+            "type": "number",
+            "title": "Activation Rate"
+          }
+        },
+        "type": "object",
+        "required": [
+          "total_tenants",
+          "tenants_with_issue",
+          "tenants_with_investigation",
+          "tenants_activated",
+          "issue_rate",
+          "investigation_rate",
+          "activation_rate"
+        ],
+        "title": "ActivationFunnelResponse",
+        "description": "Activation funnel statistics response."
+      },
+      "ActivationStatusResponse": {
+        "properties": {
+          "tenant_id": {
+            "type": "string",
+            "title": "Tenant Id"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "first_issue_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "First Issue At"
+          },
+          "first_investigation_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "First Investigation At"
+          },
+          "activated_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Activated At"
+          },
+          "is_activated": {
+            "type": "boolean",
+            "title": "Is Activated"
+          },
+          "days_to_activation": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Days To Activation"
+          }
+        },
+        "type": "object",
+        "required": [
+          "tenant_id",
+          "created_at",
+          "first_issue_at",
+          "first_investigation_at",
+          "activated_at",
+          "is_activated",
+          "days_to_activation"
+        ],
+        "title": "ActivationStatusResponse",
+        "description": "Activation status response."
+      },
       "AmbiguousAssetCandidate": {
         "properties": {
           "datasource_id": {
@@ -15169,18 +15472,11 @@
             "type": "boolean",
             "title": "Success"
           },
-          "error": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Error"
+          "message": {
+            "type": "string",
+            "title": "Message"
           },
-          "tables_accessible": {
+          "latency_ms": {
             "anyOf": [
               {
                 "type": "integer"
@@ -15189,15 +15485,27 @@
                 "type": "null"
               }
             ],
-            "title": "Tables Accessible"
+            "title": "Latency Ms"
+          },
+          "server_version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Server Version"
           }
         },
         "type": "object",
         "required": [
-          "success"
+          "success",
+          "message"
         ],
         "title": "TestConnectionResponse",
-        "description": "Response for testing credentials."
+        "description": "Response for testing a connection."
       },
       "TokenResponse": {
         "properties": {
@@ -15652,6 +15960,68 @@
         "title": "WebhookIssueResponse",
         "description": "Response from webhook issue creation."
       },
+      "WeeklyUsageListResponse": {
+        "properties": {
+          "weeks": {
+            "items": {
+              "$ref": "#/components/schemas/WeeklyUsageResponse"
+            },
+            "type": "array",
+            "title": "Weeks"
+          }
+        },
+        "type": "object",
+        "required": [
+          "weeks"
+        ],
+        "title": "WeeklyUsageListResponse",
+        "description": "List of weekly usage statistics."
+      },
+      "WeeklyUsageResponse": {
+        "properties": {
+          "week_start": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Week Start"
+          },
+          "issues_created": {
+            "type": "integer",
+            "title": "Issues Created"
+          },
+          "investigations_started": {
+            "type": "integer",
+            "title": "Investigations Started"
+          },
+          "investigations_completed": {
+            "type": "integer",
+            "title": "Investigations Completed"
+          },
+          "issues_resolved": {
+            "type": "integer",
+            "title": "Issues Resolved"
+          },
+          "active_teams": {
+            "type": "integer",
+            "title": "Active Teams"
+          },
+          "resolution_rate": {
+            "type": "number",
+            "title": "Resolution Rate"
+          }
+        },
+        "type": "object",
+        "required": [
+          "week_start",
+          "issues_created",
+          "investigations_started",
+          "investigations_completed",
+          "issues_resolved",
+          "active_teams",
+          "resolution_rate"
+        ],
+        "title": "WeeklyUsageResponse",
+        "description": "Weekly usage statistics response."
+      },
       "dataing__entrypoints__api__routes__bundles__LineageGraphResponse": {
         "properties": {
           "root": {
@@ -15685,28 +16055,13 @@
         "title": "LineageGraphResponse",
         "description": "Lineage graph response."
       },
-      "dataing__entrypoints__api__routes__datasources__TestConnectionResponse": {
+      "dataing__entrypoints__api__routes__credentials__TestConnectionResponse": {
         "properties": {
           "success": {
             "type": "boolean",
             "title": "Success"
           },
-          "message": {
-            "type": "string",
-            "title": "Message"
-          },
-          "latency_ms": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Latency Ms"
-          },
-          "server_version": {
+          "error": {
             "anyOf": [
               {
                 "type": "string"
@@ -15715,16 +16070,26 @@
                 "type": "null"
               }
             ],
-            "title": "Server Version"
+            "title": "Error"
+          },
+          "tables_accessible": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tables Accessible"
           }
         },
         "type": "object",
         "required": [
-          "success",
-          "message"
+          "success"
         ],
         "title": "TestConnectionResponse",
-        "description": "Response for testing a connection."
+        "description": "Response for testing credentials."
       },
       "dataing__entrypoints__api__routes__runs__AssetRefRequest": {
         "properties": {

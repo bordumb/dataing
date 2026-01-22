@@ -446,6 +446,8 @@ demo: demo-fixtures
     PGPASSWORD=dataing psql -h localhost -U dataing -d dataing_demo -f python-packages/dataing/migrations/025_sdk_bundles_runs.sql 2>&1 | grep -v "^NOTICE:" || true
     PGPASSWORD=dataing psql -h localhost -U dataing -d dataing_demo -f python-packages/dataing/migrations/026_sdk_evidence.sql 2>&1 | grep -v "^NOTICE:" || true
     PGPASSWORD=dataing psql -h localhost -U dataing -d dataing_demo -f python-packages/dataing/migrations/027_sdk_vp_fields.sql 2>&1 | grep -v "^NOTICE:" || true
+    PGPASSWORD=dataing psql -h localhost -U dataing -d dataing_demo -f python-packages/dataing/migrations/028_team_policies.sql 2>&1 | grep -v "^NOTICE:" || true
+    PGPASSWORD=dataing psql -h localhost -U dataing -d dataing_demo -f python-packages/dataing/migrations/029_analytics_events.sql 2>&1 | grep -v "^NOTICE:" || true
 
     trap 'kill 0' EXIT
 

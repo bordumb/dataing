@@ -273,16 +273,18 @@ export function TeamPolicyEditor({ teamId, teamName, onClose }: TeamPolicyEditor
             <div className="space-y-2">
               <Label>Auto-investigate Min Severity</Label>
               <Select
-                value={policy?.auto_investigate_min_severity || ''}
+                value={policy?.auto_investigate_min_severity || '__none__'}
                 onValueChange={(value) =>
-                  handleUpdatePolicy({ autoInvestigateMinSeverity: value || null })
+                  handleUpdatePolicy({
+                    autoInvestigateMinSeverity: value === '__none__' ? null : value,
+                  })
                 }
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Not set" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Not set</SelectItem>
+                  <SelectItem value="__none__">Not set</SelectItem>
                   {SEVERITY_LEVELS.map((level) => (
                     <SelectItem key={level} value={level}>
                       {level.charAt(0).toUpperCase() + level.slice(1)}
@@ -295,16 +297,18 @@ export function TeamPolicyEditor({ teamId, teamName, onClose }: TeamPolicyEditor
             <div className="space-y-2">
               <Label>Review Required Max Severity</Label>
               <Select
-                value={policy?.review_required_max_severity || ''}
+                value={policy?.review_required_max_severity || '__none__'}
                 onValueChange={(value) =>
-                  handleUpdatePolicy({ reviewRequiredMaxSeverity: value || null })
+                  handleUpdatePolicy({
+                    reviewRequiredMaxSeverity: value === '__none__' ? null : value,
+                  })
                 }
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Not set" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Not set</SelectItem>
+                  <SelectItem value="__none__">Not set</SelectItem>
                   {SEVERITY_LEVELS.map((level) => (
                     <SelectItem key={level} value={level}>
                       {level.charAt(0).toUpperCase() + level.slice(1)}
@@ -452,14 +456,19 @@ export function TeamPolicyEditor({ teamId, teamName, onClose }: TeamPolicyEditor
             <div className="space-y-2">
               <Label>Override Action</Label>
               <Select
-                value={newOverride.defaultAction}
-                onValueChange={(value) => setNewOverride({ ...newOverride, defaultAction: value })}
+                value={newOverride.defaultAction || '__none__'}
+                onValueChange={(value) =>
+                  setNewOverride({
+                    ...newOverride,
+                    defaultAction: value === '__none__' ? '' : value,
+                  })
+                }
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Use default" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Use default</SelectItem>
+                  <SelectItem value="__none__">Use default</SelectItem>
                   {POLICY_ACTIONS.map((action) => (
                     <SelectItem key={action} value={action}>
                       {action === 'auto'
@@ -476,16 +485,19 @@ export function TeamPolicyEditor({ teamId, teamName, onClose }: TeamPolicyEditor
               <div className="space-y-2">
                 <Label>Auto-investigate Min Severity</Label>
                 <Select
-                  value={newOverride.autoInvestigateMinSeverity}
+                  value={newOverride.autoInvestigateMinSeverity || '__none__'}
                   onValueChange={(value) =>
-                    setNewOverride({ ...newOverride, autoInvestigateMinSeverity: value })
+                    setNewOverride({
+                      ...newOverride,
+                      autoInvestigateMinSeverity: value === '__none__' ? '' : value,
+                    })
                   }
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Use default" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">Use default</SelectItem>
+                    <SelectItem value="__none__">Use default</SelectItem>
                     {SEVERITY_LEVELS.map((level) => (
                       <SelectItem key={level} value={level}>
                         {level.charAt(0).toUpperCase() + level.slice(1)}
@@ -497,16 +509,19 @@ export function TeamPolicyEditor({ teamId, teamName, onClose }: TeamPolicyEditor
               <div className="space-y-2">
                 <Label>Review Required Max Severity</Label>
                 <Select
-                  value={newOverride.reviewRequiredMaxSeverity}
+                  value={newOverride.reviewRequiredMaxSeverity || '__none__'}
                   onValueChange={(value) =>
-                    setNewOverride({ ...newOverride, reviewRequiredMaxSeverity: value })
+                    setNewOverride({
+                      ...newOverride,
+                      reviewRequiredMaxSeverity: value === '__none__' ? '' : value,
+                    })
                   }
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Use default" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">Use default</SelectItem>
+                    <SelectItem value="__none__">Use default</SelectItem>
                     {SEVERITY_LEVELS.map((level) => (
                       <SelectItem key={level} value={level}>
                         {level.charAt(0).toUpperCase() + level.slice(1)}

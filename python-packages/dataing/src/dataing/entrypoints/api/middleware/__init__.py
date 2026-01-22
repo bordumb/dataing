@@ -20,6 +20,10 @@ from dataing.entrypoints.api.middleware.jwt_auth import (
     verify_jwt,
 )
 from dataing.entrypoints.api.middleware.rate_limit import RateLimitMiddleware
+from dataing.entrypoints.api.middleware.redis_rate_limit import (
+    RedisRateLimitConfig,
+    RedisRateLimitMiddleware,
+)
 
 __all__ = [
     # API Key auth
@@ -38,4 +42,6 @@ __all__ = [
     "RequireOwner",
     # Middleware
     "RateLimitMiddleware",
+    "RedisRateLimitMiddleware",
+    "RedisRateLimitConfig",
 ]

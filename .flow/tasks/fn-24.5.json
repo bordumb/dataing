@@ -1,14 +1,21 @@
 {
-  "assignee": null,
+  "assignee": "bordumbb@gmail.com",
   "claim_note": "",
-  "claimed_at": null,
+  "claimed_at": "2026-01-22T19:32:07.904710Z",
   "created_at": "2026-01-22T18:02:54.454759Z",
   "depends_on": [],
   "epic": "fn-24",
+  "evidence": {
+    "commits": [],
+    "prs": [],
+    "tests": [
+      "uv run pytest python-packages/dataing/tests/unit/adapters/sse/ python-packages/dataing/tests/unit/middleware/test_redis_rate_limit.py -v"
+    ]
+  },
   "id": "fn-24.5",
   "priority": null,
   "spec_path": ".flow/tasks/fn-24.5.md",
-  "status": "todo",
+  "status": "done",
   "title": "Redis-backed SSE event store + rate limiting",
-  "updated_at": "2026-01-22T18:02:54.454939Z"
+  "updated_at": "2026-01-22T19:39:04.950959Z"
 }

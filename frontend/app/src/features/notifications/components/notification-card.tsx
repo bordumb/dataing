@@ -80,6 +80,11 @@ export function NotificationCard({ notification, onMarkRead }: NotificationCardP
 
   // Polymorphic rendering for approval_required type
   if (notification.type === 'approval_required') {
+    // For approval notifications, the resource_id is the approval_request_id
+    const approvalLink = notification.resource_id
+      ? `/approvals/${notification.resource_id}`
+      : resourceLink
+
     return (
       <Card className={cn('p-4', isUnread && 'border-l-4 border-l-primary')}>
         <div className="flex items-start gap-3">
@@ -93,10 +98,10 @@ export function NotificationCard({ notification, onMarkRead }: NotificationCardP
               <p className="text-sm text-muted-foreground">{notification.body}</p>
             )}
             <div className="flex gap-2 mt-3">
-              {resourceLink && (
+              {approvalLink && (
                 <Button size="sm" asChild>
-                  <Link to={resourceLink} onClick={handleClick}>
-                    Review
+                  <Link to={approvalLink} onClick={handleClick}>
+                    Review Context
                   </Link>
                 </Button>
               )}

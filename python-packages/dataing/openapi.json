@@ -1730,7 +1730,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/dataing__entrypoints__api__routes__datasources__TestConnectionResponse"
+                  "$ref": "#/components/schemas/TestConnectionResponse"
                 }
               }
             }
@@ -1955,7 +1955,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/dataing__entrypoints__api__routes__datasources__TestConnectionResponse"
+                  "$ref": "#/components/schemas/TestConnectionResponse"
                 }
               }
             }
@@ -2390,7 +2390,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/dataing__entrypoints__api__routes__datasources__TestConnectionResponse"
+                  "$ref": "#/components/schemas/TestConnectionResponse"
                 }
               }
             }
@@ -2615,7 +2615,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/dataing__entrypoints__api__routes__datasources__TestConnectionResponse"
+                  "$ref": "#/components/schemas/TestConnectionResponse"
                 }
               }
             }
@@ -3210,7 +3210,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/TestConnectionResponse"
+                  "$ref": "#/components/schemas/dataing__entrypoints__api__routes__credentials__TestConnectionResponse"
                 }
               }
             }
@@ -9357,13 +9357,11 @@
         "properties": {
           "platform": {
             "type": "string",
-            "title": "Platform",
-            "description": "Data platform (postgres, snowflake, dbt)"
+            "title": "Platform"
           },
           "name": {
             "type": "string",
-            "title": "Name",
-            "description": "Fully qualified name (db.schema.table)"
+            "title": "Name"
           },
           "datasource_id": {
             "anyOf": [
@@ -9374,8 +9372,7 @@
                 "type": "null"
               }
             ],
-            "title": "Datasource Id",
-            "description": "Optional datasource ID for disambiguation"
+            "title": "Datasource Id"
           }
         },
         "type": "object",
@@ -9695,7 +9692,7 @@
         "properties": {
           "assets": {
             "items": {
-              "$ref": "#/components/schemas/AssetRefRequest"
+              "$ref": "#/components/schemas/dataing__entrypoints__api__routes__bundles__AssetRefRequest"
             },
             "type": "array",
             "minItems": 1,
@@ -10697,13 +10694,13 @@
               "query",
               "evidence",
               "synthesis",
-              "investigation"
+              "investigation",
+              "recommendation"
             ],
             "title": "Target Type"
           },
           "target_id": {
             "type": "string",
-            "format": "uuid",
             "title": "Target Id"
           },
           "investigation_id": {
@@ -10765,7 +10762,6 @@
           },
           "target_id": {
             "type": "string",
-            "format": "uuid",
             "title": "Target Id"
           },
           "rating": {
@@ -10851,7 +10847,7 @@
         "properties": {
           "assets": {
             "items": {
-              "$ref": "#/components/schemas/dataing__entrypoints__api__routes__runs__AssetRefRequest"
+              "$ref": "#/components/schemas/AssetRefRequest"
             },
             "type": "array",
             "title": "Assets"
@@ -14697,18 +14693,11 @@
             "type": "boolean",
             "title": "Success"
           },
-          "error": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Error"
+          "message": {
+            "type": "string",
+            "title": "Message"
           },
-          "tables_accessible": {
+          "latency_ms": {
             "anyOf": [
               {
                 "type": "integer"
@@ -14717,15 +14706,27 @@
                 "type": "null"
               }
             ],
-            "title": "Tables Accessible"
+            "title": "Latency Ms"
+          },
+          "server_version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Server Version"
           }
         },
         "type": "object",
         "required": [
-          "success"
+          "success",
+          "message"
         ],
         "title": "TestConnectionResponse",
-        "description": "Response for testing credentials."
+        "description": "Response for testing a connection."
       },
       "TokenResponse": {
         "properties": {
@@ -15242,28 +15243,19 @@
         "title": "WeeklyUsageResponse",
         "description": "Weekly usage statistics response."
       },
-      "dataing__entrypoints__api__routes__datasources__TestConnectionResponse": {
+      "dataing__entrypoints__api__routes__bundles__AssetRefRequest": {
         "properties": {
-          "success": {
-            "type": "boolean",
-            "title": "Success"
-          },
-          "message": {
+          "platform": {
             "type": "string",
-            "title": "Message"
+            "title": "Platform",
+            "description": "Data platform (postgres, snowflake, dbt)"
           },
-          "latency_ms": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Latency Ms"
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "Fully qualified name (db.schema.table)"
           },
-          "server_version": {
+          "datasource_id": {
             "anyOf": [
               {
                 "type": "string"
@@ -15272,16 +15264,53 @@
                 "type": "null"
               }
             ],
-            "title": "Server Version"
+            "title": "Datasource Id",
+            "description": "Optional datasource ID for disambiguation"
           }
         },
         "type": "object",
         "required": [
-          "success",
-          "message"
+          "platform",
+          "name"
+        ],
+        "title": "AssetRefRequest",
+        "description": "Asset reference in request."
+      },
+      "dataing__entrypoints__api__routes__credentials__TestConnectionResponse": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "title": "Success"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          },
+          "tables_accessible": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tables Accessible"
+          }
+        },
+        "type": "object",
+        "required": [
+          "success"
         ],
         "title": "TestConnectionResponse",
-        "description": "Response for testing a connection."
+        "description": "Response for testing credentials."
       },
       "dataing__entrypoints__api__routes__lineage__LineageGraphResponse": {
         "properties": {
@@ -15320,36 +15349,6 @@
         ],
         "title": "LineageGraphResponse",
         "description": "Response for a lineage graph."
-      },
-      "dataing__entrypoints__api__routes__runs__AssetRefRequest": {
-        "properties": {
-          "platform": {
-            "type": "string",
-            "title": "Platform"
-          },
-          "name": {
-            "type": "string",
-            "title": "Name"
-          },
-          "datasource_id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Datasource Id"
-          }
-        },
-        "type": "object",
-        "required": [
-          "platform",
-          "name"
-        ],
-        "title": "AssetRefRequest",
-        "description": "Asset reference in request."
       }
     },
     "securitySchemes": {

@@ -40,6 +40,7 @@ class EventType(Enum):
     FEEDBACK_EVIDENCE = "feedback.evidence"
     FEEDBACK_SYNTHESIS = "feedback.synthesis"
     FEEDBACK_INVESTIGATION = "feedback.investigation"
+    FEEDBACK_RECOMMENDATION = "feedback.recommendation"
 
     # Comments
     COMMENT_ADDED = "comment.added"

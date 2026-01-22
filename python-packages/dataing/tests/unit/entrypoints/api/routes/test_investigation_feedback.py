@@ -27,7 +27,7 @@ class TestFeedbackSchemas:
         """FeedbackCreate accepts valid data."""
         data = FeedbackCreate(
             target_type="hypothesis",
-            target_id=uuid4(),
+            target_id=str(uuid4()),
             investigation_id=uuid4(),
             rating=1,
             reason="Right direction",
@@ -39,7 +39,7 @@ class TestFeedbackSchemas:
         """FeedbackCreate accepts negative rating."""
         data = FeedbackCreate(
             target_type="query",
-            target_id=uuid4(),
+            target_id=str(uuid4()),
             investigation_id=uuid4(),
             rating=-1,
         )
@@ -50,7 +50,7 @@ class TestFeedbackSchemas:
         with pytest.raises(ValidationError):
             FeedbackCreate(
                 target_type="hypothesis",
-                target_id=uuid4(),
+                target_id=str(uuid4()),
                 investigation_id=uuid4(),
                 rating=0,  # Invalid - must be 1 or -1
             )
@@ -60,10 +60,23 @@ class TestFeedbackSchemas:
         with pytest.raises(ValidationError):
             FeedbackCreate(
                 target_type="invalid",
-                target_id=uuid4(),
+                target_id=str(uuid4()),
                 investigation_id=uuid4(),
                 rating=1,
             )
+
+    def test_feedback_create_recommendation(self) -> None:
+        """FeedbackCreate accepts recommendation target type."""
+        inv_id = uuid4()
+        data = FeedbackCreate(
+            target_type="recommendation",
+            target_id=f"{inv_id}-rec-0",  # Composite ID format
+            investigation_id=inv_id,
+            rating=1,
+            reason="Will implement",
+        )
+        assert data.target_type == "recommendation"
+        assert "-rec-" in data.target_id
 
 
 class TestFeedbackEndpoint:

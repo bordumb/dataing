@@ -1873,6 +1873,123 @@ class AppDatabase:
             raise RuntimeError("Failed to insert query audit log")
         return result
 
+    async def search_asset_instances(
+        self,
+        tenant_id: UUID,
+        query: str,
+        limit: int = 10,
+        cursor: str | None = None,
+        datasource_id: UUID | None = None,
+    ) -> tuple[list[dict[str, Any]], str | None, int | None]:
+        """Search for asset instances (datasets) across all tenant datasources.
+
+        Args:
+            tenant_id: The tenant ID.
+            query: Search query (matched against name and native_path).
+            limit: Maximum results to return (max 100).
+            cursor: Opaque pagination cursor (base64 encoded).
+            datasource_id: Optional filter to single datasource.
+
+        Returns:
+            Tuple of (results, next_cursor, total_hint).
+        """
+        import base64
+
+        # Cap limit at 100
+        limit = min(limit, 100)
+
+        # Parse cursor if provided (format: base64(native_path|datasource_id|dataset_id))
+        cursor_path: str | None = None
+        cursor_ds_id: UUID | None = None
+        cursor_dataset_id: UUID | None = None
+        if cursor:
+            try:
+                decoded = base64.b64decode(cursor).decode()
+                parts = decoded.split("|")
+                cursor_path = parts[0]
+                cursor_ds_id = UUID(parts[1])
+                cursor_dataset_id = UUID(parts[2])
+            except (ValueError, IndexError):
+                pass  # Invalid cursor, start from beginning
+
+        # Build the search query
+        search_pattern = f"%{query}%"
+
+        # Base query with datasource join
+        base_query = """
+            SELECT d.id, d.datasource_id, d.native_path, d.name, d.table_type,
+                   d.schema_name, d.catalog_name, d.row_count, d.column_count,
+                   ds.name as datasource_name, ds.type as platform,
+                   CASE
+                       WHEN d.name ILIKE $2 THEN 'name_prefix'
+                       WHEN d.native_path ILIKE $2 THEN 'path_match'
+                       ELSE 'fuzzy'
+                   END as match_reason
+            FROM datasets d
+            JOIN data_sources ds ON d.datasource_id = ds.id
+            WHERE d.tenant_id = $1
+              AND ds.is_active = true
+              AND d.is_active = true
+              AND (d.name ILIKE $3 OR d.native_path ILIKE $3)
+        """
+        args: list[Any] = [tenant_id, f"{query}%", search_pattern]
+        idx = 4
+
+        # Add datasource filter if provided
+        if datasource_id:
+            base_query += f" AND d.datasource_id = ${idx}"
+            args.append(datasource_id)
+            idx += 1
+
+        # Add cursor filter
+        if cursor_path and cursor_ds_id and cursor_dataset_id:
+            base_query += f"""
+                AND (d.native_path, d.datasource_id, d.id) > (${idx}, ${idx + 1}, ${idx + 2})
+            """
+            args.extend([cursor_path, cursor_ds_id, cursor_dataset_id])
+            idx += 3
+
+        # Order and limit (fetch one extra to check has_more)
+        base_query += f"""
+            ORDER BY d.native_path, d.datasource_id, d.id
+            LIMIT ${idx}
+        """
+        args.append(limit + 1)
+
+        rows = await self.fetch_all(base_query, *args)
+
+        # Check if there are more results
+        has_more = len(rows) > limit
+        if has_more:
+            rows = rows[:limit]
+
+        # Build next cursor from last row
+        next_cursor: str | None = None
+        if has_more and rows:
+            last = rows[-1]
+            cursor_str = f"{last['native_path']}|{last['datasource_id']}|{last['id']}"
+            next_cursor = base64.b64encode(cursor_str.encode()).decode()
+
+        # Get total hint (approximate count for UI)
+        count_query = """
+            SELECT COUNT(*)::int as count
+            FROM datasets d
+            JOIN data_sources ds ON d.datasource_id = ds.id
+            WHERE d.tenant_id = $1
+              AND ds.is_active = true
+              AND d.is_active = true
+              AND (d.name ILIKE $2 OR d.native_path ILIKE $2)
+        """
+        count_args: list[Any] = [tenant_id, search_pattern]
+        if datasource_id:
+            count_query += " AND d.datasource_id = $3"
+            count_args.append(datasource_id)
+
+        count_result = await self.fetch_one(count_query, *count_args)
+        total_hint = count_result["count"] if count_result else None
+
+        return rows, next_cursor, total_hint
+
     async def get_query_audit_logs(
         self,
         tenant_id: UUID,

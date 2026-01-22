@@ -6,6 +6,7 @@ Note: SSO, SCIM, Audit, and Settings routes are available in Enterprise Edition.
 from fastapi import APIRouter
 
 from dataing.entrypoints.api.routes.approvals import router as approvals_router
+from dataing.entrypoints.api.routes.asset_instances import router as asset_instances_router
 from dataing.entrypoints.api.routes.auth import router as auth_router
 from dataing.entrypoints.api.routes.bundles import router as bundles_router
 from dataing.entrypoints.api.routes.comment_votes import router as comment_votes_router
@@ -49,6 +50,7 @@ api_router = APIRouter()
 
 # Include all route modules
 api_router.include_router(auth_router, prefix="/auth")  # Auth routes (no API key required)
+api_router.include_router(asset_instances_router)  # Cross-datasource asset search
 api_router.include_router(investigations_router)  # Unified investigation API
 api_router.include_router(issues_router)  # Issues CRUD API
 api_router.include_router(datasources_router)

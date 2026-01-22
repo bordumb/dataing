@@ -28,7 +28,7 @@ from dataing_sdk import DataingClient, AssetRef
 # Initialize client
 client = DataingClient(
     base_url="http://localhost:8000",
-    api_key="your-api-key"
+    api_key="your-api-key"  # pragma: allowlist secret
 )
 
 # Create a context for an asset
@@ -58,22 +58,114 @@ for event in client.stream_run(run.run_id):
 
 ## DataingClient
 
-::: dataing_sdk.client.DataingClient
-    options:
-      show_source: false
-      show_root_heading: true
-      show_root_toc_entry: true
-      members:
-        - __init__
-        - attach
-        - detach
-        - context
-        - create_bundle
-        - run
-        - get_run
-        - wait_for_run
-        - stream_run
-        - health
+The main client for interacting with the Dataing API.
+
+### Constructor
+
+```python
+DataingClient(
+    base_url: str | None = None,
+    api_key: str | None = None,
+    timeout: float = 30.0
+)
+```
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `base_url` | `str \| None` | API base URL. Falls back to `DATAING_BASE_URL` env var, then `http://localhost:8000` |
+| `api_key` | `str \| None` | API key. Falls back to `DATAING_API_KEY` env var |
+| `timeout` | `float` | Request timeout in seconds (default: 30.0) |
+
+### Methods
+
+#### `attach(datasource_id, name=None)`
+
+Set the session default datasource for subsequent operations.
+
+```python
+client.attach("ds_prod", name="Production Analytics")
+```
+
+#### `detach()`
+
+Clear the session default datasource.
+
+#### `context(*urns, assets=None, window=None)`
+
+Create a Context for the given assets. Returns a `Context` object with query and analysis methods.
+
+```python
+ctx = client.context("postgres://db.schema.orders", window="7d")
+```
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `*urns` | `str` | URN strings (e.g., `postgres://db.schema.table`) |
+| `assets` | `list[AssetRef] \| None` | Asset references |
+| `window` | `str \| None` | Time window (e.g., `"7d"`, `"24h"`) |
+
+#### `create_bundle(assets, window=None, ...)`
+
+Create a context bundle for the given assets.
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `assets` | `list[AssetRef]` | Assets to include |
+| `window` | `str \| None` | Time window |
+| `include_lineage` | `bool` | Include lineage graph (default: True) |
+| `include_operational` | `bool` | Include operational metadata (default: True) |
+| `include_anomalies` | `bool` | Include detected anomalies (default: True) |
+
+#### `run(assets, goal, bundle_id=None)`
+
+Start an investigation run.
+
+```python
+run = client.run(
+    assets=[AssetRef(platform="postgres", name="db.schema.orders")],
+    goal="Why are there null values spiking?"
+)
+```
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `assets` | `list[AssetRef]` | Assets to investigate |
+| `goal` | `str` | Natural language investigation goal |
+| `bundle_id` | `str \| None` | Optional bundle ID to reuse |
+
+**Returns:** `Run` object with `run_id`, `status`, etc.
+
+#### `get_run(run_id)`
+
+Get the current status of a run.
+
+#### `wait_for_run(run_id, poll_interval=1.0, timeout=300.0, on_progress=None)`
+
+Wait for a run to complete by polling.
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `run_id` | `str` | Run ID |
+| `poll_interval` | `float` | Seconds between polls (default: 1.0) |
+| `timeout` | `float \| None` | Max wait time (default: 300.0) |
+| `on_progress` | `callable \| None` | Progress callback |
+
+#### `stream_run(run_id, last_seq=None, timeout=300.0)`
+
+Stream SSE events from a run in real-time.
+
+```python
+for event in client.stream_run(run.run_id):
+    print(f"[{event.event}] {event.data}")
+    if event.event in ("run_completed", "run_failed"):
+        break
+```
+
+**Yields:** `RunEvent` objects
+
+#### `health()`
+
+Check API health and connectivity. Returns a dict with status info.
 
 ---
 
@@ -81,54 +173,101 @@ for event in client.stream_run(run.run_id):
 
 ### AssetRef
 
-::: dataing_sdk.types.AssetRef
-    options:
-      show_source: false
-      show_root_heading: true
+Reference to a data asset (table, view, model).
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `platform` | `str` | Data platform (postgres, snowflake, dbt, etc.) |
+| `name` | `str` | Fully qualified name (database.schema.table) |
+| `datasource_id` | `str \| None` | Optional datasource ID for disambiguation |
+
+**Methods:**
+
+- `AssetRef.from_urn(urn)` — Parse from URN string
+- `asset.to_urn()` — Convert to URN string
+
+```python
+# Direct construction
+asset = AssetRef(platform="postgres", name="db.schema.orders")
+
+# From URN
+asset = AssetRef.from_urn("postgres://db.schema.orders")
+```
 
 ### ContextBundle
 
-::: dataing_sdk.types.ContextBundle
-    options:
-      show_source: false
-      show_root_heading: true
+Cached context snapshot for data assets.
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `bundle_id` | `str` | Unique bundle identifier |
+| `resolved_assets` | `list[ResolvedAsset]` | Resolved assets with datasource bindings |
+| `lineage` | `dict \| None` | Data lineage graph |
+| `operational` | `dict \| None` | Operational metadata |
+| `anomalies` | `list[dict] \| None` | Detected anomalies |
+| `bundle_hash` | `str` | Content hash for caching |
+| `expires_at` | `datetime` | Cache expiration time |
 
 ### Run
 
-::: dataing_sdk.types.Run
-    options:
-      show_source: false
-      show_root_heading: true
+An investigation run.
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `run_id` | `str` | Unique run identifier |
+| `bundle_id` | `str` | Context bundle used |
+| `bundle_hash` | `str` | Bundle content hash |
+| `status` | `RunStatus` | Current status |
+| `error_code` | `str \| None` | Error code if failed |
+| `created_at` | `datetime` | Creation timestamp |
 
 ### RunEvent
 
-::: dataing_sdk.types.RunEvent
-    options:
-      show_source: false
-      show_root_heading: true
+Real-time event from SSE streaming.
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `seq` | `int` | Sequence number for resumption |
+| `event` | `str` | Event type (run_started, run_progress, etc.) |
+| `run_id` | `str` | Run ID |
+| `data` | `dict` | Event payload |
+| `timestamp` | `str \| None` | ISO 8601 timestamp |
+
+**Properties:**
+
+- `is_terminal` — True if run_completed or run_failed
+- `is_evidence` — True if run_evidence event
+- `is_progress` — True if run_progress event
 
 ### RunStatus
 
-::: dataing_sdk.types.RunStatus
-    options:
-      show_source: false
-      show_root_heading: true
+Enum of run statuses.
+
+| Value | Description |
+|-------|-------------|
+| `RUNNING` | Investigation is actively executing |
+| `COMPLETED` | Finished successfully |
+| `FAILED` | Encountered an error |
+| `CANCELLED` | Manually cancelled |
 
 ---
 
 ## Exceptions
 
-::: dataing_sdk.exceptions
-    options:
-      show_source: false
-      show_root_heading: true
-      members:
-        - DataingError
-        - AuthError
-        - NotFoundError
-        - ValidationError
-        - RateLimitError
-        - ServerError
+All exceptions inherit from `DataingError`.
+
+| Exception | HTTP Code | Description |
+|-----------|-----------|-------------|
+| `DataingError` | — | Base exception for all SDK errors |
+| `AuthError` | 401/403 | Authentication or authorization failed |
+| `NotFoundError` | 404 | Resource not found |
+| `ValidationError` | 422 | Request validation failed |
+| `RateLimitError` | 429 | Rate limit exceeded (has `retry_after` attribute) |
+| `ServerError` | 5xx | Server-side error |
+| `TimeoutError` | — | Request timed out |
+| `AmbiguousAssetError` | 409 | Multiple datasources match (has `candidates` attribute) |
+| `StreamError` | — | SSE streaming error |
+| `ReplayWindowExpiredError` | 410 | Replay window expired |
 
 ---
 

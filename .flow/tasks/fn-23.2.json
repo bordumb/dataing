@@ -1,0 +1,47 @@
+{
+  "assignee": "bordumbb@gmail.com",
+  "claim_note": "",
+  "claimed_at": "2026-01-21T17:41:15.593747Z",
+  "created_at": "2026-01-21T11:52:42.590171Z",
+  "depends_on": [],
+  "epic": "fn-23",
+  "evidence": {
+    "files_created": [
+      "python-packages/dataing-notebook/src/dataing_notebook/serverextension/credentials.py",
+      "python-packages/dataing-notebook/tests/test_credentials.py"
+    ],
+    "files_modified": [
+      "python-packages/dataing-notebook/src/dataing_notebook/serverextension/handlers.py",
+      "python-packages/dataing-notebook/pyproject.toml"
+    ],
+    "linting": {
+      "py_compile": "pass",
+      "ruff": "pass"
+    },
+    "tests": [
+      "python-packages/dataing-notebook/tests/test_credentials.py::TestCredentialModeDetection::test_detect_env_var_mode",
+      "python-packages/dataing-notebook/tests/test_credentials.py::TestCredentialModeDetection::test_detect_keychain_mode",
+      "python-packages/dataing-notebook/tests/test_credentials.py::TestCredentialModeDetection::test_detect_session_mode",
+      "python-packages/dataing-notebook/tests/test_credentials.py::TestKeyringAvailability::test_keyring_not_installed",
+      "python-packages/dataing-notebook/tests/test_credentials.py::TestKeyringAvailability::test_keyring_fail_backend",
+      "python-packages/dataing-notebook/tests/test_credentials.py::TestCredentialStorage::test_store_session_only",
+      "python-packages/dataing-notebook/tests/test_credentials.py::TestCredentialStorage::test_store_with_persist_uses_keychain",
+      "python-packages/dataing-notebook/tests/test_credentials.py::TestCredentialStorage::test_store_fallback_to_session_on_keychain_failure",
+      "python-packages/dataing-notebook/tests/test_credentials.py::TestCredentialRetrieval::test_precedence_session_first",
+      "python-packages/dataing-notebook/tests/test_credentials.py::TestCredentialRetrieval::test_precedence_keychain_second",
+      "python-packages/dataing-notebook/tests/test_credentials.py::TestCredentialRetrieval::test_precedence_env_third",
+      "python-packages/dataing-notebook/tests/test_credentials.py::TestCredentialRetrieval::test_returns_none_when_nothing_available",
+      "python-packages/dataing-notebook/tests/test_credentials.py::TestCredentialDeletion::test_delete_clears_session",
+      "python-packages/dataing-notebook/tests/test_credentials.py::TestCredentialDeletion::test_delete_clears_keychain",
+      "python-packages/dataing-notebook/tests/test_credentials.py::TestCredentialStatus::test_status_env_var_stored",
+      "python-packages/dataing-notebook/tests/test_credentials.py::TestCredentialStatus::test_status_session_not_stored",
+      "python-packages/dataing-notebook/tests/test_credentials.py::TestCredentialStatus::test_status_session_stored"
+    ]
+  },
+  "id": "fn-23.2",
+  "priority": null,
+  "spec_path": ".flow/tasks/fn-23.2.md",
+  "status": "done",
+  "title": "Server Extension Credential Storage",
+  "updated_at": "2026-01-21T17:47:05.685130Z"
+}

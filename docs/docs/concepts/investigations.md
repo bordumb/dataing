@@ -259,8 +259,6 @@ At key decision points, investigations can pause for human review:
 | **After Hypothesis Selection** | Configurable | Approve hypotheses to test |
 | **Before Final Report** | Optional | Review findings before delivery |
 
-[Learn about the workflow engine](agent-workflows.md)
-
 ---
 
 ## Investigation Lifecycle
@@ -284,12 +282,6 @@ stateDiagram-v2
 ## Learn More
 
 <div class="grid cards" markdown>
-
--   :material-state-machine: **[Agent Workflows (Maistro)](agent-workflows.md)**
-
-    ---
-
-    The workflow engine powering investigations
 
 -   :material-shield: **[Safety & Guardrails](guardrails.md)**
 

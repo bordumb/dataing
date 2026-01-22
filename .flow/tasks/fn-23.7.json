@@ -1,0 +1,17 @@
+{
+  "assignee": null,
+  "claim_note": "",
+  "claimed_at": null,
+  "created_at": "2026-01-21T11:52:43.565488Z",
+  "depends_on": [
+    "fn-23.1",
+    "fn-23.4"
+  ],
+  "epic": "fn-23",
+  "id": "fn-23.7",
+  "priority": null,
+  "spec_path": ".flow/tasks/fn-23.7.md",
+  "status": "todo",
+  "title": "Asset Typeahead Component",
+  "updated_at": "2026-01-21T11:55:49.918772Z"
+}

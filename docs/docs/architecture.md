@@ -316,12 +316,6 @@ sequenceDiagram
 
     Deep dive into the investigation workflow
 
--   :material-state-machine: **[Agent Workflows (Maistro)](concepts/agent-workflows.md)**
-
-    ---
-
-    Understanding the workflow engine
-
 -   :material-shield: **[Safety & Guardrails](concepts/guardrails.md)**
 
     ---

@@ -35,7 +35,7 @@ except ImportError:
 
 # Environment variables for configuration
 ENV_BACKEND_URL = "DATAING_BACKEND_URL"
-ENV_API_KEY = "DATAING_API_KEY"
+ENV_API_KEY = "DATAING_API_KEY"  # pragma: allowlist secret
 ENV_JUPYTERHUB_SERVICE_URL = "JUPYTERHUB_SERVICE_URL"
 ENV_JUPYTERHUB_API_TOKEN = "JUPYTERHUB_API_TOKEN"
 
@@ -64,10 +64,17 @@ def get_backend_url() -> str:
 def get_api_key() -> str | None:
     """Get the API key for backend authentication.
 
+    Uses the credential module's precedence order:
+    1. Session-only memory store
+    2. OS keyring
+    3. Environment variable
+
     Returns:
         API key string or None.
     """
-    return os.environ.get(ENV_API_KEY)
+    from dataing_notebook.serverextension.credentials import get_credential
+
+    return get_credential()
 
 
 def is_jupyterhub_environment() -> bool:
@@ -145,7 +152,7 @@ class TokenHandler(BaseHandler):
                     {
                         "has_token": False,
                         "token_type": None,
-                        "message": "No API key configured. Set DATAING_API_KEY environment variable.",
+                        "message": "No API key configured. Set DATAING_API_KEY env var.",
                     }
                 )
             )
@@ -211,6 +218,197 @@ class TokenHandler(BaseHandler):
             )
 
 
+class CredentialHandler(BaseHandler):
+    """Handler for /dataing/credentials endpoint.
+
+    Manages credential storage with three modes:
+    - keychain: Stored in OS keychain via keyring library
+    - env_var: Read from DATAING_API_KEY environment variable
+    - session: Stored in memory only (cleared on server restart)
+
+    Security:
+    - Actual credential values are NEVER returned
+    - XSRF protection is ENABLED (unlike StateHandler)
+    """
+
+    async def get(self) -> None:
+        """Get current credential status (never returns actual key).
+
+        Returns:
+            {mode: "keychain"|"env_var"|"session", stored: bool, explanation: str}
+        """
+        from dataing_notebook.serverextension.credentials import get_credential_status
+
+        status = get_credential_status()
+        self.write(
+            json_encode(
+                {
+                    "mode": status.mode.value,
+                    "stored": status.stored,
+                    "explanation": status.explanation,
+                }
+            )
+        )
+
+    async def post(self) -> None:
+        """Store a credential.
+
+        Request body:
+            {api_key: "...", persist: bool}
+
+        persist=true: Use keychain if available, else session
+        persist=false: Force session-only storage
+        """
+        from dataing_notebook.serverextension.credentials import store_credential
+
+        try:
+            body = json_decode(self.request.body) if self.request.body else {}
+        except json.JSONDecodeError:
+            self.set_status(400)
+            self.write(json_encode({"error": "Invalid JSON"}))
+            return
+
+        api_key = body.get("api_key")
+        if not api_key:
+            self.set_status(400)
+            self.write(json_encode({"error": "api_key is required"}))
+            return
+
+        persist = body.get("persist", True)
+
+        status = store_credential(api_key, persist=persist)
+        self.write(
+            json_encode(
+                {
+                    "success": True,
+                    "mode": status.mode.value,
+                    "stored": status.stored,
+                    "explanation": status.explanation,
+                }
+            )
+        )
+
+    async def delete(self) -> None:
+        """Clear stored credentials (both keychain and session).
+
+        Returns:
+            Updated credential status.
+        """
+        from dataing_notebook.serverextension.credentials import delete_credential
+
+        status = delete_credential()
+        self.write(
+            json_encode(
+                {
+                    "success": True,
+                    "mode": status.mode.value,
+                    "stored": status.stored,
+                    "explanation": status.explanation,
+                }
+            )
+        )
+
+
+class ConnectionTestHandler(BaseHandler):
+    """Handler for /dataing/connection/test endpoint.
+
+    Tests connection to a Dataing backend before saving credentials.
+    This allows the wizard to validate URL and API key before committing.
+    """
+
+    async def post(self) -> None:
+        """Test connection to a backend.
+
+        Request body:
+            {base_url: "https://...", api_key: "..."}
+
+        Returns:
+            {success: true} on success
+            {success: false, error: "message"} on failure
+        """
+        try:
+            body = json_decode(self.request.body) if self.request.body else {}
+        except json.JSONDecodeError:
+            self.set_status(400)
+            self.write(json_encode({"success": False, "error": "Invalid JSON"}))
+            return
+
+        base_url = body.get("base_url")
+        api_key = body.get("api_key")
+
+        if not base_url:
+            self.set_status(400)
+            self.write(json_encode({"success": False, "error": "base_url is required"}))
+            return
+
+        if not api_key:
+            self.set_status(400)
+            self.write(json_encode({"success": False, "error": "api_key is required"}))
+            return
+
+        # Normalize URL
+        base_url = base_url.rstrip("/")
+
+        # Test connection by calling /health endpoint
+        http_client = tornado.httpclient.AsyncHTTPClient()
+        try:
+            response = await http_client.fetch(
+                f"{base_url}/health",
+                method="GET",
+                headers={
+                    "X-API-Key": api_key,
+                    "Accept": "application/json",
+                },
+                raise_error=False,
+                request_timeout=10,  # 10 second timeout
+            )
+
+            if response.code == 200:
+                self.write(json_encode({"success": True}))
+            elif response.code == 401:
+                self.write(json_encode({"success": False, "error": "Invalid API key"}))
+            elif response.code == 403:
+                self.write(json_encode({"success": False, "error": "API key not authorized"}))
+            elif response.code == 404:
+                self.write(
+                    json_encode({"success": False, "error": "Backend not found at this URL"})
+                )
+            else:
+                self.write(
+                    json_encode(
+                        {
+                            "success": False,
+                            "error": f"Backend returned error: {response.code}",
+                        }
+                    )
+                )
+
+        except tornado.httpclient.HTTPClientError as e:
+            # Connection errors
+            error_msg = self._get_friendly_error(str(e))
+            self.write(json_encode({"success": False, "error": error_msg}))
+        except Exception as e:
+            # Other errors
+            error_msg = self._get_friendly_error(str(e))
+            self.write(json_encode({"success": False, "error": error_msg}))
+
+    def _get_friendly_error(self, error: str) -> str:
+        """Convert technical errors to user-friendly messages."""
+        error_lower = error.lower()
+
+        if "connection refused" in error_lower:
+            return "Cannot connect to backend. Is the server running?"
+        if "name or service not known" in error_lower or "nodename nor servname" in error_lower:
+            return "Cannot resolve backend hostname. Check the URL."
+        if "timed out" in error_lower or "timeout" in error_lower:
+            return "Connection timed out. Backend may be unreachable."
+        if "ssl" in error_lower or "certificate" in error_lower:
+            return "SSL/TLS error. Check if HTTPS is configured correctly."
+
+        # Generic fallback - avoid exposing raw errors
+        return f"Connection failed: {error[:100]}"
+
+
 class SSEProxyHandler(BaseHandler):
     """Handler for /dataing/sse/* endpoint.
 
@@ -246,6 +444,7 @@ class SSEProxyHandler(BaseHandler):
 
         # Use streaming callback to forward events
         try:
+
             def handle_chunk(chunk: bytes) -> None:
                 """Forward chunks to client."""
                 try:
@@ -421,6 +620,377 @@ class StateHandler(BaseHandler):
         self.write(json_encode({"success": True}))
 
 
+class CommandConnectHandler(BaseHandler):
+    """Handler for /dataing/command/connect endpoint.
+
+    Implements versioned connect command for the state machine.
+    """
+
+    async def post(self) -> None:
+        """Execute connect command."""
+        from dataing_notebook.serverextension.state import (
+            StaleVersionError,
+            StateTransitionError,
+            get_workspace_manager,
+        )
+
+        try:
+            body = json_decode(self.request.body) if self.request.body else {}
+        except json.JSONDecodeError:
+            self.set_status(400)
+            self.write(json_encode({"error": "Invalid JSON"}))
+            return
+
+        workspace_id = body.get("workspace_id")
+        kernel_id = body.get("kernel_id")
+        base_url = body.get("base_url")
+        expected_version = body.get("expected_version")
+        credential_mode = body.get("credential_mode", "none")
+
+        if not workspace_id or not kernel_id:
+            self.set_status(400)
+            self.write(json_encode({"error": "workspace_id and kernel_id required"}))
+            return
+
+        if not base_url:
+            base_url = get_backend_url()
+
+        manager = get_workspace_manager()
+
+        try:
+            state = manager.connect(
+                workspace_id=workspace_id,
+                kernel_id=kernel_id,
+                base_url=base_url,
+                credential_mode=credential_mode,
+                expected_version=expected_version,
+            )
+            self.write(json_encode(state.to_dict()))
+
+        except StaleVersionError as e:
+            self.set_status(409)
+            self.write(
+                json_encode(
+                    {
+                        "error": "stale_state",
+                        "current_state": e.current_state,
+                        "current_version": e.current,
+                    }
+                )
+            )
+        except StateTransitionError as e:
+            self.set_status(400)
+            self.write(
+                json_encode(
+                    {
+                        "error": "invalid_state",
+                        "current_state": e.current_state.value,
+                        "allowed": e.allowed_commands,
+                    }
+                )
+            )
+
+
+class CommandAttachHandler(BaseHandler):
+    """Handler for /dataing/command/attach endpoint."""
+
+    async def post(self) -> None:
+        """Execute attach command."""
+        from dataing_notebook.serverextension.state import (
+            StaleVersionError,
+            StateTransitionError,
+            get_workspace_manager,
+        )
+
+        try:
+            body = json_decode(self.request.body) if self.request.body else {}
+        except json.JSONDecodeError:
+            self.set_status(400)
+            self.write(json_encode({"error": "Invalid JSON"}))
+            return
+
+        workspace_id = body.get("workspace_id")
+        kernel_id = body.get("kernel_id")
+        asset_urn = body.get("asset_urn")
+        datasource_id = body.get("datasource_id")
+        datasource_name = body.get("datasource_name")
+        expected_version = body.get("expected_version")
+
+        if not workspace_id or not kernel_id:
+            self.set_status(400)
+            self.write(json_encode({"error": "workspace_id and kernel_id required"}))
+            return
+
+        if not asset_urn:
+            self.set_status(400)
+            self.write(json_encode({"error": "asset_urn is required"}))
+            return
+
+        manager = get_workspace_manager()
+
+        try:
+            state = manager.attach(
+                workspace_id=workspace_id,
+                kernel_id=kernel_id,
+                asset_urn=asset_urn,
+                datasource_id=datasource_id,
+                datasource_name=datasource_name,
+                expected_version=expected_version,
+            )
+            self.write(json_encode(state.to_dict()))
+
+        except StaleVersionError as e:
+            self.set_status(409)
+            self.write(
+                json_encode(
+                    {
+                        "error": "stale_state",
+                        "current_state": e.current_state,
+                        "current_version": e.current,
+                    }
+                )
+            )
+        except StateTransitionError as e:
+            self.set_status(400)
+            self.write(
+                json_encode(
+                    {
+                        "error": "invalid_state",
+                        "current_state": e.current_state.value,
+                        "allowed": e.allowed_commands,
+                    }
+                )
+            )
+
+
+class CommandStartRunHandler(BaseHandler):
+    """Handler for /dataing/command/start_run endpoint.
+
+    Implements idempotent run creation with client_request_id.
+    """
+
+    async def post(self) -> None:
+        """Execute start_run command."""
+        from dataing_notebook.serverextension.state import (
+            StaleVersionError,
+            StateTransitionError,
+            get_workspace_manager,
+        )
+
+        try:
+            body = json_decode(self.request.body) if self.request.body else {}
+        except json.JSONDecodeError:
+            self.set_status(400)
+            self.write(json_encode({"error": "Invalid JSON"}))
+            return
+
+        workspace_id = body.get("workspace_id")
+        kernel_id = body.get("kernel_id")
+        question = body.get("question")
+        client_request_id = body.get("client_request_id")
+        expected_version = body.get("expected_version")
+
+        if not workspace_id or not kernel_id:
+            self.set_status(400)
+            self.write(json_encode({"error": "workspace_id and kernel_id required"}))
+            return
+
+        if not question:
+            self.set_status(400)
+            self.write(json_encode({"error": "question is required"}))
+            return
+
+        if not client_request_id:
+            self.set_status(400)
+            self.write(json_encode({"error": "client_request_id is required"}))
+            return
+
+        manager = get_workspace_manager()
+
+        try:
+            state, run_id, is_new = manager.start_run(
+                workspace_id=workspace_id,
+                kernel_id=kernel_id,
+                question=question,
+                client_request_id=client_request_id,
+                expected_version=expected_version,
+            )
+            response = state.to_dict()
+            response["run_id"] = run_id
+            response["is_new"] = is_new
+            self.write(json_encode(response))
+
+        except StaleVersionError as e:
+            self.set_status(409)
+            self.write(
+                json_encode(
+                    {
+                        "error": "stale_state",
+                        "current_state": e.current_state,
+                        "current_version": e.current,
+                    }
+                )
+            )
+        except StateTransitionError as e:
+            self.set_status(400)
+            self.write(
+                json_encode(
+                    {
+                        "error": "invalid_state",
+                        "current_state": e.current_state.value,
+                        "allowed": e.allowed_commands,
+                    }
+                )
+            )
+
+
+class CommandClearHandler(BaseHandler):
+    """Handler for /dataing/command/clear endpoint."""
+
+    async def post(self) -> None:
+        """Execute clear command."""
+        from dataing_notebook.serverextension.state import (
+            StaleVersionError,
+            StateTransitionError,
+            get_workspace_manager,
+        )
+
+        try:
+            body = json_decode(self.request.body) if self.request.body else {}
+        except json.JSONDecodeError:
+            self.set_status(400)
+            self.write(json_encode({"error": "Invalid JSON"}))
+            return
+
+        workspace_id = body.get("workspace_id")
+        kernel_id = body.get("kernel_id")
+        expected_version = body.get("expected_version")
+
+        if not workspace_id or not kernel_id:
+            self.set_status(400)
+            self.write(json_encode({"error": "workspace_id and kernel_id required"}))
+            return
+
+        manager = get_workspace_manager()
+
+        try:
+            state = manager.clear(
+                workspace_id=workspace_id,
+                kernel_id=kernel_id,
+                expected_version=expected_version,
+            )
+            self.write(json_encode(state.to_dict()))
+
+        except StaleVersionError as e:
+            self.set_status(409)
+            self.write(
+                json_encode(
+                    {
+                        "error": "stale_state",
+                        "current_state": e.current_state,
+                        "current_version": e.current,
+                    }
+                )
+            )
+        except StateTransitionError as e:
+            self.set_status(400)
+            self.write(
+                json_encode(
+                    {
+                        "error": "invalid_state",
+                        "current_state": e.current_state.value,
+                        "allowed": e.allowed_commands,
+                    }
+                )
+            )
+
+
+class WorkspaceStateHandler(BaseHandler):
+    """Handler for /dataing/workspace/state endpoint.
+
+    Gets current workspace state by workspace_id and kernel_id.
+    """
+
+    async def get(self) -> None:
+        """Get current workspace state."""
+        from dataing_notebook.serverextension.state import get_workspace_manager
+
+        workspace_id = self.get_query_argument("workspace_id", None)
+        kernel_id = self.get_query_argument("kernel_id", None)
+
+        if not workspace_id or not kernel_id:
+            self.set_status(400)
+            self.write(json_encode({"error": "workspace_id and kernel_id required"}))
+            return
+
+        manager = get_workspace_manager()
+        state = manager.get_state(workspace_id, kernel_id)
+        self.write(json_encode(state.to_dict()))
+
+
+class SnippetHandler(BaseHandler):
+    """Handler for /dataing/snippet endpoint.
+
+    Returns reproducible magic command snippets for the current GUI state.
+    Used by the sidebar "Copy snippet" button.
+    """
+
+    async def get(self) -> None:
+        """Generate magic commands for current state.
+
+        Returns:
+            {
+                snippet: "# Magic commands...",
+                description: "Human-readable summary"
+            }
+        """
+        from dataing_notebook.serverextension.credentials import (
+            get_credential_status,
+        )
+
+        backend_url = get_backend_url()
+        cred_status = get_credential_status()
+        attached = _notebook_state.get("attached_datasource")
+
+        # Build snippet
+        lines = []
+        lines.append("# Dataing notebook setup")
+        lines.append("")
+
+        # Connect command
+        lines.append(f"%dataing connect --base-url {backend_url}")
+
+        # Auth comment based on mode
+        mode = cred_status.mode.value
+        if mode == "env_var":
+            lines.append("# API key: using DATAING_API_KEY environment variable")
+        elif mode == "keychain":
+            lines.append("# API key: stored in OS keychain")
+        else:
+            lines.append("# API key: session only (must be re-entered)")
+
+        # Attach command if attached
+        if attached:
+            lines.append("")
+            lines.append(f"%dataing attach {attached}")
+
+        snippet = "\n".join(lines)
+
+        # Build description
+        desc_parts = [f"Connect to {backend_url}"]
+        if attached:
+            desc_parts.append(f", attach to {attached}")
+
+        self.write(
+            json_encode(
+                {
+                    "snippet": snippet,
+                    "description": "".join(desc_parts),
+                }
+            )
+        )
+
+
 def setup_handlers(web_app: tornado.web.Application) -> None:
     """Setup handlers for the Dataing server extension.
 
@@ -435,7 +1005,17 @@ def setup_handlers(web_app: tornado.web.Application) -> None:
     handlers = [
         (url_path_join(base_url, "dataing", "handshake"), HandshakeHandler),
         (url_path_join(base_url, "dataing", "token"), TokenHandler),
+        (url_path_join(base_url, "dataing", "credentials"), CredentialHandler),
+        (url_path_join(base_url, "dataing", "connection", "test"), ConnectionTestHandler),
+        (url_path_join(base_url, "dataing", "snippet"), SnippetHandler),
         (url_path_join(base_url, "dataing", "state"), StateHandler),
+        # Versioned command endpoints
+        (url_path_join(base_url, "dataing", "command", "connect"), CommandConnectHandler),
+        (url_path_join(base_url, "dataing", "command", "attach"), CommandAttachHandler),
+        (url_path_join(base_url, "dataing", "command", "start_run"), CommandStartRunHandler),
+        (url_path_join(base_url, "dataing", "command", "clear"), CommandClearHandler),
+        (url_path_join(base_url, "dataing", "workspace", "state"), WorkspaceStateHandler),
+        # Proxy handlers
         (url_path_join(base_url, r"dataing/sse/(.*)"), SSEProxyHandler),
         (url_path_join(base_url, r"dataing/proxy/(.*)"), ProxyHandler),
     ]

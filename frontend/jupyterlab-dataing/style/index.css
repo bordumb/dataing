@@ -169,3 +169,430 @@
   font-size: 10px;
   color: var(--jp-ui-font-color2);
 }
+
+/* Connect section */
+.jp-DataingWidget-connect-section {
+  text-align: center;
+  padding: 24px 12px;
+}
+
+.jp-DataingWidget-connect-section p {
+  margin: 0 0 16px 0;
+  color: var(--jp-ui-font-color2);
+  font-size: 13px;
+}
+
+.jp-DataingWidget-connect-btn,
+.jp-DataingWidget-edit-btn,
+.jp-DataingWidget-copy-btn {
+  padding: 6px 12px;
+  font-size: 12px;
+  border: 1px solid var(--jp-border-color1);
+  border-radius: 4px;
+  background: var(--jp-layout-color1);
+  cursor: pointer;
+  color: var(--jp-ui-font-color1);
+}
+
+.jp-DataingWidget-connect-btn {
+  background: var(--jp-brand-color1);
+  color: white;
+  border-color: var(--jp-brand-color1);
+}
+
+.jp-DataingWidget-connect-btn:hover,
+.jp-DataingWidget-edit-btn:hover,
+.jp-DataingWidget-copy-btn:hover {
+  background: var(--jp-layout-color2);
+}
+
+.jp-DataingWidget-connect-btn:hover {
+  background: var(--jp-brand-color2);
+}
+
+/* Actions row */
+.jp-DataingWidget-actions {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+/* Checking state */
+.jp-DataingWidget-checking {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 24px 12px;
+  color: var(--jp-ui-font-color2);
+}
+
+.jp-DataingWidget-spinner {
+  width: 16px;
+  height: 16px;
+  border: 2px solid var(--jp-border-color1);
+  border-top-color: var(--jp-brand-color1);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* ============================================
+   Connection Wizard Styles
+   ============================================ */
+
+.jp-ConnectionWizardWidget {
+  height: 100%;
+  overflow: auto;
+}
+
+.jp-ConnectionWizard {
+  padding: 12px;
+  font-size: 13px;
+}
+
+.jp-ConnectionWizard-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+
+.jp-ConnectionWizard-header h3 {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--jp-ui-font-color0);
+}
+
+.jp-ConnectionWizard-close {
+  background: none;
+  border: none;
+  font-size: 20px;
+  color: var(--jp-ui-font-color2);
+  cursor: pointer;
+  padding: 0;
+  line-height: 1;
+}
+
+.jp-ConnectionWizard-close:hover {
+  color: var(--jp-ui-font-color1);
+}
+
+/* Progress indicator */
+.jp-ConnectionWizard-progress {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+  margin-bottom: 20px;
+}
+
+.jp-ConnectionWizard-progress-step {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  border: 2px solid var(--jp-border-color1);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  color: var(--jp-ui-font-color2);
+}
+
+.jp-ConnectionWizard-progress-step-active {
+  border-color: var(--jp-brand-color1);
+  background: var(--jp-brand-color1);
+  color: white;
+}
+
+.jp-ConnectionWizard-progress-step-complete {
+  border-color: #10b981;
+  background: #10b981;
+  color: white;
+}
+
+/* Step content */
+.jp-ConnectionWizard-step {
+  margin-bottom: 20px;
+}
+
+.jp-ConnectionWizard-step h4 {
+  margin: 0 0 8px 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--jp-ui-font-color0);
+}
+
+.jp-ConnectionWizard-description {
+  margin: 0 0 12px 0;
+  font-size: 12px;
+  color: var(--jp-ui-font-color2);
+}
+
+/* Form fields */
+.jp-ConnectionWizard-field {
+  margin-bottom: 12px;
+}
+
+.jp-ConnectionWizard-field label {
+  display: block;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--jp-ui-font-color2);
+  margin-bottom: 4px;
+  text-transform: uppercase;
+}
+
+.jp-ConnectionWizard-input {
+  width: 100%;
+  padding: 8px;
+  font-size: 13px;
+  border: 1px solid var(--jp-border-color1);
+  border-radius: 4px;
+  background: var(--jp-layout-color1);
+  color: var(--jp-ui-font-color1);
+  box-sizing: border-box;
+}
+
+.jp-ConnectionWizard-input:focus {
+  outline: none;
+  border-color: var(--jp-brand-color1);
+}
+
+/* Recent URLs */
+.jp-ConnectionWizard-recent {
+  margin-top: 12px;
+}
+
+.jp-ConnectionWizard-recent label {
+  display: block;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--jp-ui-font-color2);
+  margin-bottom: 4px;
+  text-transform: uppercase;
+}
+
+.jp-ConnectionWizard-recent-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.jp-ConnectionWizard-recent-item {
+  padding: 6px 8px;
+  font-size: 12px;
+  text-align: left;
+  border: 1px solid var(--jp-border-color1);
+  border-radius: 4px;
+  background: var(--jp-layout-color2);
+  cursor: pointer;
+  color: var(--jp-ui-font-color1);
+}
+
+.jp-ConnectionWizard-recent-item:hover {
+  background: var(--jp-layout-color3);
+}
+
+/* Auth mode display */
+.jp-ConnectionWizard-mode {
+  padding: 8px 12px;
+  background: var(--jp-layout-color2);
+  border-radius: 4px;
+  margin-bottom: 12px;
+}
+
+.jp-ConnectionWizard-mode-label {
+  font-size: 11px;
+  color: var(--jp-ui-font-color2);
+  text-transform: uppercase;
+}
+
+.jp-ConnectionWizard-mode-value {
+  font-weight: 600;
+  color: var(--jp-ui-font-color1);
+  margin-left: 8px;
+}
+
+/* Checkbox */
+.jp-ConnectionWizard-checkbox {
+  margin-top: 12px;
+}
+
+.jp-ConnectionWizard-checkbox label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--jp-ui-font-color1);
+  cursor: pointer;
+}
+
+.jp-ConnectionWizard-checkbox input[type="checkbox"] {
+  width: 14px;
+  height: 14px;
+}
+
+/* Buttons */
+.jp-ConnectionWizard-button {
+  padding: 8px 16px;
+  font-size: 12px;
+  border: 1px solid var(--jp-border-color1);
+  border-radius: 4px;
+  background: var(--jp-layout-color1);
+  cursor: pointer;
+  color: var(--jp-ui-font-color1);
+}
+
+.jp-ConnectionWizard-button:hover:not(:disabled) {
+  background: var(--jp-layout-color2);
+}
+
+.jp-ConnectionWizard-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.jp-ConnectionWizard-button-primary {
+  background: var(--jp-brand-color1);
+  color: white;
+  border-color: var(--jp-brand-color1);
+}
+
+.jp-ConnectionWizard-button-primary:hover:not(:disabled) {
+  background: var(--jp-brand-color2);
+}
+
+/* Testing state */
+.jp-ConnectionWizard-testing {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 16px;
+  color: var(--jp-ui-font-color2);
+}
+
+.jp-ConnectionWizard-spinner {
+  width: 16px;
+  height: 16px;
+  border: 2px solid var(--jp-border-color1);
+  border-top-color: var(--jp-brand-color1);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+/* Test result */
+.jp-ConnectionWizard-result {
+  padding: 12px;
+  border-radius: 4px;
+  margin-bottom: 12px;
+}
+
+.jp-ConnectionWizard-result-success {
+  background: #d1fae5;
+  border: 1px solid #6ee7b7;
+  color: #065f46;
+}
+
+.jp-ConnectionWizard-result-error {
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  color: #991b1b;
+}
+
+.jp-ConnectionWizard-result strong {
+  display: block;
+  margin-bottom: 4px;
+}
+
+.jp-ConnectionWizard-result p {
+  margin: 0 0 8px 0;
+  font-size: 12px;
+}
+
+/* Summary */
+.jp-ConnectionWizard-summary {
+  background: var(--jp-layout-color2);
+  border-radius: 4px;
+  padding: 12px;
+  margin-bottom: 16px;
+}
+
+.jp-ConnectionWizard-summary-row {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.jp-ConnectionWizard-summary-row:last-child {
+  margin-bottom: 0;
+}
+
+.jp-ConnectionWizard-summary-label {
+  font-size: 11px;
+  color: var(--jp-ui-font-color2);
+  text-transform: uppercase;
+}
+
+.jp-ConnectionWizard-summary-value {
+  font-size: 12px;
+  color: var(--jp-ui-font-color1);
+  font-weight: 500;
+}
+
+/* Error message */
+.jp-ConnectionWizard-error {
+  padding: 8px;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  border-radius: 4px;
+  color: #991b1b;
+  font-size: 12px;
+  margin-top: 12px;
+}
+
+/* Footer */
+.jp-ConnectionWizard-footer {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-top: 12px;
+  border-top: 1px solid var(--jp-border-color1);
+}
+
+.jp-ConnectionWizard-footer-spacer {
+  flex: 1;
+}
+
+/* ============================================
+   Empty State (No Kernel)
+   ============================================ */
+
+.jp-DataingWidget-empty-state {
+  text-align: center;
+  padding: 32px 16px;
+}
+
+.jp-DataingWidget-empty-icon {
+  font-size: 48px;
+  margin-bottom: 12px;
+  opacity: 0.8;
+}
+
+.jp-DataingWidget-empty-title {
+  margin: 0 0 8px 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--jp-ui-font-color0);
+}
+
+.jp-DataingWidget-empty-description {
+  margin: 0;
+  font-size: 12px;
+  color: var(--jp-ui-font-color2);
+  line-height: 1.5;
+}

@@ -101,6 +101,8 @@ repos:
             uv\.lock$|
             pnpm-lock\.yaml$|
             package-lock\.json$|
+            frontend/jupyterlab-dataing/tsconfig\.tsbuildinfo|
+            frontend/jupyterlab-dataing/jupyterlab_dataing/labextension/static/.*|
             dist/.*|
             \.next/.*|
             \.venv/.*|

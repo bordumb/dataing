@@ -30,6 +30,22 @@
       "title": "Show Status Bar",
       "description": "Show connection status in the status bar",
       "default": true
+    },
+    "recentUrls": {
+      "type": "array",
+      "title": "Recent URLs",
+      "description": "Recently connected backend URLs (for quick reconnection)",
+      "items": {
+        "type": "string"
+      },
+      "default": [],
+      "maxItems": 10
+    },
+    "workspaceId": {
+      "type": "string",
+      "title": "Workspace ID",
+      "description": "Unique identifier for this workspace (auto-generated on first use)",
+      "default": ""
     }
   },
   "additionalProperties": false

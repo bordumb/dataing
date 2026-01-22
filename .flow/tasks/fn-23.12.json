@@ -1,0 +1,16 @@
+{
+  "assignee": null,
+  "claim_note": "",
+  "claimed_at": null,
+  "created_at": "2026-01-21T11:52:44.479537Z",
+  "depends_on": [
+    "fn-23.4"
+  ],
+  "epic": "fn-23",
+  "id": "fn-23.12",
+  "priority": null,
+  "spec_path": ".flow/tasks/fn-23.12.md",
+  "status": "todo",
+  "title": "Keyboard Shortcuts",
+  "updated_at": "2026-01-21T11:55:51.013096Z"
+}

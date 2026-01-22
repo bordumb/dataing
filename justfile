@@ -14,6 +14,8 @@ setup:
     cd frontend/app && pnpm install
     @echo "Setting up landing site..."
     cd frontend/landing && pnpm install
+    @echo "Setting up JupyterLab extension..."
+    cd frontend/jupyterlab-dataing && jlpm install && jlpm build
     @echo "Installing pre-commit hooks..."
     uv tool install pre-commit || pip install pre-commit
     pre-commit install
@@ -27,6 +29,48 @@ pre-commit-install:
 # Run pre-commit on all files
 pre-commit:
     pre-commit run --all-files
+
+# =============================================================================
+# JupyterLab Extension Commands
+# =============================================================================
+
+# Build the JupyterLab extension for production
+build-jupyterlab:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    echo "Building JupyterLab Dataing extension..."
+    cd frontend/jupyterlab-dataing
+    jlpm install
+    jlpm build:prod
+    echo "Extension built successfully!"
+
+# Install JupyterLab extension in development mode (watches for changes)
+dev-jupyterlab:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    echo "Installing JupyterLab extension in development mode..."
+    cd frontend/jupyterlab-dataing
+    jlpm install
+    jlpm build
+    jupyter labextension develop --overwrite .
+    echo "Extension installed! Run 'just dev-jupyterlab-watch' to watch for changes."
+
+# Watch JupyterLab extension source for changes (run in separate terminal)
+dev-jupyterlab-watch:
+    #!/usr/bin/env bash
+    echo "Watching JupyterLab extension for changes..."
+    cd frontend/jupyterlab-dataing && jlpm watch
+
+# Run JupyterLab with the Dataing extension (standalone, for extension development)
+run-jupyterlab:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    echo "Starting JupyterLab..."
+    DATAING_BACKEND_URL=${DATAING_BACKEND_URL:-http://localhost:8000} \
+    DATAING_API_KEY=${DATAING_API_KEY:-dd_demo_12345} \
+    uv run jupyter lab --notebook-dir=demo --no-browser
+
+# =============================================================================
 
 # Run development servers (EE backend + frontend). Requires infrastructure running.
 dev:

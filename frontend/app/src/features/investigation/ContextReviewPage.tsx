@@ -143,10 +143,10 @@ export function ContextReviewPage() {
 
   // Build context object for ContextReview component
   const context = {
-    query: approval.context?.query || 'Query not available',
-    purpose: approval.context?.purpose || `Review context for investigation ${approval.investigation_id}`,
-    tables_accessed: approval.context?.tables_accessed || [],
-    estimated_rows: approval.context?.estimated_rows || 0,
+    query: (approval.context?.query as string) || 'Query not available',
+    purpose: (approval.context?.purpose as string) || `Review context for investigation ${approval.investigation_id}`,
+    tables_accessed: (approval.context?.tables_accessed as string[]) || [],
+    estimated_rows: (approval.context?.estimated_rows as number) || 0,
   }
 
   return (

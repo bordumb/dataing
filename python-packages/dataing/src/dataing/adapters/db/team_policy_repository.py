@@ -487,6 +487,26 @@ class TeamPolicyRepository:
         return self._row_to_queue_limits(result)
 
     # =========================================================================
+    # Team Lookup Operations
+    # =========================================================================
+
+    async def get_default_team_for_tenant(self, org_id: UUID) -> UUID | None:
+        """Get the default team for a tenant.
+
+        Returns the first team found for the organization, or None if no teams exist.
+        """
+        result = await self.db.fetch_one(
+            """
+            SELECT id FROM teams
+            WHERE org_id = $1
+            ORDER BY created_at ASC
+            LIMIT 1
+            """,
+            org_id,
+        )
+        return result["id"] if result else None
+
+    # =========================================================================
     # Dataset Tags Operations
     # =========================================================================
 

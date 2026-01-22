@@ -5,6 +5,7 @@ Note: SSO, SCIM, Audit, and Settings routes are available in Enterprise Edition.
 
 from fastapi import APIRouter
 
+from dataing.entrypoints.api.routes.analytics import router as analytics_router
 from dataing.entrypoints.api.routes.approvals import router as approvals_router
 from dataing.entrypoints.api.routes.asset_instances import router as asset_instances_router
 from dataing.entrypoints.api.routes.auth import router as auth_router
@@ -61,6 +62,7 @@ api_router.include_router(approvals_router)
 api_router.include_router(users_router)
 api_router.include_router(dashboard_router)
 api_router.include_router(usage_router)
+api_router.include_router(analytics_router)  # Activation and weekly usage analytics
 api_router.include_router(lineage_router)
 api_router.include_router(bundles_router)  # Context bundles API
 api_router.include_router(runs_router)  # Runs API with SSE streaming

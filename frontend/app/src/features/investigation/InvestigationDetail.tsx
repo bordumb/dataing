@@ -315,11 +315,17 @@ function SynthesisCard({ synthesis, investigationId }: { synthesis: unknown; inv
           <p className="text-sm font-medium text-blue-800 dark:text-blue-200 mb-3">
             Recommendations
           </p>
-          <ul className="space-y-2">
+          <ul className="space-y-3">
             {syn.recommendations!.map((rec, i) => (
-              <li key={i} className="flex gap-2 text-sm text-blue-700 dark:text-blue-300">
-                <span className="shrink-0">•</span>
-                <span>{rec}</span>
+              <li key={i} className="flex items-start justify-between gap-2">
+                <div className="flex gap-2 text-sm text-blue-700 dark:text-blue-300">
+                  <span className="shrink-0">•</span>
+                  <span>{rec}</span>
+                </div>
+                <InvestigationFeedbackButtons
+                  targetType="recommendation"
+                  targetId={`${investigationId}-rec-${i}`}
+                />
               </li>
             ))}
           </ul>

@@ -5,6 +5,8 @@
  * Autonomous Data Quality Investigation
  * OpenAPI spec version: 2.0.0
  */
+import type { WebhookIssueResponseInvestigationId } from "./webhookIssueResponseInvestigationId";
+import type { WebhookIssueResponsePolicyAction } from "./webhookIssueResponsePolicyAction";
 
 /**
  * Response from webhook issue creation.
@@ -12,6 +14,8 @@
 export interface WebhookIssueResponse {
   created: boolean;
   id: string;
+  investigation_id?: WebhookIssueResponseInvestigationId;
   number: number;
+  policy_action?: WebhookIssueResponsePolicyAction;
   status: string;
 }

@@ -1,7 +1,10 @@
 """Unit tests for Integrations API routes (CE)."""
 
+from __future__ import annotations
+
 import hashlib
 import hmac
+from unittest.mock import AsyncMock, MagicMock
 from uuid import uuid4
 
 import pytest
@@ -148,3 +151,294 @@ class TestWebhookIssueResponse:
         )
         assert response.created is False
         assert response.status == "in_progress"
+
+    def test_response_with_policy_action(self) -> None:
+        """Test response with policy action."""
+        inv_id = uuid4()
+        response = WebhookIssueResponse(
+            id=uuid4(),
+            number=789,
+            status="open",
+            created=True,
+            policy_action="auto",
+            investigation_id=inv_id,
+        )
+        assert response.policy_action == "auto"
+        assert response.investigation_id == inv_id
+
+    def test_response_without_policy_action(self) -> None:
+        """Test response without policy action (deduplicated)."""
+        response = WebhookIssueResponse(
+            id=uuid4(),
+            number=789,
+            status="open",
+            created=False,
+        )
+        assert response.policy_action is None
+        assert response.investigation_id is None
+
+
+class TestEvaluateAndApplyPolicy:
+    """Tests for _evaluate_and_apply_policy function."""
+
+    @pytest.fixture
+    def mock_db(self) -> AsyncMock:
+        """Create mock database."""
+        from unittest.mock import AsyncMock
+
+        return AsyncMock()
+
+    @pytest.fixture
+    def mock_request(self) -> MagicMock:
+        """Create mock request."""
+        from unittest.mock import MagicMock
+
+        mock = MagicMock()
+        mock.app.state.temporal_client = None
+        return mock
+
+    @pytest.fixture
+    def mock_auth(self) -> MagicMock:
+        """Create mock auth context."""
+        from unittest.mock import MagicMock
+
+        mock = MagicMock()
+        mock.tenant_id = uuid4()
+        return mock
+
+    @pytest.fixture
+    def sample_payload(self) -> GenericWebhookPayload:
+        """Create sample payload."""
+        return GenericWebhookPayload(
+            title="Test Issue",
+            severity="high",
+            dataset_id="prod.orders",
+            source_provider="dbt",
+        )
+
+    async def test_no_team_returns_issue_only(
+        self,
+        mock_db: AsyncMock,
+        mock_request: MagicMock,
+        mock_auth: MagicMock,
+        sample_payload: GenericWebhookPayload,
+    ) -> None:
+        """Test that no team defaults to issue_only."""
+        from unittest.mock import AsyncMock, patch
+
+        from dataing.entrypoints.api.routes.integrations import _evaluate_and_apply_policy
+
+        # Mock no team found
+        with patch("dataing.entrypoints.api.routes.integrations.TeamPolicyRepository") as MockRepo:
+            mock_repo = MockRepo.return_value
+            mock_repo.get_default_team_for_tenant = AsyncMock(return_value=None)
+
+            action, inv_id = await _evaluate_and_apply_policy(
+                request=mock_request,
+                db=mock_db,
+                auth=mock_auth,
+                issue_id=uuid4(),
+                payload=sample_payload,
+            )
+
+            assert action == "issue_only"
+            assert inv_id is None
+
+    async def test_review_action_sends_notification(
+        self,
+        mock_db: AsyncMock,
+        mock_request: MagicMock,
+        mock_auth: MagicMock,
+        sample_payload: GenericWebhookPayload,
+    ) -> None:
+        """Test that review action sends notification."""
+        from unittest.mock import AsyncMock, patch
+
+        from dataing.adapters.db.team_policy_repository import PolicyAction
+        from dataing.entrypoints.api.routes.integrations import _evaluate_and_apply_policy
+        from dataing.services.policy import PolicyResult, QueueConfig
+
+        team_id = uuid4()
+
+        with (
+            patch("dataing.entrypoints.api.routes.integrations.TeamPolicyRepository") as MockRepo,
+            patch("dataing.entrypoints.api.routes.integrations.PolicyService") as MockPolicyService,
+            patch(
+                "dataing.entrypoints.api.routes.integrations.NotificationService"
+            ) as MockNotifService,
+        ):
+            mock_repo = MockRepo.return_value
+            mock_repo.get_default_team_for_tenant = AsyncMock(return_value=team_id)
+
+            mock_policy_svc = MockPolicyService.return_value
+            mock_policy_svc.evaluate = AsyncMock(
+                return_value=PolicyResult(
+                    action=PolicyAction.REVIEW,
+                    queue_config=QueueConfig(),
+                    source="team_default",
+                    team_id=team_id,
+                )
+            )
+
+            mock_notif = MockNotifService.return_value
+            mock_notif.notify = AsyncMock()
+
+            mock_db.execute = AsyncMock()
+
+            action, inv_id = await _evaluate_and_apply_policy(
+                request=mock_request,
+                db=mock_db,
+                auth=mock_auth,
+                issue_id=uuid4(),
+                payload=sample_payload,
+            )
+
+            assert action == "review"
+            assert inv_id is None
+            mock_notif.notify.assert_called_once()
+
+    async def test_issue_only_action_no_investigation(
+        self,
+        mock_db: AsyncMock,
+        mock_request: MagicMock,
+        mock_auth: MagicMock,
+        sample_payload: GenericWebhookPayload,
+    ) -> None:
+        """Test that issue_only action does not start investigation."""
+        from unittest.mock import AsyncMock, patch
+
+        from dataing.adapters.db.team_policy_repository import PolicyAction
+        from dataing.entrypoints.api.routes.integrations import _evaluate_and_apply_policy
+        from dataing.services.policy import PolicyResult, QueueConfig
+
+        team_id = uuid4()
+
+        with (
+            patch("dataing.entrypoints.api.routes.integrations.TeamPolicyRepository") as MockRepo,
+            patch("dataing.entrypoints.api.routes.integrations.PolicyService") as MockPolicyService,
+        ):
+            mock_repo = MockRepo.return_value
+            mock_repo.get_default_team_for_tenant = AsyncMock(return_value=team_id)
+
+            mock_policy_svc = MockPolicyService.return_value
+            mock_policy_svc.evaluate = AsyncMock(
+                return_value=PolicyResult(
+                    action=PolicyAction.ISSUE_ONLY,
+                    queue_config=QueueConfig(),
+                    source="system_default",
+                    team_id=team_id,
+                )
+            )
+
+            mock_db.execute = AsyncMock()
+
+            action, inv_id = await _evaluate_and_apply_policy(
+                request=mock_request,
+                db=mock_db,
+                auth=mock_auth,
+                issue_id=uuid4(),
+                payload=sample_payload,
+            )
+
+            assert action == "issue_only"
+            assert inv_id is None
+
+    async def test_auto_action_starts_investigation_when_temporal_available(
+        self,
+        mock_db: AsyncMock,
+        mock_auth: MagicMock,
+        sample_payload: GenericWebhookPayload,
+    ) -> None:
+        """Test that auto action starts investigation when Temporal is available."""
+        from unittest.mock import AsyncMock, MagicMock, patch
+
+        from dataing.adapters.db.team_policy_repository import PolicyAction
+        from dataing.entrypoints.api.routes.integrations import _evaluate_and_apply_policy
+        from dataing.services.policy import PolicyResult, QueueConfig
+
+        team_id = uuid4()
+
+        # Create mock request with Temporal client
+        mock_request = MagicMock()
+        mock_temporal = AsyncMock()
+        mock_temporal.start_investigation = AsyncMock()
+        mock_request.app.state.temporal_client = mock_temporal
+
+        with (
+            patch("dataing.entrypoints.api.routes.integrations.TeamPolicyRepository") as MockRepo,
+            patch("dataing.entrypoints.api.routes.integrations.PolicyService") as MockPolicyService,
+            patch("dataing.entrypoints.api.deps.resolve_datasource_id") as mock_resolve_ds,
+        ):
+            mock_repo = MockRepo.return_value
+            mock_repo.get_default_team_for_tenant = AsyncMock(return_value=team_id)
+
+            mock_policy_svc = MockPolicyService.return_value
+            mock_policy_svc.evaluate = AsyncMock(
+                return_value=PolicyResult(
+                    action=PolicyAction.AUTO,
+                    queue_config=QueueConfig(),
+                    source="team_default",
+                    team_id=team_id,
+                )
+            )
+
+            mock_resolve_ds.return_value = uuid4()
+            mock_db.execute = AsyncMock()
+
+            action, inv_id = await _evaluate_and_apply_policy(
+                request=mock_request,
+                db=mock_db,
+                auth=mock_auth,
+                issue_id=uuid4(),
+                payload=sample_payload,
+            )
+
+            assert action == "auto"
+            assert inv_id is not None
+            mock_temporal.start_investigation.assert_called_once()
+
+    async def test_auto_action_without_temporal_returns_none_investigation(
+        self,
+        mock_db: AsyncMock,
+        mock_request: MagicMock,
+        mock_auth: MagicMock,
+        sample_payload: GenericWebhookPayload,
+    ) -> None:
+        """Test that auto action without Temporal returns None investigation_id."""
+        from unittest.mock import AsyncMock, patch
+
+        from dataing.adapters.db.team_policy_repository import PolicyAction
+        from dataing.entrypoints.api.routes.integrations import _evaluate_and_apply_policy
+        from dataing.services.policy import PolicyResult, QueueConfig
+
+        team_id = uuid4()
+
+        with (
+            patch("dataing.entrypoints.api.routes.integrations.TeamPolicyRepository") as MockRepo,
+            patch("dataing.entrypoints.api.routes.integrations.PolicyService") as MockPolicyService,
+        ):
+            mock_repo = MockRepo.return_value
+            mock_repo.get_default_team_for_tenant = AsyncMock(return_value=team_id)
+
+            mock_policy_svc = MockPolicyService.return_value
+            mock_policy_svc.evaluate = AsyncMock(
+                return_value=PolicyResult(
+                    action=PolicyAction.AUTO,
+                    queue_config=QueueConfig(),
+                    source="team_default",
+                    team_id=team_id,
+                )
+            )
+
+            mock_db.execute = AsyncMock()
+
+            action, inv_id = await _evaluate_and_apply_policy(
+                request=mock_request,
+                db=mock_db,
+                auth=mock_auth,
+                issue_id=uuid4(),
+                payload=sample_payload,
+            )
+
+            assert action == "auto"
+            assert inv_id is None  # No Temporal configured

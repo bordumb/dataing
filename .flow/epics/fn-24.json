@@ -1,0 +1,13 @@
+{
+  "branch_name": "fn-24",
+  "created_at": "2026-01-22T18:01:43.795974Z",
+  "depends_on_epics": [],
+  "id": "fn-24",
+  "next_task": 1,
+  "plan_review_status": "unknown",
+  "plan_reviewed_at": null,
+  "spec_path": ".flow/specs/fn-24.md",
+  "status": "open",
+  "title": "Month 0-2: Triage + Policy Engine",
+  "updated_at": "2026-01-22T18:01:43.796354Z"
+}

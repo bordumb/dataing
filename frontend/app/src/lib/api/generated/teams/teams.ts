@@ -17,703 +17,23 @@ import type {
 } from "@tanstack/react-query";
 import type {
   AddTeamMemberApiV1TeamsTeamIdMembersPost201,
-  AddTeamMemberApiV1TeamsTeamsTeamIdMembersPost201,
   HTTPValidationError,
   TeamCreate,
   TeamListResponse,
   TeamMemberAdd,
+  TeamPolicyFullResponse,
+  TeamPolicyOverrideCreate,
+  TeamPolicyOverrideResponse,
+  TeamPolicyOverrideUpdate,
+  TeamPolicyResponse,
+  TeamPolicyUpdate,
+  TeamQueueLimitsResponse,
+  TeamQueueLimitsUpdate,
   TeamResponse,
   TeamUpdate,
 } from "../../model";
 import { customInstance } from "../../client";
 
-/**
- * List all teams in the organization.
- * @summary List Teams
- */
-export const listTeamsApiV1TeamsTeamsGet = (signal?: AbortSignal) => {
-  return customInstance<TeamListResponse>({
-    url: `/api/v1/teams/teams/`,
-    method: "GET",
-    signal,
-  });
-};
-
-export const getListTeamsApiV1TeamsTeamsGetQueryKey = () => {
-  return [`/api/v1/teams/teams/`] as const;
-};
-
-export const getListTeamsApiV1TeamsTeamsGetQueryOptions = <
-  TData = Awaited<ReturnType<typeof listTeamsApiV1TeamsTeamsGet>>,
-  TError = unknown,
->(options?: {
-  query?: Partial<
-    UseQueryOptions<
-      Awaited<ReturnType<typeof listTeamsApiV1TeamsTeamsGet>>,
-      TError,
-      TData
-    >
-  >;
-}) => {
-  const { query: queryOptions } = options ?? {};
-
-  const queryKey =
-    queryOptions?.queryKey ?? getListTeamsApiV1TeamsTeamsGetQueryKey();
-
-  const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof listTeamsApiV1TeamsTeamsGet>>
-  > = ({ signal }) => listTeamsApiV1TeamsTeamsGet(signal);
-
-  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
-    Awaited<ReturnType<typeof listTeamsApiV1TeamsTeamsGet>>,
-    TError,
-    TData
-  > & { queryKey: QueryKey };
-};
-
-export type ListTeamsApiV1TeamsTeamsGetQueryResult = NonNullable<
-  Awaited<ReturnType<typeof listTeamsApiV1TeamsTeamsGet>>
->;
-export type ListTeamsApiV1TeamsTeamsGetQueryError = unknown;
-
-/**
- * @summary List Teams
- */
-export const useListTeamsApiV1TeamsTeamsGet = <
-  TData = Awaited<ReturnType<typeof listTeamsApiV1TeamsTeamsGet>>,
-  TError = unknown,
->(options?: {
-  query?: Partial<
-    UseQueryOptions<
-      Awaited<ReturnType<typeof listTeamsApiV1TeamsTeamsGet>>,
-      TError,
-      TData
-    >
-  >;
-}): UseQueryResult<TData, TError> & { queryKey: QueryKey } => {
-  const queryOptions = getListTeamsApiV1TeamsTeamsGetQueryOptions(options);
-
-  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
-    queryKey: QueryKey;
-  };
-
-  query.queryKey = queryOptions.queryKey;
-
-  return query;
-};
-
-/**
- * Create a new team.
-
-Requires admin scope.
- * @summary Create Team
- */
-export const createTeamApiV1TeamsTeamsPost = (teamCreate: TeamCreate) => {
-  return customInstance<TeamResponse>({
-    url: `/api/v1/teams/teams/`,
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    data: teamCreate,
-  });
-};
-
-export const getCreateTeamApiV1TeamsTeamsPostMutationOptions = <
-  TError = HTTPValidationError,
-  TContext = unknown,
->(options?: {
-  mutation?: UseMutationOptions<
-    Awaited<ReturnType<typeof createTeamApiV1TeamsTeamsPost>>,
-    TError,
-    { data: TeamCreate },
-    TContext
-  >;
-}): UseMutationOptions<
-  Awaited<ReturnType<typeof createTeamApiV1TeamsTeamsPost>>,
-  TError,
-  { data: TeamCreate },
-  TContext
-> => {
-  const { mutation: mutationOptions } = options ?? {};
-
-  const mutationFn: MutationFunction<
-    Awaited<ReturnType<typeof createTeamApiV1TeamsTeamsPost>>,
-    { data: TeamCreate }
-  > = (props) => {
-    const { data } = props ?? {};
-
-    return createTeamApiV1TeamsTeamsPost(data);
-  };
-
-  return { mutationFn, ...mutationOptions };
-};
-
-export type CreateTeamApiV1TeamsTeamsPostMutationResult = NonNullable<
-  Awaited<ReturnType<typeof createTeamApiV1TeamsTeamsPost>>
->;
-export type CreateTeamApiV1TeamsTeamsPostMutationBody = TeamCreate;
-export type CreateTeamApiV1TeamsTeamsPostMutationError = HTTPValidationError;
-
-/**
- * @summary Create Team
- */
-export const useCreateTeamApiV1TeamsTeamsPost = <
-  TError = HTTPValidationError,
-  TContext = unknown,
->(options?: {
-  mutation?: UseMutationOptions<
-    Awaited<ReturnType<typeof createTeamApiV1TeamsTeamsPost>>,
-    TError,
-    { data: TeamCreate },
-    TContext
-  >;
-}): UseMutationResult<
-  Awaited<ReturnType<typeof createTeamApiV1TeamsTeamsPost>>,
-  TError,
-  { data: TeamCreate },
-  TContext
-> => {
-  const mutationOptions =
-    getCreateTeamApiV1TeamsTeamsPostMutationOptions(options);
-
-  return useMutation(mutationOptions);
-};
-/**
- * Get a team by ID.
- * @summary Get Team
- */
-export const getTeamApiV1TeamsTeamsTeamIdGet = (
-  teamId: string,
-  signal?: AbortSignal,
-) => {
-  return customInstance<TeamResponse>({
-    url: `/api/v1/teams/teams/${teamId}`,
-    method: "GET",
-    signal,
-  });
-};
-
-export const getGetTeamApiV1TeamsTeamsTeamIdGetQueryKey = (teamId: string) => {
-  return [`/api/v1/teams/teams/${teamId}`] as const;
-};
-
-export const getGetTeamApiV1TeamsTeamsTeamIdGetQueryOptions = <
-  TData = Awaited<ReturnType<typeof getTeamApiV1TeamsTeamsTeamIdGet>>,
-  TError = HTTPValidationError,
->(
-  teamId: string,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof getTeamApiV1TeamsTeamsTeamIdGet>>,
-        TError,
-        TData
-      >
-    >;
-  },
-) => {
-  const { query: queryOptions } = options ?? {};
-
-  const queryKey =
-    queryOptions?.queryKey ??
-    getGetTeamApiV1TeamsTeamsTeamIdGetQueryKey(teamId);
-
-  const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof getTeamApiV1TeamsTeamsTeamIdGet>>
-  > = ({ signal }) => getTeamApiV1TeamsTeamsTeamIdGet(teamId, signal);
-
-  return {
-    queryKey,
-    queryFn,
-    enabled: !!teamId,
-    ...queryOptions,
-  } as UseQueryOptions<
-    Awaited<ReturnType<typeof getTeamApiV1TeamsTeamsTeamIdGet>>,
-    TError,
-    TData
-  > & { queryKey: QueryKey };
-};
-
-export type GetTeamApiV1TeamsTeamsTeamIdGetQueryResult = NonNullable<
-  Awaited<ReturnType<typeof getTeamApiV1TeamsTeamsTeamIdGet>>
->;
-export type GetTeamApiV1TeamsTeamsTeamIdGetQueryError = HTTPValidationError;
-
-/**
- * @summary Get Team
- */
-export const useGetTeamApiV1TeamsTeamsTeamIdGet = <
-  TData = Awaited<ReturnType<typeof getTeamApiV1TeamsTeamsTeamIdGet>>,
-  TError = HTTPValidationError,
->(
-  teamId: string,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof getTeamApiV1TeamsTeamsTeamIdGet>>,
-        TError,
-        TData
-      >
-    >;
-  },
-): UseQueryResult<TData, TError> & { queryKey: QueryKey } => {
-  const queryOptions = getGetTeamApiV1TeamsTeamsTeamIdGetQueryOptions(
-    teamId,
-    options,
-  );
-
-  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
-    queryKey: QueryKey;
-  };
-
-  query.queryKey = queryOptions.queryKey;
-
-  return query;
-};
-
-/**
- * Update a team.
-
-Requires admin scope. Cannot update SCIM-managed teams.
- * @summary Update Team
- */
-export const updateTeamApiV1TeamsTeamsTeamIdPut = (
-  teamId: string,
-  teamUpdate: TeamUpdate,
-) => {
-  return customInstance<TeamResponse>({
-    url: `/api/v1/teams/teams/${teamId}`,
-    method: "PUT",
-    headers: { "Content-Type": "application/json" },
-    data: teamUpdate,
-  });
-};
-
-export const getUpdateTeamApiV1TeamsTeamsTeamIdPutMutationOptions = <
-  TError = HTTPValidationError,
-  TContext = unknown,
->(options?: {
-  mutation?: UseMutationOptions<
-    Awaited<ReturnType<typeof updateTeamApiV1TeamsTeamsTeamIdPut>>,
-    TError,
-    { teamId: string; data: TeamUpdate },
-    TContext
-  >;
-}): UseMutationOptions<
-  Awaited<ReturnType<typeof updateTeamApiV1TeamsTeamsTeamIdPut>>,
-  TError,
-  { teamId: string; data: TeamUpdate },
-  TContext
-> => {
-  const { mutation: mutationOptions } = options ?? {};
-
-  const mutationFn: MutationFunction<
-    Awaited<ReturnType<typeof updateTeamApiV1TeamsTeamsTeamIdPut>>,
-    { teamId: string; data: TeamUpdate }
-  > = (props) => {
-    const { teamId, data } = props ?? {};
-
-    return updateTeamApiV1TeamsTeamsTeamIdPut(teamId, data);
-  };
-
-  return { mutationFn, ...mutationOptions };
-};
-
-export type UpdateTeamApiV1TeamsTeamsTeamIdPutMutationResult = NonNullable<
-  Awaited<ReturnType<typeof updateTeamApiV1TeamsTeamsTeamIdPut>>
->;
-export type UpdateTeamApiV1TeamsTeamsTeamIdPutMutationBody = TeamUpdate;
-export type UpdateTeamApiV1TeamsTeamsTeamIdPutMutationError =
-  HTTPValidationError;
-
-/**
- * @summary Update Team
- */
-export const useUpdateTeamApiV1TeamsTeamsTeamIdPut = <
-  TError = HTTPValidationError,
-  TContext = unknown,
->(options?: {
-  mutation?: UseMutationOptions<
-    Awaited<ReturnType<typeof updateTeamApiV1TeamsTeamsTeamIdPut>>,
-    TError,
-    { teamId: string; data: TeamUpdate },
-    TContext
-  >;
-}): UseMutationResult<
-  Awaited<ReturnType<typeof updateTeamApiV1TeamsTeamsTeamIdPut>>,
-  TError,
-  { teamId: string; data: TeamUpdate },
-  TContext
-> => {
-  const mutationOptions =
-    getUpdateTeamApiV1TeamsTeamsTeamIdPutMutationOptions(options);
-
-  return useMutation(mutationOptions);
-};
-/**
- * Delete a team.
-
-Requires admin scope. Cannot delete SCIM-managed teams.
- * @summary Delete Team
- */
-export const deleteTeamApiV1TeamsTeamsTeamIdDelete = (teamId: string) => {
-  return customInstance<void>({
-    url: `/api/v1/teams/teams/${teamId}`,
-    method: "DELETE",
-  });
-};
-
-export const getDeleteTeamApiV1TeamsTeamsTeamIdDeleteMutationOptions = <
-  TError = HTTPValidationError,
-  TContext = unknown,
->(options?: {
-  mutation?: UseMutationOptions<
-    Awaited<ReturnType<typeof deleteTeamApiV1TeamsTeamsTeamIdDelete>>,
-    TError,
-    { teamId: string },
-    TContext
-  >;
-}): UseMutationOptions<
-  Awaited<ReturnType<typeof deleteTeamApiV1TeamsTeamsTeamIdDelete>>,
-  TError,
-  { teamId: string },
-  TContext
-> => {
-  const { mutation: mutationOptions } = options ?? {};
-
-  const mutationFn: MutationFunction<
-    Awaited<ReturnType<typeof deleteTeamApiV1TeamsTeamsTeamIdDelete>>,
-    { teamId: string }
-  > = (props) => {
-    const { teamId } = props ?? {};
-
-    return deleteTeamApiV1TeamsTeamsTeamIdDelete(teamId);
-  };
-
-  return { mutationFn, ...mutationOptions };
-};
-
-export type DeleteTeamApiV1TeamsTeamsTeamIdDeleteMutationResult = NonNullable<
-  Awaited<ReturnType<typeof deleteTeamApiV1TeamsTeamsTeamIdDelete>>
->;
-
-export type DeleteTeamApiV1TeamsTeamsTeamIdDeleteMutationError =
-  HTTPValidationError;
-
-/**
- * @summary Delete Team
- */
-export const useDeleteTeamApiV1TeamsTeamsTeamIdDelete = <
-  TError = HTTPValidationError,
-  TContext = unknown,
->(options?: {
-  mutation?: UseMutationOptions<
-    Awaited<ReturnType<typeof deleteTeamApiV1TeamsTeamsTeamIdDelete>>,
-    TError,
-    { teamId: string },
-    TContext
-  >;
-}): UseMutationResult<
-  Awaited<ReturnType<typeof deleteTeamApiV1TeamsTeamsTeamIdDelete>>,
-  TError,
-  { teamId: string },
-  TContext
-> => {
-  const mutationOptions =
-    getDeleteTeamApiV1TeamsTeamsTeamIdDeleteMutationOptions(options);
-
-  return useMutation(mutationOptions);
-};
-/**
- * Get team members.
- * @summary Get Team Members
- */
-export const getTeamMembersApiV1TeamsTeamsTeamIdMembersGet = (
-  teamId: string,
-  signal?: AbortSignal,
-) => {
-  return customInstance<string[]>({
-    url: `/api/v1/teams/teams/${teamId}/members`,
-    method: "GET",
-    signal,
-  });
-};
-
-export const getGetTeamMembersApiV1TeamsTeamsTeamIdMembersGetQueryKey = (
-  teamId: string,
-) => {
-  return [`/api/v1/teams/teams/${teamId}/members`] as const;
-};
-
-export const getGetTeamMembersApiV1TeamsTeamsTeamIdMembersGetQueryOptions = <
-  TData = Awaited<
-    ReturnType<typeof getTeamMembersApiV1TeamsTeamsTeamIdMembersGet>
-  >,
-  TError = HTTPValidationError,
->(
-  teamId: string,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<
-          ReturnType<typeof getTeamMembersApiV1TeamsTeamsTeamIdMembersGet>
-        >,
-        TError,
-        TData
-      >
-    >;
-  },
-) => {
-  const { query: queryOptions } = options ?? {};
-
-  const queryKey =
-    queryOptions?.queryKey ??
-    getGetTeamMembersApiV1TeamsTeamsTeamIdMembersGetQueryKey(teamId);
-
-  const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof getTeamMembersApiV1TeamsTeamsTeamIdMembersGet>>
-  > = ({ signal }) =>
-    getTeamMembersApiV1TeamsTeamsTeamIdMembersGet(teamId, signal);
-
-  return {
-    queryKey,
-    queryFn,
-    enabled: !!teamId,
-    ...queryOptions,
-  } as UseQueryOptions<
-    Awaited<ReturnType<typeof getTeamMembersApiV1TeamsTeamsTeamIdMembersGet>>,
-    TError,
-    TData
-  > & { queryKey: QueryKey };
-};
-
-export type GetTeamMembersApiV1TeamsTeamsTeamIdMembersGetQueryResult =
-  NonNullable<
-    Awaited<ReturnType<typeof getTeamMembersApiV1TeamsTeamsTeamIdMembersGet>>
-  >;
-export type GetTeamMembersApiV1TeamsTeamsTeamIdMembersGetQueryError =
-  HTTPValidationError;
-
-/**
- * @summary Get Team Members
- */
-export const useGetTeamMembersApiV1TeamsTeamsTeamIdMembersGet = <
-  TData = Awaited<
-    ReturnType<typeof getTeamMembersApiV1TeamsTeamsTeamIdMembersGet>
-  >,
-  TError = HTTPValidationError,
->(
-  teamId: string,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<
-          ReturnType<typeof getTeamMembersApiV1TeamsTeamsTeamIdMembersGet>
-        >,
-        TError,
-        TData
-      >
-    >;
-  },
-): UseQueryResult<TData, TError> & { queryKey: QueryKey } => {
-  const queryOptions =
-    getGetTeamMembersApiV1TeamsTeamsTeamIdMembersGetQueryOptions(
-      teamId,
-      options,
-    );
-
-  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
-    queryKey: QueryKey;
-  };
-
-  query.queryKey = queryOptions.queryKey;
-
-  return query;
-};
-
-/**
- * Add a member to a team.
-
-Requires admin scope.
- * @summary Add Team Member
- */
-export const addTeamMemberApiV1TeamsTeamsTeamIdMembersPost = (
-  teamId: string,
-  teamMemberAdd: TeamMemberAdd,
-) => {
-  return customInstance<AddTeamMemberApiV1TeamsTeamsTeamIdMembersPost201>({
-    url: `/api/v1/teams/teams/${teamId}/members`,
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    data: teamMemberAdd,
-  });
-};
-
-export const getAddTeamMemberApiV1TeamsTeamsTeamIdMembersPostMutationOptions = <
-  TError = HTTPValidationError,
-  TContext = unknown,
->(options?: {
-  mutation?: UseMutationOptions<
-    Awaited<ReturnType<typeof addTeamMemberApiV1TeamsTeamsTeamIdMembersPost>>,
-    TError,
-    { teamId: string; data: TeamMemberAdd },
-    TContext
-  >;
-}): UseMutationOptions<
-  Awaited<ReturnType<typeof addTeamMemberApiV1TeamsTeamsTeamIdMembersPost>>,
-  TError,
-  { teamId: string; data: TeamMemberAdd },
-  TContext
-> => {
-  const { mutation: mutationOptions } = options ?? {};
-
-  const mutationFn: MutationFunction<
-    Awaited<ReturnType<typeof addTeamMemberApiV1TeamsTeamsTeamIdMembersPost>>,
-    { teamId: string; data: TeamMemberAdd }
-  > = (props) => {
-    const { teamId, data } = props ?? {};
-
-    return addTeamMemberApiV1TeamsTeamsTeamIdMembersPost(teamId, data);
-  };
-
-  return { mutationFn, ...mutationOptions };
-};
-
-export type AddTeamMemberApiV1TeamsTeamsTeamIdMembersPostMutationResult =
-  NonNullable<
-    Awaited<ReturnType<typeof addTeamMemberApiV1TeamsTeamsTeamIdMembersPost>>
-  >;
-export type AddTeamMemberApiV1TeamsTeamsTeamIdMembersPostMutationBody =
-  TeamMemberAdd;
-export type AddTeamMemberApiV1TeamsTeamsTeamIdMembersPostMutationError =
-  HTTPValidationError;
-
-/**
- * @summary Add Team Member
- */
-export const useAddTeamMemberApiV1TeamsTeamsTeamIdMembersPost = <
-  TError = HTTPValidationError,
-  TContext = unknown,
->(options?: {
-  mutation?: UseMutationOptions<
-    Awaited<ReturnType<typeof addTeamMemberApiV1TeamsTeamsTeamIdMembersPost>>,
-    TError,
-    { teamId: string; data: TeamMemberAdd },
-    TContext
-  >;
-}): UseMutationResult<
-  Awaited<ReturnType<typeof addTeamMemberApiV1TeamsTeamsTeamIdMembersPost>>,
-  TError,
-  { teamId: string; data: TeamMemberAdd },
-  TContext
-> => {
-  const mutationOptions =
-    getAddTeamMemberApiV1TeamsTeamsTeamIdMembersPostMutationOptions(options);
-
-  return useMutation(mutationOptions);
-};
-/**
- * Remove a member from a team.
-
-Requires admin scope.
- * @summary Remove Team Member
- */
-export const removeTeamMemberApiV1TeamsTeamsTeamIdMembersUserIdDelete = (
-  teamId: string,
-  userId: string,
-) => {
-  return customInstance<void>({
-    url: `/api/v1/teams/teams/${teamId}/members/${userId}`,
-    method: "DELETE",
-  });
-};
-
-export const getRemoveTeamMemberApiV1TeamsTeamsTeamIdMembersUserIdDeleteMutationOptions =
-  <TError = HTTPValidationError, TContext = unknown>(options?: {
-    mutation?: UseMutationOptions<
-      Awaited<
-        ReturnType<
-          typeof removeTeamMemberApiV1TeamsTeamsTeamIdMembersUserIdDelete
-        >
-      >,
-      TError,
-      { teamId: string; userId: string },
-      TContext
-    >;
-  }): UseMutationOptions<
-    Awaited<
-      ReturnType<
-        typeof removeTeamMemberApiV1TeamsTeamsTeamIdMembersUserIdDelete
-      >
-    >,
-    TError,
-    { teamId: string; userId: string },
-    TContext
-  > => {
-    const { mutation: mutationOptions } = options ?? {};
-
-    const mutationFn: MutationFunction<
-      Awaited<
-        ReturnType<
-          typeof removeTeamMemberApiV1TeamsTeamsTeamIdMembersUserIdDelete
-        >
-      >,
-      { teamId: string; userId: string }
-    > = (props) => {
-      const { teamId, userId } = props ?? {};
-
-      return removeTeamMemberApiV1TeamsTeamsTeamIdMembersUserIdDelete(
-        teamId,
-        userId,
-      );
-    };
-
-    return { mutationFn, ...mutationOptions };
-  };
-
-export type RemoveTeamMemberApiV1TeamsTeamsTeamIdMembersUserIdDeleteMutationResult =
-  NonNullable<
-    Awaited<
-      ReturnType<
-        typeof removeTeamMemberApiV1TeamsTeamsTeamIdMembersUserIdDelete
-      >
-    >
-  >;
-
-export type RemoveTeamMemberApiV1TeamsTeamsTeamIdMembersUserIdDeleteMutationError =
-  HTTPValidationError;
-
-/**
- * @summary Remove Team Member
- */
-export const useRemoveTeamMemberApiV1TeamsTeamsTeamIdMembersUserIdDelete = <
-  TError = HTTPValidationError,
-  TContext = unknown,
->(options?: {
-  mutation?: UseMutationOptions<
-    Awaited<
-      ReturnType<
-        typeof removeTeamMemberApiV1TeamsTeamsTeamIdMembersUserIdDelete
-      >
-    >,
-    TError,
-    { teamId: string; userId: string },
-    TContext
-  >;
-}): UseMutationResult<
-  Awaited<
-    ReturnType<typeof removeTeamMemberApiV1TeamsTeamsTeamIdMembersUserIdDelete>
-  >,
-  TError,
-  { teamId: string; userId: string },
-  TContext
-> => {
-  const mutationOptions =
-    getRemoveTeamMemberApiV1TeamsTeamsTeamIdMembersUserIdDeleteMutationOptions(
-      options,
-    );
-
-  return useMutation(mutationOptions);
-};
 /**
  * List all teams in the organization.
  * @summary List Teams
@@ -1371,6 +691,591 @@ export const useRemoveTeamMemberApiV1TeamsTeamIdMembersUserIdDelete = <
 > => {
   const mutationOptions =
     getRemoveTeamMemberApiV1TeamsTeamIdMembersUserIdDeleteMutationOptions(
+      options,
+    );
+
+  return useMutation(mutationOptions);
+};
+/**
+ * Get the full policy configuration for a team.
+
+Returns the team policy, all overrides, and queue limits.
+ * @summary Get Team Policy
+ */
+export const getTeamPolicyApiV1TeamsTeamIdPolicyGet = (
+  teamId: string,
+  signal?: AbortSignal,
+) => {
+  return customInstance<TeamPolicyFullResponse>({
+    url: `/api/v1/teams/${teamId}/policy`,
+    method: "GET",
+    signal,
+  });
+};
+
+export const getGetTeamPolicyApiV1TeamsTeamIdPolicyGetQueryKey = (
+  teamId: string,
+) => {
+  return [`/api/v1/teams/${teamId}/policy`] as const;
+};
+
+export const getGetTeamPolicyApiV1TeamsTeamIdPolicyGetQueryOptions = <
+  TData = Awaited<ReturnType<typeof getTeamPolicyApiV1TeamsTeamIdPolicyGet>>,
+  TError = HTTPValidationError,
+>(
+  teamId: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof getTeamPolicyApiV1TeamsTeamIdPolicyGet>>,
+        TError,
+        TData
+      >
+    >;
+  },
+) => {
+  const { query: queryOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ??
+    getGetTeamPolicyApiV1TeamsTeamIdPolicyGetQueryKey(teamId);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getTeamPolicyApiV1TeamsTeamIdPolicyGet>>
+  > = ({ signal }) => getTeamPolicyApiV1TeamsTeamIdPolicyGet(teamId, signal);
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!teamId,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof getTeamPolicyApiV1TeamsTeamIdPolicyGet>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetTeamPolicyApiV1TeamsTeamIdPolicyGetQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getTeamPolicyApiV1TeamsTeamIdPolicyGet>>
+>;
+export type GetTeamPolicyApiV1TeamsTeamIdPolicyGetQueryError =
+  HTTPValidationError;
+
+/**
+ * @summary Get Team Policy
+ */
+export const useGetTeamPolicyApiV1TeamsTeamIdPolicyGet = <
+  TData = Awaited<ReturnType<typeof getTeamPolicyApiV1TeamsTeamIdPolicyGet>>,
+  TError = HTTPValidationError,
+>(
+  teamId: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof getTeamPolicyApiV1TeamsTeamIdPolicyGet>>,
+        TError,
+        TData
+      >
+    >;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } => {
+  const queryOptions = getGetTeamPolicyApiV1TeamsTeamIdPolicyGetQueryOptions(
+    teamId,
+    options,
+  );
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  query.queryKey = queryOptions.queryKey;
+
+  return query;
+};
+
+/**
+ * Update or create the team policy.
+
+Requires admin scope.
+ * @summary Update Team Policy
+ */
+export const updateTeamPolicyApiV1TeamsTeamIdPolicyPut = (
+  teamId: string,
+  teamPolicyUpdate: TeamPolicyUpdate,
+) => {
+  return customInstance<TeamPolicyResponse>({
+    url: `/api/v1/teams/${teamId}/policy`,
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    data: teamPolicyUpdate,
+  });
+};
+
+export const getUpdateTeamPolicyApiV1TeamsTeamIdPolicyPutMutationOptions = <
+  TError = HTTPValidationError,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof updateTeamPolicyApiV1TeamsTeamIdPolicyPut>>,
+    TError,
+    { teamId: string; data: TeamPolicyUpdate },
+    TContext
+  >;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof updateTeamPolicyApiV1TeamsTeamIdPolicyPut>>,
+  TError,
+  { teamId: string; data: TeamPolicyUpdate },
+  TContext
+> => {
+  const { mutation: mutationOptions } = options ?? {};
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof updateTeamPolicyApiV1TeamsTeamIdPolicyPut>>,
+    { teamId: string; data: TeamPolicyUpdate }
+  > = (props) => {
+    const { teamId, data } = props ?? {};
+
+    return updateTeamPolicyApiV1TeamsTeamIdPolicyPut(teamId, data);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type UpdateTeamPolicyApiV1TeamsTeamIdPolicyPutMutationResult =
+  NonNullable<
+    Awaited<ReturnType<typeof updateTeamPolicyApiV1TeamsTeamIdPolicyPut>>
+  >;
+export type UpdateTeamPolicyApiV1TeamsTeamIdPolicyPutMutationBody =
+  TeamPolicyUpdate;
+export type UpdateTeamPolicyApiV1TeamsTeamIdPolicyPutMutationError =
+  HTTPValidationError;
+
+/**
+ * @summary Update Team Policy
+ */
+export const useUpdateTeamPolicyApiV1TeamsTeamIdPolicyPut = <
+  TError = HTTPValidationError,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof updateTeamPolicyApiV1TeamsTeamIdPolicyPut>>,
+    TError,
+    { teamId: string; data: TeamPolicyUpdate },
+    TContext
+  >;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof updateTeamPolicyApiV1TeamsTeamIdPolicyPut>>,
+  TError,
+  { teamId: string; data: TeamPolicyUpdate },
+  TContext
+> => {
+  const mutationOptions =
+    getUpdateTeamPolicyApiV1TeamsTeamIdPolicyPutMutationOptions(options);
+
+  return useMutation(mutationOptions);
+};
+/**
+ * Create a policy override for a dataset or tag.
+
+Requires admin scope.
+ * @summary Create Policy Override
+ */
+export const createPolicyOverrideApiV1TeamsTeamIdPolicyOverridesPost = (
+  teamId: string,
+  teamPolicyOverrideCreate: TeamPolicyOverrideCreate,
+) => {
+  return customInstance<TeamPolicyOverrideResponse>({
+    url: `/api/v1/teams/${teamId}/policy/overrides`,
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    data: teamPolicyOverrideCreate,
+  });
+};
+
+export const getCreatePolicyOverrideApiV1TeamsTeamIdPolicyOverridesPostMutationOptions =
+  <TError = HTTPValidationError, TContext = unknown>(options?: {
+    mutation?: UseMutationOptions<
+      Awaited<
+        ReturnType<
+          typeof createPolicyOverrideApiV1TeamsTeamIdPolicyOverridesPost
+        >
+      >,
+      TError,
+      { teamId: string; data: TeamPolicyOverrideCreate },
+      TContext
+    >;
+  }): UseMutationOptions<
+    Awaited<
+      ReturnType<typeof createPolicyOverrideApiV1TeamsTeamIdPolicyOverridesPost>
+    >,
+    TError,
+    { teamId: string; data: TeamPolicyOverrideCreate },
+    TContext
+  > => {
+    const { mutation: mutationOptions } = options ?? {};
+
+    const mutationFn: MutationFunction<
+      Awaited<
+        ReturnType<
+          typeof createPolicyOverrideApiV1TeamsTeamIdPolicyOverridesPost
+        >
+      >,
+      { teamId: string; data: TeamPolicyOverrideCreate }
+    > = (props) => {
+      const { teamId, data } = props ?? {};
+
+      return createPolicyOverrideApiV1TeamsTeamIdPolicyOverridesPost(
+        teamId,
+        data,
+      );
+    };
+
+    return { mutationFn, ...mutationOptions };
+  };
+
+export type CreatePolicyOverrideApiV1TeamsTeamIdPolicyOverridesPostMutationResult =
+  NonNullable<
+    Awaited<
+      ReturnType<typeof createPolicyOverrideApiV1TeamsTeamIdPolicyOverridesPost>
+    >
+  >;
+export type CreatePolicyOverrideApiV1TeamsTeamIdPolicyOverridesPostMutationBody =
+  TeamPolicyOverrideCreate;
+export type CreatePolicyOverrideApiV1TeamsTeamIdPolicyOverridesPostMutationError =
+  HTTPValidationError;
+
+/**
+ * @summary Create Policy Override
+ */
+export const useCreatePolicyOverrideApiV1TeamsTeamIdPolicyOverridesPost = <
+  TError = HTTPValidationError,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<
+      ReturnType<typeof createPolicyOverrideApiV1TeamsTeamIdPolicyOverridesPost>
+    >,
+    TError,
+    { teamId: string; data: TeamPolicyOverrideCreate },
+    TContext
+  >;
+}): UseMutationResult<
+  Awaited<
+    ReturnType<typeof createPolicyOverrideApiV1TeamsTeamIdPolicyOverridesPost>
+  >,
+  TError,
+  { teamId: string; data: TeamPolicyOverrideCreate },
+  TContext
+> => {
+  const mutationOptions =
+    getCreatePolicyOverrideApiV1TeamsTeamIdPolicyOverridesPostMutationOptions(
+      options,
+    );
+
+  return useMutation(mutationOptions);
+};
+/**
+ * Update a policy override.
+
+Requires admin scope.
+ * @summary Update Policy Override
+ */
+export const updatePolicyOverrideApiV1TeamsTeamIdPolicyOverridesOverrideIdPut =
+  (
+    teamId: string,
+    overrideId: string,
+    teamPolicyOverrideUpdate: TeamPolicyOverrideUpdate,
+  ) => {
+    return customInstance<TeamPolicyOverrideResponse>({
+      url: `/api/v1/teams/${teamId}/policy/overrides/${overrideId}`,
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      data: teamPolicyOverrideUpdate,
+    });
+  };
+
+export const getUpdatePolicyOverrideApiV1TeamsTeamIdPolicyOverridesOverrideIdPutMutationOptions =
+  <TError = HTTPValidationError, TContext = unknown>(options?: {
+    mutation?: UseMutationOptions<
+      Awaited<
+        ReturnType<
+          typeof updatePolicyOverrideApiV1TeamsTeamIdPolicyOverridesOverrideIdPut
+        >
+      >,
+      TError,
+      { teamId: string; overrideId: string; data: TeamPolicyOverrideUpdate },
+      TContext
+    >;
+  }): UseMutationOptions<
+    Awaited<
+      ReturnType<
+        typeof updatePolicyOverrideApiV1TeamsTeamIdPolicyOverridesOverrideIdPut
+      >
+    >,
+    TError,
+    { teamId: string; overrideId: string; data: TeamPolicyOverrideUpdate },
+    TContext
+  > => {
+    const { mutation: mutationOptions } = options ?? {};
+
+    const mutationFn: MutationFunction<
+      Awaited<
+        ReturnType<
+          typeof updatePolicyOverrideApiV1TeamsTeamIdPolicyOverridesOverrideIdPut
+        >
+      >,
+      { teamId: string; overrideId: string; data: TeamPolicyOverrideUpdate }
+    > = (props) => {
+      const { teamId, overrideId, data } = props ?? {};
+
+      return updatePolicyOverrideApiV1TeamsTeamIdPolicyOverridesOverrideIdPut(
+        teamId,
+        overrideId,
+        data,
+      );
+    };
+
+    return { mutationFn, ...mutationOptions };
+  };
+
+export type UpdatePolicyOverrideApiV1TeamsTeamIdPolicyOverridesOverrideIdPutMutationResult =
+  NonNullable<
+    Awaited<
+      ReturnType<
+        typeof updatePolicyOverrideApiV1TeamsTeamIdPolicyOverridesOverrideIdPut
+      >
+    >
+  >;
+export type UpdatePolicyOverrideApiV1TeamsTeamIdPolicyOverridesOverrideIdPutMutationBody =
+  TeamPolicyOverrideUpdate;
+export type UpdatePolicyOverrideApiV1TeamsTeamIdPolicyOverridesOverrideIdPutMutationError =
+  HTTPValidationError;
+
+/**
+ * @summary Update Policy Override
+ */
+export const useUpdatePolicyOverrideApiV1TeamsTeamIdPolicyOverridesOverrideIdPut =
+  <TError = HTTPValidationError, TContext = unknown>(options?: {
+    mutation?: UseMutationOptions<
+      Awaited<
+        ReturnType<
+          typeof updatePolicyOverrideApiV1TeamsTeamIdPolicyOverridesOverrideIdPut
+        >
+      >,
+      TError,
+      { teamId: string; overrideId: string; data: TeamPolicyOverrideUpdate },
+      TContext
+    >;
+  }): UseMutationResult<
+    Awaited<
+      ReturnType<
+        typeof updatePolicyOverrideApiV1TeamsTeamIdPolicyOverridesOverrideIdPut
+      >
+    >,
+    TError,
+    { teamId: string; overrideId: string; data: TeamPolicyOverrideUpdate },
+    TContext
+  > => {
+    const mutationOptions =
+      getUpdatePolicyOverrideApiV1TeamsTeamIdPolicyOverridesOverrideIdPutMutationOptions(
+        options,
+      );
+
+    return useMutation(mutationOptions);
+  };
+/**
+ * Delete a policy override.
+
+Requires admin scope.
+ * @summary Delete Policy Override
+ */
+export const deletePolicyOverrideApiV1TeamsTeamIdPolicyOverridesOverrideIdDelete =
+  (teamId: string, overrideId: string) => {
+    return customInstance<void>({
+      url: `/api/v1/teams/${teamId}/policy/overrides/${overrideId}`,
+      method: "DELETE",
+    });
+  };
+
+export const getDeletePolicyOverrideApiV1TeamsTeamIdPolicyOverridesOverrideIdDeleteMutationOptions =
+  <TError = HTTPValidationError, TContext = unknown>(options?: {
+    mutation?: UseMutationOptions<
+      Awaited<
+        ReturnType<
+          typeof deletePolicyOverrideApiV1TeamsTeamIdPolicyOverridesOverrideIdDelete
+        >
+      >,
+      TError,
+      { teamId: string; overrideId: string },
+      TContext
+    >;
+  }): UseMutationOptions<
+    Awaited<
+      ReturnType<
+        typeof deletePolicyOverrideApiV1TeamsTeamIdPolicyOverridesOverrideIdDelete
+      >
+    >,
+    TError,
+    { teamId: string; overrideId: string },
+    TContext
+  > => {
+    const { mutation: mutationOptions } = options ?? {};
+
+    const mutationFn: MutationFunction<
+      Awaited<
+        ReturnType<
+          typeof deletePolicyOverrideApiV1TeamsTeamIdPolicyOverridesOverrideIdDelete
+        >
+      >,
+      { teamId: string; overrideId: string }
+    > = (props) => {
+      const { teamId, overrideId } = props ?? {};
+
+      return deletePolicyOverrideApiV1TeamsTeamIdPolicyOverridesOverrideIdDelete(
+        teamId,
+        overrideId,
+      );
+    };
+
+    return { mutationFn, ...mutationOptions };
+  };
+
+export type DeletePolicyOverrideApiV1TeamsTeamIdPolicyOverridesOverrideIdDeleteMutationResult =
+  NonNullable<
+    Awaited<
+      ReturnType<
+        typeof deletePolicyOverrideApiV1TeamsTeamIdPolicyOverridesOverrideIdDelete
+      >
+    >
+  >;
+
+export type DeletePolicyOverrideApiV1TeamsTeamIdPolicyOverridesOverrideIdDeleteMutationError =
+  HTTPValidationError;
+
+/**
+ * @summary Delete Policy Override
+ */
+export const useDeletePolicyOverrideApiV1TeamsTeamIdPolicyOverridesOverrideIdDelete =
+  <TError = HTTPValidationError, TContext = unknown>(options?: {
+    mutation?: UseMutationOptions<
+      Awaited<
+        ReturnType<
+          typeof deletePolicyOverrideApiV1TeamsTeamIdPolicyOverridesOverrideIdDelete
+        >
+      >,
+      TError,
+      { teamId: string; overrideId: string },
+      TContext
+    >;
+  }): UseMutationResult<
+    Awaited<
+      ReturnType<
+        typeof deletePolicyOverrideApiV1TeamsTeamIdPolicyOverridesOverrideIdDelete
+      >
+    >,
+    TError,
+    { teamId: string; overrideId: string },
+    TContext
+  > => {
+    const mutationOptions =
+      getDeletePolicyOverrideApiV1TeamsTeamIdPolicyOverridesOverrideIdDeleteMutationOptions(
+        options,
+      );
+
+    return useMutation(mutationOptions);
+  };
+/**
+ * Update or create queue limits for a team.
+
+Requires admin scope.
+ * @summary Update Queue Limits
+ */
+export const updateQueueLimitsApiV1TeamsTeamIdPolicyQueueLimitsPut = (
+  teamId: string,
+  teamQueueLimitsUpdate: TeamQueueLimitsUpdate,
+) => {
+  return customInstance<TeamQueueLimitsResponse>({
+    url: `/api/v1/teams/${teamId}/policy/queue-limits`,
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    data: teamQueueLimitsUpdate,
+  });
+};
+
+export const getUpdateQueueLimitsApiV1TeamsTeamIdPolicyQueueLimitsPutMutationOptions =
+  <TError = HTTPValidationError, TContext = unknown>(options?: {
+    mutation?: UseMutationOptions<
+      Awaited<
+        ReturnType<typeof updateQueueLimitsApiV1TeamsTeamIdPolicyQueueLimitsPut>
+      >,
+      TError,
+      { teamId: string; data: TeamQueueLimitsUpdate },
+      TContext
+    >;
+  }): UseMutationOptions<
+    Awaited<
+      ReturnType<typeof updateQueueLimitsApiV1TeamsTeamIdPolicyQueueLimitsPut>
+    >,
+    TError,
+    { teamId: string; data: TeamQueueLimitsUpdate },
+    TContext
+  > => {
+    const { mutation: mutationOptions } = options ?? {};
+
+    const mutationFn: MutationFunction<
+      Awaited<
+        ReturnType<typeof updateQueueLimitsApiV1TeamsTeamIdPolicyQueueLimitsPut>
+      >,
+      { teamId: string; data: TeamQueueLimitsUpdate }
+    > = (props) => {
+      const { teamId, data } = props ?? {};
+
+      return updateQueueLimitsApiV1TeamsTeamIdPolicyQueueLimitsPut(
+        teamId,
+        data,
+      );
+    };
+
+    return { mutationFn, ...mutationOptions };
+  };
+
+export type UpdateQueueLimitsApiV1TeamsTeamIdPolicyQueueLimitsPutMutationResult =
+  NonNullable<
+    Awaited<
+      ReturnType<typeof updateQueueLimitsApiV1TeamsTeamIdPolicyQueueLimitsPut>
+    >
+  >;
+export type UpdateQueueLimitsApiV1TeamsTeamIdPolicyQueueLimitsPutMutationBody =
+  TeamQueueLimitsUpdate;
+export type UpdateQueueLimitsApiV1TeamsTeamIdPolicyQueueLimitsPutMutationError =
+  HTTPValidationError;
+
+/**
+ * @summary Update Queue Limits
+ */
+export const useUpdateQueueLimitsApiV1TeamsTeamIdPolicyQueueLimitsPut = <
+  TError = HTTPValidationError,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<
+      ReturnType<typeof updateQueueLimitsApiV1TeamsTeamIdPolicyQueueLimitsPut>
+    >,
+    TError,
+    { teamId: string; data: TeamQueueLimitsUpdate },
+    TContext
+  >;
+}): UseMutationResult<
+  Awaited<
+    ReturnType<typeof updateQueueLimitsApiV1TeamsTeamIdPolicyQueueLimitsPut>
+  >,
+  TError,
+  { teamId: string; data: TeamQueueLimitsUpdate },
+  TContext
+> => {
+  const mutationOptions =
+    getUpdateQueueLimitsApiV1TeamsTeamIdPolicyQueueLimitsPutMutationOptions(
       options,
     );
 

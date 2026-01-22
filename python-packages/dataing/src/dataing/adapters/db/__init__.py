@@ -11,6 +11,13 @@ Contents:
 from .app_db import AppDatabase
 from .mock import MockDatabaseAdapter
 from .sdk_repository import BundleRepository, EvidenceRepository, RunRepository
+from .team_policy_repository import (
+    PolicyAction,
+    TeamPolicy,
+    TeamPolicyOverride,
+    TeamPolicyRepository,
+    TeamQueueLimits,
+)
 
 __all__ = [
     "AppDatabase",
@@ -18,4 +25,9 @@ __all__ = [
     "BundleRepository",
     "RunRepository",
     "EvidenceRepository",
+    "PolicyAction",
+    "TeamPolicy",
+    "TeamPolicyOverride",
+    "TeamPolicyRepository",
+    "TeamQueueLimits",
 ]

@@ -2,24 +2,30 @@
 
 This module provides a generic webhook endpoint for external integrations
 to create issues. Signature verification is used to authenticate requests.
+Policy evaluation determines the action taken: auto investigation, review, or issue-only.
 """
 
 from __future__ import annotations
 
 import hashlib
 import hmac
+import json
 import logging
 import os
-from typing import Annotated
-from uuid import UUID
+from datetime import UTC, datetime
+from typing import Annotated, Any
+from uuid import UUID, uuid4
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Request, status
 from pydantic import BaseModel, Field
 
 from dataing.adapters.db.app_db import AppDatabase
+from dataing.adapters.db.team_policy_repository import PolicyAction, TeamPolicyRepository
 from dataing.core.json_utils import to_json_string
 from dataing.entrypoints.api.deps import get_app_db
 from dataing.entrypoints.api.middleware.auth import ApiKeyContext, verify_api_key
+from dataing.services.notification import NotificationEvent, NotificationService
+from dataing.services.policy import IssueContext, PolicyService
 
 logger = logging.getLogger(__name__)
 
@@ -56,6 +62,8 @@ class WebhookIssueResponse(BaseModel):
     number: int
     status: str
     created: bool  # True if newly created, False if deduplicated
+    policy_action: str | None = None  # auto, review, issue_only
+    investigation_id: UUID | None = None  # Set if auto investigation started
 
 
 # ============================================================================
@@ -250,9 +258,245 @@ async def receive_generic_webhook(
         f"provider={payload.source_provider}, tenant={auth.tenant_id}"
     )
 
+    # Evaluate policy for the created issue
+    policy_action, investigation_id = await _evaluate_and_apply_policy(
+        request=request,
+        db=db,
+        auth=auth,
+        issue_id=issue_id,
+        payload=payload,
+    )
+
     return WebhookIssueResponse(
         id=issue_id,
         number=row["number"],
         status=row["status"],
         created=True,
+        policy_action=policy_action,
+        investigation_id=investigation_id,
+    )
+
+
+async def _evaluate_and_apply_policy(
+    request: Request,
+    db: AppDatabase,
+    auth: ApiKeyContext,
+    issue_id: UUID,
+    payload: GenericWebhookPayload,
+) -> tuple[str | None, UUID | None]:
+    """Evaluate policy for an issue and apply the resulting action.
+
+    Returns:
+        Tuple of (policy_action, investigation_id).
+        investigation_id is set only for AUTO actions.
+    """
+    # Get the default team for this tenant
+    policy_repo = TeamPolicyRepository(db)
+    team_id = await policy_repo.get_default_team_for_tenant(auth.tenant_id)
+
+    if not team_id:
+        # No teams configured, default to issue-only
+        logger.debug(f"No team found for tenant={auth.tenant_id}, using issue_only")
+        return (PolicyAction.ISSUE_ONLY.value, None)
+
+    # Build issue context for policy evaluation
+    context = IssueContext(
+        team_id=team_id,
+        dataset_id=payload.dataset_id,
+        severity=payload.severity,
+        source=payload.source_provider,
+    )
+
+    # Evaluate policy
+    policy_service = PolicyService(db)
+    policy_result = await policy_service.evaluate(context)
+
+    logger.info(
+        f"Policy evaluated: issue={issue_id}, action={policy_result.action.value}, "
+        f"source={policy_result.source}"
+    )
+
+    # Record policy evaluation event
+    await db.execute(
+        """
+        INSERT INTO issue_events (issue_id, event_type, actor_user_id, payload)
+        VALUES ($1, 'policy_evaluated', NULL, $2)
+        """,
+        issue_id,
+        to_json_string(
+            {
+                "action": policy_result.action.value,
+                "source": policy_result.source,
+                "policy_id": (str(policy_result.policy_id) if policy_result.policy_id else None),
+                "override_id": (
+                    str(policy_result.override_id) if policy_result.override_id else None
+                ),
+            }
+        ),
+    )
+
+    investigation_id: UUID | None = None
+
+    if policy_result.action == PolicyAction.AUTO:
+        # Start auto investigation
+        investigation_id = await _start_auto_investigation(
+            request=request,
+            db=db,
+            auth=auth,
+            issue_id=issue_id,
+            payload=payload,
+        )
+
+    elif policy_result.action == PolicyAction.REVIEW:
+        # Send notification that review is required
+        await _send_review_notification(
+            db=db,
+            auth=auth,
+            issue_id=issue_id,
+            payload=payload,
+        )
+
+    # ISSUE_ONLY requires no additional action
+
+    return (policy_result.action.value, investigation_id)
+
+
+async def _start_auto_investigation(
+    request: Request,
+    db: AppDatabase,
+    auth: ApiKeyContext,
+    issue_id: UUID,
+    payload: GenericWebhookPayload,
+) -> UUID | None:
+    """Start an automatic investigation for an issue.
+
+    Returns:
+        Investigation ID if started successfully, None otherwise.
+    """
+    from dataing.entrypoints.api.deps import resolve_datasource_id
+    from dataing.temporal.client import TemporalInvestigationClient
+
+    # Get Temporal client
+    temporal_client: TemporalInvestigationClient | None = getattr(
+        request.app.state, "temporal_client", None
+    )
+
+    if temporal_client is None:
+        logger.warning(
+            f"Temporal not configured, cannot start auto investigation for issue={issue_id}"
+        )
+        return None
+
+    investigation_id = uuid4()
+    now = datetime.now(UTC)
+
+    # Resolve datasource
+    try:
+        datasource_id = await resolve_datasource_id(request, auth.tenant_id, explicit_id=None)
+    except ValueError:
+        # No default datasource, use placeholder
+        datasource_id = UUID("00000000-0000-0000-0000-000000000003")
+
+    # Build alert data
+    alert_data: dict[str, Any] = {
+        "dataset_ids": [payload.dataset_id] if payload.dataset_id else [],
+        "metric_spec": {
+            "metric_type": "description",
+            "expression": payload.title,
+            "display_name": "Integration Alert",
+            "columns_referenced": [],
+        },
+        "anomaly_type": "integration_alert",
+        "expected_value": 0.0,
+        "actual_value": 0.0,
+        "deviation_pct": 0.0,
+        "anomaly_date": now.date().isoformat(),
+        "severity": payload.severity or "medium",
+        "datasource_id": str(datasource_id),
+        "issue_id": str(issue_id),
+    }
+
+    try:
+        # Create investigation record (issue_id is stored in alert JSONB)
+        await db.execute(
+            """
+            INSERT INTO investigations (id, tenant_id, alert)
+            VALUES ($1, $2, $3)
+            """,
+            investigation_id,
+            auth.tenant_id,
+            json.dumps(alert_data),
+        )
+
+        # Start Temporal workflow
+        alert_summary = f"Auto investigation: {payload.title}"
+        await temporal_client.start_investigation(
+            investigation_id=str(investigation_id),
+            tenant_id=str(auth.tenant_id),
+            datasource_id=str(datasource_id),
+            alert_data=alert_data,
+            alert_summary=alert_summary,
+        )
+
+        # Record event on issue
+        await db.execute(
+            """
+            INSERT INTO issue_events (issue_id, event_type, actor_user_id, payload)
+            VALUES ($1, 'investigation_started', NULL, $2)
+            """,
+            issue_id,
+            to_json_string(
+                {
+                    "investigation_id": str(investigation_id),
+                    "trigger": "auto_policy",
+                }
+            ),
+        )
+
+        logger.info(
+            f"Auto investigation started: investigation={investigation_id}, issue={issue_id}"
+        )
+
+        return investigation_id
+
+    except Exception as e:
+        logger.error(f"Failed to start auto investigation for issue={issue_id}: {e}")
+        return None
+
+
+async def _send_review_notification(
+    db: AppDatabase,
+    auth: ApiKeyContext,
+    issue_id: UUID,
+    payload: GenericWebhookPayload,
+) -> None:
+    """Send notification that an issue requires review before investigation."""
+    notification_service = NotificationService(db)
+
+    await notification_service.notify(
+        NotificationEvent(
+            event_type="issue.review_required",
+            tenant_id=auth.tenant_id,
+            payload={
+                "issue_id": str(issue_id),
+                "title": payload.title,
+                "severity": payload.severity,
+                "dataset_id": payload.dataset_id,
+                "source_provider": payload.source_provider,
+            },
+        )
+    )
+
+    # Record event on issue
+    await db.execute(
+        """
+        INSERT INTO issue_events (issue_id, event_type, actor_user_id, payload)
+        VALUES ($1, 'review_requested', NULL, $2)
+        """,
+        issue_id,
+        to_json_string(
+            {
+                "trigger": "review_policy",
+            }
+        ),
     )

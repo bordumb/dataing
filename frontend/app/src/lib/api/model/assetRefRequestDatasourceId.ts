@@ -6,4 +6,7 @@
  * OpenAPI spec version: 2.0.0
  */
 
+/**
+ * Optional datasource ID for disambiguation
+ */
 export type AssetRefRequestDatasourceId = string | null;

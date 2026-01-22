@@ -1730,7 +1730,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/TestConnectionResponse"
+                  "$ref": "#/components/schemas/dataing__entrypoints__api__routes__datasources__TestConnectionResponse"
                 }
               }
             }
@@ -1955,7 +1955,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/TestConnectionResponse"
+                  "$ref": "#/components/schemas/dataing__entrypoints__api__routes__datasources__TestConnectionResponse"
                 }
               }
             }
@@ -2390,7 +2390,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/TestConnectionResponse"
+                  "$ref": "#/components/schemas/dataing__entrypoints__api__routes__datasources__TestConnectionResponse"
                 }
               }
             }
@@ -2615,7 +2615,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/TestConnectionResponse"
+                  "$ref": "#/components/schemas/dataing__entrypoints__api__routes__datasources__TestConnectionResponse"
                 }
               }
             }
@@ -3210,7 +3210,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/dataing__entrypoints__api__routes__credentials__TestConnectionResponse"
+                  "$ref": "#/components/schemas/TestConnectionResponse"
                 }
               }
             }
@@ -4815,7 +4815,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/LineageGraphResponse"
+                  "$ref": "#/components/schemas/dataing__entrypoints__api__routes__lineage__LineageGraphResponse"
                 }
               }
             }
@@ -7427,776 +7427,6 @@
         }
       }
     },
-    "/api/v1/teams/teams/": {
-      "get": {
-        "tags": [
-          "teams"
-        ],
-        "summary": "List Teams",
-        "description": "List all teams in the organization.",
-        "operationId": "list_teams_api_v1_teams_teams__get",
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/TeamListResponse"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "APIKeyHeader": []
-          },
-          {
-            "HTTPBearer": []
-          }
-        ]
-      },
-      "post": {
-        "tags": [
-          "teams"
-        ],
-        "summary": "Create Team",
-        "description": "Create a new team.\n\nRequires admin scope.",
-        "operationId": "create_team_api_v1_teams_teams__post",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/TeamCreate"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "201": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/TeamResponse"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "APIKeyHeader": []
-          },
-          {
-            "HTTPBearer": []
-          }
-        ]
-      }
-    },
-    "/api/v1/teams/teams/{team_id}": {
-      "get": {
-        "tags": [
-          "teams"
-        ],
-        "summary": "Get Team",
-        "description": "Get a team by ID.",
-        "operationId": "get_team_api_v1_teams_teams__team_id__get",
-        "security": [
-          {
-            "APIKeyHeader": []
-          },
-          {
-            "HTTPBearer": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "team_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "uuid",
-              "title": "Team Id"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/TeamResponse"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      },
-      "put": {
-        "tags": [
-          "teams"
-        ],
-        "summary": "Update Team",
-        "description": "Update a team.\n\nRequires admin scope. Cannot update SCIM-managed teams.",
-        "operationId": "update_team_api_v1_teams_teams__team_id__put",
-        "security": [
-          {
-            "APIKeyHeader": []
-          },
-          {
-            "HTTPBearer": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "team_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "uuid",
-              "title": "Team Id"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/TeamUpdate"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/TeamResponse"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      },
-      "delete": {
-        "tags": [
-          "teams"
-        ],
-        "summary": "Delete Team",
-        "description": "Delete a team.\n\nRequires admin scope. Cannot delete SCIM-managed teams.",
-        "operationId": "delete_team_api_v1_teams_teams__team_id__delete",
-        "security": [
-          {
-            "APIKeyHeader": []
-          },
-          {
-            "HTTPBearer": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "team_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "uuid",
-              "title": "Team Id"
-            }
-          }
-        ],
-        "responses": {
-          "204": {
-            "description": "Successful Response"
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/v1/teams/teams/{team_id}/members": {
-      "get": {
-        "tags": [
-          "teams"
-        ],
-        "summary": "Get Team Members",
-        "description": "Get team members.",
-        "operationId": "get_team_members_api_v1_teams_teams__team_id__members_get",
-        "security": [
-          {
-            "APIKeyHeader": []
-          },
-          {
-            "HTTPBearer": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "team_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "uuid",
-              "title": "Team Id"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "array",
-                  "items": {
-                    "type": "string",
-                    "format": "uuid"
-                  },
-                  "title": "Response Get Team Members Api V1 Teams Teams  Team Id  Members Get"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      },
-      "post": {
-        "tags": [
-          "teams"
-        ],
-        "summary": "Add Team Member",
-        "description": "Add a member to a team.\n\nRequires admin scope.",
-        "operationId": "add_team_member_api_v1_teams_teams__team_id__members_post",
-        "security": [
-          {
-            "APIKeyHeader": []
-          },
-          {
-            "HTTPBearer": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "team_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "uuid",
-              "title": "Team Id"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/TeamMemberAdd"
-              }
-            }
-          }
-        },
-        "responses": {
-          "201": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "additionalProperties": {
-                    "type": "string"
-                  },
-                  "title": "Response Add Team Member Api V1 Teams Teams  Team Id  Members Post"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/v1/teams/teams/{team_id}/members/{user_id}": {
-      "delete": {
-        "tags": [
-          "teams"
-        ],
-        "summary": "Remove Team Member",
-        "description": "Remove a member from a team.\n\nRequires admin scope.",
-        "operationId": "remove_team_member_api_v1_teams_teams__team_id__members__user_id__delete",
-        "security": [
-          {
-            "APIKeyHeader": []
-          },
-          {
-            "HTTPBearer": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "team_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "uuid",
-              "title": "Team Id"
-            }
-          },
-          {
-            "name": "user_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "uuid",
-              "title": "User Id"
-            }
-          }
-        ],
-        "responses": {
-          "204": {
-            "description": "Successful Response"
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/v1/teams/teams/{team_id}/policy": {
-      "get": {
-        "tags": [
-          "teams"
-        ],
-        "summary": "Get Team Policy",
-        "description": "Get the full policy configuration for a team.\n\nReturns the team policy, all overrides, and queue limits.",
-        "operationId": "get_team_policy_api_v1_teams_teams__team_id__policy_get",
-        "security": [
-          {
-            "APIKeyHeader": []
-          },
-          {
-            "HTTPBearer": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "team_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "uuid",
-              "title": "Team Id"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/TeamPolicyFullResponse"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      },
-      "put": {
-        "tags": [
-          "teams"
-        ],
-        "summary": "Update Team Policy",
-        "description": "Update or create the team policy.\n\nRequires admin scope.",
-        "operationId": "update_team_policy_api_v1_teams_teams__team_id__policy_put",
-        "security": [
-          {
-            "APIKeyHeader": []
-          },
-          {
-            "HTTPBearer": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "team_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "uuid",
-              "title": "Team Id"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/TeamPolicyUpdate"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/TeamPolicyResponse"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/v1/teams/teams/{team_id}/policy/overrides": {
-      "post": {
-        "tags": [
-          "teams"
-        ],
-        "summary": "Create Policy Override",
-        "description": "Create a policy override for a dataset or tag.\n\nRequires admin scope.",
-        "operationId": "create_policy_override_api_v1_teams_teams__team_id__policy_overrides_post",
-        "security": [
-          {
-            "APIKeyHeader": []
-          },
-          {
-            "HTTPBearer": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "team_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "uuid",
-              "title": "Team Id"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/TeamPolicyOverrideCreate"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/TeamPolicyOverrideResponse"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/v1/teams/teams/{team_id}/policy/overrides/{override_id}": {
-      "put": {
-        "tags": [
-          "teams"
-        ],
-        "summary": "Update Policy Override",
-        "description": "Update a policy override.\n\nRequires admin scope.",
-        "operationId": "update_policy_override_api_v1_teams_teams__team_id__policy_overrides__override_id__put",
-        "security": [
-          {
-            "APIKeyHeader": []
-          },
-          {
-            "HTTPBearer": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "team_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "uuid",
-              "title": "Team Id"
-            }
-          },
-          {
-            "name": "override_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "uuid",
-              "title": "Override Id"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/TeamPolicyOverrideUpdate"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/TeamPolicyOverrideResponse"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      },
-      "delete": {
-        "tags": [
-          "teams"
-        ],
-        "summary": "Delete Policy Override",
-        "description": "Delete a policy override.\n\nRequires admin scope.",
-        "operationId": "delete_policy_override_api_v1_teams_teams__team_id__policy_overrides__override_id__delete",
-        "security": [
-          {
-            "APIKeyHeader": []
-          },
-          {
-            "HTTPBearer": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "team_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "uuid",
-              "title": "Team Id"
-            }
-          },
-          {
-            "name": "override_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "uuid",
-              "title": "Override Id"
-            }
-          }
-        ],
-        "responses": {
-          "204": {
-            "description": "Successful Response"
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/v1/teams/teams/{team_id}/policy/queue-limits": {
-      "put": {
-        "tags": [
-          "teams"
-        ],
-        "summary": "Update Queue Limits",
-        "description": "Update or create queue limits for a team.\n\nRequires admin scope.",
-        "operationId": "update_queue_limits_api_v1_teams_teams__team_id__policy_queue_limits_put",
-        "security": [
-          {
-            "APIKeyHeader": []
-          },
-          {
-            "HTTPBearer": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "team_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "uuid",
-              "title": "Team Id"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/TeamQueueLimitsUpdate"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/TeamQueueLimitsResponse"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
     "/api/v1/teams/": {
       "get": {
         "tags": [
@@ -10127,13 +9357,11 @@
         "properties": {
           "platform": {
             "type": "string",
-            "title": "Platform",
-            "description": "Data platform (postgres, snowflake, dbt)"
+            "title": "Platform"
           },
           "name": {
             "type": "string",
-            "title": "Name",
-            "description": "Fully qualified name (db.schema.table)"
+            "title": "Name"
           },
           "datasource_id": {
             "anyOf": [
@@ -10144,8 +9372,7 @@
                 "type": "null"
               }
             ],
-            "title": "Datasource Id",
-            "description": "Optional datasource ID for disambiguation"
+            "title": "Datasource Id"
           }
         },
         "type": "object",
@@ -10382,7 +9609,7 @@
           "lineage": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/dataing__entrypoints__api__routes__bundles__LineageGraphResponse"
+                "$ref": "#/components/schemas/LineageGraphResponse"
               },
               {
                 "type": "null"
@@ -10465,7 +9692,7 @@
         "properties": {
           "assets": {
             "items": {
-              "$ref": "#/components/schemas/AssetRefRequest"
+              "$ref": "#/components/schemas/dataing__entrypoints__api__routes__bundles__AssetRefRequest"
             },
             "type": "array",
             "minItems": 1,
@@ -11621,7 +10848,7 @@
         "properties": {
           "assets": {
             "items": {
-              "$ref": "#/components/schemas/dataing__entrypoints__api__routes__runs__AssetRefRequest"
+              "$ref": "#/components/schemas/AssetRefRequest"
             },
             "type": "array",
             "title": "Assets"
@@ -12907,40 +12134,35 @@
       "LineageGraphResponse": {
         "properties": {
           "root": {
-            "type": "string",
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Root"
           },
           "datasets": {
             "additionalProperties": {
-              "$ref": "#/components/schemas/DatasetResponse"
+              "additionalProperties": true,
+              "type": "object"
             },
             "type": "object",
             "title": "Datasets"
           },
           "edges": {
             "items": {
-              "$ref": "#/components/schemas/LineageEdgeResponse"
+              "$ref": "#/components/schemas/LineageEdge"
             },
             "type": "array",
             "title": "Edges"
-          },
-          "jobs": {
-            "additionalProperties": {
-              "$ref": "#/components/schemas/JobResponse"
-            },
-            "type": "object",
-            "title": "Jobs"
           }
         },
         "type": "object",
-        "required": [
-          "root",
-          "datasets",
-          "edges",
-          "jobs"
-        ],
         "title": "LineageGraphResponse",
-        "description": "Response for a lineage graph."
+        "description": "Lineage graph response."
       },
       "LineageProviderResponse": {
         "properties": {
@@ -15472,22 +14694,7 @@
             "type": "boolean",
             "title": "Success"
           },
-          "message": {
-            "type": "string",
-            "title": "Message"
-          },
-          "latency_ms": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Latency Ms"
-          },
-          "server_version": {
+          "error": {
             "anyOf": [
               {
                 "type": "string"
@@ -15496,16 +14703,26 @@
                 "type": "null"
               }
             ],
-            "title": "Server Version"
+            "title": "Error"
+          },
+          "tables_accessible": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tables Accessible"
           }
         },
         "type": "object",
         "required": [
-          "success",
-          "message"
+          "success"
         ],
         "title": "TestConnectionResponse",
-        "description": "Response for testing a connection."
+        "description": "Response for testing credentials."
       },
       "TokenResponse": {
         "properties": {
@@ -16022,84 +15239,17 @@
         "title": "WeeklyUsageResponse",
         "description": "Weekly usage statistics response."
       },
-      "dataing__entrypoints__api__routes__bundles__LineageGraphResponse": {
-        "properties": {
-          "root": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Root"
-          },
-          "datasets": {
-            "additionalProperties": {
-              "additionalProperties": true,
-              "type": "object"
-            },
-            "type": "object",
-            "title": "Datasets"
-          },
-          "edges": {
-            "items": {
-              "$ref": "#/components/schemas/LineageEdge"
-            },
-            "type": "array",
-            "title": "Edges"
-          }
-        },
-        "type": "object",
-        "title": "LineageGraphResponse",
-        "description": "Lineage graph response."
-      },
-      "dataing__entrypoints__api__routes__credentials__TestConnectionResponse": {
-        "properties": {
-          "success": {
-            "type": "boolean",
-            "title": "Success"
-          },
-          "error": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Error"
-          },
-          "tables_accessible": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Tables Accessible"
-          }
-        },
-        "type": "object",
-        "required": [
-          "success"
-        ],
-        "title": "TestConnectionResponse",
-        "description": "Response for testing credentials."
-      },
-      "dataing__entrypoints__api__routes__runs__AssetRefRequest": {
+      "dataing__entrypoints__api__routes__bundles__AssetRefRequest": {
         "properties": {
           "platform": {
             "type": "string",
-            "title": "Platform"
+            "title": "Platform",
+            "description": "Data platform (postgres, snowflake, dbt)"
           },
           "name": {
             "type": "string",
-            "title": "Name"
+            "title": "Name",
+            "description": "Fully qualified name (db.schema.table)"
           },
           "datasource_id": {
             "anyOf": [
@@ -16110,7 +15260,8 @@
                 "type": "null"
               }
             ],
-            "title": "Datasource Id"
+            "title": "Datasource Id",
+            "description": "Optional datasource ID for disambiguation"
           }
         },
         "type": "object",
@@ -16120,6 +15271,85 @@
         ],
         "title": "AssetRefRequest",
         "description": "Asset reference in request."
+      },
+      "dataing__entrypoints__api__routes__datasources__TestConnectionResponse": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "title": "Success"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          },
+          "latency_ms": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Latency Ms"
+          },
+          "server_version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Server Version"
+          }
+        },
+        "type": "object",
+        "required": [
+          "success",
+          "message"
+        ],
+        "title": "TestConnectionResponse",
+        "description": "Response for testing a connection."
+      },
+      "dataing__entrypoints__api__routes__lineage__LineageGraphResponse": {
+        "properties": {
+          "root": {
+            "type": "string",
+            "title": "Root"
+          },
+          "datasets": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/DatasetResponse"
+            },
+            "type": "object",
+            "title": "Datasets"
+          },
+          "edges": {
+            "items": {
+              "$ref": "#/components/schemas/LineageEdgeResponse"
+            },
+            "type": "array",
+            "title": "Edges"
+          },
+          "jobs": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/JobResponse"
+            },
+            "type": "object",
+            "title": "Jobs"
+          }
+        },
+        "type": "object",
+        "required": [
+          "root",
+          "datasets",
+          "edges",
+          "jobs"
+        ],
+        "title": "LineageGraphResponse",
+        "description": "Response for a lineage graph."
       }
     },
     "securitySchemes": {

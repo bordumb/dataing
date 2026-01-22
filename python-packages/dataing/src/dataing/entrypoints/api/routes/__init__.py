@@ -73,10 +73,9 @@ api_router.include_router(knowledge_comments_router)
 api_router.include_router(comment_votes_router)
 api_router.include_router(sla_policies_router)  # SLA policy management
 api_router.include_router(integrations_router)  # Webhook integrations
-api_router.include_router(teams_router, prefix="/teams")
 
 # RBAC routes
-api_router.include_router(teams_router)
+api_router.include_router(teams_router)  # Teams + policies
 api_router.include_router(tags_router)
 api_router.include_router(permissions_router)
 api_router.include_router(investigation_tags_router)

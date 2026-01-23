@@ -1139,7 +1139,7 @@ async def spawn_investigation(
     # In a real implementation, this would call the InvestigationService
     investigation_row = await db.execute_returning(
         """
-        INSERT INTO investigations (tenant_id, alert, created_by_user_id)
+        INSERT INTO investigations (tenant_id, alert, created_by)
         VALUES ($1, $2, $3)
         RETURNING id
         """,

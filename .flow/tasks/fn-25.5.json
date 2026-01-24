@@ -1,0 +1,21 @@
+{
+  "assignee": "bordumbb@gmail.com",
+  "claim_note": "",
+  "claimed_at": "2026-01-22T21:15:04.127877Z",
+  "created_at": "2026-01-22T20:47:02.603484Z",
+  "depends_on": [],
+  "epic": "fn-25",
+  "evidence": {
+    "commits": [],
+    "prs": [],
+    "tests": [
+      "uv run pytest python-packages/dataing/tests/unit/adapters/queue/test_investigation_queue.py -v"
+    ]
+  },
+  "id": "fn-25.5",
+  "priority": null,
+  "spec_path": ".flow/tasks/fn-25.5.md",
+  "status": "done",
+  "title": "Stabilize queue worker and retry behavior",
+  "updated_at": "2026-01-22T21:39:46.388658Z"
+}

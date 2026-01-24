@@ -1,0 +1,23 @@
+{
+  "assignee": "bordumbb@gmail.com",
+  "claim_note": "",
+  "claimed_at": "2026-01-22T21:13:08.480999Z",
+  "created_at": "2026-01-22T20:47:00.095451Z",
+  "depends_on": [],
+  "epic": "fn-25",
+  "evidence": {
+    "commits": [
+      "0fddd909154ef1a751f1ecc5eb49bf39883af5dd"
+    ],
+    "prs": [],
+    "tests": [
+      "just test-frontend"
+    ]
+  },
+  "id": "fn-25.4",
+  "priority": null,
+  "spec_path": ".flow/tasks/fn-25.4.md",
+  "status": "done",
+  "title": "Improve recommendation capture and resolution signals",
+  "updated_at": "2026-01-22T21:14:46.425297Z"
+}

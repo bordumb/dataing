@@ -5,6 +5,8 @@ This module provides a queue for investigation jobs with:
 - Priority support
 - Retry handling with exponential backoff
 - Job status tracking
+- Duplicate processing prevention
+- Stale job recovery
 """
 
 from __future__ import annotations
@@ -12,7 +14,7 @@ from __future__ import annotations
 import json
 import time
 from dataclasses import dataclass, field
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from enum import Enum
 from typing import Any
 from uuid import UUID
@@ -21,6 +23,9 @@ import structlog
 from redis.asyncio import Redis
 
 logger = structlog.get_logger()
+
+# Default timeout for stale processing detection (5 minutes)
+DEFAULT_PROCESSING_TIMEOUT_SECONDS = 300
 
 
 class JobStatus(str, Enum):
@@ -95,6 +100,7 @@ class InvestigationQueueConfig:
     key_prefix: str = "dataing:investigation_queue"
     default_batch_size: int = 5
     max_retry_delay_seconds: int = 300  # 5 minutes max
+    processing_timeout_seconds: int = DEFAULT_PROCESSING_TIMEOUT_SECONDS
 
 
 class InvestigationQueue:
@@ -128,6 +134,14 @@ class InvestigationQueue:
     def _teams_set_key(self) -> str:
         """Get the key for tracking active teams."""
         return f"{self.config.key_prefix}:teams"
+
+    def _processing_key(self, job_id: str) -> str:
+        """Get the key for tracking when a job started processing."""
+        return f"{self.config.key_prefix}:processing:{job_id}"
+
+    def _processing_set_key(self) -> str:
+        """Get the key for the set of all jobs currently processing."""
+        return f"{self.config.key_prefix}:processing_jobs"
 
     async def enqueue(self, job: InvestigationJob) -> None:
         """Add an investigation job to the team's queue.
@@ -169,6 +183,7 @@ class InvestigationQueue:
         """Dequeue a batch of jobs for a team.
 
         Returns up to batch_size jobs, marking them as processing.
+        Uses atomic operations to prevent duplicate processing.
         """
         if batch_size is None:
             batch_size = self.config.default_batch_size
@@ -182,6 +197,22 @@ class InvestigationQueue:
         for job_id_bytes in job_ids:
             job_id = job_id_bytes.decode() if isinstance(job_id_bytes, bytes) else job_id_bytes
 
+            # Check if job is already being processed (duplicate prevention)
+            processing_key = self._processing_key(job_id)
+            existing_processing = await self.redis.get(processing_key)
+            if existing_processing:
+                logger.warning(
+                    "job_already_processing",
+                    job_id=job_id,
+                    team_id=str(team_id),
+                    started_at=existing_processing.decode()
+                    if isinstance(existing_processing, bytes)
+                    else existing_processing,
+                )
+                # Remove from queue but don't process (already being handled)
+                await self.redis.zrem(team_queue_key, job_id)
+                continue
+
             # Get job data
             job_key = self._job_key(job_id)
             job_json = await self.redis.get(job_key)
@@ -189,10 +220,22 @@ class InvestigationQueue:
             if not job_json:
                 # Job data missing, remove from queue
                 await self.redis.zrem(team_queue_key, job_id)
+                logger.warning("job_data_missing", job_id=job_id, team_id=str(team_id))
                 continue
 
             job_data = json.loads(job_json)
             job = InvestigationJob.from_dict(job_data)
+
+            # Set processing timestamp (for stale detection) with TTL
+            processing_started = datetime.now(UTC).isoformat()
+            await self.redis.set(
+                processing_key,
+                processing_started,
+                ex=self.config.processing_timeout_seconds * 2,  # TTL = 2x timeout
+            )
+
+            # Add to processing set for tracking
+            await self.redis.sadd(self._processing_set_key(), job_id)  # type: ignore[misc]
 
             # Mark as processing
             status_key = self._status_key(job_id)
@@ -203,9 +246,17 @@ class InvestigationQueue:
 
             jobs.append(job)
 
+            logger.debug(
+                "job_dequeued",
+                job_id=job_id,
+                team_id=str(team_id),
+                retry_count=job.retry_count,
+                max_retries=job.max_retries,
+            )
+
         if jobs:
             logger.debug(
-                "jobs_dequeued",
+                "jobs_dequeued_batch",
                 team_id=str(team_id),
                 count=len(jobs),
             )
@@ -216,19 +267,29 @@ class InvestigationQueue:
         """Mark a job as completed."""
         status_key = self._status_key(job_id)
         job_key = self._job_key(job_id)
+        processing_key = self._processing_key(job_id)
 
         await self.redis.set(status_key, JobStatus.COMPLETED.value)
+
+        # Clean up processing tracking
+        await self.redis.delete(processing_key)
+        await self.redis.srem(self._processing_set_key(), job_id)  # type: ignore[misc]
 
         # Clean up after a delay (optional: could keep for auditing)
         await self.redis.expire(job_key, 3600)  # 1 hour
         await self.redis.expire(status_key, 3600)
 
-        logger.debug("job_completed", job_id=job_id)
+        logger.info("job_completed", job_id=job_id)
 
     async def fail(self, job: InvestigationJob, error: str) -> None:
         """Mark a job as failed. Will retry if retries remain."""
         job_key = self._job_key(job.job_id)
         status_key = self._status_key(job.job_id)
+        processing_key = self._processing_key(job.job_id)
+
+        # Clean up processing tracking
+        await self.redis.delete(processing_key)
+        await self.redis.srem(self._processing_set_key(), job.job_id)  # type: ignore[misc]
 
         job.retry_count += 1
 
@@ -238,9 +299,7 @@ class InvestigationQueue:
                 2**job.retry_count,
                 self.config.max_retry_delay_seconds,
             )
-            job.next_retry_at = datetime.now(UTC).replace(microsecond=0) + __import__(
-                "datetime"
-            ).timedelta(seconds=delay)
+            job.next_retry_at = datetime.now(UTC).replace(microsecond=0) + timedelta(seconds=delay)
 
             # Update job data
             job_json = json.dumps(job.to_dict())
@@ -256,8 +315,15 @@ class InvestigationQueue:
             logger.info(
                 "job_scheduled_for_retry",
                 job_id=job.job_id,
+                team_id=str(job.team_id),
                 retry_count=job.retry_count,
+                max_retries=job.max_retries,
+                backoff_seconds=delay,
                 next_retry_at=job.next_retry_at.isoformat(),
+                retry_policy=(
+                    f"exponential backoff "
+                    f"(2^{job.retry_count}s, max {self.config.max_retry_delay_seconds}s)"
+                ),
                 error=error,
             )
         else:
@@ -269,7 +335,10 @@ class InvestigationQueue:
             logger.error(
                 "job_failed_permanently",
                 job_id=job.job_id,
+                team_id=str(job.team_id),
                 retry_count=job.retry_count,
+                max_retries=job.max_retries,
+                retry_policy=f"exhausted after {job.max_retries} retries with exponential backoff",
                 error=error,
             )
 
@@ -353,3 +422,92 @@ class InvestigationQueue:
                 await self.redis.srem(  # type: ignore[misc]
                     self._teams_set_key(), str(team_id)
                 )
+
+    async def recover_stale_jobs(self) -> list[InvestigationJob]:
+        """Recover jobs that have been stuck in PROCESSING status.
+
+        Jobs that have been processing longer than the configured timeout
+        are considered stale and will be re-queued for retry.
+
+        Returns:
+            List of jobs that were recovered.
+        """
+        processing_set_key = self._processing_set_key()
+        job_ids: set[Any] = await self.redis.smembers(processing_set_key)  # type: ignore[misc]
+
+        recovered: list[InvestigationJob] = []
+        now = datetime.now(UTC)
+        timeout = timedelta(seconds=self.config.processing_timeout_seconds)
+
+        for job_id_bytes in job_ids:
+            job_id = job_id_bytes.decode() if isinstance(job_id_bytes, bytes) else job_id_bytes
+
+            # Check processing timestamp
+            processing_key = self._processing_key(job_id)
+            started_at_str = await self.redis.get(processing_key)
+
+            if not started_at_str:
+                # Processing key expired or missing - clean up set
+                await self.redis.srem(processing_set_key, job_id)  # type: ignore[misc]
+                continue
+
+            started_at_decoded = (
+                started_at_str.decode() if isinstance(started_at_str, bytes) else started_at_str
+            )
+            started_at = datetime.fromisoformat(started_at_decoded)
+
+            if now - started_at < timeout:
+                # Not stale yet
+                continue
+
+            # Job is stale - get job data
+            job_key = self._job_key(job_id)
+            job_json = await self.redis.get(job_key)
+
+            if not job_json:
+                # Job data missing - clean up
+                await self.redis.delete(processing_key)
+                await self.redis.srem(processing_set_key, job_id)  # type: ignore[misc]
+                logger.warning("stale_job_data_missing", job_id=job_id)
+                continue
+
+            job_data = json.loads(job_json)
+            job = InvestigationJob.from_dict(job_data)
+
+            # Log stale job recovery with full context
+            logger.warning(
+                "stale_job_recovered",
+                job_id=job_id,
+                team_id=str(job.team_id),
+                started_at=started_at.isoformat(),
+                stale_duration_seconds=(now - started_at).total_seconds(),
+                processing_timeout_seconds=self.config.processing_timeout_seconds,
+                retry_count=job.retry_count,
+                max_retries=job.max_retries,
+            )
+
+            # Treat as a failure (will retry or mark failed)
+            await self.fail(job, "Job processing timed out (stale recovery)")
+            recovered.append(job)
+
+        if recovered:
+            logger.info(
+                "stale_jobs_recovered_batch",
+                count=len(recovered),
+                timeout_seconds=self.config.processing_timeout_seconds,
+            )
+
+        return recovered
+
+    async def get_job(self, job_id: str) -> InvestigationJob | None:
+        """Get a job by ID.
+
+        Returns:
+            The job if found, None otherwise.
+        """
+        job_key = self._job_key(job_id)
+        job_json = await self.redis.get(job_key)
+        if not job_json:
+            return None
+        job_data = json.loads(job_json)
+        return InvestigationJob.from_dict(job_data)

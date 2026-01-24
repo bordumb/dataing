@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import customInstance from './client'
 import { queryKeys } from './query-keys'
 
-export type TargetType = 'hypothesis' | 'query' | 'evidence' | 'synthesis' | 'investigation'
+export type TargetType = 'hypothesis' | 'query' | 'evidence' | 'synthesis' | 'investigation' | 'recommendation'
 
 export interface FeedbackCreate {
   target_type: TargetType

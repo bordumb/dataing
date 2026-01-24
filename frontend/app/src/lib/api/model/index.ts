@@ -205,6 +205,7 @@ export * from "./investigationListItem";
 export * from "./investigationResponse";
 export * from "./investigationRunCreate";
 export * from "./investigationRunCreateDatasetId";
+export * from "./investigationRunCreateDatasourceId";
 export * from "./investigationRunListResponse";
 export * from "./investigationRunResponse";
 export * from "./investigationRunResponseApprovalStatus";

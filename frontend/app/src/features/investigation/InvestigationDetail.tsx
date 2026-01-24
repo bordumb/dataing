@@ -25,6 +25,8 @@ import {
 } from 'lucide-react'
 
 import { StepTimeline, PatternList, EvidenceList } from './components'
+import { InvestigationFeedbackProvider } from './context/InvestigationFeedbackContext'
+import { InvestigationFeedbackButtons } from './components/InvestigationFeedbackButtons'
 
 function getStatusVariant(status: string) {
   switch (status) {
@@ -185,7 +187,7 @@ interface SynthesisData {
   affected_scope?: string
 }
 
-function SynthesisCard({ synthesis }: { synthesis: unknown }) {
+function SynthesisCard({ synthesis, investigationId }: { synthesis: unknown; investigationId: string }) {
   // Handle non-object synthesis
   if (typeof synthesis !== 'object' || synthesis === null) {
     return (
@@ -219,11 +221,17 @@ function SynthesisCard({ synthesis }: { synthesis: unknown }) {
             <p className="text-sm font-medium text-green-800 dark:text-green-200">
               Root Cause Analysis
             </p>
-            {confidence !== null && (
-              <Badge variant="outline" className="text-xs">
-                {Math.round(confidence * 100)}% confidence
-              </Badge>
-            )}
+            <div className="flex items-center gap-2">
+              {confidence !== null && (
+                <Badge variant="outline" className="text-xs">
+                  {Math.round(confidence * 100)}% confidence
+                </Badge>
+              )}
+              <InvestigationFeedbackButtons
+                targetType="synthesis"
+                targetId={investigationId}
+              />
+            </div>
           </div>
           <p className="text-sm text-green-700 dark:text-green-300 leading-relaxed">
             {hasRootCause ? syn.root_cause : syn.summary}
@@ -238,11 +246,17 @@ function SynthesisCard({ synthesis }: { synthesis: unknown }) {
             <p className="text-sm font-medium text-yellow-800 dark:text-yellow-200">
               Analysis Complete
             </p>
-            {confidence !== null && (
-              <Badge variant="outline" className="text-xs">
-                {Math.round(confidence * 100)}% confidence
-              </Badge>
-            )}
+            <div className="flex items-center gap-2">
+              {confidence !== null && (
+                <Badge variant="outline" className="text-xs">
+                  {Math.round(confidence * 100)}% confidence
+                </Badge>
+              )}
+              <InvestigationFeedbackButtons
+                targetType="synthesis"
+                targetId={investigationId}
+              />
+            </div>
           </div>
           <p className="text-sm text-yellow-700 dark:text-yellow-300">
             Unable to determine a definitive root cause. See supporting evidence and recommendations below.
@@ -301,11 +315,17 @@ function SynthesisCard({ synthesis }: { synthesis: unknown }) {
           <p className="text-sm font-medium text-blue-800 dark:text-blue-200 mb-3">
             Recommendations
           </p>
-          <ul className="space-y-2">
+          <ul className="space-y-3">
             {syn.recommendations!.map((rec, i) => (
-              <li key={i} className="flex gap-2 text-sm text-blue-700 dark:text-blue-300">
-                <span className="shrink-0">•</span>
-                <span>{rec}</span>
+              <li key={i} className="flex items-start justify-between gap-2">
+                <div className="flex gap-2 text-sm text-blue-700 dark:text-blue-300">
+                  <span className="shrink-0">•</span>
+                  <span>{rec}</span>
+                </div>
+                <InvestigationFeedbackButtons
+                  targetType="recommendation"
+                  targetId={`${investigationId}-rec-${i}`}
+                />
               </li>
             ))}
           </ul>
@@ -483,6 +503,7 @@ export function InvestigationDetail() {
     : data.main_branch.current_step
 
   return (
+    <InvestigationFeedbackProvider investigationId={id}>
     <div className="h-[calc(100vh-8rem)] flex flex-col gap-4">
       {/* Header */}
       <div className="flex items-center justify-between shrink-0">
@@ -585,7 +606,7 @@ export function InvestigationDetail() {
 
             {/* Synthesis */}
             {data.main_branch.synthesis && (
-              <SynthesisCard synthesis={data.main_branch.synthesis} />
+              <SynthesisCard synthesis={data.main_branch.synthesis} investigationId={id} />
             )}
 
             {/* Evidence - formatted nicely */}
@@ -620,5 +641,6 @@ export function InvestigationDetail() {
         </Card>
       </div>
     </div>
+    </InvestigationFeedbackProvider>
   )
 }

@@ -36,6 +36,8 @@ from dataing.services.usage import UsageTracker
 if TYPE_CHECKING:
     from fastapi import FastAPI
 
+    from dataing.services.investigation import InvestigationStarterService
+
 logger = logging.getLogger(__name__)
 
 
@@ -746,3 +748,25 @@ def get_usage_tracker(request: Request) -> UsageTracker:
     """
     tracker: UsageTracker = request.app.state.usage_tracker
     return tracker
+
+
+def get_investigation_starter(request: Request) -> InvestigationStarterService:
+    """Get investigation starter service from app state.
+
+    This service provides a centralized way to start Temporal investigations,
+    ensuring consistent behavior across all entry points.
+
+    Args:
+        request: The current request.
+
+    Returns:
+        An InvestigationStarterService configured with db and temporal client.
+    """
+    from dataing.services.investigation import InvestigationStarterService
+    from dataing.temporal.client import TemporalInvestigationClient
+
+    app_db: AppDatabase = request.app.state.app_db
+    temporal_client: TemporalInvestigationClient | None = getattr(
+        request.app.state, "temporal_client", None
+    )
+    return InvestigationStarterService(db=app_db, temporal_client=temporal_client)

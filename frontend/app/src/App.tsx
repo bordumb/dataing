@@ -17,6 +17,7 @@ import { DashboardPage } from '@/features/dashboard/dashboard-page'
 import { InvestigationList } from '@/features/investigation/InvestigationList'
 import { InvestigationDetail } from '@/features/investigation/InvestigationDetail'
 import { NewInvestigation } from '@/features/investigation/NewInvestigation'
+import { ContextReviewPage } from '@/features/investigation/ContextReviewPage'
 import { DataSourcePage } from '@/features/datasources/datasource-page'
 import { DatasetListPage, DatasetDetailPage } from '@/features/datasets'
 import { SettingsPage } from '@/features/settings/settings-page'
@@ -139,6 +140,14 @@ function AppWithEntitlements() {
                     element={
                       <FeatureErrorBoundary feature="investigation details">
                         <InvestigationDetail />
+                      </FeatureErrorBoundary>
+                    }
+                  />
+                  <Route
+                    path="approvals/:approvalId"
+                    element={
+                      <FeatureErrorBoundary feature="context review">
+                        <ContextReviewPage />
                       </FeatureErrorBoundary>
                     }
                   />

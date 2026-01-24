@@ -28,8 +28,10 @@ DbDep = Annotated[AppDatabase, Depends(get_app_db)]
 class FeedbackCreate(BaseModel):
     """Request body for submitting feedback."""
 
-    target_type: Literal["hypothesis", "query", "evidence", "synthesis", "investigation"]
-    target_id: UUID
+    target_type: Literal[
+        "hypothesis", "query", "evidence", "synthesis", "investigation", "recommendation"
+    ]
+    target_id: str  # Can be UUID or composite ID like "{investigation_id}-rec-{index}"
     investigation_id: UUID
     rating: Literal[1, -1]
     reason: str | None = None
@@ -50,6 +52,7 @@ TARGET_TYPE_TO_EVENT = {
     "evidence": EventType.FEEDBACK_EVIDENCE,
     "synthesis": EventType.FEEDBACK_SYNTHESIS,
     "investigation": EventType.FEEDBACK_INVESTIGATION,
+    "recommendation": EventType.FEEDBACK_RECOMMENDATION,
 }
 
 
@@ -67,7 +70,7 @@ async def submit_feedback(
         tenant_id=auth.tenant_id,
         event_type=event_type,
         event_data={
-            "target_id": str(body.target_id),
+            "target_id": body.target_id,
             "rating": body.rating,
             "reason": body.reason,
             "comment": body.comment,
@@ -85,7 +88,7 @@ class FeedbackItem(BaseModel):
 
     id: UUID
     target_type: str
-    target_id: UUID
+    target_id: str  # Can be UUID or composite ID
     rating: int
     reason: str | None
     comment: str | None
@@ -133,7 +136,7 @@ async def get_investigation_feedback(
             FeedbackItem(
                 id=e["id"],
                 target_type=e["event_type"].replace("feedback.", ""),
-                target_id=UUID(str(event_data["target_id"])),
+                target_id=str(event_data["target_id"]),
                 rating=event_data["rating"],
                 reason=event_data.get("reason"),
                 comment=event_data.get("comment"),

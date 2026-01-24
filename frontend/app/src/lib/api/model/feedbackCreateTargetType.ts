@@ -16,4 +16,5 @@ export const FeedbackCreateTargetType = {
   evidence: "evidence",
   synthesis: "synthesis",
   investigation: "investigation",
+  recommendation: "recommendation",
 } as const;

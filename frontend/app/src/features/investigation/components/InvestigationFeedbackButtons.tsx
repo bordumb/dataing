@@ -28,6 +28,10 @@ const REASON_OPTIONS: Record<TargetType, { positive: string[]; negative: string[
     positive: ['Saved time', 'Found the issue'],
     negative: ['No value', 'Wrong conclusion'],
   },
+  recommendation: {
+    positive: ['Will implement', 'Good advice'],
+    negative: ['Not applicable', 'Already done'],
+  },
 }
 
 interface InvestigationFeedbackButtonsProps {

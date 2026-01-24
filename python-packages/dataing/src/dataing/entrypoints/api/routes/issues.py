@@ -20,9 +20,14 @@ from sse_starlette.sse import EventSourceResponse
 
 from dataing.adapters.db.app_db import AppDatabase
 from dataing.core.json_utils import to_json_string
-from dataing.entrypoints.api.deps import get_app_db
+from dataing.entrypoints.api.deps import (
+    get_app_db,
+    get_investigation_starter,
+    resolve_datasource_id,
+)
 from dataing.entrypoints.api.middleware.auth import ApiKeyContext, verify_api_key
 from dataing.models.issue import IssueStatus
+from dataing.services.investigation import InvestigationStarterService
 
 logger = logging.getLogger(__name__)
 
@@ -31,6 +36,7 @@ router = APIRouter(prefix="/issues", tags=["issues"])
 # Annotated types for dependency injection
 AuthDep = Annotated[ApiKeyContext, Depends(verify_api_key)]
 AppDbDep = Annotated[AppDatabase, Depends(get_app_db)]
+InvestigationStarterDep = Annotated[InvestigationStarterService, Depends(get_investigation_starter)]
 
 
 # ============================================================================
@@ -1004,6 +1010,7 @@ class InvestigationRunCreate(BaseModel):
 
     focus_prompt: str = Field(..., min_length=1)
     dataset_id: str | None = None  # Inherits from issue if not provided
+    datasource_id: UUID | None = None  # Uses tenant default if not provided
     execution_profile: str = Field(
         default="standard",
         pattern="^(safe|standard|deep)$",
@@ -1088,8 +1095,10 @@ async def list_investigation_runs(
 )
 async def spawn_investigation(
     issue_id: UUID,
+    http_request: Request,
     auth: AuthDep,
     db: AppDbDep,
+    investigation_starter: InvestigationStarterDep,
     body: InvestigationRunCreate,
 ) -> InvestigationRunResponse:
     """Spawn an investigation from an issue.
@@ -1103,7 +1112,7 @@ async def spawn_investigation(
     # Verify issue exists and get its data
     issue = await db.fetch_one(
         """
-        SELECT id, tenant_id, dataset_id
+        SELECT id, tenant_id, dataset_id, title, description
         FROM issues
         WHERE id = $1 AND tenant_id = $2
         """,
@@ -1129,29 +1138,58 @@ async def spawn_investigation(
             detail="dataset_id required - not set on issue and not provided in request",
         )
 
+    # Resolve datasource_id (use provided or get default)
+    try:
+        datasource_id = await resolve_datasource_id(
+            http_request, auth.tenant_id, explicit_id=body.datasource_id
+        )
+    except ValueError as e:
+        error_msg = str(e)
+        if error_msg.startswith("ambiguous_datasource:"):
+            raise HTTPException(
+                status_code=409,
+                detail={
+                    "error": "ambiguous_datasource",
+                    "message": "Multiple datasources match. Please specify which to use.",
+                    "hint": "Specify datasource_id in the request body.",
+                },
+            ) from e
+        raise HTTPException(status_code=400, detail=error_msg) from e
+
     # Determine approval_status based on execution_profile
     # Deep profile may require approval - for now we approve immediately
     approval_status = None
     if body.execution_profile == "deep":
         approval_status = "approved"  # Could be "queued" based on tenant settings
 
-    # Create a placeholder investigation record
-    # In a real implementation, this would call the InvestigationService
-    investigation_row = await db.execute_returning(
-        """
-        INSERT INTO investigations (tenant_id, alert, created_by_user_id)
-        VALUES ($1, $2, $3)
-        RETURNING id
-        """,
-        auth.tenant_id,
-        '{"dataset_id": "' + dataset_id + '", "source": "issue_spawn"}',
-        auth.user_id,
+    # Build alert data and summary from issue
+    alert_data = {
+        "dataset_id": dataset_id,
+        "source": "issue_spawn",
+        "issue_id": str(issue_id),
+        "focus_prompt": body.focus_prompt,
+    }
+    alert_summary = (
+        f"Investigation spawned from issue: {issue.get('title', 'Untitled')}. "
+        f"Dataset: {dataset_id}. "
+        f"Focus: {body.focus_prompt or 'General investigation'}."
     )
 
-    if not investigation_row:
-        raise HTTPException(status_code=500, detail="Failed to create investigation")
-
-    investigation_id = investigation_row["id"]
+    # Start the investigation using the centralized service
+    try:
+        result = await investigation_starter.start_investigation(
+            tenant_id=auth.tenant_id,
+            datasource_id=datasource_id,
+            alert_data=alert_data,
+            alert_summary=alert_summary,
+            created_by=auth.user_id,
+        )
+        investigation_id = result.investigation_id
+    except RuntimeError as e:
+        raise HTTPException(status_code=503, detail=str(e)) from e
+    except Exception as e:
+        logger.error(f"Failed to start investigation: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to start investigation: {e}") from e
 
     # Create the issue_investigation_run record
     trigger_ref = {"user_id": str(auth.user_id), "dataset_id": dataset_id}

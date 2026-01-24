@@ -111,12 +111,18 @@ class InvestigationWorker:
             await asyncio.sleep(self.config.poll_interval_seconds)
 
     async def _retry_loop(self) -> None:
-        """Loop that re-queues jobs ready for retry."""
+        """Loop that re-queues jobs ready for retry and recovers stale jobs."""
         while self._running:
             try:
-                jobs = await self.queue.process_retries()
-                if jobs:
-                    logger.debug("retries_processed", count=len(jobs))
+                # Process jobs ready for retry
+                retry_jobs = await self.queue.process_retries()
+                if retry_jobs:
+                    logger.debug("retries_processed", count=len(retry_jobs))
+
+                # Recover stale jobs (stuck in PROCESSING too long)
+                stale_jobs = await self.queue.recover_stale_jobs()
+                if stale_jobs:
+                    logger.info("stale_jobs_recovered", count=len(stale_jobs))
             except Exception as e:
                 logger.error("retry_loop_error", error=str(e))
 

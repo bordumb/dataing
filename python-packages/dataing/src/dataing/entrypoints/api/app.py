@@ -1,7 +1,8 @@
 """FastAPI application factory - Community Edition.
 
 This module provides a factory function to create the FastAPI app.
-Enterprise Edition extends this by calling create_app() and adding EE routes/middleware.
+Enterprise Edition extends this by calling create_app() and
+adding EE routes/middleware (auth, etc.).
 """
 
 from __future__ import annotations

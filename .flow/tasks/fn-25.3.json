@@ -1,0 +1,23 @@
+{
+  "assignee": "bordumbb@gmail.com",
+  "claim_note": "",
+  "claimed_at": "2026-01-22T21:11:16.106895Z",
+  "created_at": "2026-01-22T20:46:58.017553Z",
+  "depends_on": [],
+  "epic": "fn-25",
+  "evidence": {
+    "commits": [
+      "76f8e1257482858d0f47f79fc211a541b14c400b"
+    ],
+    "prs": [],
+    "tests": [
+      "just test-frontend"
+    ]
+  },
+  "id": "fn-25.3",
+  "priority": null,
+  "spec_path": ".flow/tasks/fn-25.3.md",
+  "status": "done",
+  "title": "Promote investigation summary on issue workspace",
+  "updated_at": "2026-01-22T21:12:47.510403Z"
+}

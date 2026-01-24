@@ -6,12 +6,14 @@
  * OpenAPI spec version: 2.0.0
  */
 import type { InvestigationRunCreateDatasetId } from "./investigationRunCreateDatasetId";
+import type { InvestigationRunCreateDatasourceId } from "./investigationRunCreateDatasourceId";
 
 /**
  * Request body for spawning an investigation from an issue.
  */
 export interface InvestigationRunCreate {
   dataset_id?: InvestigationRunCreateDatasetId;
+  datasource_id?: InvestigationRunCreateDatasourceId;
   /** @pattern ^(safe|standard|deep)$ */
   execution_profile?: string;
   /** @minLength 1 */

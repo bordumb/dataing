@@ -23,9 +23,11 @@ logger = logging.getLogger(__name__)
 # Constants
 ENV_API_KEY = "DATAING_API_KEY"  # pragma: allowlist secret
 ENV_BASE_URL = "DATAING_BASE_URL"
+ENV_FRONTEND_URL = "DATAING_FRONTEND_URL"
 KEYRING_SERVICE = "dataing-cli"
 KEYRING_USERNAME = "api_key"
 DEFAULT_BASE_URL = "http://localhost:8000"
+DEFAULT_FRONTEND_URL = "http://localhost:3000"
 
 
 class ConfigError(Exception):
@@ -227,6 +229,17 @@ def get_base_url(from_flag: str | None = None) -> str:
     if env_url := os.environ.get(ENV_BASE_URL):
         return env_url
     return load_config().get("api_url", DEFAULT_BASE_URL)
+
+
+def get_frontend_url() -> str:
+    """Get frontend URL with precedence: env > config > default.
+
+    Returns:
+        Frontend URL for the Dataing web app.
+    """
+    if env_url := os.environ.get(ENV_FRONTEND_URL):
+        return env_url
+    return load_config().get("frontend_url", DEFAULT_FRONTEND_URL)
 
 
 def get_client(

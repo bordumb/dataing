@@ -10,7 +10,7 @@ from rich.console import Console
 from rich.live import Live
 from rich.panel import Panel
 
-from dataing_cli.config import get_client, load_config
+from dataing_cli.config import get_client, get_frontend_url, load_config
 from dataing_cli.display import format_completion, format_event
 from dataing_cli.errors import cli_error_handler
 
@@ -62,7 +62,10 @@ def start_run(
     with console.status("[bold blue]Starting investigation..."):
         run = client.run(assets=[asset], goal=goal)
 
+    frontend_url = get_frontend_url()
+    inv_url = f"{frontend_url}/investigations/{run.run_id}"
     console.print(f"[green]+[/green] Started run: [cyan]{run.run_id}[/cyan]")
+    console.print(f"[green]+[/green] View at: [link={inv_url}]{inv_url}[/link]")
 
     if state and state.json_output:
         console.print(json.dumps(run.model_dump(), indent=2, default=str))

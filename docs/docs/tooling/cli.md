@@ -53,7 +53,7 @@ dataing ds attach <datasource-id>
 ### 4. Run an Investigation
 
 ```bash
-dataing run start analytics.orders --goal "investigate null spike in customer_id"
+dataing run start main.orders --goal "investigate null spike in customer_id"
 ```
 
 ---

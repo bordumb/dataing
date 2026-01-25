@@ -468,6 +468,10 @@ demo: demo-fixtures
     echo "    Password: demo123456"
     echo ""
     echo "  API Key: dd_demo_12345"
+    echo ""
+    echo "  CLI usage (in another terminal):"
+    echo "    dataing ds list"
+    echo "    dataing run start <table> --goal \"...\""
     echo "========================================="
     echo ""
 
@@ -502,7 +506,7 @@ demo: demo-fixtures
     (uv run python -m dataing.entrypoints.temporal_worker) &
     WORKER_PID=$!
 
-    # Wait for backend to be ready, then sync datasets
+    # Wait for backend to be ready, then sync datasets and configure CLI
     (
         echo "Waiting for backend to be ready..."
         for i in {1..30}; do
@@ -512,6 +516,17 @@ demo: demo-fixtures
                     -H "X-API-Key: dd_demo_12345" > /dev/null 2>&1 && \
                     echo "Datasets synced successfully" || \
                     echo "Dataset sync failed (non-critical)"
+
+                # Auto-configure CLI for demo
+                echo "Configuring CLI for demo..."
+                mkdir -p ~/.config/dataing
+                {
+                    echo 'api_url = "http://localhost:8000"'
+                    echo 'api_key = "dd_demo_12345"'  # pragma: allowlist secret
+                    echo 'default_datasource_id = "00000000-0000-0000-0000-000000000003"'
+                    echo 'default_datasource_name = "demo-duckdb"'
+                } > ~/.config/dataing/config.toml
+                echo "CLI configured! Run 'dataing ds list' in another terminal."
                 break
             fi
             sleep 1

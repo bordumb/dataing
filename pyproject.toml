@@ -60,8 +60,9 @@ demo = [
     "pyarrow>=15.0.0",
     "duckdb>=0.9.0",
     "jupyterlab>=4.0.0",
-    # SDK and notebook packages for demo/testing
+    # SDK, CLI, and notebook packages for demo/testing
     "dataing-sdk",
+    "dataing-cli",
     "dataing-notebook[server,keyring]",
     "jupyterlab-dataing",
 ]
@@ -155,5 +156,6 @@ dev = [
 
 [tool.uv.sources]
 dataing-sdk = { path = "python-packages/dataing-sdk", editable = true }
+dataing-cli = { path = "python-packages/dataing-cli", editable = true }
 dataing-notebook = { path = "python-packages/dataing-notebook", editable = true }
 jupyterlab-dataing = { path = "frontend/jupyterlab-dataing", editable = true }

@@ -352,3 +352,143 @@ class TestGetDefaultDescription:
         assert (
             _get_default_description(payload, IntegrationProvider.CUSTOM) == "Generic description"
         )
+
+
+class TestAdapterDelegation:
+    """Test that adapter classes are used for MC and GX providers."""
+
+    def test_get_adapter_monte_carlo(self) -> None:
+        """Test that get_adapter returns MonteCarloAdapter for monte_carlo provider."""
+        from dataing_ee.adapters.integrations.registry import get_adapter
+
+        adapter = get_adapter("monte_carlo")
+        assert adapter is not None
+        assert adapter.provider == "monte_carlo"
+        assert adapter.signature_header == "X-MC-Signature"
+
+    def test_get_adapter_great_expectations(self) -> None:
+        """Test that get_adapter returns GreatExpectationsAdapter for GX provider."""
+        from dataing_ee.adapters.integrations.registry import get_adapter
+
+        adapter = get_adapter("great_expectations")
+        assert adapter is not None
+        assert adapter.provider == "great_expectations"
+        assert adapter.signature_header == "X-GE-Signature"
+
+    def test_get_adapter_fallback_for_jira(self) -> None:
+        """Test that get_adapter returns JiraAdapter for jira provider."""
+        from dataing_ee.adapters.integrations.registry import get_adapter
+
+        adapter = get_adapter("jira")
+        assert adapter is not None
+        assert adapter.provider == "jira"
+
+    def test_monte_carlo_adapter_verify_signature(self) -> None:
+        """Test Monte Carlo adapter signature verification."""
+        from dataing_ee.adapters.integrations.base import WebhookRequest
+        from dataing_ee.adapters.integrations.registry import get_adapter
+
+        adapter = get_adapter("monte_carlo")
+        assert adapter is not None
+
+        secret = "test_secret"
+        body = b'{"incident": {"id": "123"}}'
+        signature = hmac.new(secret.encode(), body, hashlib.sha256).hexdigest()
+
+        request = WebhookRequest(
+            body=body,
+            headers={"X-MC-Signature": signature},
+            query_params={},
+        )
+        assert adapter.verify_signature(request, secret) is True
+
+    def test_monte_carlo_adapter_parse_payload(self) -> None:
+        """Test Monte Carlo adapter payload parsing."""
+        import json
+
+        from dataing_ee.adapters.integrations.base import WebhookRequest
+        from dataing_ee.adapters.integrations.registry import get_adapter
+
+        adapter = get_adapter("monte_carlo")
+        assert adapter is not None
+
+        payload = {
+            "incident": {
+                "id": "inc-123",
+                "title": "Data freshness issue",
+                "severity": "high",
+                "tables": [{"full_table_id": "db.schema.table"}],
+            }
+        }
+        body = json.dumps(payload).encode()
+
+        request = WebhookRequest(
+            body=body,
+            headers={},
+            query_params={},
+        )
+        issue_data = adapter.parse_payload(request)
+        assert issue_data.title == "Data freshness issue"
+        assert issue_data.severity == "high"
+        assert "monte-carlo" in issue_data.labels
+
+    def test_monte_carlo_adapter_get_fingerprint(self) -> None:
+        """Test Monte Carlo adapter fingerprint generation."""
+        import json
+
+        from dataing_ee.adapters.integrations.base import WebhookRequest
+        from dataing_ee.adapters.integrations.registry import get_adapter
+
+        adapter = get_adapter("monte_carlo")
+        assert adapter is not None
+
+        payload = {"incident": {"id": "inc-456"}}
+        body = json.dumps(payload).encode()
+
+        request = WebhookRequest(
+            body=body,
+            headers={},
+            query_params={},
+        )
+        fingerprint = adapter.get_fingerprint(request)
+        assert fingerprint == "mc_incident_inc-456"
+
+    def test_great_expectations_adapter_should_process_failure(self) -> None:
+        """Test GX adapter processes failed validations."""
+        import json
+
+        from dataing_ee.adapters.integrations.base import WebhookRequest
+        from dataing_ee.adapters.integrations.registry import get_adapter
+
+        adapter = get_adapter("great_expectations")
+        assert adapter is not None
+
+        payload = {"result": {"success": False, "statistics": {"success_percent": 50}}}
+        body = json.dumps(payload).encode()
+
+        request = WebhookRequest(
+            body=body,
+            headers={},
+            query_params={},
+        )
+        assert adapter.should_process(request) is True
+
+    def test_great_expectations_adapter_skips_success(self) -> None:
+        """Test GX adapter skips successful validations."""
+        import json
+
+        from dataing_ee.adapters.integrations.base import WebhookRequest
+        from dataing_ee.adapters.integrations.registry import get_adapter
+
+        adapter = get_adapter("great_expectations")
+        assert adapter is not None
+
+        payload = {"result": {"success": True}}
+        body = json.dumps(payload).encode()
+
+        request = WebhookRequest(
+            body=body,
+            headers={},
+            query_params={},
+        )
+        assert adapter.should_process(request) is False

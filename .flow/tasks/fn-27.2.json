@@ -1,0 +1,14 @@
+{
+  "assignee": null,
+  "claim_note": "",
+  "claimed_at": null,
+  "created_at": "2026-01-25T03:43:01.178472Z",
+  "depends_on": [],
+  "epic": "fn-27",
+  "id": "fn-27.2",
+  "priority": null,
+  "spec_path": ".flow/tasks/fn-27.2.md",
+  "status": "todo",
+  "title": "Add to_anomaly_alert conversion to IntegrationAdapter",
+  "updated_at": "2026-01-25T03:43:59.618263Z"
+}

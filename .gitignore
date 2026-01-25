@@ -193,3 +193,5 @@ pr_changes.txt
 .env*.local
 docs/site/
 .worktrees/
+
+dataing_all_code.txt

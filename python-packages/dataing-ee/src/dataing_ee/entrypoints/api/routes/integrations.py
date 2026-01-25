@@ -21,6 +21,8 @@ from dataing.adapters.db.app_db import AppDatabase
 from dataing.core.json_utils import to_json_string
 from dataing.entrypoints.api.deps import get_app_db
 from dataing.entrypoints.api.middleware.auth import ApiKeyContext, require_scope, verify_api_key
+from dataing_ee.adapters.integrations.base import WebhookRequest
+from dataing_ee.adapters.integrations.registry import get_adapter
 from dataing_ee.models.integration import IntegrationEventStatus, IntegrationProvider
 
 logger = logging.getLogger(__name__)
@@ -454,6 +456,7 @@ async def receive_provider_webhook(
     """Receive a webhook from an integration provider.
 
     The webhook is verified using the provider-specific signature scheme.
+    Uses adapter classes for MC/GX when available, falls back to inline logic otherwise.
     Idempotency is enforced via the integration_events table.
     """
     if provider not in IntegrationProvider.all():
@@ -488,20 +491,51 @@ async def receive_provider_webhook(
     # Read body
     body = await request.body()
 
-    # Get signature header
-    sig_header_name = _get_signature_header_name(provider)
-    signature = request.headers.get(sig_header_name)
+    # Try to get adapter for this provider
+    adapter = get_adapter(provider)
+
+    # Build WebhookRequest for adapter if available
+    webhook_request: WebhookRequest | None = None
+    if adapter:
+        webhook_request = WebhookRequest(
+            body=body,
+            headers=dict(request.headers),
+            query_params=dict(request.query_params),
+        )
+
+        # Check if adapter wants to process this event
+        if not adapter.should_process(webhook_request):
+            logger.info(
+                f"Webhook skipped by adapter: integration={integration_id}, provider={provider}"
+            )
+            return {"status": "skipped", "reason": "filtered_by_adapter"}
 
     # Verify signature
     if integration["signing_secret"]:
-        if not _verify_provider_signature(body, signature, integration["signing_secret"], provider):
-            logger.warning(
-                f"Webhook signature invalid: integration={integration_id}, provider={provider}"
-            )
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Invalid webhook signature",
-            )
+        if adapter and webhook_request:
+            # Use adapter for signature verification
+            if not adapter.verify_signature(webhook_request, integration["signing_secret"]):
+                logger.warning(
+                    f"Webhook signature invalid: integration={integration_id}, provider={provider}"
+                )
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="Invalid webhook signature",
+                )
+        else:
+            # Fallback to inline verification
+            sig_header_name = _get_signature_header_name(provider)
+            signature = request.headers.get(sig_header_name)
+            if not _verify_provider_signature(
+                body, signature, integration["signing_secret"], provider
+            ):
+                logger.warning(
+                    f"Webhook signature invalid: integration={integration_id}, provider={provider}"
+                )
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="Invalid webhook signature",
+                )
 
     # Parse payload and compute idempotency key
     import json
@@ -514,10 +548,16 @@ async def receive_provider_webhook(
             detail=f"Invalid JSON: {e}",
         ) from e
 
-    # Extract idempotency key (provider-specific)
-    idempotency_key = _extract_idempotency_key(payload, provider, request)
+    # Extract idempotency key and event type (provider-specific)
+    if adapter and webhook_request:
+        # Use adapter for fingerprinting and event type
+        idempotency_key = adapter.get_fingerprint(webhook_request)
+        event_type = adapter.get_event_type(webhook_request)
+    else:
+        # Fallback to inline extraction
+        idempotency_key = _extract_idempotency_key(payload, provider, request)
+        event_type = _extract_event_type(payload, provider)
     payload_hash = hashlib.sha256(body).hexdigest()
-    event_type = _extract_event_type(payload, provider)
 
     # Check for existing event (idempotency)
     existing_event = await db.fetch_one(
@@ -569,9 +609,26 @@ async def receive_provider_webhook(
         """,
         integration_id,
     )
+    mappings_list = [dict(m) for m in mappings]
 
-    # Map payload to issue fields
-    issue_data = _map_payload_to_issue(payload, mappings, provider)
+    # Map payload to issue fields using adapter or fallback
+    if adapter and webhook_request:
+        # Use adapter for payload parsing - returns IssueData dataclass
+        issue_data_obj = adapter.parse_payload(webhook_request, mappings_list)
+        # Convert IssueData to dict for consistent access
+        issue_data: dict[str, Any] = {
+            "title": issue_data_obj.title,
+            "description": issue_data_obj.description,
+            "severity": issue_data_obj.severity,
+            "priority": issue_data_obj.priority,
+            "dataset_id": issue_data_obj.dataset_id,
+            "labels": issue_data_obj.labels,
+            "external_url": issue_data_obj.external_url,
+            "metadata": issue_data_obj.metadata,
+        }
+    else:
+        # Fallback to inline parsing
+        issue_data = _map_payload_to_issue(payload, mappings_list, provider)
 
     if not issue_data.get("title"):
         # Mark as skipped - no title means we can't create an issue

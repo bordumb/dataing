@@ -1,0 +1,17 @@
+{
+  "assignee": null,
+  "claim_note": "",
+  "claimed_at": null,
+  "created_at": "2026-01-25T00:57:43.029246Z",
+  "depends_on": [
+    "fn-26.2",
+    "fn-26.3"
+  ],
+  "epic": "fn-26",
+  "id": "fn-26.4",
+  "priority": null,
+  "spec_path": ".flow/tasks/fn-26.4.md",
+  "status": "todo",
+  "title": "Regenerate locks and sync environment",
+  "updated_at": "2026-01-25T00:58:34.695716Z"
+}

@@ -35,6 +35,7 @@ dataing init
 ```
 
 You'll be prompted for:
+
 - **Backend URL**: The Dataing API endpoint (default: `http://localhost:8000`)
 - **API Key**: Your authentication key (stored securely in OS keychain)
 
@@ -381,6 +382,7 @@ Run `dataing init` to configure your API key, or set `DATAING_API_KEY` environme
 ### "No datasource specified"
 
 Either:
+
 - Provide `--datasource` flag: `dataing run start table --goal "..." --datasource ds-123`
 - Set a default: `dataing ds attach ds-123`
 

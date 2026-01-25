@@ -890,11 +890,13 @@ class Datasource(BaseModel):
 
     id: str = Field(..., description="Unique datasource identifier")
     name: str = Field(..., description="Human-readable datasource name")
-    source_type: str = Field(..., description="Type of datasource")
+    source_type: str = Field(..., alias="type", description="Type of datasource")
     status: str | None = Field(
         default=None,
         description="Connection status (connected, disconnected, error)",
     )
+
+    model_config = {"populate_by_name": True}
 
 
 class ConnectionTestResult(BaseModel):
@@ -925,8 +927,11 @@ class ConnectionTestResult(BaseModel):
     )
     error: str | None = Field(
         default=None,
+        alias="message",
         description="Error message if connection failed",
     )
+
+    model_config = {"populate_by_name": True}
 
 
 class ColumnSchema(BaseModel):

@@ -1118,7 +1118,9 @@ class DataingClient:
         from .types import Datasource
 
         response = self._request("GET", "/api/v1/datasources")
-        items = response.json().get("items", [])
+        data = response.json()
+        # Backend returns "data_sources" key
+        items = data.get("data_sources", data.get("items", []))
         return [Datasource.model_validate(ds) for ds in items]
 
     async def async_list_datasources(self) -> list:
@@ -1129,7 +1131,9 @@ class DataingClient:
         from .types import Datasource
 
         response = await self._async_request("GET", "/api/v1/datasources")
-        items = response.json().get("items", [])
+        data = response.json()
+        # Backend returns "data_sources" key
+        items = data.get("data_sources", data.get("items", []))
         return [Datasource.model_validate(ds) for ds in items]
 
     def test_datasource(self, datasource_id: str):
@@ -1198,17 +1202,59 @@ class DataingClient:
                     print(f"  {col.name}: {col.data_type} {null}")
             ```
         """
-        from .types import DatasourceSchema
-
         response = self._request("GET", f"/api/v1/datasources/{datasource_id}/schema")
-        return DatasourceSchema.model_validate(response.json())
+        return self._parse_schema_response(response.json())
 
     async def async_get_schema(self, datasource_id: str):
         """Async version of `get_schema`.
 
         See `get_schema` for full documentation.
         """
-        from .types import DatasourceSchema
-
         response = await self._async_request("GET", f"/api/v1/datasources/{datasource_id}/schema")
-        return DatasourceSchema.model_validate(response.json())
+        return self._parse_schema_response(response.json())
+
+    def _parse_schema_response(self, data: dict[str, Any]) -> Any:
+        """Parse backend schema response into SDK DatasourceSchema.
+
+        The backend returns a hierarchical catalog structure:
+        {catalogs: [{schemas: [{tables: [...]}]}]}
+
+        This method flattens it into a simple list of tables.
+        """
+        from .types import ColumnSchema, DatasourceSchema, TableSchema
+
+        tables = []
+
+        # If response already has "tables" key, use it directly
+        if "tables" in data:
+            for tbl in data["tables"]:
+                columns = [
+                    ColumnSchema(
+                        name=col.get("name", ""),
+                        data_type=col.get("data_type", col.get("type", "unknown")),
+                        nullable=col.get("nullable", True),
+                    )
+                    for col in tbl.get("columns", [])
+                ]
+                tables.append(TableSchema(name=tbl["name"], columns=columns))
+        # Otherwise, extract from catalog hierarchy
+        elif "catalogs" in data:
+            for catalog in data.get("catalogs", []):
+                for schema in catalog.get("schemas", []):
+                    schema_name = schema.get("name", "")
+                    for tbl in schema.get("tables", []):
+                        # Build fully qualified name
+                        tbl_name = tbl.get("name", "")
+                        full_name = f"{schema_name}.{tbl_name}" if schema_name else tbl_name
+
+                        columns = [
+                            ColumnSchema(
+                                name=col.get("name", ""),
+                                data_type=col.get("data_type", col.get("type", "unknown")),
+                                nullable=col.get("nullable", True),
+                            )
+                            for col in tbl.get("columns", [])
+                        ]
+                        tables.append(TableSchema(name=full_name, columns=columns))
+
+        return DatasourceSchema(tables=tables)

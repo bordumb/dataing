@@ -234,6 +234,20 @@ class TestDatasourceTypes:
         )
         assert ds.status == "connected"
 
+    def test_datasource_from_backend_response(self) -> None:
+        """Test Datasource parses backend response with 'type' field."""
+        # Backend API returns 'type' but SDK uses 'source_type'
+        backend_data = {
+            "id": "ds-abc123",
+            "name": "Production Postgres",
+            "type": "postgres",
+            "status": "connected",
+        }
+        ds = Datasource.model_validate(backend_data)
+        assert ds.id == "ds-abc123"
+        assert ds.source_type == "postgres"  # Mapped from 'type'
+        assert ds.status == "connected"
+
     def test_test_connection_result_success(self) -> None:
         """Test ConnectionTestResult for success case."""
         result = ConnectionTestResult(success=True, latency_ms=42)
@@ -247,6 +261,18 @@ class TestDatasourceTypes:
         assert result.success is False
         assert result.latency_ms is None
         assert result.error == "Connection refused"
+
+    def test_test_connection_result_from_backend(self) -> None:
+        """Test ConnectionTestResult parses backend response with 'message' field."""
+        # Backend API returns 'message' but SDK uses 'error'
+        backend_data = {
+            "success": False,
+            "message": "Connection refused",
+            "latency_ms": None,
+        }
+        result = ConnectionTestResult.model_validate(backend_data)
+        assert result.success is False
+        assert result.error == "Connection refused"  # Mapped from 'message'
 
     def test_column_schema(self) -> None:
         """Test ColumnSchema."""

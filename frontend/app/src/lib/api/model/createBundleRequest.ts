@@ -5,7 +5,7 @@
  * Autonomous Data Quality Investigation
  * OpenAPI spec version: 2.0.0
  */
-import type { DataingEntrypointsApiRoutesBundlesAssetRefRequest } from "./dataingEntrypointsApiRoutesBundlesAssetRefRequest";
+import type { AssetRefRequest } from "./assetRefRequest";
 import type { CreateBundleRequestWindow } from "./createBundleRequestWindow";
 
 /**
@@ -16,7 +16,7 @@ export interface CreateBundleRequest {
    * Assets to include in bundle
    * @minItems 1
    */
-  assets: DataingEntrypointsApiRoutesBundlesAssetRefRequest[];
+  assets: AssetRefRequest[];
   /** Include anomaly summary */
   include_anomalies?: boolean;
   /** Include lineage graph */

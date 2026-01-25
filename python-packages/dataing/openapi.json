@@ -9375,11 +9375,13 @@
         "properties": {
           "platform": {
             "type": "string",
-            "title": "Platform"
+            "title": "Platform",
+            "description": "Data platform (postgres, snowflake, dbt)"
           },
           "name": {
             "type": "string",
-            "title": "Name"
+            "title": "Name",
+            "description": "Fully qualified name (db.schema.table)"
           },
           "datasource_id": {
             "anyOf": [
@@ -9390,7 +9392,8 @@
                 "type": "null"
               }
             ],
-            "title": "Datasource Id"
+            "title": "Datasource Id",
+            "description": "Optional datasource ID for disambiguation"
           }
         },
         "type": "object",
@@ -9710,7 +9713,7 @@
         "properties": {
           "assets": {
             "items": {
-              "$ref": "#/components/schemas/dataing__entrypoints__api__routes__bundles__AssetRefRequest"
+              "$ref": "#/components/schemas/AssetRefRequest"
             },
             "type": "array",
             "minItems": 1,
@@ -10865,7 +10868,7 @@
         "properties": {
           "assets": {
             "items": {
-              "$ref": "#/components/schemas/AssetRefRequest"
+              "$ref": "#/components/schemas/dataing__entrypoints__api__routes__runs__AssetRefRequest"
             },
             "type": "array",
             "title": "Assets"
@@ -15287,39 +15290,6 @@
         "title": "WeeklyUsageResponse",
         "description": "Weekly usage statistics response."
       },
-      "dataing__entrypoints__api__routes__bundles__AssetRefRequest": {
-        "properties": {
-          "platform": {
-            "type": "string",
-            "title": "Platform",
-            "description": "Data platform (postgres, snowflake, dbt)"
-          },
-          "name": {
-            "type": "string",
-            "title": "Name",
-            "description": "Fully qualified name (db.schema.table)"
-          },
-          "datasource_id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Datasource Id",
-            "description": "Optional datasource ID for disambiguation"
-          }
-        },
-        "type": "object",
-        "required": [
-          "platform",
-          "name"
-        ],
-        "title": "AssetRefRequest",
-        "description": "Asset reference in request."
-      },
       "dataing__entrypoints__api__routes__bundles__LineageGraphResponse": {
         "properties": {
           "root": {
@@ -15388,6 +15358,36 @@
         ],
         "title": "TestConnectionResponse",
         "description": "Response for testing credentials."
+      },
+      "dataing__entrypoints__api__routes__runs__AssetRefRequest": {
+        "properties": {
+          "platform": {
+            "type": "string",
+            "title": "Platform"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "datasource_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Datasource Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "platform",
+          "name"
+        ],
+        "title": "AssetRefRequest",
+        "description": "Asset reference in request."
       }
     },
     "securitySchemes": {

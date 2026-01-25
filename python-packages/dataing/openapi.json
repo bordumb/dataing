@@ -1748,14 +1748,14 @@
         }
       }
     },
-    "/api/v1/datasources/": {
+    "/api/v1/datasources": {
       "get": {
         "tags": [
           "datasources"
         ],
         "summary": "List Datasources",
         "description": "List all data sources for the current tenant.",
-        "operationId": "list_datasources_api_v1_datasources__get",
+        "operationId": "list_datasources_api_v1_datasources_get",
         "responses": {
           "200": {
             "description": "Successful Response",
@@ -1783,7 +1783,7 @@
         ],
         "summary": "Create Datasource",
         "description": "Create a new data source.\n\nTests the connection before saving. Returns 400 if connection test fails.",
-        "operationId": "create_datasource_api_v1_datasources__post",
+        "operationId": "create_datasource_api_v1_datasources_post",
         "requestBody": {
           "content": {
             "application/json": {
@@ -2408,14 +2408,14 @@
         }
       }
     },
-    "/api/v1/v2/datasources/": {
+    "/api/v1/v2/datasources": {
       "get": {
         "tags": [
           "datasources"
         ],
         "summary": "List Datasources",
         "description": "List all data sources for the current tenant.",
-        "operationId": "list_datasources_api_v1_v2_datasources__get",
+        "operationId": "list_datasources_api_v1_v2_datasources_get",
         "responses": {
           "200": {
             "description": "Successful Response",
@@ -2443,7 +2443,7 @@
         ],
         "summary": "Create Datasource",
         "description": "Create a new data source.\n\nTests the connection before saving. Returns 400 if connection test fails.",
-        "operationId": "create_datasource_api_v1_v2_datasources__post",
+        "operationId": "create_datasource_api_v1_v2_datasources_post",
         "requestBody": {
           "content": {
             "application/json": {
@@ -4815,7 +4815,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/dataing__entrypoints__api__routes__lineage__LineageGraphResponse"
+                  "$ref": "#/components/schemas/LineageGraphResponse"
                 }
               }
             }
@@ -9375,13 +9375,11 @@
         "properties": {
           "platform": {
             "type": "string",
-            "title": "Platform",
-            "description": "Data platform (postgres, snowflake, dbt)"
+            "title": "Platform"
           },
           "name": {
             "type": "string",
-            "title": "Name",
-            "description": "Fully qualified name (db.schema.table)"
+            "title": "Name"
           },
           "datasource_id": {
             "anyOf": [
@@ -9392,8 +9390,7 @@
                 "type": "null"
               }
             ],
-            "title": "Datasource Id",
-            "description": "Optional datasource ID for disambiguation"
+            "title": "Datasource Id"
           }
         },
         "type": "object",
@@ -9630,7 +9627,7 @@
           "lineage": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/LineageGraphResponse"
+                "$ref": "#/components/schemas/dataing__entrypoints__api__routes__bundles__LineageGraphResponse"
               },
               {
                 "type": "null"
@@ -9713,7 +9710,7 @@
         "properties": {
           "assets": {
             "items": {
-              "$ref": "#/components/schemas/AssetRefRequest"
+              "$ref": "#/components/schemas/dataing__entrypoints__api__routes__bundles__AssetRefRequest"
             },
             "type": "array",
             "minItems": 1,
@@ -10868,7 +10865,7 @@
         "properties": {
           "assets": {
             "items": {
-              "$ref": "#/components/schemas/dataing__entrypoints__api__routes__runs__AssetRefRequest"
+              "$ref": "#/components/schemas/AssetRefRequest"
             },
             "type": "array",
             "title": "Assets"
@@ -12166,35 +12163,40 @@
       "LineageGraphResponse": {
         "properties": {
           "root": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
+            "type": "string",
             "title": "Root"
           },
           "datasets": {
             "additionalProperties": {
-              "additionalProperties": true,
-              "type": "object"
+              "$ref": "#/components/schemas/DatasetResponse"
             },
             "type": "object",
             "title": "Datasets"
           },
           "edges": {
             "items": {
-              "$ref": "#/components/schemas/LineageEdge"
+              "$ref": "#/components/schemas/LineageEdgeResponse"
             },
             "type": "array",
             "title": "Edges"
+          },
+          "jobs": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/JobResponse"
+            },
+            "type": "object",
+            "title": "Jobs"
           }
         },
         "type": "object",
+        "required": [
+          "root",
+          "datasets",
+          "edges",
+          "jobs"
+        ],
         "title": "LineageGraphResponse",
-        "description": "Lineage graph response."
+        "description": "Response for a lineage graph."
       },
       "LineageProviderResponse": {
         "properties": {
@@ -15280,6 +15282,72 @@
         "title": "WeeklyUsageResponse",
         "description": "Weekly usage statistics response."
       },
+      "dataing__entrypoints__api__routes__bundles__AssetRefRequest": {
+        "properties": {
+          "platform": {
+            "type": "string",
+            "title": "Platform",
+            "description": "Data platform (postgres, snowflake, dbt)"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "Fully qualified name (db.schema.table)"
+          },
+          "datasource_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Datasource Id",
+            "description": "Optional datasource ID for disambiguation"
+          }
+        },
+        "type": "object",
+        "required": [
+          "platform",
+          "name"
+        ],
+        "title": "AssetRefRequest",
+        "description": "Asset reference in request."
+      },
+      "dataing__entrypoints__api__routes__bundles__LineageGraphResponse": {
+        "properties": {
+          "root": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Root"
+          },
+          "datasets": {
+            "additionalProperties": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "object",
+            "title": "Datasets"
+          },
+          "edges": {
+            "items": {
+              "$ref": "#/components/schemas/LineageEdge"
+            },
+            "type": "array",
+            "title": "Edges"
+          }
+        },
+        "type": "object",
+        "title": "LineageGraphResponse",
+        "description": "Lineage graph response."
+      },
       "dataing__entrypoints__api__routes__datasources__TestConnectionResponse": {
         "properties": {
           "success": {
@@ -15320,74 +15388,6 @@
         ],
         "title": "TestConnectionResponse",
         "description": "Response for testing a connection."
-      },
-      "dataing__entrypoints__api__routes__lineage__LineageGraphResponse": {
-        "properties": {
-          "root": {
-            "type": "string",
-            "title": "Root"
-          },
-          "datasets": {
-            "additionalProperties": {
-              "$ref": "#/components/schemas/DatasetResponse"
-            },
-            "type": "object",
-            "title": "Datasets"
-          },
-          "edges": {
-            "items": {
-              "$ref": "#/components/schemas/LineageEdgeResponse"
-            },
-            "type": "array",
-            "title": "Edges"
-          },
-          "jobs": {
-            "additionalProperties": {
-              "$ref": "#/components/schemas/JobResponse"
-            },
-            "type": "object",
-            "title": "Jobs"
-          }
-        },
-        "type": "object",
-        "required": [
-          "root",
-          "datasets",
-          "edges",
-          "jobs"
-        ],
-        "title": "LineageGraphResponse",
-        "description": "Response for a lineage graph."
-      },
-      "dataing__entrypoints__api__routes__runs__AssetRefRequest": {
-        "properties": {
-          "platform": {
-            "type": "string",
-            "title": "Platform"
-          },
-          "name": {
-            "type": "string",
-            "title": "Name"
-          },
-          "datasource_id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Datasource Id"
-          }
-        },
-        "type": "object",
-        "required": [
-          "platform",
-          "name"
-        ],
-        "title": "AssetRefRequest",
-        "description": "Asset reference in request."
       }
     },
     "securitySchemes": {

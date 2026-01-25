@@ -14,7 +14,6 @@ import type {
 } from "@tanstack/react-query";
 import type {
   ColumnLineageListResponse,
-  DataingEntrypointsApiRoutesLineageLineageGraphResponse,
   DatasetResponse,
   DownstreamResponse,
   GetColumnLineageApiV1LineageColumnLineageGetParams,
@@ -27,6 +26,7 @@ import type {
   HTTPValidationError,
   JobResponse,
   JobRunsResponse,
+  LineageGraphResponse,
   LineageProvidersResponse,
   ListDatasetsApiV1LineageDatasetsGetParams,
   SearchDatasetsApiV1LineageSearchGetParams,
@@ -312,9 +312,12 @@ export const getLineageGraphApiV1LineageGraphGet = (
   params: GetLineageGraphApiV1LineageGraphGetParams,
   signal?: AbortSignal,
 ) => {
-  return customInstance<DataingEntrypointsApiRoutesLineageLineageGraphResponse>(
-    { url: `/api/v1/lineage/graph`, method: "GET", params, signal },
-  );
+  return customInstance<LineageGraphResponse>({
+    url: `/api/v1/lineage/graph`,
+    method: "GET",
+    params,
+    signal,
+  });
 };
 
 export const getGetLineageGraphApiV1LineageGraphGetQueryKey = (

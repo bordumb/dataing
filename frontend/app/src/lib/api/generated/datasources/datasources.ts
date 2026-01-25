@@ -207,14 +207,14 @@ export const useTestConnectionApiV1DatasourcesTestPost = <
  */
 export const listDatasourcesApiV1DatasourcesGet = (signal?: AbortSignal) => {
   return customInstance<DataSourceListResponse>({
-    url: `/api/v1/datasources/`,
+    url: `/api/v1/datasources`,
     method: "GET",
     signal,
   });
 };
 
 export const getListDatasourcesApiV1DatasourcesGetQueryKey = () => {
-  return [`/api/v1/datasources/`] as const;
+  return [`/api/v1/datasources`] as const;
 };
 
 export const getListDatasourcesApiV1DatasourcesGetQueryOptions = <
@@ -287,7 +287,7 @@ export const createDatasourceApiV1DatasourcesPost = (
   createDataSourceRequest: CreateDataSourceRequest,
 ) => {
   return customInstance<DataSourceResponse>({
-    url: `/api/v1/datasources/`,
+    url: `/api/v1/datasources`,
     method: "POST",
     headers: { "Content-Type": "application/json" },
     data: createDataSourceRequest,
@@ -1404,14 +1404,14 @@ export const useTestConnectionApiV1V2DatasourcesTestPost = <
  */
 export const listDatasourcesApiV1V2DatasourcesGet = (signal?: AbortSignal) => {
   return customInstance<DataSourceListResponse>({
-    url: `/api/v1/v2/datasources/`,
+    url: `/api/v1/v2/datasources`,
     method: "GET",
     signal,
   });
 };
 
 export const getListDatasourcesApiV1V2DatasourcesGetQueryKey = () => {
-  return [`/api/v1/v2/datasources/`] as const;
+  return [`/api/v1/v2/datasources`] as const;
 };
 
 export const getListDatasourcesApiV1V2DatasourcesGetQueryOptions = <
@@ -1484,7 +1484,7 @@ export const createDatasourceApiV1V2DatasourcesPost = (
   createDataSourceRequest: CreateDataSourceRequest,
 ) => {
   return customInstance<DataSourceResponse>({
-    url: `/api/v1/v2/datasources/`,
+    url: `/api/v1/v2/datasources`,
     method: "POST",
     headers: { "Content-Type": "application/json" },
     data: createDataSourceRequest,

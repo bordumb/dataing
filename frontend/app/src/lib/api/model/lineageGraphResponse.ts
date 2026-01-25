@@ -6,14 +6,15 @@
  * OpenAPI spec version: 2.0.0
  */
 import type { LineageGraphResponseDatasets } from "./lineageGraphResponseDatasets";
-import type { LineageEdge } from "./lineageEdge";
-import type { LineageGraphResponseRoot } from "./lineageGraphResponseRoot";
+import type { LineageEdgeResponse } from "./lineageEdgeResponse";
+import type { LineageGraphResponseJobs } from "./lineageGraphResponseJobs";
 
 /**
- * Lineage graph response.
+ * Response for a lineage graph.
  */
 export interface LineageGraphResponse {
-  datasets?: LineageGraphResponseDatasets;
-  edges?: LineageEdge[];
-  root?: LineageGraphResponseRoot;
+  datasets: LineageGraphResponseDatasets;
+  edges: LineageEdgeResponse[];
+  jobs: LineageGraphResponseJobs;
+  root: string;
 }

@@ -280,7 +280,7 @@ async def test_connection(
         )
 
 
-@router.post("/", response_model=DataSourceResponse, status_code=201)
+@router.post("", response_model=DataSourceResponse, status_code=201)
 @audited(action="datasource.create", resource_type="datasource")
 @require_under_limit(Feature.MAX_DATASOURCES)
 async def create_datasource(
@@ -395,7 +395,7 @@ async def create_datasource(
     )
 
 
-@router.get("/", response_model=DataSourceListResponse)
+@router.get("", response_model=DataSourceListResponse)
 async def list_datasources(
     auth: AuthDep,
     app_db: AppDbDep,

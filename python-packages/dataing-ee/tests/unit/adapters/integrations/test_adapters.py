@@ -8,6 +8,7 @@ import time
 import pytest
 from dataing_ee.adapters.integrations import (
     AdapterRegistry,
+    DbtAdapter,
     GreatExpectationsAdapter,
     IssueData,
     JiraAdapter,
@@ -72,6 +73,12 @@ class TestAdapterRegistry:
         assert adapter is not None
         assert isinstance(adapter, SodaAdapter)
 
+    def test_get_dbt_adapter(self) -> None:
+        """Test getting dbt adapter."""
+        adapter = get_adapter("dbt")
+        assert adapter is not None
+        assert isinstance(adapter, DbtAdapter)
+
     def test_get_unknown_adapter(self) -> None:
         """Test getting unknown adapter returns None."""
         adapter = get_adapter("unknown_provider")
@@ -85,11 +92,13 @@ class TestAdapterRegistry:
         assert "great_expectations" in providers
         assert "slack" in providers
         assert "soda" in providers
+        assert "dbt" in providers
 
     def test_has_provider(self) -> None:
         """Test checking provider exists."""
         assert AdapterRegistry.has("jira")
         assert AdapterRegistry.has("soda")
+        assert AdapterRegistry.has("dbt")
         assert not AdapterRegistry.has("unknown")
 
 
@@ -670,6 +679,263 @@ class TestSodaAdapter:
         assert alert.source_alert_id == "soda_check_chk-123"
         assert alert.anomaly_type == "row_count"
         assert "orders" in alert.dataset_ids
+
+
+class TestDbtAdapter:
+    """Test dbt Cloud adapter."""
+
+    @pytest.fixture
+    def adapter(self) -> DbtAdapter:
+        """Create adapter instance."""
+        return DbtAdapter()
+
+    def test_verify_signature_bearer_valid(self, adapter: DbtAdapter) -> None:
+        """Test valid signature with Bearer prefix."""
+        secret = "test_secret"
+        body = b'{"data": {"run": {"id": 123}}}'
+        signature = hmac.new(secret.encode(), body, hashlib.sha256).hexdigest()
+
+        request = WebhookRequest(
+            body=body,
+            headers={"Authorization": f"Bearer {signature}"},
+            query_params={},
+        )
+        assert adapter.verify_signature(request, secret) is True
+
+    def test_verify_signature_sha256_prefix_valid(self, adapter: DbtAdapter) -> None:
+        """Test valid signature with sha256= prefix."""
+        secret = "test_secret"
+        body = b'{"data": {"run": {"id": 123}}}'
+        signature = "sha256=" + hmac.new(secret.encode(), body, hashlib.sha256).hexdigest()
+
+        request = WebhookRequest(
+            body=body,
+            headers={"Authorization": signature},
+            query_params={},
+        )
+        assert adapter.verify_signature(request, secret) is True
+
+    def test_verify_signature_invalid(self, adapter: DbtAdapter) -> None:
+        """Test invalid signature is rejected."""
+        request = WebhookRequest(
+            body=b'{"data": {"run": {"id": 123}}}',
+            headers={"Authorization": "Bearer invalid"},
+            query_params={},
+        )
+        assert adapter.verify_signature(request, "test_secret") is False
+
+    def test_verify_signature_missing(self, adapter: DbtAdapter) -> None:
+        """Test missing signature is rejected."""
+        request = WebhookRequest(
+            body=b'{"data": {"run": {"id": 123}}}',
+            headers={},
+            query_params={},
+        )
+        assert adapter.verify_signature(request, "test_secret") is False
+
+    def test_parse_test_failures(self, adapter: DbtAdapter) -> None:
+        """Test parsing test failure payload."""
+        request = make_request(
+            {
+                "data": {
+                    "run": {
+                        "id": "run-123",
+                        "status": "error",
+                        "started_at": "2024-01-15T10:00:00Z",
+                    },
+                    "job": {
+                        "id": "job-456",
+                        "name": "Daily Transform",
+                    },
+                    "project": {"name": "analytics"},
+                    "account_id": "acc-789",
+                    "run_results": [
+                        {
+                            "unique_id": "test.project.not_null_orders_id",
+                            "status": "fail",
+                            "message": "Failed: null values found",
+                            "depends_on": {"nodes": ["model.project.orders"]},
+                        },
+                        {
+                            "unique_id": "test.project.unique_orders_id",
+                            "status": "fail",
+                            "message": "Failed: duplicate values found",
+                            "depends_on": {"nodes": ["model.project.orders"]},
+                        },
+                    ],
+                },
+            }
+        )
+        issue_data = adapter.parse_payload(request)
+
+        assert "2 test(s)" in issue_data.title
+        assert "Daily Transform" in issue_data.title
+        assert issue_data.severity == "medium"  # 2 failures = medium
+        assert issue_data.metadata["dbt_run_id"] == "run-123"
+        assert issue_data.metadata["dbt_test_count"] == 2
+        assert "dbt" in issue_data.labels
+        assert "test-failed" in issue_data.labels
+
+    def test_parse_run_failure(self, adapter: DbtAdapter) -> None:
+        """Test parsing general run failure (no test results)."""
+        request = make_request(
+            {
+                "data": {
+                    "run": {
+                        "id": "run-999",
+                        "status": "error",
+                        "status_message": "Compilation error in model",
+                    },
+                    "job": {"name": "Daily Transform"},
+                },
+            }
+        )
+        issue_data = adapter.parse_payload(request)
+
+        assert "dbt Run Failed" in issue_data.title
+        assert "Daily Transform" in issue_data.title
+        assert issue_data.severity == "high"
+        assert "Compilation error" in issue_data.description
+        assert "run-failed" in issue_data.labels
+
+    def test_parse_severity_critical(self, adapter: DbtAdapter) -> None:
+        """Test critical severity for 5+ failures."""
+        request = make_request(
+            {
+                "data": {
+                    "job": {"name": "Job"},
+                    "run_results": [
+                        {"unique_id": f"test.project.test_{i}", "status": "fail"} for i in range(5)
+                    ],
+                },
+            }
+        )
+        issue_data = adapter.parse_payload(request)
+        assert issue_data.severity == "critical"
+
+    def test_parse_severity_high(self, adapter: DbtAdapter) -> None:
+        """Test high severity for 3-4 failures."""
+        request = make_request(
+            {
+                "data": {
+                    "job": {"name": "Job"},
+                    "run_results": [
+                        {"unique_id": f"test.project.test_{i}", "status": "fail"} for i in range(3)
+                    ],
+                },
+            }
+        )
+        issue_data = adapter.parse_payload(request)
+        assert issue_data.severity == "high"
+
+    def test_get_fingerprint_run_id(self, adapter: DbtAdapter) -> None:
+        """Test fingerprint from run ID."""
+        request = make_request({"data": {"run": {"id": "run-abc"}}})
+        assert adapter.get_fingerprint(request) == "dbt_run_run-abc"
+
+    def test_get_fingerprint_event_id(self, adapter: DbtAdapter) -> None:
+        """Test fingerprint from event ID."""
+        request = make_request({"event_id": "evt-123"})
+        assert adapter.get_fingerprint(request) == "dbt_evt-123"
+
+    def test_get_fingerprint_fallback(self, adapter: DbtAdapter) -> None:
+        """Test fingerprint fallback to hash."""
+        request = make_request({"some": "data"})
+        fingerprint = adapter.get_fingerprint(request)
+        assert fingerprint.startswith("dbt_")
+
+    def test_get_event_type_explicit(self, adapter: DbtAdapter) -> None:
+        """Test event type from explicit field."""
+        request = make_request({"event_type": "job.run.errored"})
+        assert adapter.get_event_type(request) == "job.run.errored"
+
+    def test_get_event_type_from_status(self, adapter: DbtAdapter) -> None:
+        """Test event type inferred from run status."""
+        request = make_request({"data": {"run": {"status": "error"}}})
+        assert adapter.get_event_type(request) == "job.run.errored"
+
+    def test_should_process_error(self, adapter: DbtAdapter) -> None:
+        """Test should process errored runs."""
+        request = make_request({"event_type": "job.run.errored"})
+        assert adapter.should_process(request) is True
+
+    def test_should_not_process_success(self, adapter: DbtAdapter) -> None:
+        """Test should not process successful runs without test failures."""
+        request = make_request({"event_type": "job.run.completed", "data": {}})
+        assert adapter.should_process(request) is False
+
+    def test_should_process_completed_with_test_failures(self, adapter: DbtAdapter) -> None:
+        """Test should process completed runs that have test failures."""
+        request = make_request(
+            {
+                "event_type": "job.run.completed",
+                "data": {
+                    "run_results": [
+                        {"unique_id": "test.project.test_1", "status": "fail"},
+                    ],
+                },
+            }
+        )
+        assert adapter.should_process(request) is True
+
+    def test_to_anomaly_alert(self, adapter: DbtAdapter) -> None:
+        """Test dbt adapter creates valid AnomalyAlert."""
+        issue_data = IssueData(
+            title="dbt Test Failed: 2 test(s) in Daily Transform",
+            severity="medium",
+            dataset_id="orders",
+            metadata={
+                "dbt_run_id": "run-123",
+                "dbt_job_name": "Daily Transform",
+                "dbt_test_type": "not_null",
+                "dbt_model": "orders",
+                "dbt_test_names": ["not_null_orders_id", "unique_orders_id"],
+            },
+        )
+
+        alert = adapter.to_anomaly_alert(issue_data, fingerprint="dbt_run_run-123")
+
+        assert alert.source_system == "dbt"
+        assert alert.source_alert_id == "dbt_run_run-123"
+        assert alert.anomaly_type == "null_rate"  # mapped from not_null
+        assert "orders" in alert.dataset_ids
+
+    def test_anomaly_type_mapping(self, adapter: DbtAdapter) -> None:
+        """Test dbt test type to anomaly type mapping."""
+        test_cases = [
+            ("not_null", "null_rate"),
+            ("unique", "duplicate_rate"),
+            ("accepted_values", "distribution"),
+            ("relationships", "referential_integrity"),
+            ("freshness", "freshness"),
+        ]
+
+        for dbt_type, expected_type in test_cases:
+            issue_data = IssueData(
+                title=f"{dbt_type} test failure",
+                metadata={"dbt_test_type": dbt_type},
+            )
+            alert = adapter.to_anomaly_alert(issue_data, fingerprint=f"test-{dbt_type}")
+            assert alert.anomaly_type == expected_type, f"Failed for {dbt_type}"
+
+    def test_extract_model_from_depends_on(self, adapter: DbtAdapter) -> None:
+        """Test model extraction from test depends_on."""
+        request = make_request(
+            {
+                "data": {
+                    "job": {"name": "Job"},
+                    "run_results": [
+                        {
+                            "unique_id": "test.project.not_null_orders_id",
+                            "status": "fail",
+                            "depends_on": {"nodes": ["model.project.orders"]},
+                        },
+                    ],
+                },
+            }
+        )
+        issue_data = adapter.parse_payload(request)
+        assert issue_data.dataset_id == "orders"
 
 
 class TestIssueData:

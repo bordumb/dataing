@@ -1,16 +1,27 @@
 {
-  "assignee": null,
+  "assignee": "bordumbb@gmail.com",
   "claim_note": "",
-  "claimed_at": null,
+  "claimed_at": "2026-01-25T04:08:58.747152Z",
   "created_at": "2026-01-25T03:43:01.739267Z",
   "depends_on": [
     "fn-27.2"
   ],
   "epic": "fn-27",
+  "evidence": {
+    "commit": "9f4ff413",
+    "commit_message": "feat: add dbt Cloud webhook adapter",
+    "files_changed": [
+      "python-packages/dataing-ee/src/dataing_ee/adapters/integrations/dbt.py",
+      "python-packages/dataing-ee/src/dataing_ee/adapters/integrations/__init__.py",
+      "python-packages/dataing-ee/tests/unit/adapters/integrations/test_adapters.py"
+    ],
+    "test_count": 82,
+    "tests_passed": true
+  },
   "id": "fn-27.5",
   "priority": null,
   "spec_path": ".flow/tasks/fn-27.5.md",
-  "status": "todo",
+  "status": "done",
   "title": "Create dbt Cloud webhook adapter",
-  "updated_at": "2026-01-25T03:44:13.708420Z"
+  "updated_at": "2026-01-25T04:13:20.804079Z"
 }

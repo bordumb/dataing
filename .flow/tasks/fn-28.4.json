@@ -1,16 +1,23 @@
 {
-  "assignee": null,
+  "assignee": "bordumbb@gmail.com",
   "claim_note": "",
-  "claimed_at": null,
+  "claimed_at": "2026-01-25T21:00:36.300062Z",
   "created_at": "2026-01-25T20:44:53.965699Z",
   "depends_on": [
     "fn-28.1"
   ],
   "epic": "fn-28",
+  "evidence": {
+    "commits": [],
+    "prs": [],
+    "tests": [
+      "Manual CLI verification: dataing --help, --version, run --help, ds --help all work correctly"
+    ]
+  },
   "id": "fn-28.4",
   "priority": null,
   "spec_path": ".flow/tasks/fn-28.4.md",
-  "status": "todo",
+  "status": "done",
   "title": "Main entry point with callback and subcommand registration",
-  "updated_at": "2026-01-25T20:46:34.799462Z"
+  "updated_at": "2026-01-25T21:02:27.053566Z"
 }

@@ -143,6 +143,7 @@ nav:
       - "Deployment": development/deployment.md
   - Tooling:
       - "Distributed Tracing": tooling/jeager-logging.md
+      - "CLI": tooling/cli.md
 
 extra:
   social:

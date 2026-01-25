@@ -1,97 +1,111 @@
-import { useState, useEffect, useCallback } from 'react'
-import { useNavigate, Link } from 'react-router-dom'
-import { useStartInvestigation } from '@/lib/api/investigations'
-import { useDataSources, useDataSourceSchema, SchemaTable } from '@/lib/api/datasources'
-import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card'
-import { Button } from '@/components/ui/Button'
-import { Input } from '@/components/ui/Input'
+import { useState, useEffect, useCallback } from "react";
+import { useNavigate, Link } from "react-router-dom";
+import { useStartInvestigation } from "@/lib/api/investigations";
+import {
+  useDataSources,
+  useDataSourceSchema,
+  SchemaTable,
+} from "@/lib/api/datasources";
+import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/Card";
+import { Button } from "@/components/ui/Button";
+import { Input } from "@/components/ui/Input";
 import {
   DatePicker,
   DatePickerValue,
   datePickerValueToString,
   stringToDatePickerValue,
-} from '@/components/ui/DatePicker'
-import { ArrowLeft, Loader2, Plus, AlertCircle } from 'lucide-react'
+} from "@/components/ui/DatePicker";
+import { ArrowLeft, Loader2, Plus, AlertCircle } from "lucide-react";
 
-import { SchemaViewer, LineagePanel, DatasetEntry } from './components'
+import { SchemaViewer, LineagePanel, DatasetEntry } from "./components";
 
 interface Dataset {
-  id: string
-  datasourceId: string
-  identifier: string
+  id: string;
+  datasourceId: string;
+  identifier: string;
 }
 
 interface FormData {
-  anomaly_type: string
-  column_name: string
-  display_name: string
-  expected_value: string
-  actual_value: string
-  deviation_pct: string
-  severity: string
-  description: string
+  anomaly_type: string;
+  column_name: string;
+  display_name: string;
+  expected_value: string;
+  actual_value: string;
+  deviation_pct: string;
+  severity: string;
+  description: string;
 }
 
 export function NewInvestigation() {
-  const navigate = useNavigate()
-  const startInvestigation = useStartInvestigation()
+  const navigate = useNavigate();
+  const startInvestigation = useStartInvestigation();
 
-  const [selectedTable, setSelectedTable] = useState<SchemaTable | null>(null)
+  const [selectedTable, setSelectedTable] = useState<SchemaTable | null>(null);
   const [datasets, setDatasets] = useState<Dataset[]>([
-    { id: crypto.randomUUID(), datasourceId: '', identifier: '' },
-  ])
+    { id: crypto.randomUUID(), datasourceId: "", identifier: "" },
+  ]);
   const [anomalyDate, setAnomalyDate] = useState<DatePickerValue>(() =>
-    stringToDatePickerValue(new Date().toISOString().split('T')[0])
-  )
+    stringToDatePickerValue(new Date().toISOString().split("T")[0]),
+  );
   const [formData, setFormData] = useState<FormData>({
-    anomaly_type: 'null_rate',
-    column_name: '',
-    display_name: '',
-    expected_value: '',
-    actual_value: '',
-    deviation_pct: '',
-    severity: 'medium',
-    description: '',
-  })
+    anomaly_type: "null_rate",
+    column_name: "",
+    display_name: "",
+    expected_value: "",
+    actual_value: "",
+    deviation_pct: "",
+    severity: "medium",
+    description: "",
+  });
 
-  const { data: dataSources, isLoading: isLoadingDataSources, error: dataSourcesError } = useDataSources()
-  const { isLoading: isLoadingSchema } = useDataSourceSchema(datasets[0]?.datasourceId || null)
+  const {
+    data: dataSources,
+    isLoading: isLoadingDataSources,
+    error: dataSourcesError,
+  } = useDataSources();
+  const { isLoading: isLoadingSchema } = useDataSourceSchema(
+    datasets[0]?.datasourceId || null,
+  );
 
   // Auto-select first datasource
   useEffect(() => {
     if (dataSources && dataSources.length > 0 && !datasets[0].datasourceId) {
       setDatasets((prev) =>
-        prev.map((ds, i) => (i === 0 ? { ...ds, datasourceId: dataSources[0].id } : ds))
-      )
+        prev.map((ds, i) =>
+          i === 0 ? { ...ds, datasourceId: dataSources[0].id } : ds,
+        ),
+      );
     }
-  }, [dataSources, datasets])
+  }, [dataSources, datasets]);
 
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    const primaryDataset = datasets[0]
-    if (!primaryDataset.identifier.trim()) return
+    e.preventDefault();
+    const primaryDataset = datasets[0];
+    if (!primaryDataset.identifier.trim()) return;
 
-    const dateStr = datePickerValueToString(anomalyDate)
-    if (!dateStr) return
+    const dateStr = datePickerValueToString(anomalyDate);
+    if (!dateStr) return;
 
     try {
       // Build display name from column and anomaly type if not provided
       const displayName =
         formData.display_name.trim() ||
-        `${formData.anomaly_type} on ${formData.column_name || primaryDataset.identifier}`
+        `${formData.anomaly_type} on ${formData.column_name || primaryDataset.identifier}`;
 
       // Send all datasets - first is primary, rest are reference context
       const datasetIds = datasets
         .map((ds) => ds.identifier.trim())
-        .filter((id) => id.length > 0)
+        .filter((id) => id.length > 0);
 
       const result = await startInvestigation.mutateAsync({
         dataset_ids: datasetIds,
         metric_spec: {
-          metric_type: 'column',
+          metric_type: "column",
           expression: formData.column_name || primaryDataset.identifier,
           display_name: displayName,
-          columns_referenced: formData.column_name ? [formData.column_name] : [],
+          columns_referenced: formData.column_name
+            ? [formData.column_name]
+            : [],
         },
         anomaly_type: formData.anomaly_type,
         expected_value: parseFloat(formData.expected_value),
@@ -99,54 +113,62 @@ export function NewInvestigation() {
         deviation_pct: parseFloat(formData.deviation_pct),
         anomaly_date: dateStr,
         severity: formData.severity,
-      })
-      navigate(`/investigations/${result.investigation_id}`)
+      });
+      navigate(`/investigations/${result.investigation_id}`);
     } catch (error) {
-      console.error('Failed to create investigation:', error)
+      console.error("Failed to create investigation:", error);
     }
-  }
+  };
 
   const handleChange = (
-    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>
+    e: React.ChangeEvent<
+      HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement
+    >,
   ) => {
-    setFormData((prev) => ({ ...prev, [e.target.name]: e.target.value }))
-  }
+    setFormData((prev) => ({ ...prev, [e.target.name]: e.target.value }));
+  };
 
   const updateDataset = useCallback(
-    (id: string, updates: Partial<{ datasourceId: string; identifier: string }>) => {
-      setDatasets((prev) => prev.map((ds) => (ds.id === id ? { ...ds, ...updates } : ds)))
-      if (updates.identifier === '' || updates.datasourceId) {
-        setSelectedTable(null)
+    (
+      id: string,
+      updates: Partial<{ datasourceId: string; identifier: string }>,
+    ) => {
+      setDatasets((prev) =>
+        prev.map((ds) => (ds.id === id ? { ...ds, ...updates } : ds)),
+      );
+      if (updates.identifier === "" || updates.datasourceId) {
+        setSelectedTable(null);
       }
     },
-    []
-  )
+    [],
+  );
 
   const addDataset = useCallback(() => {
-    const defaultDsId = dataSources?.[0]?.id || ''
+    const defaultDsId = dataSources?.[0]?.id || "";
     setDatasets((prev) => [
       ...prev,
-      { id: crypto.randomUUID(), datasourceId: defaultDsId, identifier: '' },
-    ])
-  }, [dataSources])
+      { id: crypto.randomUUID(), datasourceId: defaultDsId, identifier: "" },
+    ]);
+  }, [dataSources]);
 
   const removeDataset = useCallback((id: string) => {
     setDatasets((prev) => {
-      if (prev.length <= 1) return prev
-      return prev.filter((ds) => ds.id !== id)
-    })
-  }, [])
+      if (prev.length <= 1) return prev;
+      return prev.filter((ds) => ds.id !== id);
+    });
+  }, []);
 
-  const primaryDataset = datasets[0]
-  const hasEmptyDataset = datasets.some((ds) => !ds.identifier.trim())
-  const isSubmitDisabled = startInvestigation.isPending || hasEmptyDataset || !anomalyDate.start
+  const primaryDataset = datasets[0];
+  const hasEmptyDataset = datasets.some((ds) => !ds.identifier.trim());
+  const isSubmitDisabled =
+    startInvestigation.isPending || hasEmptyDataset || !anomalyDate.start;
 
   if (isLoadingDataSources) {
     return (
       <div className="flex h-64 items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
       </div>
-    )
+    );
   }
 
   return (
@@ -165,9 +187,12 @@ export function NewInvestigation() {
         <div className="flex items-center gap-3 rounded-lg border border-destructive/50 bg-destructive/10 p-4">
           <AlertCircle className="h-5 w-5 text-destructive" />
           <div>
-            <p className="font-medium text-destructive">Failed to load data sources</p>
+            <p className="font-medium text-destructive">
+              Failed to load data sources
+            </p>
             <p className="text-sm text-muted-foreground">
-              {dataSourcesError.message}. Please check your API key and try again.
+              {dataSourcesError.message}. Please check your API key and try
+              again.
             </p>
           </div>
           <Link to="/settings" className="ml-auto">
@@ -195,30 +220,40 @@ export function NewInvestigation() {
                   </label>
                   <div className="space-y-2">
                     {datasets.map((dataset, index) => {
-                      const ds = dataSources?.find((d) => d.id === dataset.datasourceId)
+                      const ds = dataSources?.find(
+                        (d) => d.id === dataset.datasourceId,
+                      );
                       return (
                         <DatasetEntry
                           key={dataset.id}
                           datasourceId={dataset.datasourceId}
-                          datasourceType={ds?.type || 'postgresql'}
+                          datasourceType={ds?.type || "postgresql"}
                           identifier={dataset.identifier}
-                          onDatasourceChange={(id) => updateDataset(dataset.id, { datasourceId: id })}
-                          onIdentifierChange={(val) => updateDataset(dataset.id, { identifier: val })}
+                          onDatasourceChange={(id) =>
+                            updateDataset(dataset.id, { datasourceId: id })
+                          }
+                          onIdentifierChange={(val) =>
+                            updateDataset(dataset.id, { identifier: val })
+                          }
                           onRemove={() => removeDataset(dataset.id)}
                           canRemove={datasets.length > 1}
                           disabled={startInvestigation.isPending}
-                          autoFocus={index === datasets.length - 1 && !dataset.identifier}
+                          autoFocus={
+                            index === datasets.length - 1 && !dataset.identifier
+                          }
                           dataSources={dataSources || []}
                           onTableSelect={setSelectedTable}
                         />
-                      )
+                      );
                     })}
                   </div>
                   <Button
                     type="button"
                     variant="outline"
                     onClick={addDataset}
-                    disabled={startInvestigation.isPending || !dataSources?.length}
+                    disabled={
+                      startInvestigation.isPending || !dataSources?.length
+                    }
                     className="w-full border-dashed"
                   >
                     <Plus className="mr-2 h-4 w-4" />
@@ -245,12 +280,22 @@ export function NewInvestigation() {
                       onChange={handleChange}
                       className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                     >
-                      <option value="null_rate">Null Rate - Unexpected NULL values</option>
-                      <option value="row_count">Row Count - Volume anomaly</option>
+                      <option value="null_rate">
+                        Null Rate - Unexpected NULL values
+                      </option>
+                      <option value="row_count">
+                        Row Count - Volume anomaly
+                      </option>
                       <option value="freshness">Freshness - Stale data</option>
-                      <option value="duplicate_rate">Duplicate Rate - Unexpected duplicates</option>
-                      <option value="schema_drift">Schema Drift - Column changes</option>
-                      <option value="custom">Custom - Other anomaly type</option>
+                      <option value="duplicate_rate">
+                        Duplicate Rate - Unexpected duplicates
+                      </option>
+                      <option value="schema_drift">
+                        Schema Drift - Column changes
+                      </option>
+                      <option value="custom">
+                        Custom - Other anomaly type
+                      </option>
                     </select>
                   </div>
                   <div>
@@ -271,7 +316,9 @@ export function NewInvestigation() {
 
                 <div className="grid gap-4 sm:grid-cols-2">
                   <div>
-                    <label className="mb-1.5 block text-sm font-medium">Display Name</label>
+                    <label className="mb-1.5 block text-sm font-medium">
+                      Display Name
+                    </label>
                     <Input
                       name="display_name"
                       value={formData.display_name}
@@ -283,7 +330,9 @@ export function NewInvestigation() {
                     </p>
                   </div>
                   <div>
-                    <label className="mb-1.5 block text-sm font-medium">Severity</label>
+                    <label className="mb-1.5 block text-sm font-medium">
+                      Severity
+                    </label>
                     <select
                       name="severity"
                       value={formData.severity}
@@ -300,7 +349,9 @@ export function NewInvestigation() {
 
                 <div className="grid gap-4 sm:grid-cols-3">
                   <div>
-                    <label className="mb-1.5 block text-sm font-medium">Expected Value</label>
+                    <label className="mb-1.5 block text-sm font-medium">
+                      Expected Value
+                    </label>
                     <Input
                       name="expected_value"
                       type="number"
@@ -312,7 +363,9 @@ export function NewInvestigation() {
                     />
                   </div>
                   <div>
-                    <label className="mb-1.5 block text-sm font-medium">Actual Value</label>
+                    <label className="mb-1.5 block text-sm font-medium">
+                      Actual Value
+                    </label>
                     <Input
                       name="actual_value"
                       type="number"
@@ -324,7 +377,9 @@ export function NewInvestigation() {
                     />
                   </div>
                   <div>
-                    <label className="mb-1.5 block text-sm font-medium">Deviation %</label>
+                    <label className="mb-1.5 block text-sm font-medium">
+                      Deviation %
+                    </label>
                     <Input
                       name="deviation_pct"
                       type="number"
@@ -338,7 +393,9 @@ export function NewInvestigation() {
                 </div>
 
                 <div>
-                  <label className="mb-1.5 block text-sm font-medium">Description</label>
+                  <label className="mb-1.5 block text-sm font-medium">
+                    Description
+                  </label>
                   <textarea
                     name="description"
                     rows={3}
@@ -348,7 +405,8 @@ export function NewInvestigation() {
                     className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                   />
                   <p className="mt-1 text-xs text-muted-foreground">
-                    Provide context to help the AI agent focus its investigation.
+                    Provide context to help the AI agent focus its
+                    investigation.
                   </p>
                 </div>
 
@@ -356,26 +414,31 @@ export function NewInvestigation() {
                   <div className="rounded-md bg-destructive/10 p-3 text-sm text-destructive">
                     <p className="font-medium">Error:</p>
                     {(() => {
-                      const err = startInvestigation.error as { detail?: Array<{ loc: string[]; msg: string }> }
+                      const err = startInvestigation.error as {
+                        detail?: Array<{ loc: string[]; msg: string }>;
+                      };
                       if (err.detail && Array.isArray(err.detail)) {
                         return (
                           <ul className="mt-1 list-disc pl-4">
                             {err.detail.map((e, i) => (
                               <li key={i}>
-                                {e.loc?.slice(1).join('.') || 'field'}: {e.msg}
+                                {e.loc?.slice(1).join(".") || "field"}: {e.msg}
                               </li>
                             ))}
                           </ul>
-                        )
+                        );
                       }
-                      return <p>{String(startInvestigation.error)}</p>
+                      return <p>{String(startInvestigation.error)}</p>;
                     })()}
                   </div>
                 )}
 
                 <div className="flex justify-end gap-3 border-t border-border pt-4">
                   <Link to="/investigations">
-                    <Button variant="secondary" disabled={startInvestigation.isPending}>
+                    <Button
+                      variant="secondary"
+                      disabled={startInvestigation.isPending}
+                    >
                       Cancel
                     </Button>
                   </Link>
@@ -386,7 +449,7 @@ export function NewInvestigation() {
                         Starting Investigation...
                       </>
                     ) : (
-                      'Run Investigation'
+                      "Run Investigation"
                     )}
                   </Button>
                 </div>
@@ -398,7 +461,10 @@ export function NewInvestigation() {
         <div className="lg:col-span-1">
           <div className="sticky top-6 space-y-4">
             <h2 className="text-sm font-semibold">Dataset Preview</h2>
-            <SchemaViewer table={selectedTable} isLoading={isLoadingSchema && !!primaryDataset?.identifier} />
+            <SchemaViewer
+              table={selectedTable}
+              isLoading={isLoadingSchema && !!primaryDataset?.identifier}
+            />
 
             <h2 className="text-sm font-semibold">Lineage</h2>
             <LineagePanel
@@ -409,5 +475,5 @@ export function NewInvestigation() {
         </div>
       </div>
     </div>
-  )
+  );
 }

@@ -2,113 +2,120 @@
  * API client for unified investigations with branch support.
  */
 
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { customInstance } from './client'
-import { queryKeys } from './query-keys'
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { customInstance } from "./client";
+import { queryKeys } from "./query-keys";
 
 // Types
 
 export interface StepHistoryItem {
-  step: string
-  completed: boolean
-  timestamp: string | null
+  step: string;
+  completed: boolean;
+  timestamp: string | null;
 }
 
 export interface MatchedPattern {
-  pattern_id: string
-  pattern_name: string
-  confidence: number
-  description: string | null
+  pattern_id: string;
+  pattern_name: string;
+  confidence: number;
+  description: string | null;
 }
 
 export interface BranchState {
-  branch_id: string
-  status: string
-  current_step: string
-  synthesis: Record<string, unknown> | null
-  evidence: Record<string, unknown>[]
-  step_history: StepHistoryItem[]
-  matched_patterns: MatchedPattern[]
-  can_merge: boolean
-  parent_branch_id: string | null
+  branch_id: string;
+  status: string;
+  current_step: string;
+  synthesis: Record<string, unknown> | null;
+  evidence: Record<string, unknown>[];
+  step_history: StepHistoryItem[];
+  matched_patterns: MatchedPattern[];
+  can_merge: boolean;
+  parent_branch_id: string | null;
 }
 
 export interface InvestigationState {
-  investigation_id: string
-  status: string
-  main_branch: BranchState
-  user_branch: BranchState | null
+  investigation_id: string;
+  status: string;
+  main_branch: BranchState;
+  user_branch: BranchState | null;
 }
 
 export interface InvestigationListItem {
-  investigation_id: string
-  status: string
-  created_at: string
-  dataset_id: string
+  investigation_id: string;
+  status: string;
+  created_at: string;
+  dataset_id: string;
 }
 
 export interface AlertData {
-  dataset_ids: string[]
+  dataset_ids: string[];
   metric_spec: {
-    metric_type: string
-    expression: string
-    display_name: string
-    columns_referenced: string[]
-    source_url?: string
-  }
-  anomaly_type: string
-  expected_value: number
-  actual_value: number
-  deviation_pct: number
-  anomaly_date: string
-  severity?: string
-  source_system?: string
-  source_alert_id?: string
-  source_url?: string
-  metadata?: Record<string, unknown>
+    metric_type: string;
+    expression: string;
+    display_name: string;
+    columns_referenced: string[];
+    source_url?: string;
+  };
+  anomaly_type: string;
+  expected_value: number;
+  actual_value: number;
+  deviation_pct: number;
+  anomaly_date: string;
+  severity?: string;
+  source_system?: string;
+  source_alert_id?: string;
+  source_url?: string;
+  metadata?: Record<string, unknown>;
 }
 
 export interface StartInvestigationResponse {
-  investigation_id: string
-  main_branch_id: string
+  investigation_id: string;
+  main_branch_id: string;
 }
 
 export interface SendMessageResponse {
-  branch_id: string
+  branch_id: string;
 }
 
 // API functions
 
-const API_BASE = '/api/v1/investigations'
+const API_BASE = "/api/v1/investigations";
 
 async function listInvestigations(): Promise<InvestigationListItem[]> {
   return customInstance<InvestigationListItem[]>({
     url: API_BASE,
-    method: 'GET',
-  })
+    method: "GET",
+  });
 }
 
-async function getInvestigation(investigationId: string): Promise<InvestigationState> {
+async function getInvestigation(
+  investigationId: string,
+): Promise<InvestigationState> {
   return customInstance<InvestigationState>({
     url: `${API_BASE}/${investigationId}`,
-    method: 'GET',
-  })
+    method: "GET",
+  });
 }
 
-async function startInvestigation(alert: AlertData): Promise<StartInvestigationResponse> {
+async function startInvestigation(
+  alert: AlertData,
+): Promise<StartInvestigationResponse> {
   return customInstance<StartInvestigationResponse>({
     url: API_BASE,
-    method: 'POST',
+    method: "POST",
     data: { alert },
-  })
+  });
 }
 
-async function sendMessage(investigationId: string, message: string): Promise<SendMessageResponse> {
+async function sendMessage(
+  investigationId: string,
+  message: string,
+): Promise<SendMessageResponse> {
   return customInstance<SendMessageResponse>({
     url: `${API_BASE}/${investigationId}/messages`,
-    method: 'POST',
+    method: "POST",
     data: { message },
-  })
+  });
 }
 
 // Hooks
@@ -117,76 +124,95 @@ export function useInvestigations() {
   return useQuery({
     queryKey: queryKeys.investigations.all,
     queryFn: listInvestigations,
-  })
+  });
 }
 
 export function useInvestigation(investigationId: string | undefined) {
   return useQuery({
-    queryKey: queryKeys.investigations.detail(investigationId ?? ''),
+    queryKey: queryKeys.investigations.detail(investigationId ?? ""),
     queryFn: () => getInvestigation(investigationId!),
     enabled: !!investigationId,
     refetchInterval: (query) => {
-      const data = query.state.data
-      if (['completed', 'failed', 'cancelled', 'inconclusive'].includes(data?.status ?? '')) {
-        return false
+      const data = query.state.data;
+      if (
+        ["completed", "failed", "cancelled", "inconclusive"].includes(
+          data?.status ?? "",
+        )
+      ) {
+        return false;
       }
-      return 2000
+      return 2000;
     },
-  })
+  });
 }
 
 export function useStartInvestigation() {
-  const queryClient = useQueryClient()
+  const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: startInvestigation,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.investigations.all })
+      queryClient.invalidateQueries({ queryKey: queryKeys.investigations.all });
     },
-  })
+  });
 }
 
 export function useSendMessage() {
-  const queryClient = useQueryClient()
+  const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: ({ investigationId, message }: { investigationId: string; message: string }) =>
-      sendMessage(investigationId, message),
+    mutationFn: ({
+      investigationId,
+      message,
+    }: {
+      investigationId: string;
+      message: string;
+    }) => sendMessage(investigationId, message),
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({
         queryKey: queryKeys.investigations.detail(variables.investigationId),
-      })
+      });
     },
-  })
+  });
 }
 
 // SSE subscription for real-time updates
 export function subscribeToInvestigation(
   investigationId: string,
   handlers: {
-    onStepChanged?: (data: { step: string; branch_id: string }) => void
-    onStatusChanged?: (data: { status: string; investigation_id: string }) => void
-    onEnded?: (data: { status: string; synthesis: Record<string, unknown> | null }) => void
-    onError?: (error: Event) => void
-  }
+    onStepChanged?: (data: { step: string; branch_id: string }) => void;
+    onStatusChanged?: (data: {
+      status: string;
+      investigation_id: string;
+    }) => void;
+    onEnded?: (data: {
+      status: string;
+      synthesis: Record<string, unknown> | null;
+    }) => void;
+    onError?: (error: Event) => void;
+  },
 ): () => void {
   // EventSource doesn't support custom headers, so pass JWT token as query param
-  const token = localStorage.getItem('dataing_access_token')
+  const token = localStorage.getItem("dataing_access_token");
   const url = token
     ? `${API_BASE}/${investigationId}/stream?token=${encodeURIComponent(token)}`
-    : `${API_BASE}/${investigationId}/stream`
-  const eventSource = new EventSource(url)
+    : `${API_BASE}/${investigationId}/stream`;
+  const eventSource = new EventSource(url);
 
-  eventSource.addEventListener('step_changed', (e) => handlers.onStepChanged?.(JSON.parse(e.data)))
-  eventSource.addEventListener('status_changed', (e) => handlers.onStatusChanged?.(JSON.parse(e.data)))
-  eventSource.addEventListener('investigation_ended', (e) => {
-    handlers.onEnded?.(JSON.parse(e.data))
-    eventSource.close()
-  })
+  eventSource.addEventListener("step_changed", (e) =>
+    handlers.onStepChanged?.(JSON.parse(e.data)),
+  );
+  eventSource.addEventListener("status_changed", (e) =>
+    handlers.onStatusChanged?.(JSON.parse(e.data)),
+  );
+  eventSource.addEventListener("investigation_ended", (e) => {
+    handlers.onEnded?.(JSON.parse(e.data));
+    eventSource.close();
+  });
   eventSource.onerror = (e) => {
-    handlers.onError?.(e)
-    eventSource.close()
-  }
+    handlers.onError?.(e);
+    eventSource.close();
+  };
 
-  return () => eventSource.close()
+  return () => eventSource.close();
 }

@@ -1,0 +1,24 @@
+{
+  "assignee": "bordumbb@gmail.com",
+  "claim_note": "",
+  "claimed_at": "2026-01-25T01:06:38.944317Z",
+  "created_at": "2026-01-25T00:57:42.460826Z",
+  "depends_on": [],
+  "epic": "fn-26",
+  "evidence": {
+    "commits": [
+      "3632c8770bb89a9ce40981a96d45a37c40801f5a"
+    ],
+    "prs": [],
+    "tests": [
+      "python -c 'from bond import BondAgent, StreamHandlers'",
+      "python -c 'from bond.tools.schema import SchemaLookupProtocol'"
+    ]
+  },
+  "id": "fn-26.1",
+  "priority": null,
+  "spec_path": ".flow/tasks/fn-26.1.md",
+  "status": "done",
+  "title": "Verify bond-agent import compatibility",
+  "updated_at": "2026-01-25T01:09:16.887175Z"
+}

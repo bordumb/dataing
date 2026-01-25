@@ -1,42 +1,55 @@
-import { useState, useEffect } from 'react'
-import { Routes, Route } from 'react-router-dom'
-import { Toaster } from '@/components/ui/sonner'
-import { SidebarProvider, SidebarInset, SidebarTrigger } from '@/components/ui/sidebar'
-import { AppSidebar } from '@/components/layout/app-sidebar'
-import { Separator } from '@/components/ui/separator'
-import { ModeToggle } from '@/components/mode-toggle'
-import { ErrorBoundary, FeatureErrorBoundary } from '@/components/error-boundary'
+import { useState, useEffect } from "react";
+import { Routes, Route } from "react-router-dom";
+import { Toaster } from "@/components/ui/sonner";
+import {
+  SidebarProvider,
+  SidebarInset,
+  SidebarTrigger,
+} from "@/components/ui/sidebar";
+import { AppSidebar } from "@/components/layout/app-sidebar";
+import { Separator } from "@/components/ui/separator";
+import { ModeToggle } from "@/components/mode-toggle";
+import {
+  ErrorBoundary,
+  FeatureErrorBoundary,
+} from "@/components/error-boundary";
 import {
   UpgradeRequiredModal,
   type UpgradeError,
-} from '@/components/shared/upgrade-required-modal'
-import { subscribeToUpgradeError, setUpgradeError } from '@/lib/api/upgrade-error'
+} from "@/components/shared/upgrade-required-modal";
+import {
+  subscribeToUpgradeError,
+  setUpgradeError,
+} from "@/lib/api/upgrade-error";
 
 // Pages
-import { DashboardPage } from '@/features/dashboard/dashboard-page'
-import { InvestigationList } from '@/features/investigation/InvestigationList'
-import { InvestigationDetail } from '@/features/investigation/InvestigationDetail'
-import { NewInvestigation } from '@/features/investigation/NewInvestigation'
-import { ContextReviewPage } from '@/features/investigation/ContextReviewPage'
-import { DataSourcePage } from '@/features/datasources/datasource-page'
-import { DatasetListPage, DatasetDetailPage } from '@/features/datasets'
-import { SettingsPage } from '@/features/settings/settings-page'
-import { UsagePage } from '@/features/usage/usage-page'
-import { NotificationsPage } from '@/features/notifications'
-import { AdminPage } from '@/features/admin'
-import { IssueList, IssueCreate, IssueWorkspace } from '@/features/issues'
-import { JwtLoginPage } from '@/features/auth/jwt-login-page'
-import { SSOLoginPage } from '@/features/auth/sso-login-page'
-import { SSOCallbackPage } from '@/features/auth/sso-callback-page'
+import { DashboardPage } from "@/features/dashboard/dashboard-page";
+import { InvestigationList } from "@/features/investigation/InvestigationList";
+import { InvestigationDetail } from "@/features/investigation/InvestigationDetail";
+import { NewInvestigation } from "@/features/investigation/NewInvestigation";
+import { ContextReviewPage } from "@/features/investigation/ContextReviewPage";
+import { DataSourcePage } from "@/features/datasources/datasource-page";
+import { DatasetListPage, DatasetDetailPage } from "@/features/datasets";
+import { SettingsPage } from "@/features/settings/settings-page";
+import { UsagePage } from "@/features/usage/usage-page";
+import { NotificationsPage } from "@/features/notifications";
+import { AdminPage } from "@/features/admin";
+import { IssueList, IssueCreate, IssueWorkspace } from "@/features/issues";
+import { JwtLoginPage } from "@/features/auth/jwt-login-page";
+import { SSOLoginPage } from "@/features/auth/sso-login-page";
+import { SSOCallbackPage } from "@/features/auth/sso-callback-page";
 
 // Auth
-import { JwtAuthProvider, RequireJwtAuth } from '@/lib/auth/jwt-context'
-import { DemoRoleToggle } from '@/lib/auth/demo-role-toggle'
-import { DemoRoleProvider, useDemoRoleContext } from '@/lib/auth/demo-role-context'
-import { ImpersonationProvider, ImpersonateUserToggle } from '@/lib/auth'
+import { JwtAuthProvider, RequireJwtAuth } from "@/lib/auth/jwt-context";
+import { DemoRoleToggle } from "@/lib/auth/demo-role-toggle";
+import {
+  DemoRoleProvider,
+  useDemoRoleContext,
+} from "@/lib/auth/demo-role-context";
+import { ImpersonationProvider, ImpersonateUserToggle } from "@/lib/auth";
 
 // Notifications
-import { NotificationProvider } from '@/lib/notifications'
+import { NotificationProvider } from "@/lib/notifications";
 
 /**
  * CRITICAL: DO NOT REMOVE THE ENTITLEMENTS IMPORTS OR DEMO TOGGLE
@@ -51,7 +64,7 @@ import {
   EntitlementsProvider,
   useDemoEntitlements,
   DemoToggle,
-} from '@/lib/entitlements'
+} from "@/lib/entitlements";
 
 function AppLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -72,7 +85,7 @@ function AppLayout({ children }: { children: React.ReactNode }) {
         <main className="flex-1 p-6">{children}</main>
       </SidebarInset>
     </SidebarProvider>
-  )
+  );
 }
 
 /**
@@ -83,18 +96,20 @@ function AppLayout({ children }: { children: React.ReactNode }) {
  * - DemoRoleToggle (bottom-left): User roles (viewer/member/admin/owner)
  */
 function AppWithEntitlements() {
-  const { entitlements, plan, setPlan } = useDemoEntitlements()
-  const { role, setRole } = useDemoRoleContext()
-  const [upgradeError, setUpgradeErrorState] = useState<UpgradeError | null>(null)
+  const { entitlements, plan, setPlan } = useDemoEntitlements();
+  const { role, setRole } = useDemoRoleContext();
+  const [upgradeError, setUpgradeErrorState] = useState<UpgradeError | null>(
+    null,
+  );
 
   useEffect(() => {
-    return subscribeToUpgradeError(setUpgradeErrorState)
-  }, [])
+    return subscribeToUpgradeError(setUpgradeErrorState);
+  }, []);
 
   const handleCloseUpgradeModal = () => {
-    setUpgradeError(null)
-    setUpgradeErrorState(null)
-  }
+    setUpgradeError(null);
+    setUpgradeErrorState(null);
+  };
 
   return (
     <EntitlementsProvider entitlements={entitlements}>
@@ -242,10 +257,13 @@ function AppWithEntitlements() {
       <DemoToggle plan={plan} onPlanChange={setPlan} />
       {/* Bottom-left: User roles (viewer/member/admin/owner) */}
       <DemoRoleToggle currentRole={role} onRoleChange={setRole} />
-      <UpgradeRequiredModal error={upgradeError} onClose={handleCloseUpgradeModal} />
+      <UpgradeRequiredModal
+        error={upgradeError}
+        onClose={handleCloseUpgradeModal}
+      />
       <Toaster />
     </EntitlementsProvider>
-  )
+  );
 }
 
 function App() {
@@ -261,7 +279,7 @@ function App() {
         </NotificationProvider>
       </JwtAuthProvider>
     </ErrorBoundary>
-  )
+  );
 }
 
-export default App
+export default App;

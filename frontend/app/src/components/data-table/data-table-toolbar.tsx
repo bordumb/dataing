@@ -1,13 +1,13 @@
-import { Table } from "@tanstack/react-table"
-import { X } from "lucide-react"
+import { Table } from "@tanstack/react-table";
+import { X } from "lucide-react";
 
-import { Button } from "@/components/ui/Button"
-import { Input } from "@/components/ui/Input"
+import { Button } from "@/components/ui/Button";
+import { Input } from "@/components/ui/Input";
 
 interface DataTableToolbarProps<TData> {
-  table: Table<TData>
-  searchKey?: string
-  searchPlaceholder?: string
+  table: Table<TData>;
+  searchKey?: string;
+  searchPlaceholder?: string;
 }
 
 export function DataTableToolbar<TData>({
@@ -15,7 +15,7 @@ export function DataTableToolbar<TData>({
   searchKey,
   searchPlaceholder = "Filter...",
 }: DataTableToolbarProps<TData>) {
-  const isFiltered = table.getState().columnFilters.length > 0
+  const isFiltered = table.getState().columnFilters.length > 0;
 
   return (
     <div className="flex items-center justify-between">
@@ -23,7 +23,9 @@ export function DataTableToolbar<TData>({
         {searchKey && (
           <Input
             placeholder={searchPlaceholder}
-            value={(table.getColumn(searchKey)?.getFilterValue() as string) ?? ""}
+            value={
+              (table.getColumn(searchKey)?.getFilterValue() as string) ?? ""
+            }
             onChange={(event) =>
               table.getColumn(searchKey)?.setFilterValue(event.target.value)
             }
@@ -42,5 +44,5 @@ export function DataTableToolbar<TData>({
         )}
       </div>
     </div>
-  )
+  );
 }

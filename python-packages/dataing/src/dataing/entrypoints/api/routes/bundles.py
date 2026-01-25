@@ -49,9 +49,7 @@ class ResolvedAssetResponse(BaseModel):
     asset: AssetRefRequest
     datasource_id: str | None = None
     dataset_id: str = Field(..., description="Canonical URN")
-    dataset_type: str | None = Field(
-        default=None, description="TABLE, VIEW, MODEL, etc."
-    )
+    dataset_type: str | None = Field(default=None, description="TABLE, VIEW, MODEL, etc.")
 
 
 class LineageEdge(BaseModel):
@@ -128,9 +126,7 @@ class CreateBundleRequest(BaseModel):
         default=None, description="Time window for context (e.g., '7d', '24h')"
     )
     include_lineage: bool = Field(default=True, description="Include lineage graph")
-    include_operational: bool = Field(
-        default=True, description="Include operational facts"
-    )
+    include_operational: bool = Field(default=True, description="Include operational facts")
     include_anomalies: bool = Field(default=True, description="Include anomaly summary")
 
 
@@ -331,9 +327,7 @@ async def create_bundle(
     bundle_hash = _compute_bundle_hash(body.assets, body.window, resolved_assets)
 
     # Get default datasource from first resolved asset (if available)
-    default_datasource_id = (
-        resolved_assets[0].datasource_id if resolved_assets else None
-    )
+    default_datasource_id = resolved_assets[0].datasource_id if resolved_assets else None
 
     # Build context data
     lineage_data = LineageGraphResponse() if body.include_lineage else None
@@ -431,9 +425,7 @@ async def get_bundle(
     ]
 
     # Get default datasource from first asset
-    default_datasource_id = (
-        resolved_assets[0].datasource_id if resolved_assets else None
-    )
+    default_datasource_id = resolved_assets[0].datasource_id if resolved_assets else None
 
     # Reconstruct context data
     lineage_data = None
@@ -470,15 +462,9 @@ class DiffRequest(BaseModel):
     """Request to compute metric diff."""
 
     bundle_id: str = Field(..., description="Bundle ID to analyze")
-    metric: str = Field(
-        ..., description="Metric to compare (e.g., row_count, null_rate)"
-    )
-    window: str = Field(
-        default="7d", description="Time window for comparison (e.g., 7d, 24h)"
-    )
-    datasource_id: str | None = Field(
-        default=None, description="Optional datasource override"
-    )
+    metric: str = Field(..., description="Metric to compare (e.g., row_count, null_rate)")
+    window: str = Field(default="7d", description="Time window for comparison (e.g., 7d, 24h)")
+    datasource_id: str | None = Field(default=None, description="Optional datasource override")
 
 
 class DiffSample(BaseModel):
@@ -497,9 +483,7 @@ class DiffResponse(BaseModel):
     previous_value: float | None = None
     delta: float | None = None
     delta_percent: float | None = None
-    trend: str | None = Field(
-        default=None, description="up, down, stable, or unknown"
-    )
+    trend: str | None = Field(default=None, description="up, down, stable, or unknown")
     samples: list[DiffSample] = Field(default_factory=list)
 
 

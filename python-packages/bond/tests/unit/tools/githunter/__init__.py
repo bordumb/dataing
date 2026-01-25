@@ -1,1 +1,0 @@
-"""Tests for GitHunter tool."""

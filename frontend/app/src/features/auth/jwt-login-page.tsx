@@ -4,44 +4,44 @@
  * Supports both login and registration flows.
  */
 
-import * as React from 'react'
-import { useNavigate, useLocation, Link } from 'react-router-dom'
-import { Search, Mail, Lock, User, Building } from 'lucide-react'
+import * as React from "react";
+import { useNavigate, useLocation, Link } from "react-router-dom";
+import { Search, Mail, Lock, User, Building } from "lucide-react";
 
-import { Button } from '@/components/ui/Button'
-import { Input } from '@/components/ui/Input'
-import { Label } from '@/components/ui/label'
+import { Button } from "@/components/ui/Button";
+import { Input } from "@/components/ui/Input";
+import { Label } from "@/components/ui/label";
 import {
   Card,
   CardContent,
   CardDescription,
   CardHeader,
   CardTitle,
-} from '@/components/ui/Card'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { useJwtAuth } from '@/lib/auth'
+} from "@/components/ui/Card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useJwtAuth } from "@/lib/auth";
 
 export function JwtLoginPage() {
-  const { isAuthenticated, isLoading: authLoading } = useJwtAuth()
-  const navigate = useNavigate()
-  const location = useLocation()
+  const { isAuthenticated, isLoading: authLoading } = useJwtAuth();
+  const navigate = useNavigate();
+  const location = useLocation();
 
   const from =
-    (location.state as { from?: { pathname: string } })?.from?.pathname || '/'
+    (location.state as { from?: { pathname: string } })?.from?.pathname || "/";
 
   // Redirect if already authenticated
   React.useEffect(() => {
     if (isAuthenticated) {
-      navigate(from, { replace: true })
+      navigate(from, { replace: true });
     }
-  }, [isAuthenticated, navigate, from])
+  }, [isAuthenticated, navigate, from]);
 
   if (authLoading) {
     return (
       <div className="flex min-h-screen items-center justify-center">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
       </div>
-    )
+    );
   }
 
   return (
@@ -53,8 +53,12 @@ export function JwtLoginPage() {
               <Search className="h-6 w-6" />
             </div>
           </div>
-          <CardTitle className="text-2xl font-bold">Welcome to Dataing</CardTitle>
-          <CardDescription>Sign in or create an account to continue</CardDescription>
+          <CardTitle className="text-2xl font-bold">
+            Welcome to Dataing
+          </CardTitle>
+          <CardDescription>
+            Sign in or create an account to continue
+          </CardDescription>
         </CardHeader>
         <CardContent>
           <Tabs defaultValue="login" className="w-full">
@@ -66,41 +70,43 @@ export function JwtLoginPage() {
               <LoginForm onSuccess={() => navigate(from, { replace: true })} />
             </TabsContent>
             <TabsContent value="register">
-              <RegisterForm onSuccess={() => navigate(from, { replace: true })} />
+              <RegisterForm
+                onSuccess={() => navigate(from, { replace: true })}
+              />
             </TabsContent>
           </Tabs>
         </CardContent>
       </Card>
     </div>
-  )
+  );
 }
 
 interface FormProps {
-  onSuccess: () => void
+  onSuccess: () => void;
 }
 
 function LoginForm({ onSuccess }: FormProps) {
-  const { login } = useJwtAuth()
-  const [email, setEmail] = React.useState('')
-  const [password, setPassword] = React.useState('')
-  const [orgId, setOrgId] = React.useState('')
-  const [isLoading, setIsLoading] = React.useState(false)
-  const [error, setError] = React.useState<string | null>(null)
+  const { login } = useJwtAuth();
+  const [email, setEmail] = React.useState("");
+  const [password, setPassword] = React.useState("");
+  const [orgId, setOrgId] = React.useState("");
+  const [isLoading, setIsLoading] = React.useState(false);
+  const [error, setError] = React.useState<string | null>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setError(null)
-    setIsLoading(true)
+    e.preventDefault();
+    setError(null);
+    setIsLoading(true);
 
     try {
-      await login({ email, password, org_id: orgId })
-      onSuccess()
+      await login({ email, password, org_id: orgId });
+      onSuccess();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to sign in')
+      setError(err instanceof Error ? err.message : "Failed to sign in");
     } finally {
-      setIsLoading(false)
+      setIsLoading(false);
     }
-  }
+  };
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4 mt-4">
@@ -170,35 +176,35 @@ function LoginForm({ onSuccess }: FormProps) {
         className="w-full"
         disabled={isLoading || !email || !password || !orgId}
       >
-        {isLoading ? 'Signing in...' : 'Sign In'}
+        {isLoading ? "Signing in..." : "Sign In"}
       </Button>
     </form>
-  )
+  );
 }
 
 function RegisterForm({ onSuccess }: FormProps) {
-  const { register } = useJwtAuth()
-  const [email, setEmail] = React.useState('')
-  const [password, setPassword] = React.useState('')
-  const [name, setName] = React.useState('')
-  const [orgName, setOrgName] = React.useState('')
-  const [isLoading, setIsLoading] = React.useState(false)
-  const [error, setError] = React.useState<string | null>(null)
+  const { register } = useJwtAuth();
+  const [email, setEmail] = React.useState("");
+  const [password, setPassword] = React.useState("");
+  const [name, setName] = React.useState("");
+  const [orgName, setOrgName] = React.useState("");
+  const [isLoading, setIsLoading] = React.useState(false);
+  const [error, setError] = React.useState<string | null>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setError(null)
-    setIsLoading(true)
+    e.preventDefault();
+    setError(null);
+    setIsLoading(true);
 
     try {
-      await register({ email, password, name, org_name: orgName })
-      onSuccess()
+      await register({ email, password, name, org_name: orgName });
+      onSuccess();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to register')
+      setError(err instanceof Error ? err.message : "Failed to register");
     } finally {
-      setIsLoading(false)
+      setIsLoading(false);
     }
-  }
+  };
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4 mt-4">
@@ -278,8 +284,8 @@ function RegisterForm({ onSuccess }: FormProps) {
         className="w-full"
         disabled={isLoading || !email || !password || !name || !orgName}
       >
-        {isLoading ? 'Creating account...' : 'Create Account'}
+        {isLoading ? "Creating account..." : "Create Account"}
       </Button>
     </form>
-  )
+  );
 }

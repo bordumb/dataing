@@ -1,6 +1,6 @@
-import { useState } from 'react'
-import { useParams, Link } from 'react-router-dom'
-import type { UseQueryResult } from '@tanstack/react-query'
+import { useState } from "react";
+import { useParams, Link } from "react-router-dom";
+import type { UseQueryResult } from "@tanstack/react-query";
 import {
   ArrowLeft,
   RefreshCw,
@@ -17,7 +17,7 @@ import {
   Search,
   Lightbulb,
   ArrowRight,
-} from 'lucide-react'
+} from "lucide-react";
 import {
   useIssue,
   useUpdateIssue,
@@ -33,7 +33,7 @@ import {
   getStatusLabel,
   getPriorityVariant,
   getSeverityVariant,
-} from '@/lib/api/issues'
+} from "@/lib/api/issues";
 import type {
   IssueResponse,
   IssueCommentResponse,
@@ -41,48 +41,48 @@ import type {
   InvestigationRunResponse,
   InvestigationRunListResponse,
   WatcherListResponse,
-} from '@/lib/api/issues'
-import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card'
-import { Badge } from '@/components/ui/Badge'
-import { Button } from '@/components/ui/Button'
-import { Input } from '@/components/ui/Input'
-import { Textarea } from '@/components/ui/textarea'
-import { Label } from '@/components/ui/label'
+} from "@/lib/api/issues";
+import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/Card";
+import { Badge } from "@/components/ui/Badge";
+import { Button } from "@/components/ui/Button";
+import { Input } from "@/components/ui/Input";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from '@/components/ui/select'
-import { AsyncBoundary } from '@/components/async-boundary'
-import { formatDate } from '@/lib/utils'
+} from "@/components/ui/select";
+import { AsyncBoundary } from "@/components/async-boundary";
+import { formatDate } from "@/lib/utils";
 
 interface CommentsSectionProps {
-  issueId: string
+  issueId: string;
 }
 
 function CommentsSection({ issueId }: CommentsSectionProps) {
-  const [newComment, setNewComment] = useState('')
-  const query = useIssueComments(issueId)
-  const createComment = useCreateIssueComment()
-  const invalidate = useInvalidateIssues()
+  const [newComment, setNewComment] = useState("");
+  const query = useIssueComments(issueId);
+  const createComment = useCreateIssueComment();
+  const invalidate = useInvalidateIssues();
 
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!newComment.trim()) return
+    e.preventDefault();
+    if (!newComment.trim()) return;
 
     try {
       await createComment.mutateAsync({
         issueId,
         data: { body: newComment.trim() },
-      })
-      setNewComment('')
-      invalidate.invalidateComments(issueId)
+      });
+      setNewComment("");
+      invalidate.invalidateComments(issueId);
     } catch (error) {
-      console.error('Failed to add comment:', error)
+      console.error("Failed to add comment:", error);
     }
-  }
+  };
 
   return (
     <Card>
@@ -94,12 +94,16 @@ function CommentsSection({ issueId }: CommentsSectionProps) {
       </CardHeader>
       <CardContent className="space-y-4">
         <AsyncBoundary
-          query={query as unknown as UseQueryResult<IssueCommentListResponse, Error>}
+          query={
+            query as unknown as UseQueryResult<IssueCommentListResponse, Error>
+          }
         >
           {(data) => (
             <div className="space-y-3">
               {data.items.length === 0 ? (
-                <p className="text-sm text-muted-foreground">No comments yet.</p>
+                <p className="text-sm text-muted-foreground">
+                  No comments yet.
+                </p>
               ) : (
                 data.items.map((comment: IssueCommentResponse) => (
                   <div
@@ -142,28 +146,29 @@ function CommentsSection({ issueId }: CommentsSectionProps) {
         </form>
       </CardContent>
     </Card>
-  )
+  );
 }
 
 interface InvestigationSummaryCardProps {
-  issueId: string
+  issueId: string;
 }
 
 function InvestigationSummaryCard({ issueId }: InvestigationSummaryCardProps) {
-  const query = useIssueInvestigationRuns(issueId)
+  const query = useIssueInvestigationRuns(issueId);
 
   // Get the latest completed investigation run
-  const latestRun = query.data?.items?.find(
-    (run: InvestigationRunResponse) =>
-      run.synthesis_summary && run.completed_at
-  ) || query.data?.items?.[0]
+  const latestRun =
+    query.data?.items?.find(
+      (run: InvestigationRunResponse) =>
+        run.synthesis_summary && run.completed_at,
+    ) || query.data?.items?.[0];
 
   if (query.isLoading) {
-    return null // Don't show loading state, will show when data arrives
+    return null; // Don't show loading state, will show when data arrives
   }
 
   if (!latestRun?.synthesis_summary) {
-    return null // No summary available
+    return null; // No summary available
   }
 
   return (
@@ -185,9 +190,7 @@ function InvestigationSummaryCard({ issueId }: InvestigationSummaryCardProps) {
         {latestRun.root_cause_tag && (
           <Badge variant="secondary">{latestRun.root_cause_tag}</Badge>
         )}
-        <p className="text-sm leading-relaxed">
-          {latestRun.synthesis_summary}
-        </p>
+        <p className="text-sm leading-relaxed">{latestRun.synthesis_summary}</p>
         <Link
           to={`/investigations/${latestRun.investigation_id}`}
           className="inline-flex items-center gap-1 text-sm text-primary hover:underline"
@@ -197,42 +200,45 @@ function InvestigationSummaryCard({ issueId }: InvestigationSummaryCardProps) {
         </Link>
       </CardContent>
     </Card>
-  )
+  );
 }
 
 interface InvestigationRunsSectionProps {
-  issueId: string
-  datasetId?: string | null
+  issueId: string;
+  datasetId?: string | null;
 }
 
-function InvestigationRunsSection({ issueId, datasetId }: InvestigationRunsSectionProps) {
-  const [showModal, setShowModal] = useState(false)
-  const [focusPrompt, setFocusPrompt] = useState('')
-  const [executionProfile, setExecutionProfile] = useState('standard')
-  const query = useIssueInvestigationRuns(issueId)
-  const spawnInvestigation = useSpawnInvestigation()
-  const invalidate = useInvalidateIssues()
+function InvestigationRunsSection({
+  issueId,
+  datasetId,
+}: InvestigationRunsSectionProps) {
+  const [showModal, setShowModal] = useState(false);
+  const [focusPrompt, setFocusPrompt] = useState("");
+  const [executionProfile, setExecutionProfile] = useState("standard");
+  const query = useIssueInvestigationRuns(issueId);
+  const spawnInvestigation = useSpawnInvestigation();
+  const invalidate = useInvalidateIssues();
 
   const handleSpawn = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!focusPrompt.trim()) return
+    e.preventDefault();
+    if (!focusPrompt.trim()) return;
 
     try {
       await spawnInvestigation.mutateAsync({
         issueId,
         data: {
           focus_prompt: focusPrompt.trim(),
-          execution_profile: executionProfile as 'safe' | 'standard' | 'deep',
+          execution_profile: executionProfile as "safe" | "standard" | "deep",
           dataset_id: datasetId || undefined,
         },
-      })
-      setShowModal(false)
-      setFocusPrompt('')
-      invalidate.invalidateInvestigationRuns(issueId)
+      });
+      setShowModal(false);
+      setFocusPrompt("");
+      invalidate.invalidateInvestigationRuns(issueId);
     } catch (error) {
-      console.error('Failed to spawn investigation:', error)
+      console.error("Failed to spawn investigation:", error);
     }
-  }
+  };
 
   return (
     <>
@@ -251,7 +257,12 @@ function InvestigationRunsSection({ issueId, datasetId }: InvestigationRunsSecti
         </CardHeader>
         <CardContent>
           <AsyncBoundary
-            query={query as unknown as UseQueryResult<InvestigationRunListResponse, Error>}
+            query={
+              query as unknown as UseQueryResult<
+                InvestigationRunListResponse,
+                Error
+              >
+            }
           >
             {(data) => (
               <div className="space-y-2">
@@ -269,7 +280,7 @@ function InvestigationRunsSection({ issueId, datasetId }: InvestigationRunsSecti
                       <div className="flex items-center justify-between mb-1">
                         <span className="text-sm font-medium">
                           {run.focus_prompt?.slice(0, 50)}
-                          {(run.focus_prompt?.length ?? 0) > 50 ? '...' : ''}
+                          {(run.focus_prompt?.length ?? 0) > 50 ? "..." : ""}
                         </span>
                         <Badge variant="outline" className="text-xs">
                           {run.execution_profile}
@@ -278,7 +289,9 @@ function InvestigationRunsSection({ issueId, datasetId }: InvestigationRunsSecti
                       <div className="flex items-center gap-2 text-xs text-muted-foreground">
                         <span>{formatDate(run.created_at)}</span>
                         {run.confidence && (
-                          <span>• {Math.round(run.confidence * 100)}% confidence</span>
+                          <span>
+                            • {Math.round(run.confidence * 100)}% confidence
+                          </span>
                         )}
                         {run.root_cause_tag && (
                           <Badge variant="secondary" className="text-xs">
@@ -337,15 +350,22 @@ function InvestigationRunsSection({ issueId, datasetId }: InvestigationRunsSecti
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="safe">Safe - Limited queries</SelectItem>
-                        <SelectItem value="standard">Standard - Balanced</SelectItem>
-                        <SelectItem value="deep">Deep - Comprehensive</SelectItem>
+                        <SelectItem value="safe">
+                          Safe - Limited queries
+                        </SelectItem>
+                        <SelectItem value="standard">
+                          Standard - Balanced
+                        </SelectItem>
+                        <SelectItem value="deep">
+                          Deep - Comprehensive
+                        </SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
                   {datasetId && (
                     <p className="text-sm text-muted-foreground">
-                      Dataset: <code className="bg-muted px-1">{datasetId}</code>
+                      Dataset:{" "}
+                      <code className="bg-muted px-1">{datasetId}</code>
                     </p>
                   )}
                   <div className="flex justify-end gap-2">
@@ -358,7 +378,9 @@ function InvestigationRunsSection({ issueId, datasetId }: InvestigationRunsSecti
                     </Button>
                     <Button
                       type="submit"
-                      disabled={spawnInvestigation.isPending || !focusPrompt.trim()}
+                      disabled={
+                        spawnInvestigation.isPending || !focusPrompt.trim()
+                      }
                     >
                       {spawnInvestigation.isPending ? (
                         <Loader2 className="h-4 w-4 animate-spin mr-2" />
@@ -375,35 +397,35 @@ function InvestigationRunsSection({ issueId, datasetId }: InvestigationRunsSecti
         </>
       )}
     </>
-  )
+  );
 }
 
 interface WatchersSectionProps {
-  issueId: string
+  issueId: string;
 }
 
 function WatchersSection({ issueId }: WatchersSectionProps) {
-  const query = useIssueWatchers(issueId)
-  const watchIssue = useWatchIssue()
-  const unwatchIssue = useUnwatchIssue()
-  const invalidate = useInvalidateIssues()
-  const [isWatching, setIsWatching] = useState(false)
+  const query = useIssueWatchers(issueId);
+  const watchIssue = useWatchIssue();
+  const unwatchIssue = useUnwatchIssue();
+  const invalidate = useInvalidateIssues();
+  const [isWatching, setIsWatching] = useState(false);
 
   const handleToggleWatch = async () => {
     try {
       if (isWatching) {
-        await unwatchIssue.mutateAsync({ issueId })
+        await unwatchIssue.mutateAsync({ issueId });
       } else {
-        await watchIssue.mutateAsync({ issueId })
+        await watchIssue.mutateAsync({ issueId });
       }
-      setIsWatching(!isWatching)
-      invalidate.invalidateWatchers(issueId)
+      setIsWatching(!isWatching);
+      invalidate.invalidateWatchers(issueId);
     } catch (error) {
-      console.error('Failed to toggle watch:', error)
+      console.error("Failed to toggle watch:", error);
     }
-  }
+  };
 
-  const isPending = watchIssue.isPending || unwatchIssue.isPending
+  const isPending = watchIssue.isPending || unwatchIssue.isPending;
 
   return (
     <div className="space-y-2">
@@ -433,39 +455,41 @@ function WatchersSection({ issueId }: WatchersSectionProps) {
           )}
         </Button>
       </div>
-      <AsyncBoundary query={query as unknown as UseQueryResult<WatcherListResponse, Error>}>
+      <AsyncBoundary
+        query={query as unknown as UseQueryResult<WatcherListResponse, Error>}
+      >
         {(data) => (
           <p className="text-sm text-muted-foreground">
-            {data.total} {data.total === 1 ? 'watcher' : 'watchers'}
+            {data.total} {data.total === 1 ? "watcher" : "watchers"}
           </p>
         )}
       </AsyncBoundary>
     </div>
-  )
+  );
 }
 
 interface IssueWorkspaceContentProps {
-  issue: IssueResponse
+  issue: IssueResponse;
 }
 
 function IssueWorkspaceContent({ issue }: IssueWorkspaceContentProps) {
-  const updateIssue = useUpdateIssue()
-  const invalidate = useInvalidateIssues()
-  const [isEditingStatus, setIsEditingStatus] = useState(false)
+  const updateIssue = useUpdateIssue();
+  const invalidate = useInvalidateIssues();
+  const [isEditingStatus, setIsEditingStatus] = useState(false);
 
   const handleStatusChange = async (newStatus: string) => {
     try {
       await updateIssue.mutateAsync({
         issueId: issue.id,
         data: { status: newStatus },
-      })
-      invalidate.invalidateDetail(issue.id)
-      invalidate.invalidateList()
-      setIsEditingStatus(false)
+      });
+      invalidate.invalidateDetail(issue.id);
+      invalidate.invalidateList();
+      setIsEditingStatus(false);
     } catch (error) {
-      console.error('Failed to update status:', error)
+      console.error("Failed to update status:", error);
     }
-  }
+  };
 
   return (
     <div className="space-y-6">
@@ -479,7 +503,9 @@ function IssueWorkspaceContent({ issue }: IssueWorkspaceContentProps) {
           </Link>
           <div>
             <div className="flex items-center gap-2 mb-1">
-              <span className="text-muted-foreground font-mono">#{issue.number}</span>
+              <span className="text-muted-foreground font-mono">
+                #{issue.number}
+              </span>
               <h1 className="text-2xl font-bold">{issue.title}</h1>
             </div>
             <div className="flex items-center gap-2">
@@ -538,7 +564,9 @@ function IssueWorkspaceContent({ issue }: IssueWorkspaceContentProps) {
             </CardHeader>
             <CardContent>
               {issue.description ? (
-                <p className="text-sm whitespace-pre-wrap">{issue.description}</p>
+                <p className="text-sm whitespace-pre-wrap">
+                  {issue.description}
+                </p>
               ) : (
                 <p className="text-sm text-muted-foreground italic">
                   No description provided.
@@ -584,7 +612,7 @@ function IssueWorkspaceContent({ issue }: IssueWorkspaceContentProps) {
                   Assignee
                 </span>
                 <p className="text-sm text-muted-foreground">
-                  {issue.assignee_user_id || 'Unassigned'}
+                  {issue.assignee_user_id || "Unassigned"}
                 </p>
               </div>
 
@@ -617,7 +645,9 @@ function IssueWorkspaceContent({ issue }: IssueWorkspaceContentProps) {
                 <div className="text-sm text-muted-foreground space-y-1">
                   <p>Created: {formatDate(issue.created_at)}</p>
                   <p>Updated: {formatDate(issue.updated_at)}</p>
-                  {issue.closed_at && <p>Closed: {formatDate(issue.closed_at)}</p>}
+                  {issue.closed_at && (
+                    <p>Closed: {formatDate(issue.closed_at)}</p>
+                  )}
                 </div>
               </div>
             </CardContent>
@@ -625,12 +655,12 @@ function IssueWorkspaceContent({ issue }: IssueWorkspaceContentProps) {
         </div>
       </div>
     </div>
-  )
+  );
 }
 
 export function IssueWorkspace() {
-  const { id } = useParams<{ id: string }>()
-  const query = useIssue(id ?? '')
+  const { id } = useParams<{ id: string }>();
+  const query = useIssue(id ?? "");
 
   if (!id) {
     return (
@@ -642,7 +672,7 @@ export function IssueWorkspace() {
           </Link>
         </CardContent>
       </Card>
-    )
+    );
   }
 
   if (query.isLoading) {
@@ -650,7 +680,7 @@ export function IssueWorkspace() {
       <div className="flex items-center justify-center py-12">
         <RefreshCw className="h-8 w-8 animate-spin text-muted-foreground" />
       </div>
-    )
+    );
   }
 
   if (query.error || !query.data) {
@@ -658,15 +688,16 @@ export function IssueWorkspace() {
       <Card>
         <CardContent className="py-12 text-center">
           <p className="text-destructive">
-            Failed to load issue: {query.error ? String(query.error) : 'Not found'}
+            Failed to load issue:{" "}
+            {query.error ? String(query.error) : "Not found"}
           </p>
           <Link to="/issues">
             <Button className="mt-4">Back to list</Button>
           </Link>
         </CardContent>
       </Card>
-    )
+    );
   }
 
-  return <IssueWorkspaceContent issue={query.data} />
+  return <IssueWorkspaceContent issue={query.data} />;
 }

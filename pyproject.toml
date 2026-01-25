@@ -7,7 +7,7 @@ requires-python = ">=3.11"
 license = { text = "MIT" }
 authors = [{ name = "dataing team" }]
 dependencies = [
-    "bond",
+    "bond-agent>=0.1.2",
     "fastapi[standard]>=0.109.0",
     "uvicorn[standard]>=0.27.0",
     "pydantic[email]>=2.5.0",
@@ -75,8 +75,8 @@ packages = ["python-packages/dataing/src/dataing"]
 
 [tool.mypy]
 python_version = "3.11"
-mypy_path = ["python-packages/bond/src", "python-packages/dataing/src", "python-packages/dataing-ee/src"]
-files = ["python-packages/bond/src/bond", "python-packages/dataing/src/dataing", "python-packages/dataing-ee/src/dataing_ee"]
+mypy_path = ["python-packages/dataing/src", "python-packages/dataing-ee/src"]
+files = ["python-packages/dataing/src/dataing", "python-packages/dataing-ee/src/dataing_ee"]
 namespace_packages = true
 explicit_package_bases = true
 # Strict mode flags (equivalent to --strict but with SQLAlchemy-compatible settings)
@@ -115,20 +115,10 @@ module = [
 disallow_untyped_decorators = false
 disallow_untyped_calls = false
 
-[[tool.mypy.overrides]]
-module = ["bond.tools.memory.backends"]
-# sentence_transformers doesn't have type stubs
-disallow_untyped_calls = false
-
-[[tool.mypy.overrides]]
-module = ["bond.agent"]
-# PydanticAI Agent internals
-disallow_any_generics = false
-
 [tool.ruff]
 target-version = "py311"
 line-length = 100
-src = ["python-packages/bond/src", "python-packages/dataing/src", "python-packages/dataing-ee"]
+src = ["python-packages/dataing/src", "python-packages/dataing-ee"]
 
 [tool.ruff.lint]
 select = [
@@ -153,9 +143,9 @@ convention = "google"
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
-pythonpath = [".", "python-packages/bond/src", "python-packages/dataing/src", "python-packages/dataing-ee/src", "python-packages/dataing/tests", "python-packages/dataing-ee/tests", "python-packages/dataing-sdk/src", "python-packages/dataing-notebook/src"]
-testpaths = ["python-packages/bond/tests", "python-packages/dataing/tests", "python-packages/dataing-ee/tests"]
-addopts = "-v --import-mode=importlib --cov=python-packages/bond/src/bond --cov=python-packages/dataing/src/dataing --cov=python-packages/dataing-ee/src/dataing_ee --cov-report=term-missing"
+pythonpath = [".", "python-packages/dataing/src", "python-packages/dataing-ee/src", "python-packages/dataing/tests", "python-packages/dataing-ee/tests", "python-packages/dataing-sdk/src", "python-packages/dataing-notebook/src"]
+testpaths = ["python-packages/dataing/tests", "python-packages/dataing-ee/tests"]
+addopts = "-v --import-mode=importlib --cov=python-packages/dataing/src/dataing --cov=python-packages/dataing-ee/src/dataing_ee --cov-report=term-missing"
 
 [dependency-groups]
 dev = [
@@ -164,7 +154,6 @@ dev = [
 ]
 
 [tool.uv.sources]
-bond = { path = "python-packages/bond", editable = true }
 dataing-sdk = { path = "python-packages/dataing-sdk", editable = true }
 dataing-notebook = { path = "python-packages/dataing-notebook", editable = true }
 jupyterlab-dataing = { path = "frontend/jupyterlab-dataing", editable = true }

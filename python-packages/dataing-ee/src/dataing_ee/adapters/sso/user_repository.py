@@ -189,7 +189,7 @@ class SCIMUserRepository:
         updates.append("updated_at = NOW()")
 
         query = f"""
-            UPDATE users SET {', '.join(updates)}
+            UPDATE users SET {", ".join(updates)}
             WHERE id = $1 AND tenant_id = $2
             RETURNING id, tenant_id, email, name, role, is_active, created_at, updated_at
         """

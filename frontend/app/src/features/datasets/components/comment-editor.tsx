@@ -1,34 +1,34 @@
-'use client'
+"use client";
 
-import { useState } from 'react'
-import { Button } from '@/components/ui/Button'
-import { Textarea } from '@/components/ui/textarea'
+import { useState } from "react";
+import { Button } from "@/components/ui/Button";
+import { Textarea } from "@/components/ui/textarea";
 
 interface CommentEditorProps {
-  placeholder?: string
-  submitLabel?: string
-  onSubmit: (content: string) => void
-  onCancel?: () => void
-  isSubmitting?: boolean
-  initialValue?: string
+  placeholder?: string;
+  submitLabel?: string;
+  onSubmit: (content: string) => void;
+  onCancel?: () => void;
+  isSubmitting?: boolean;
+  initialValue?: string;
 }
 
 export function CommentEditor({
-  placeholder = 'Write a comment... (Markdown supported)',
-  submitLabel = 'Submit',
+  placeholder = "Write a comment... (Markdown supported)",
+  submitLabel = "Submit",
   onSubmit,
   onCancel,
   isSubmitting = false,
-  initialValue = '',
+  initialValue = "",
 }: CommentEditorProps) {
-  const [content, setContent] = useState(initialValue)
+  const [content, setContent] = useState(initialValue);
 
   const handleSubmit = () => {
     if (content.trim()) {
-      onSubmit(content.trim())
-      setContent('')
+      onSubmit(content.trim());
+      setContent("");
     }
-  }
+  };
 
   return (
     <div className="space-y-2">
@@ -41,7 +41,12 @@ export function CommentEditor({
       />
       <div className="flex justify-end gap-2">
         {onCancel && (
-          <Button variant="ghost" size="sm" onClick={onCancel} disabled={isSubmitting}>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={onCancel}
+            disabled={isSubmitting}
+          >
             Cancel
           </Button>
         )}
@@ -50,9 +55,9 @@ export function CommentEditor({
           onClick={handleSubmit}
           disabled={!content.trim() || isSubmitting}
         >
-          {isSubmitting ? 'Submitting...' : submitLabel}
+          {isSubmitting ? "Submitting..." : submitLabel}
         </Button>
       </div>
     </div>
-  )
+  );
 }

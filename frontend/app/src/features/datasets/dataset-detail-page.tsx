@@ -1,5 +1,5 @@
-import { useState, useMemo } from 'react'
-import { useParams, Link } from 'react-router-dom'
+import { useState, useMemo } from "react";
+import { useParams, Link } from "react-router-dom";
 import {
   Table as TableIcon,
   AlertCircle,
@@ -12,11 +12,11 @@ import {
   CheckCircle,
   XCircle,
   Brain,
-} from 'lucide-react'
+} from "lucide-react";
 
-import { Button } from '@/components/ui/Button'
-import { Badge } from '@/components/ui/Badge'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Button } from "@/components/ui/Button";
+import { Badge } from "@/components/ui/Badge";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Table,
   TableBody,
@@ -24,77 +24,82 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from '@/components/ui/table'
-import { LoadingSpinner } from '@/components/shared/loading-spinner'
-import { EmptyState } from '@/components/shared/empty-state'
-import { useDataset, useDatasetInvestigations } from '@/lib/api/datasets'
-import { useSchemaComments } from '@/lib/api/schema-comments'
-import { formatNumber, formatRelativeTime } from '@/lib/utils'
-import { LineagePanel } from '@/features/investigation/components/lineage-panel'
-import { SchemaCommentIndicator } from './components/schema-comment-indicator'
-import { CommentSlidePanel } from './components/comment-slide-panel'
-import { KnowledgeTab } from './components/knowledge-tab'
+} from "@/components/ui/table";
+import { LoadingSpinner } from "@/components/shared/loading-spinner";
+import { EmptyState } from "@/components/shared/empty-state";
+import { useDataset, useDatasetInvestigations } from "@/lib/api/datasets";
+import { useSchemaComments } from "@/lib/api/schema-comments";
+import { formatNumber, formatRelativeTime } from "@/lib/utils";
+import { LineagePanel } from "@/features/investigation/components/lineage-panel";
+import { SchemaCommentIndicator } from "./components/schema-comment-indicator";
+import { CommentSlidePanel } from "./components/comment-slide-panel";
+import { KnowledgeTab } from "./components/knowledge-tab";
 
 function getStatusBadgeVariant(status: string) {
   switch (status.toLowerCase()) {
-    case 'completed':
-      return 'success'
-    case 'running':
-    case 'in_progress':
-      return 'default'
-    case 'failed':
-      return 'destructive'
+    case "completed":
+      return "success";
+    case "running":
+    case "in_progress":
+      return "default";
+    case "failed":
+      return "destructive";
     default:
-      return 'secondary'
+      return "secondary";
   }
 }
 
 function getSeverityBadgeVariant(severity: string | null | undefined) {
-  if (!severity) return 'secondary'
+  if (!severity) return "secondary";
   switch (severity.toLowerCase()) {
-    case 'critical':
-      return 'destructive'
-    case 'high':
-      return 'warning'
-    case 'medium':
-      return 'secondary'
-    case 'low':
-      return 'outline'
+    case "critical":
+      return "destructive";
+    case "high":
+      return "warning";
+    case "medium":
+      return "secondary";
+    case "low":
+      return "outline";
     default:
-      return 'secondary'
+      return "secondary";
   }
 }
 
 export function DatasetDetailPage() {
-  const { datasetId } = useParams<{ datasetId: string }>()
-  const { data: dataset, isLoading, error, refetch } = useDataset(datasetId ?? null)
+  const { datasetId } = useParams<{ datasetId: string }>();
+  const {
+    data: dataset,
+    isLoading,
+    error,
+    refetch,
+  } = useDataset(datasetId ?? null);
   const { data: investigationsResponse, isLoading: investigationsLoading } =
-    useDatasetInvestigations(datasetId ?? null)
-  const [selectedField, setSelectedField] = useState<string | null>(null)
+    useDatasetInvestigations(datasetId ?? null);
+  const [selectedField, setSelectedField] = useState<string | null>(null);
 
   // Fetch all comments for the dataset once (no fieldName filter) to avoid N+1 queries
-  const { data: allSchemaComments = [] } = useSchemaComments(datasetId ?? '')
+  const { data: allSchemaComments = [] } = useSchemaComments(datasetId ?? "");
 
   // Create a map of field -> comment count for efficient lookup
   const commentCountsByField = useMemo(() => {
     return allSchemaComments.reduce(
       (acc, comment) => {
-        const field = comment.field_name
-        acc[field] = (acc[field] || 0) + 1
-        return acc
+        const field = comment.field_name;
+        acc[field] = (acc[field] || 0) + 1;
+        return acc;
       },
-      {} as Record<string, number>
-    )
-  }, [allSchemaComments])
+      {} as Record<string, number>,
+    );
+  }, [allSchemaComments]);
 
-  const investigations = investigationsResponse?.investigations ?? []
+  const investigations = investigationsResponse?.investigations ?? [];
 
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-12">
         <LoadingSpinner size="lg" />
       </div>
-    )
+    );
   }
 
   if (error || !dataset) {
@@ -103,9 +108,11 @@ export function DatasetDetailPage() {
         <div className="flex items-center gap-3 rounded-lg border border-destructive/50 bg-destructive/10 p-4 max-w-lg">
           <AlertCircle className="h-5 w-5 text-destructive flex-shrink-0" />
           <div>
-            <p className="font-medium text-destructive">Failed to load dataset</p>
+            <p className="font-medium text-destructive">
+              Failed to load dataset
+            </p>
             <p className="text-sm text-muted-foreground mt-1">
-              {error?.message || 'The dataset could not be found.'}
+              {error?.message || "The dataset could not be found."}
             </p>
           </div>
         </div>
@@ -119,10 +126,10 @@ export function DatasetDetailPage() {
           </Link>
         </div>
       </div>
-    )
+    );
   }
 
-  const columns = dataset.columns ?? []
+  const columns = dataset.columns ?? [];
 
   return (
     <div className="space-y-6">
@@ -138,7 +145,7 @@ export function DatasetDetailPage() {
               to={`/datasources/${dataset.datasource_id}/datasets`}
               className="hover:text-foreground"
             >
-              {dataset.datasource_name ?? 'Datasource'}
+              {dataset.datasource_name ?? "Datasource"}
             </Link>
             <span>/</span>
           </>
@@ -201,7 +208,10 @@ export function DatasetDetailPage() {
             <Bell className="h-4 w-4" />
             Alerts
           </TabsTrigger>
-          <TabsTrigger value="investigations" className="flex items-center gap-2">
+          <TabsTrigger
+            value="investigations"
+            className="flex items-center gap-2"
+          >
             <Search className="h-4 w-4" />
             Investigations
           </TabsTrigger>
@@ -229,24 +239,28 @@ export function DatasetDetailPage() {
                       <TableHead>Data Type</TableHead>
                       <TableHead>Nullable</TableHead>
                       <TableHead>Key</TableHead>
-                      <TableHead className="w-[100px] text-right">Comments</TableHead>
+                      <TableHead className="w-[100px] text-right">
+                        Comments
+                      </TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {columns.map((col, index) => {
                       const column = col as {
-                        name?: string
-                        data_type?: string
-                        nullable?: boolean
-                        is_primary_key?: boolean
-                      }
+                        name?: string;
+                        data_type?: string;
+                        nullable?: boolean;
+                        is_primary_key?: boolean;
+                      };
                       return (
                         <TableRow key={column.name ?? index} className="group">
                           <TableCell className="font-medium font-mono">
-                            {column.name ?? '-'}
+                            {column.name ?? "-"}
                           </TableCell>
                           <TableCell>
-                            <Badge variant="outline">{column.data_type ?? 'unknown'}</Badge>
+                            <Badge variant="outline">
+                              {column.data_type ?? "unknown"}
+                            </Badge>
                           </TableCell>
                           <TableCell>
                             {column.nullable ? (
@@ -263,14 +277,18 @@ export function DatasetDetailPage() {
                           <TableCell className="text-right">
                             {column.name && (
                               <SchemaCommentIndicator
-                                commentCount={commentCountsByField[column.name] || 0}
+                                commentCount={
+                                  commentCountsByField[column.name] || 0
+                                }
                                 fieldName={column.name}
-                                onClick={() => setSelectedField(column.name ?? null)}
+                                onClick={() =>
+                                  setSelectedField(column.name ?? null)
+                                }
                               />
                             )}
                           </TableCell>
                         </TableRow>
-                      )
+                      );
                     })}
                   </TableBody>
                 </Table>
@@ -278,7 +296,7 @@ export function DatasetDetailPage() {
               {datasetId && (
                 <CommentSlidePanel
                   datasetId={datasetId}
-                  fieldName={selectedField ?? ''}
+                  fieldName={selectedField ?? ""}
                   isOpen={!!selectedField}
                   onClose={() => setSelectedField(null)}
                 />
@@ -345,13 +363,19 @@ export function DatasetDetailPage() {
                         </Link>
                       </TableCell>
                       <TableCell>
-                        <Badge variant={getStatusBadgeVariant(investigation.status)}>
+                        <Badge
+                          variant={getStatusBadgeVariant(investigation.status)}
+                        >
                           {investigation.status}
                         </Badge>
                       </TableCell>
                       <TableCell>
                         {investigation.severity ? (
-                          <Badge variant={getSeverityBadgeVariant(investigation.severity)}>
+                          <Badge
+                            variant={getSeverityBadgeVariant(
+                              investigation.severity,
+                            )}
+                          >
                             {investigation.severity}
                           </Badge>
                         ) : (
@@ -364,7 +388,7 @@ export function DatasetDetailPage() {
                       <TableCell className="text-muted-foreground">
                         {investigation.completed_at
                           ? formatRelativeTime(investigation.completed_at)
-                          : '-'}
+                          : "-"}
                       </TableCell>
                     </TableRow>
                   ))}
@@ -380,5 +404,5 @@ export function DatasetDetailPage() {
         </TabsContent>
       </Tabs>
     </div>
-  )
+  );
 }

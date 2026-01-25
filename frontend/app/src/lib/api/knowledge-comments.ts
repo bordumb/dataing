@@ -1,56 +1,61 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import customInstance from './client'
-import { queryKeys } from './query-keys'
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import customInstance from "./client";
+import { queryKeys } from "./query-keys";
 
 // Re-export generated types for convenience
 export type {
   KnowledgeCommentResponse,
   KnowledgeCommentCreate,
   KnowledgeCommentUpdate,
-} from './model'
+} from "./model";
 
 // Import types for internal use
 import type {
   KnowledgeCommentResponse,
   KnowledgeCommentCreate,
   KnowledgeCommentUpdate,
-} from './model'
+} from "./model";
 
-async function listKnowledgeComments(datasetId: string): Promise<KnowledgeCommentResponse[]> {
+async function listKnowledgeComments(
+  datasetId: string,
+): Promise<KnowledgeCommentResponse[]> {
   return customInstance<KnowledgeCommentResponse[]>({
     url: `/api/v1/datasets/${datasetId}/knowledge-comments`,
-    method: 'GET',
-  })
+    method: "GET",
+  });
 }
 
 async function createKnowledgeComment(
   datasetId: string,
-  data: KnowledgeCommentCreate
+  data: KnowledgeCommentCreate,
 ): Promise<KnowledgeCommentResponse> {
   return customInstance<KnowledgeCommentResponse>({
     url: `/api/v1/datasets/${datasetId}/knowledge-comments`,
-    method: 'POST',
+    method: "POST",
     data,
-  })
+  });
 }
 
 async function updateKnowledgeComment(
   datasetId: string,
   commentId: string,
-  data: KnowledgeCommentUpdate
+  data: KnowledgeCommentUpdate,
 ): Promise<KnowledgeCommentResponse> {
   return customInstance<KnowledgeCommentResponse>({
     url: `/api/v1/datasets/${datasetId}/knowledge-comments/${commentId}`,
-    method: 'PATCH',
+    method: "PATCH",
     data,
-  })
+  });
 }
 
-async function deleteKnowledgeComment(datasetId: string, commentId: string): Promise<void> {
+async function deleteKnowledgeComment(
+  datasetId: string,
+  commentId: string,
+): Promise<void> {
   return customInstance<void>({
     url: `/api/v1/datasets/${datasetId}/knowledge-comments/${commentId}`,
-    method: 'DELETE',
-  })
+    method: "DELETE",
+  });
 }
 
 export function useKnowledgeComments(datasetId: string) {
@@ -58,36 +63,49 @@ export function useKnowledgeComments(datasetId: string) {
     queryKey: queryKeys.knowledgeComments.list(datasetId),
     queryFn: () => listKnowledgeComments(datasetId),
     enabled: !!datasetId,
-  })
+  });
 }
 
 export function useCreateKnowledgeComment(datasetId: string) {
-  const queryClient = useQueryClient()
+  const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (data: KnowledgeCommentCreate) => createKnowledgeComment(datasetId, data),
+    mutationFn: (data: KnowledgeCommentCreate) =>
+      createKnowledgeComment(datasetId, data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.knowledgeComments.all(datasetId) })
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.knowledgeComments.all(datasetId),
+      });
     },
-  })
+  });
 }
 
 export function useUpdateKnowledgeComment(datasetId: string) {
-  const queryClient = useQueryClient()
+  const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ commentId, data }: { commentId: string; data: KnowledgeCommentUpdate }) =>
-      updateKnowledgeComment(datasetId, commentId, data),
+    mutationFn: ({
+      commentId,
+      data,
+    }: {
+      commentId: string;
+      data: KnowledgeCommentUpdate;
+    }) => updateKnowledgeComment(datasetId, commentId, data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.knowledgeComments.all(datasetId) })
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.knowledgeComments.all(datasetId),
+      });
     },
-  })
+  });
 }
 
 export function useDeleteKnowledgeComment(datasetId: string) {
-  const queryClient = useQueryClient()
+  const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (commentId: string) => deleteKnowledgeComment(datasetId, commentId),
+    mutationFn: (commentId: string) =>
+      deleteKnowledgeComment(datasetId, commentId),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.knowledgeComments.all(datasetId) })
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.knowledgeComments.all(datasetId),
+      });
     },
-  })
+  });
 }

@@ -7,8 +7,7 @@ DO NOT WORRY ABOUT LEGACY CODE.
 
 ## Repository Map (Monorepo)
 
-- python-packages/ - Python packages (bond, dataing, dataing-ee)
-  - bond/ - Agent runtime (PydanticAI wrapper, streaming)
+- python-packages/ - Python packages (dataing, dataing-ee)
   - dataing/ - Community Edition (CE) backend package, migrations, scripts
   - dataing-ee/ - Enterprise Edition (EE) extension package
 - frontend/ - React + Vite + TypeScript + Tailwind + shadcn/ui
@@ -18,8 +17,10 @@ DO NOT WORRY ABOUT LEGACY CODE.
 ### Package Dependency Order
 
 ```
-bond (pydantic-ai) → dataing (bond + temporal)
+dataing (bond-agent + temporal)
 ```
+
+Note: `bond-agent` is an external PyPI package (`pip install bond-agent`).
 
 ## Development Commands
 
@@ -76,13 +77,7 @@ cause analysis.
 The repo is open-core:
 - CE lives in `python-packages/dataing/`
 - EE lives in `python-packages/dataing-ee/` and extends CE with enterprise-only features
-- `python-packages/bond/` provides the agent runtime and memory tools used by the backend
-
-## Bond Agent Runtime
-
-`python-packages/bond/src/bond/` wraps PydanticAI for LLM interactions:
-- `agent.py` - `BondAgent` with streaming and structured output
-- Provides agent orchestration with prompt building and response mapping
+- Agent runtime is provided by `bond-agent` PyPI package (`from bond import BondAgent`)
 
 ## Backend Architecture (CE)
 

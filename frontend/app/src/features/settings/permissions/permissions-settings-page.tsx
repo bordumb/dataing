@@ -1,5 +1,5 @@
-import { PageHeader } from '@/components/shared/page-header'
-import { PermissionsSettings } from './permissions-settings'
+import { PageHeader } from "@/components/shared/page-header";
+import { PermissionsSettings } from "./permissions-settings";
 
 export function PermissionsSettingsPage() {
   return (
@@ -10,5 +10,5 @@ export function PermissionsSettingsPage() {
       />
       <PermissionsSettings />
     </div>
-  )
+  );
 }

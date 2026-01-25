@@ -1,10 +1,24 @@
-import * as React from 'react'
-import { Shield, Trash2, Loader2, Users, User, Tag, Database } from 'lucide-react'
-import { toast } from 'sonner'
-import { useQueryClient } from '@tanstack/react-query'
+import * as React from "react";
+import {
+  Shield,
+  Trash2,
+  Loader2,
+  Users,
+  User,
+  Tag,
+  Database,
+} from "lucide-react";
+import { toast } from "sonner";
+import { useQueryClient } from "@tanstack/react-query";
 
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card'
-import { Button } from '@/components/ui/Button'
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/Card";
+import { Button } from "@/components/ui/Button";
 import {
   Dialog,
   DialogContent,
@@ -12,83 +26,92 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from '@/components/ui/dialog'
-import { EmptyState } from '@/components/shared/empty-state'
-import { Badge } from '@/components/ui/Badge'
+} from "@/components/ui/dialog";
+import { EmptyState } from "@/components/shared/empty-state";
+import { Badge } from "@/components/ui/Badge";
 import {
   useListPermissionsApiV1PermissionsGet,
   useDeletePermissionApiV1PermissionsGrantIdDelete,
   getListPermissionsApiV1PermissionsGetQueryKey,
-} from '@/lib/api/generated/permissions/permissions'
-import type { PermissionGrantResponse } from '@/lib/api/model'
+} from "@/lib/api/generated/permissions/permissions";
+import type { PermissionGrantResponse } from "@/lib/api/model";
 
 export function PermissionsSettings() {
-  const queryClient = useQueryClient()
-  const [grantToDelete, setGrantToDelete] = React.useState<PermissionGrantResponse | null>(null)
+  const queryClient = useQueryClient();
+  const [grantToDelete, setGrantToDelete] =
+    React.useState<PermissionGrantResponse | null>(null);
 
-  const { data: permissionsData, isLoading, error } = useListPermissionsApiV1PermissionsGet()
-  const permissions = permissionsData?.permissions ?? []
+  const {
+    data: permissionsData,
+    isLoading,
+    error,
+  } = useListPermissionsApiV1PermissionsGet();
+  const permissions = permissionsData?.permissions ?? [];
 
   const deleteMutation = useDeletePermissionApiV1PermissionsGrantIdDelete({
     mutation: {
       onSuccess: () => {
-        queryClient.invalidateQueries({ queryKey: getListPermissionsApiV1PermissionsGetQueryKey() })
-        toast.success('Permission revoked successfully')
-        setGrantToDelete(null)
+        queryClient.invalidateQueries({
+          queryKey: getListPermissionsApiV1PermissionsGetQueryKey(),
+        });
+        toast.success("Permission revoked successfully");
+        setGrantToDelete(null);
       },
       onError: (error: Error) => {
-        toast.error(`Failed to revoke permission: ${error.message || 'Unknown error'}`)
+        toast.error(
+          `Failed to revoke permission: ${error.message || "Unknown error"}`,
+        );
       },
     },
-  })
+  });
 
   const handleDelete = () => {
-    if (!grantToDelete) return
-    deleteMutation.mutate({ grantId: grantToDelete.id })
-  }
+    if (!grantToDelete) return;
+    deleteMutation.mutate({ grantId: grantToDelete.id });
+  };
 
   const getGranteeIcon = (granteeType: string) => {
-    return granteeType === 'user' ? (
+    return granteeType === "user" ? (
       <User className="h-4 w-4 text-muted-foreground" />
     ) : (
       <Users className="h-4 w-4 text-muted-foreground" />
-    )
-  }
+    );
+  };
 
   const getAccessIcon = (accessType: string) => {
     switch (accessType) {
-      case 'tag':
-        return <Tag className="h-4 w-4 text-muted-foreground" />
-      case 'datasource':
-        return <Database className="h-4 w-4 text-muted-foreground" />
+      case "tag":
+        return <Tag className="h-4 w-4 text-muted-foreground" />;
+      case "datasource":
+        return <Database className="h-4 w-4 text-muted-foreground" />;
       default:
-        return <Shield className="h-4 w-4 text-muted-foreground" />
+        return <Shield className="h-4 w-4 text-muted-foreground" />;
     }
-  }
+  };
 
   const getPermissionBadgeVariant = (permission: string) => {
     switch (permission) {
-      case 'admin':
-        return 'destructive'
-      case 'write':
-        return 'default'
+      case "admin":
+        return "destructive";
+      case "write":
+        return "default";
       default:
-        return 'secondary'
+        return "secondary";
     }
-  }
+  };
 
   const formatGrantDescription = (grant: PermissionGrantResponse) => {
-    const granteeType = grant.grantee_type === 'user' ? 'User' : 'Team'
-    const granteeId = grant.grantee_id?.slice(0, 8) ?? 'Unknown'
+    const granteeType = grant.grantee_type === "user" ? "User" : "Team";
+    const granteeId = grant.grantee_id?.slice(0, 8) ?? "Unknown";
 
-    if (grant.access_type === 'resource') {
-      return `${granteeType} ${granteeId} can access investigation ${grant.resource_id?.slice(0, 8)}`
-    } else if (grant.access_type === 'tag') {
-      return `${granteeType} ${granteeId} can access all investigations with tag`
+    if (grant.access_type === "resource") {
+      return `${granteeType} ${granteeId} can access investigation ${grant.resource_id?.slice(0, 8)}`;
+    } else if (grant.access_type === "tag") {
+      return `${granteeType} ${granteeId} can access all investigations with tag`;
     } else {
-      return `${granteeType} ${granteeId} can access all investigations on datasource`
+      return `${granteeType} ${granteeId} can access all investigations on datasource`;
     }
-  }
+  };
 
   if (isLoading) {
     return (
@@ -97,7 +120,7 @@ export function PermissionsSettings() {
           <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
         </CardContent>
       </Card>
-    )
+    );
   }
 
   if (error) {
@@ -111,7 +134,7 @@ export function PermissionsSettings() {
           />
         </CardContent>
       </Card>
-    )
+    );
   }
 
   return (
@@ -120,8 +143,8 @@ export function PermissionsSettings() {
         <CardHeader>
           <CardTitle>Permission Grants</CardTitle>
           <CardDescription>
-            View and manage all permission grants. Permissions can be granted directly to
-            investigations, via tags, or via datasources.
+            View and manage all permission grants. Permissions can be granted
+            directly to investigations, via tags, or via datasources.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -146,9 +169,15 @@ export function PermissionsSettings() {
                       <div className="flex items-center gap-2">
                         {getGranteeIcon(grant.grantee_type)}
                         <p className="font-medium">
-                          {grant.grantee_type === 'user' ? 'User' : 'Team'}
+                          {grant.grantee_type === "user" ? "User" : "Team"}
                         </p>
-                        <Badge variant={getPermissionBadgeVariant(grant.permission) as 'default'}>
+                        <Badge
+                          variant={
+                            getPermissionBadgeVariant(
+                              grant.permission,
+                            ) as "default"
+                          }
+                        >
                           {grant.permission}
                         </Badge>
                       </div>
@@ -172,13 +201,16 @@ export function PermissionsSettings() {
       </Card>
 
       {/* Delete Confirmation Dialog */}
-      <Dialog open={!!grantToDelete} onOpenChange={() => setGrantToDelete(null)}>
+      <Dialog
+        open={!!grantToDelete}
+        onOpenChange={() => setGrantToDelete(null)}
+      >
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Revoke Permission</DialogTitle>
             <DialogDescription>
-              Are you sure you want to revoke this permission? The user or team will no longer have
-              access to the associated resources.
+              Are you sure you want to revoke this permission? The user or team
+              will no longer have access to the associated resources.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
@@ -190,12 +222,14 @@ export function PermissionsSettings() {
               onClick={handleDelete}
               disabled={deleteMutation.isPending}
             >
-              {deleteMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              {deleteMutation.isPending && (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              )}
               Revoke Permission
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
     </>
-  )
+  );
 }

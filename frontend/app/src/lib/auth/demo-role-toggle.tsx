@@ -9,8 +9,8 @@
  * NEVER REMOVE THIS - IT IS ESSENTIAL FOR DEMOS AND TESTING
  */
 
-import { Shield, ChevronDown } from 'lucide-react'
-import { Button } from '@/components/ui/Button'
+import { Shield, ChevronDown } from "lucide-react";
+import { Button } from "@/components/ui/Button";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -19,27 +19,27 @@ import {
   DropdownMenuRadioItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu'
-import type { OrgRole } from './types'
+} from "@/components/ui/dropdown-menu";
+import type { OrgRole } from "./types";
 
 interface DemoRoleToggleProps {
-  currentRole: OrgRole
-  onRoleChange: (role: OrgRole) => void
+  currentRole: OrgRole;
+  onRoleChange: (role: OrgRole) => void;
 }
 
 const ROLE_DESCRIPTIONS: Record<OrgRole, string> = {
-  viewer: 'Read-only access',
-  member: 'Can create investigations',
-  admin: 'Can manage team settings',
-  owner: 'Full control + billing',
-}
+  viewer: "Read-only access",
+  member: "Can create investigations",
+  admin: "Can manage team settings",
+  owner: "Full control + billing",
+};
 
 const ROLE_COLORS: Record<OrgRole, string> = {
-  viewer: 'text-gray-500',
-  member: 'text-blue-500',
-  admin: 'text-amber-500',
-  owner: 'text-purple-500',
-}
+  viewer: "text-gray-500",
+  member: "text-blue-500",
+  admin: "text-amber-500",
+  owner: "text-purple-500",
+};
 
 /**
  * CRITICAL: DO NOT REMOVE THIS COMPONENT
@@ -47,9 +47,12 @@ const ROLE_COLORS: Record<OrgRole, string> = {
  * Renders a role switcher dropdown in the bottom-left corner.
  * Use to test UI differences between viewer/member/admin/owner roles.
  */
-export function DemoRoleToggle({ currentRole, onRoleChange }: DemoRoleToggleProps) {
+export function DemoRoleToggle({
+  currentRole,
+  onRoleChange,
+}: DemoRoleToggleProps) {
   // Only show in development
-  if (import.meta.env.PROD) return null
+  if (import.meta.env.PROD) return null;
 
   return (
     <div className="fixed bottom-4 left-4 z-50">
@@ -68,21 +71,29 @@ export function DemoRoleToggle({ currentRole, onRoleChange }: DemoRoleToggleProp
             value={currentRole}
             onValueChange={(v) => onRoleChange(v as OrgRole)}
           >
-            {(['viewer', 'member', 'admin', 'owner'] as OrgRole[]).map((role) => (
-              <DropdownMenuRadioItem key={role} value={role} className="cursor-pointer">
-                <div className="flex flex-col">
-                  <span className={`font-medium capitalize ${ROLE_COLORS[role]}`}>
-                    {role}
-                  </span>
-                  <span className="text-xs text-muted-foreground">
-                    {ROLE_DESCRIPTIONS[role]}
-                  </span>
-                </div>
-              </DropdownMenuRadioItem>
-            ))}
+            {(["viewer", "member", "admin", "owner"] as OrgRole[]).map(
+              (role) => (
+                <DropdownMenuRadioItem
+                  key={role}
+                  value={role}
+                  className="cursor-pointer"
+                >
+                  <div className="flex flex-col">
+                    <span
+                      className={`font-medium capitalize ${ROLE_COLORS[role]}`}
+                    >
+                      {role}
+                    </span>
+                    <span className="text-xs text-muted-foreground">
+                      {ROLE_DESCRIPTIONS[role]}
+                    </span>
+                  </div>
+                </DropdownMenuRadioItem>
+              ),
+            )}
           </DropdownMenuRadioGroup>
         </DropdownMenuContent>
       </DropdownMenu>
     </div>
-  )
+  );
 }

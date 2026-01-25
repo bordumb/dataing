@@ -1,6 +1,6 @@
-import * as React from 'react'
-import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { toast } from 'sonner'
+import * as React from "react";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
 
 import {
   Dialog,
@@ -9,95 +9,102 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from '@/components/ui/dialog'
-import { Button } from '@/components/ui/Button'
-import { Input } from '@/components/ui/Input'
-import { Label } from '@/components/ui/label'
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/Button";
+import { Input } from "@/components/ui/Input";
+import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from '@/components/ui/select'
-import { useDynamicForm, getSchemaForType } from '@/components/forms'
-import { DynamicField } from '@/components/forms/dynamic-field'
-import { createDataSource, testDataSourceConnection, useSourceTypes } from '@/lib/api/datasources'
-import { queryKeys } from '@/lib/api/query-keys'
+} from "@/components/ui/select";
+import { useDynamicForm, getSchemaForType } from "@/components/forms";
+import { DynamicField } from "@/components/forms/dynamic-field";
+import {
+  createDataSource,
+  testDataSourceConnection,
+  useSourceTypes,
+} from "@/lib/api/datasources";
+import { queryKeys } from "@/lib/api/query-keys";
 
 interface DataSourceFormProps {
-  open: boolean
-  onOpenChange: (open: boolean) => void
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
 }
 
 export function DataSourceForm({ open, onOpenChange }: DataSourceFormProps) {
-  const queryClient = useQueryClient()
-  const { data: sourceTypes } = useSourceTypes()
+  const queryClient = useQueryClient();
+  const { data: sourceTypes } = useSourceTypes();
 
-  const [name, setName] = React.useState('')
-  const [selectedType, setSelectedType] = React.useState('postgresql')
+  const [name, setName] = React.useState("");
+  const [selectedType, setSelectedType] = React.useState("postgresql");
 
   // Get schema for the selected type
-  const schema = React.useMemo(() => getSchemaForType(selectedType), [selectedType])
-  const form = useDynamicForm(schema)
+  const schema = React.useMemo(
+    () => getSchemaForType(selectedType),
+    [selectedType],
+  );
+  const form = useDynamicForm(schema);
 
   // Reset form when type changes
   React.useEffect(() => {
-    form.reset()
+    form.reset();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedType])
+  }, [selectedType]);
 
   const createMutation = useMutation({
     mutationFn: createDataSource,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.datasources.all })
-      onOpenChange(false)
-      toast.success('Data source created successfully')
-      setName('')
-      setSelectedType('postgresql')
-      form.reset()
+      queryClient.invalidateQueries({ queryKey: queryKeys.datasources.all });
+      onOpenChange(false);
+      toast.success("Data source created successfully");
+      setName("");
+      setSelectedType("postgresql");
+      form.reset();
     },
     onError: (error) => {
-      toast.error(`Failed to create: ${error.message}`)
+      toast.error(`Failed to create: ${error.message}`);
     },
-  })
+  });
 
   const testMutation = useMutation({
     mutationFn: testDataSourceConnection,
     onSuccess: () => {
-      toast.success('Connection successful!')
+      toast.success("Connection successful!");
     },
     onError: (error) => {
-      toast.error(`Connection failed: ${error.message}`)
+      toast.error(`Connection failed: ${error.message}`);
     },
-  })
+  });
 
   const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault()
+    e.preventDefault();
 
     if (!form.validate()) {
-      toast.error('Please fill in all required fields')
-      return
+      toast.error("Please fill in all required fields");
+      return;
     }
 
     createMutation.mutate({
       name,
       type: selectedType,
       config: form.getConfigObject(),
-    })
-  }
+    });
+  };
 
   const handleTest = () => {
     if (!form.validate()) {
-      toast.error('Please fill in all required fields')
-      return
+      toast.error("Please fill in all required fields");
+      return;
     }
 
     testMutation.mutate({
       type: selectedType,
       config: form.getConfigObject(),
-    })
-  }
+    });
+  };
 
   // Build type options from API or fallback
   const typeOptions = React.useMemo(() => {
@@ -105,21 +112,21 @@ export function DataSourceForm({ open, onOpenChange }: DataSourceFormProps) {
       return sourceTypes.map((t) => ({
         value: t.type,
         label: t.display_name,
-      }))
+      }));
     }
     // Fallback options
     return [
-      { value: 'postgresql', label: 'PostgreSQL' },
-      { value: 'mysql', label: 'MySQL' },
-      { value: 'snowflake', label: 'Snowflake' },
-      { value: 'bigquery', label: 'BigQuery' },
-      { value: 'redshift', label: 'Redshift' },
-      { value: 'trino', label: 'Trino' },
-      { value: 'duckdb', label: 'DuckDB' },
-      { value: 'mongodb', label: 'MongoDB' },
-      { value: 's3', label: 'Amazon S3' },
-    ]
-  }, [sourceTypes])
+      { value: "postgresql", label: "PostgreSQL" },
+      { value: "mysql", label: "MySQL" },
+      { value: "snowflake", label: "Snowflake" },
+      { value: "bigquery", label: "BigQuery" },
+      { value: "redshift", label: "Redshift" },
+      { value: "trino", label: "Trino" },
+      { value: "duckdb", label: "DuckDB" },
+      { value: "mongodb", label: "MongoDB" },
+      { value: "s3", label: "Amazon S3" },
+    ];
+  }, [sourceTypes]);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -171,7 +178,9 @@ export function DataSourceForm({ open, onOpenChange }: DataSourceFormProps) {
                 field={field}
                 value={form.values[field.name]}
                 onChange={form.setValue}
-                error={form.touched[field.name] ? form.errors[field.name] : undefined}
+                error={
+                  form.touched[field.name] ? form.errors[field.name] : undefined
+                }
               />
             ))}
           </div>
@@ -183,14 +192,14 @@ export function DataSourceForm({ open, onOpenChange }: DataSourceFormProps) {
               onClick={handleTest}
               disabled={testMutation.isPending}
             >
-              {testMutation.isPending ? 'Testing...' : 'Test Connection'}
+              {testMutation.isPending ? "Testing..." : "Test Connection"}
             </Button>
             <Button type="submit" disabled={createMutation.isPending}>
-              {createMutation.isPending ? 'Creating...' : 'Create'}
+              {createMutation.isPending ? "Creating..." : "Create"}
             </Button>
           </DialogFooter>
         </form>
       </DialogContent>
     </Dialog>
-  )
+  );
 }

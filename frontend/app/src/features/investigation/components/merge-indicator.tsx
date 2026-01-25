@@ -3,16 +3,16 @@
  * Shows when branches can be merged and provides merge action.
  */
 
-import { GitMerge, ArrowRight, Check } from 'lucide-react'
-import { Button } from '@/components/ui/Button'
-import { Card, CardContent } from '@/components/ui/Card'
-import type { BranchState } from '@/lib/api/investigations'
+import { GitMerge, ArrowRight, Check } from "lucide-react";
+import { Button } from "@/components/ui/Button";
+import { Card, CardContent } from "@/components/ui/Card";
+import type { BranchState } from "@/lib/api/investigations";
 
 interface MergeIndicatorProps {
-  sourceBranch: BranchState
-  targetBranch: BranchState
-  onMerge?: () => void
-  isPending?: boolean
+  sourceBranch: BranchState;
+  targetBranch: BranchState;
+  onMerge?: () => void;
+  isPending?: boolean;
 }
 
 export function MergeIndicator({
@@ -22,7 +22,7 @@ export function MergeIndicator({
   isPending,
 }: MergeIndicatorProps) {
   if (!sourceBranch.can_merge) {
-    return null
+    return null;
   }
 
   return (
@@ -71,34 +71,38 @@ export function MergeIndicator({
             </p>
             <p className="text-sm">
               {(() => {
-                if (typeof sourceBranch.synthesis !== 'object') {
-                  return String(sourceBranch.synthesis).slice(0, 200)
+                if (typeof sourceBranch.synthesis !== "object") {
+                  return String(sourceBranch.synthesis).slice(0, 200);
                 }
-                const syn = sourceBranch.synthesis as Record<string, unknown>
-                if (typeof syn.summary === 'string') return syn.summary.slice(0, 200)
-                if (typeof syn.root_cause === 'string') return syn.root_cause.slice(0, 200)
-                return JSON.stringify(sourceBranch.synthesis).slice(0, 200)
+                const syn = sourceBranch.synthesis as Record<string, unknown>;
+                if (typeof syn.summary === "string")
+                  return syn.summary.slice(0, 200);
+                if (typeof syn.root_cause === "string")
+                  return syn.root_cause.slice(0, 200);
+                return JSON.stringify(sourceBranch.synthesis).slice(0, 200);
               })()}
             </p>
           </div>
         )}
       </CardContent>
     </Card>
-  )
+  );
 }
 
 interface MergeStatusProps {
-  merged: boolean
-  mergedAt?: string
+  merged: boolean;
+  mergedAt?: string;
 }
 
 export function MergeStatus({ merged, mergedAt }: MergeStatusProps) {
-  if (!merged) return null
+  if (!merged) return null;
 
   return (
     <div className="flex items-center gap-2 text-sm text-green-600 dark:text-green-400">
       <Check className="h-4 w-4" />
-      <span>Merged{mergedAt ? ` on ${new Date(mergedAt).toLocaleDateString()}` : ''}</span>
+      <span>
+        Merged{mergedAt ? ` on ${new Date(mergedAt).toLocaleDateString()}` : ""}
+      </span>
     </div>
-  )
+  );
 }

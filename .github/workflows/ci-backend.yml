@@ -4,7 +4,6 @@ on:
   push:
     branches: [main]
     paths:
-      - 'python-packages/bond/**'
       - 'python-packages/dataing/**'
       - 'python-packages/dataing-ee/**'
       - 'pyproject.toml'
@@ -13,7 +12,6 @@ on:
   pull_request:
     branches: [main]
     paths:
-      - 'python-packages/bond/**'
       - 'python-packages/dataing/**'
       - 'python-packages/dataing-ee/**'
       - 'pyproject.toml'
@@ -56,10 +54,10 @@ jobs:
         run: uv sync --all-extras
 
       - name: Run Ruff
-        run: uv run ruff check python-packages/bond/src python-packages/dataing/src python-packages/dataing-ee/src
+        run: uv run ruff check python-packages/dataing/src python-packages/dataing-ee/src
 
       - name: Run mypy
-        run: uv run mypy python-packages/bond/src python-packages/dataing/src python-packages/dataing-ee/src
+        run: uv run mypy python-packages/dataing/src python-packages/dataing-ee/src
 
       # Run database migrations for integration tests
       - name: Run migrations
@@ -74,7 +72,6 @@ jobs:
       # Run tests per-package to avoid conftest.py module conflicts
       - name: Run tests
         run: |
-          uv run pytest python-packages/bond/tests --cov=python-packages/bond/src/bond --cov-report=xml --cov-append
           uv run pytest python-packages/dataing/tests --cov=python-packages/dataing/src/dataing --cov-report=xml --cov-append
           uv run pytest python-packages/dataing-ee/tests --cov=python-packages/dataing-ee/src/dataing_ee --cov-report=xml --cov-append
         env:

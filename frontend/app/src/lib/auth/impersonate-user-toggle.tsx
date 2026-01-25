@@ -7,8 +7,8 @@
  * Displays in the header next to the mode toggle.
  */
 
-import { UserCircle, ChevronDown, LogOut, Check } from 'lucide-react'
-import { Button } from '@/components/ui/Button'
+import { UserCircle, ChevronDown, LogOut, Check } from "lucide-react";
+import { Button } from "@/components/ui/Button";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -17,17 +17,23 @@ import {
   DropdownMenuRadioItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu'
-import { Badge } from '@/components/ui/Badge'
-import { useImpersonation, type DemoUser } from './impersonation-context'
+} from "@/components/ui/dropdown-menu";
+import { Badge } from "@/components/ui/Badge";
+import { useImpersonation, type DemoUser } from "./impersonation-context";
 
 const ROLE_COLORS: Record<string, string> = {
-  viewer: 'bg-gray-100 text-gray-700',
-  member: 'bg-blue-100 text-blue-700',
-  admin: 'bg-amber-100 text-amber-700',
-}
+  viewer: "bg-gray-100 text-gray-700",
+  member: "bg-blue-100 text-blue-700",
+  admin: "bg-amber-100 text-amber-700",
+};
 
-function UserItem({ user, isSelected }: { user: DemoUser; isSelected: boolean }) {
+function UserItem({
+  user,
+  isSelected,
+}: {
+  user: DemoUser;
+  isSelected: boolean;
+}) {
   return (
     <div className="flex items-center justify-between w-full">
       <div className="flex flex-col">
@@ -41,7 +47,7 @@ function UserItem({ user, isSelected }: { user: DemoUser; isSelected: boolean })
         {isSelected && <Check className="h-4 w-4 text-green-500" />}
       </div>
     </div>
-  )
+  );
 }
 
 /**
@@ -58,17 +64,17 @@ export function ImpersonateUserToggle() {
     stopImpersonating,
     canImpersonate,
     availableUsers,
-  } = useImpersonation()
+  } = useImpersonation();
 
   // Only show in development and if user can impersonate
-  if (import.meta.env.PROD) return null
-  if (!canImpersonate) return null
+  if (import.meta.env.PROD) return null;
+  if (!canImpersonate) return null;
 
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <Button
-          variant={isImpersonating ? 'destructive' : 'outline'}
+          variant={isImpersonating ? "destructive" : "outline"}
           size="sm"
           className="gap-2"
         >
@@ -115,5 +121,5 @@ export function ImpersonateUserToggle() {
         </div>
       </DropdownMenuContent>
     </DropdownMenu>
-  )
+  );
 }

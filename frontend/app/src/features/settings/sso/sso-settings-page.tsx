@@ -1,8 +1,8 @@
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { PageHeader } from '@/components/shared/page-header'
-import { SSOConfigSettings } from './sso-config-settings'
-import { DomainClaimsSettings } from './domain-claims-settings'
-import { SCIMTokensSettings } from './scim-tokens-settings'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { PageHeader } from "@/components/shared/page-header";
+import { SSOConfigSettings } from "./sso-config-settings";
+import { DomainClaimsSettings } from "./domain-claims-settings";
+import { SCIMTokensSettings } from "./scim-tokens-settings";
 
 export function SSOSettingsPage() {
   return (
@@ -32,5 +32,5 @@ export function SSOSettingsPage() {
         </TabsContent>
       </Tabs>
     </div>
-  )
+  );
 }

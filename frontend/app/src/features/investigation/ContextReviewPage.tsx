@@ -1,74 +1,77 @@
-import { useParams, useNavigate, Link } from 'react-router-dom'
-import { ArrowLeft, Loader2 } from 'lucide-react'
-import { toast } from 'sonner'
-import { useQueryClient } from '@tanstack/react-query'
+import { useParams, useNavigate, Link } from "react-router-dom";
+import { ArrowLeft, Loader2 } from "lucide-react";
+import { toast } from "sonner";
+import { useQueryClient } from "@tanstack/react-query";
 
-import { Button } from '@/components/ui/Button'
-import { Card, CardContent } from '@/components/ui/Card'
-import { EmptyState } from '@/components/shared/empty-state'
+import { Button } from "@/components/ui/Button";
+import { Card, CardContent } from "@/components/ui/Card";
+import { EmptyState } from "@/components/shared/empty-state";
 import {
   useGetApprovalRequestApiV1ApprovalsApprovalIdGet,
   useApproveRequestApiV1ApprovalsApprovalIdApprovePost,
   useRejectRequestApiV1ApprovalsApprovalIdRejectPost,
   getListPendingApprovalsApiV1ApprovalsPendingGetQueryKey,
-} from '@/lib/api/generated/approvals/approvals'
-import { ContextReview } from './context-review'
+} from "@/lib/api/generated/approvals/approvals";
+import { ContextReview } from "./context-review";
 
 export function ContextReviewPage() {
-  const { approvalId } = useParams<{ approvalId: string }>()
-  const navigate = useNavigate()
-  const queryClient = useQueryClient()
+  const { approvalId } = useParams<{ approvalId: string }>();
+  const navigate = useNavigate();
+  const queryClient = useQueryClient();
 
-  const { data: approval, isLoading, error } = useGetApprovalRequestApiV1ApprovalsApprovalIdGet(
-    approvalId || '',
-    { query: { enabled: !!approvalId } }
-  )
+  const {
+    data: approval,
+    isLoading,
+    error,
+  } = useGetApprovalRequestApiV1ApprovalsApprovalIdGet(approvalId || "", {
+    query: { enabled: !!approvalId },
+  });
 
   const approveMutation = useApproveRequestApiV1ApprovalsApprovalIdApprovePost({
     mutation: {
       onSuccess: () => {
         queryClient.invalidateQueries({
           queryKey: getListPendingApprovalsApiV1ApprovalsPendingGetQueryKey(),
-        })
-        toast.success('Investigation approved and resumed')
-        navigate(`/investigations/${approval?.investigation_id}`)
+        });
+        toast.success("Investigation approved and resumed");
+        navigate(`/investigations/${approval?.investigation_id}`);
       },
       onError: (err: Error) => {
-        toast.error(`Failed to approve: ${err.message}`)
+        toast.error(`Failed to approve: ${err.message}`);
       },
     },
-  })
+  });
 
   const rejectMutation = useRejectRequestApiV1ApprovalsApprovalIdRejectPost({
     mutation: {
       onSuccess: () => {
         queryClient.invalidateQueries({
           queryKey: getListPendingApprovalsApiV1ApprovalsPendingGetQueryKey(),
-        })
-        toast.success('Investigation rejected')
-        navigate('/investigations')
+        });
+        toast.success("Investigation rejected");
+        navigate("/investigations");
       },
       onError: (err: Error) => {
-        toast.error(`Failed to reject: ${err.message}`)
+        toast.error(`Failed to reject: ${err.message}`);
       },
     },
-  })
+  });
 
   const handleApprove = async (comment?: string) => {
-    if (!approvalId) return
+    if (!approvalId) return;
     await approveMutation.mutateAsync({
       approvalId,
       data: { comment: comment || null },
-    })
-  }
+    });
+  };
 
   const handleReject = async (reason: string) => {
-    if (!approvalId) return
+    if (!approvalId) return;
     await rejectMutation.mutateAsync({
       approvalId,
       data: { reason },
-    })
-  }
+    });
+  };
 
   if (!approvalId) {
     return (
@@ -81,7 +84,7 @@ export function ContextReviewPage() {
           />
         </CardContent>
       </Card>
-    )
+    );
   }
 
   if (isLoading) {
@@ -89,7 +92,7 @@ export function ContextReviewPage() {
       <div className="flex items-center justify-center py-12">
         <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
       </div>
-    )
+    );
   }
 
   if (error || !approval) {
@@ -108,7 +111,7 @@ export function ContextReviewPage() {
           />
         </CardContent>
       </Card>
-    )
+    );
   }
 
   // Check if already decided
@@ -128,7 +131,9 @@ export function ContextReviewPage() {
             <EmptyState
               icon={Loader2}
               title={`This request has been ${approval.decision}`}
-              description={approval.comment || 'No additional details provided.'}
+              description={
+                approval.comment || "No additional details provided."
+              }
               action={
                 <Link to={`/investigations/${approval.investigation_id}`}>
                   <Button>View Investigation</Button>
@@ -138,16 +143,18 @@ export function ContextReviewPage() {
           </CardContent>
         </Card>
       </div>
-    )
+    );
   }
 
   // Build context object for ContextReview component
   const context = {
-    query: (approval.context?.query as string) || 'Query not available',
-    purpose: (approval.context?.purpose as string) || `Review context for investigation ${approval.investigation_id}`,
+    query: (approval.context?.query as string) || "Query not available",
+    purpose:
+      (approval.context?.purpose as string) ||
+      `Review context for investigation ${approval.investigation_id}`,
     tables_accessed: (approval.context?.tables_accessed as string[]) || [],
     estimated_rows: (approval.context?.estimated_rows as number) || 0,
-  }
+  };
 
   return (
     <div className="space-y-6">
@@ -167,5 +174,5 @@ export function ContextReviewPage() {
         onReject={handleReject}
       />
     </div>
-  )
+  );
 }

@@ -1,5 +1,5 @@
-import { useQuery } from '@tanstack/react-query'
-import { Link } from 'react-router-dom'
+import { useQuery } from "@tanstack/react-query";
+import { Link } from "react-router-dom";
 import {
   Search,
   Database,
@@ -7,20 +7,20 @@ import {
   Clock,
   AlertTriangle,
   Plus,
-} from 'lucide-react'
+} from "lucide-react";
 
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
-import { Button } from '@/components/ui/Button'
-import { Skeleton } from '@/components/ui/skeleton'
-import { fetchDashboardStats } from '@/lib/api/dashboard'
-import { RecentInvestigations } from './recent-investigations'
-import { PageHeader } from '@/components/shared/page-header'
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
+import { Button } from "@/components/ui/Button";
+import { Skeleton } from "@/components/ui/skeleton";
+import { fetchDashboardStats } from "@/lib/api/dashboard";
+import { RecentInvestigations } from "./recent-investigations";
+import { PageHeader } from "@/components/shared/page-header";
 
 export function DashboardPage() {
   const { data: stats, isLoading } = useQuery({
-    queryKey: ['dashboard-stats'],
+    queryKey: ["dashboard-stats"],
     queryFn: fetchDashboardStats,
-  })
+  });
 
   return (
     <div className="space-y-6">
@@ -127,5 +127,5 @@ export function DashboardPage() {
         </CardContent>
       </Card>
     </div>
-  )
+  );
 }

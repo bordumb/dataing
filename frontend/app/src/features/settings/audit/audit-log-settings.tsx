@@ -1,4 +1,4 @@
-import * as React from 'react'
+import * as React from "react";
 import {
   FileText,
   Search,
@@ -7,19 +7,25 @@ import {
   ChevronDown,
   ChevronRight,
   ChevronLeft,
-} from 'lucide-react'
-import { useQuery } from '@tanstack/react-query'
+} from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
 
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card'
-import { Button } from '@/components/ui/Button'
-import { Input } from '@/components/ui/Input'
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/Card";
+import { Button } from "@/components/ui/Button";
+import { Input } from "@/components/ui/Input";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from '@/components/ui/select'
+} from "@/components/ui/select";
 import {
   Table,
   TableBody,
@@ -27,118 +33,120 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from '@/components/ui/table'
-import { Badge } from '@/components/ui/Badge'
-import { EmptyState } from '@/components/shared/empty-state'
-import { DatePicker, type DatePickerValue } from '@/components/ui/DatePicker'
-import customInstance from '@/lib/api/client'
+} from "@/components/ui/table";
+import { Badge } from "@/components/ui/Badge";
+import { EmptyState } from "@/components/shared/empty-state";
+import { DatePicker, type DatePickerValue } from "@/components/ui/DatePicker";
+import customInstance from "@/lib/api/client";
 
 // Types matching backend AuditLogResponse
 interface AuditLogEntry {
-  id: string
-  timestamp: string
-  actor_id: string | null
-  actor_email: string | null
-  actor_ip: string | null
-  action: string
-  resource_type: string | null
-  resource_id: string | null
-  resource_name: string | null
-  request_method: string | null
-  request_path: string | null
-  status_code: number | null
-  changes: Record<string, unknown> | null
-  metadata: Record<string, unknown> | null
+  id: string;
+  timestamp: string;
+  actor_id: string | null;
+  actor_email: string | null;
+  actor_ip: string | null;
+  action: string;
+  resource_type: string | null;
+  resource_id: string | null;
+  resource_name: string | null;
+  request_method: string | null;
+  request_path: string | null;
+  status_code: number | null;
+  changes: Record<string, unknown> | null;
+  metadata: Record<string, unknown> | null;
 }
 
 interface AuditLogListResponse {
-  items: AuditLogEntry[]
-  total: number
-  page: number
-  pages: number
-  limit: number
+  items: AuditLogEntry[];
+  total: number;
+  page: number;
+  pages: number;
+  limit: number;
 }
 
 // Action categories for filtering
 const ACTION_CATEGORIES = [
-  { value: 'all', label: 'All Actions' },
-  { value: 'auth', label: 'Authentication' },
-  { value: 'investigation', label: 'Investigations' },
-  { value: 'datasource', label: 'Datasources' },
-  { value: 'settings', label: 'Settings' },
-  { value: 'api', label: 'API Access' },
-]
+  { value: "all", label: "All Actions" },
+  { value: "auth", label: "Authentication" },
+  { value: "investigation", label: "Investigations" },
+  { value: "datasource", label: "Datasources" },
+  { value: "settings", label: "Settings" },
+  { value: "api", label: "API Access" },
+];
 
 // Status badge variants
 function getStatusBadgeVariant(
-  statusCode: number | null
-): 'default' | 'success' | 'warning' | 'destructive' {
-  if (!statusCode) return 'default'
-  if (statusCode >= 200 && statusCode < 300) return 'success'
-  if (statusCode >= 400 && statusCode < 500) return 'warning'
-  if (statusCode >= 500) return 'destructive'
-  return 'default'
+  statusCode: number | null,
+): "default" | "success" | "warning" | "destructive" {
+  if (!statusCode) return "default";
+  if (statusCode >= 200 && statusCode < 300) return "success";
+  if (statusCode >= 400 && statusCode < 500) return "warning";
+  if (statusCode >= 500) return "destructive";
+  return "default";
 }
 
 // Format timestamp for display
 function formatTimestamp(timestamp: string): string {
-  const date = new Date(timestamp)
-  return date.toLocaleString('en-US', {
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit',
-  })
+  const date = new Date(timestamp);
+  return date.toLocaleString("en-US", {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+  });
 }
 
 // Format action for display
 function formatAction(action: string): string {
   return action
-    .replace(/_/g, ' ')
-    .replace(/\./g, ' - ')
-    .replace(/\b\w/g, (c) => c.toUpperCase())
+    .replace(/_/g, " ")
+    .replace(/\./g, " - ")
+    .replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
 export function AuditLogSettings() {
   // Filter state
-  const [search, setSearch] = React.useState('')
-  const [actionCategory, setActionCategory] = React.useState('all')
+  const [search, setSearch] = React.useState("");
+  const [actionCategory, setActionCategory] = React.useState("all");
   const [dateRange, setDateRange] = React.useState<DatePickerValue>({
-    mode: 'range',
+    mode: "range",
     start: null,
     end: null,
-  })
-  const [page, setPage] = React.useState(1)
-  const [expandedRows, setExpandedRows] = React.useState<Set<string>>(new Set())
-  const limit = 25
+  });
+  const [page, setPage] = React.useState(1);
+  const [expandedRows, setExpandedRows] = React.useState<Set<string>>(
+    new Set(),
+  );
+  const limit = 25;
 
   // Build query params
   const queryParams = React.useMemo(() => {
     const params: Record<string, string | number> = {
       page,
       limit,
-    }
+    };
 
     if (search.trim()) {
-      params.search = search.trim()
+      params.search = search.trim();
     }
 
-    if (actionCategory !== 'all') {
-      params.action = actionCategory
+    if (actionCategory !== "all") {
+      params.action = actionCategory;
     }
 
     if (dateRange.start) {
-      params.start_date = dateRange.start.toISOString()
+      params.start_date = dateRange.start.toISOString();
     }
 
     if (dateRange.end) {
-      params.end_date = dateRange.end.toISOString()
+      params.end_date = dateRange.end.toISOString();
     }
 
-    return params
-  }, [search, actionCategory, dateRange, page])
+    return params;
+  }, [search, actionCategory, dateRange, page]);
 
   // Fetch audit logs
   const {
@@ -147,97 +155,97 @@ export function AuditLogSettings() {
     error,
     refetch,
   } = useQuery<AuditLogListResponse>({
-    queryKey: ['audit-logs', queryParams],
+    queryKey: ["audit-logs", queryParams],
     queryFn: () =>
       customInstance<AuditLogListResponse>({
-        url: '/api/v1/audit-logs',
-        method: 'GET',
+        url: "/api/v1/audit-logs",
+        method: "GET",
         params: queryParams,
       }),
-  })
+  });
 
-  const auditLogs = auditData?.items ?? []
-  const totalPages = auditData?.pages ?? 1
-  const total = auditData?.total ?? 0
+  const auditLogs = auditData?.items ?? [];
+  const totalPages = auditData?.pages ?? 1;
+  const total = auditData?.total ?? 0;
 
   // Toggle row expansion
   const toggleRowExpansion = (id: string) => {
     setExpandedRows((prev) => {
-      const newSet = new Set(prev)
+      const newSet = new Set(prev);
       if (newSet.has(id)) {
-        newSet.delete(id)
+        newSet.delete(id);
       } else {
-        newSet.add(id)
+        newSet.add(id);
       }
-      return newSet
-    })
-  }
+      return newSet;
+    });
+  };
 
   // Handle CSV export
   const handleExport = async () => {
     try {
-      const exportParams: Record<string, string> = {}
+      const exportParams: Record<string, string> = {};
 
       if (search.trim()) {
-        exportParams.search = search.trim()
+        exportParams.search = search.trim();
       }
 
-      if (actionCategory !== 'all') {
-        exportParams.action = actionCategory
+      if (actionCategory !== "all") {
+        exportParams.action = actionCategory;
       }
 
       if (dateRange.start) {
-        exportParams.start_date = dateRange.start.toISOString()
+        exportParams.start_date = dateRange.start.toISOString();
       }
 
       if (dateRange.end) {
-        exportParams.end_date = dateRange.end.toISOString()
+        exportParams.end_date = dateRange.end.toISOString();
       }
 
-      const queryString = new URLSearchParams(exportParams).toString()
-      const url = `/api/v1/audit-logs/export${queryString ? `?${queryString}` : ''}`
+      const queryString = new URLSearchParams(exportParams).toString();
+      const url = `/api/v1/audit-logs/export${queryString ? `?${queryString}` : ""}`;
 
       // Get auth token
-      const accessToken = localStorage.getItem('dataing_access_token')
-      const apiKey = localStorage.getItem('dataing_api_key')
+      const accessToken = localStorage.getItem("dataing_access_token");
+      const apiKey = localStorage.getItem("dataing_api_key");
 
-      const headers: Record<string, string> = {}
+      const headers: Record<string, string> = {};
       if (accessToken) {
-        headers['Authorization'] = `Bearer ${accessToken}`
+        headers["Authorization"] = `Bearer ${accessToken}`;
       } else if (apiKey) {
-        headers['X-API-Key'] = apiKey
+        headers["X-API-Key"] = apiKey;
       }
 
-      const response = await fetch(url, { headers })
-      if (!response.ok) throw new Error('Export failed')
+      const response = await fetch(url, { headers });
+      if (!response.ok) throw new Error("Export failed");
 
-      const blob = await response.blob()
-      const downloadUrl = window.URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = downloadUrl
-      a.download = `audit-logs-${new Date().toISOString().split('T')[0]}.csv`
-      document.body.appendChild(a)
-      a.click()
-      document.body.removeChild(a)
-      window.URL.revokeObjectURL(downloadUrl)
+      const blob = await response.blob();
+      const downloadUrl = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = downloadUrl;
+      a.download = `audit-logs-${new Date().toISOString().split("T")[0]}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      window.URL.revokeObjectURL(downloadUrl);
     } catch (err) {
-      console.error('Export failed:', err)
+      console.error("Export failed:", err);
     }
-  }
+  };
 
   // Reset filters
   const handleResetFilters = () => {
-    setSearch('')
-    setActionCategory('all')
-    setDateRange({ mode: 'range', start: null, end: null })
-    setPage(1)
-  }
+    setSearch("");
+    setActionCategory("all");
+    setDateRange({ mode: "range", start: null, end: null });
+    setPage(1);
+  };
 
   // Handle search with debounce
   const handleSearchChange = (value: string) => {
-    setSearch(value)
-    setPage(1)
-  }
+    setSearch(value);
+    setPage(1);
+  };
 
   if (isLoading && !auditData) {
     return (
@@ -246,7 +254,7 @@ export function AuditLogSettings() {
           <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
         </CardContent>
       </Card>
-    )
+    );
   }
 
   if (error) {
@@ -257,15 +265,11 @@ export function AuditLogSettings() {
             icon={FileText}
             title="Failed to load audit logs"
             description="There was an error loading the audit logs. Please try again."
-            action={
-              <Button onClick={() => refetch()}>
-                Retry
-              </Button>
-            }
+            action={<Button onClick={() => refetch()}>Retry</Button>}
           />
         </CardContent>
       </Card>
-    )
+    );
   }
 
   return (
@@ -275,8 +279,8 @@ export function AuditLogSettings() {
           <div>
             <CardTitle>Audit Logs</CardTitle>
             <CardDescription>
-              View and export activity logs for your organization. All API and user actions are
-              recorded for compliance and security purposes.
+              View and export activity logs for your organization. All API and
+              user actions are recorded for compliance and security purposes.
             </CardDescription>
           </div>
           <Button onClick={handleExport} variant="outline">
@@ -304,8 +308,8 @@ export function AuditLogSettings() {
             <Select
               value={actionCategory}
               onValueChange={(value) => {
-                setActionCategory(value)
-                setPage(1)
+                setActionCategory(value);
+                setPage(1);
               }}
             >
               <SelectTrigger>
@@ -325,14 +329,14 @@ export function AuditLogSettings() {
             <DatePicker
               value={dateRange}
               onChange={(value) => {
-                setDateRange(value)
-                setPage(1)
+                setDateRange(value);
+                setPage(1);
               }}
               placeholder="Filter by date range..."
             />
           </div>
 
-          {(search || actionCategory !== 'all' || dateRange.start) && (
+          {(search || actionCategory !== "all" || dateRange.start) && (
             <Button variant="ghost" size="sm" onClick={handleResetFilters}>
               Clear filters
             </Button>
@@ -343,10 +347,11 @@ export function AuditLogSettings() {
         <div className="text-sm text-muted-foreground">
           {total > 0 ? (
             <>
-              Showing {(page - 1) * limit + 1} - {Math.min(page * limit, total)} of {total} entries
+              Showing {(page - 1) * limit + 1} - {Math.min(page * limit, total)}{" "}
+              of {total} entries
             </>
           ) : (
-            'No entries found'
+            "No entries found"
           )}
         </div>
 
@@ -356,9 +361,9 @@ export function AuditLogSettings() {
             icon={FileText}
             title="No audit logs found"
             description={
-              search || actionCategory !== 'all' || dateRange.start
-                ? 'Try adjusting your filters to see more results.'
-                : 'Activity logs will appear here as actions are performed.'
+              search || actionCategory !== "all" || dateRange.start
+                ? "Try adjusting your filters to see more results."
+                : "Activity logs will appear here as actions are performed."
             }
           />
         ) : (
@@ -376,7 +381,7 @@ export function AuditLogSettings() {
               </TableHeader>
               <TableBody>
                 {auditLogs.map((entry) => {
-                  const isExpanded = expandedRows.has(entry.id)
+                  const isExpanded = expandedRows.has(entry.id);
                   return (
                     <React.Fragment key={entry.id}>
                       <TableRow
@@ -396,12 +401,16 @@ export function AuditLogSettings() {
                         <TableCell>
                           <div className="truncate max-w-[180px]">
                             {entry.actor_email || (
-                              <span className="text-muted-foreground">System</span>
+                              <span className="text-muted-foreground">
+                                System
+                              </span>
                             )}
                           </div>
                         </TableCell>
                         <TableCell>
-                          <span className="font-medium">{formatAction(entry.action)}</span>
+                          <span className="font-medium">
+                            {formatAction(entry.action)}
+                          </span>
                         </TableCell>
                         <TableCell>
                           {entry.resource_type && (
@@ -414,7 +423,9 @@ export function AuditLogSettings() {
                         </TableCell>
                         <TableCell>
                           {entry.status_code && (
-                            <Badge variant={getStatusBadgeVariant(entry.status_code)}>
+                            <Badge
+                              variant={getStatusBadgeVariant(entry.status_code)}
+                            >
                               {entry.status_code}
                             </Badge>
                           )}
@@ -425,49 +436,67 @@ export function AuditLogSettings() {
                           <TableCell colSpan={6} className="bg-muted/30 p-4">
                             <div className="grid grid-cols-2 gap-4 text-sm">
                               <div>
-                                <p className="text-muted-foreground">IP Address</p>
-                                <p className="font-mono">{entry.actor_ip || '-'}</p>
+                                <p className="text-muted-foreground">
+                                  IP Address
+                                </p>
+                                <p className="font-mono">
+                                  {entry.actor_ip || "-"}
+                                </p>
                               </div>
                               <div>
-                                <p className="text-muted-foreground">Request Path</p>
+                                <p className="text-muted-foreground">
+                                  Request Path
+                                </p>
                                 <p className="font-mono truncate">
                                   {entry.request_method && entry.request_path
                                     ? `${entry.request_method} ${entry.request_path}`
-                                    : '-'}
+                                    : "-"}
                                 </p>
                               </div>
                               <div>
-                                <p className="text-muted-foreground">Resource ID</p>
+                                <p className="text-muted-foreground">
+                                  Resource ID
+                                </p>
                                 <p className="font-mono text-xs">
-                                  {entry.resource_id || '-'}
+                                  {entry.resource_id || "-"}
                                 </p>
                               </div>
                               <div>
-                                <p className="text-muted-foreground">Resource Name</p>
-                                <p className="truncate">{entry.resource_name || '-'}</p>
+                                <p className="text-muted-foreground">
+                                  Resource Name
+                                </p>
+                                <p className="truncate">
+                                  {entry.resource_name || "-"}
+                                </p>
                               </div>
-                              {entry.changes && Object.keys(entry.changes).length > 0 && (
-                                <div className="col-span-2">
-                                  <p className="text-muted-foreground mb-1">Changes</p>
-                                  <pre className="bg-muted p-2 rounded text-xs overflow-auto max-h-40">
-                                    {JSON.stringify(entry.changes, null, 2)}
-                                  </pre>
-                                </div>
-                              )}
-                              {entry.metadata && Object.keys(entry.metadata).length > 0 && (
-                                <div className="col-span-2">
-                                  <p className="text-muted-foreground mb-1">Metadata</p>
-                                  <pre className="bg-muted p-2 rounded text-xs overflow-auto max-h-40">
-                                    {JSON.stringify(entry.metadata, null, 2)}
-                                  </pre>
-                                </div>
-                              )}
+                              {entry.changes &&
+                                Object.keys(entry.changes).length > 0 && (
+                                  <div className="col-span-2">
+                                    <p className="text-muted-foreground mb-1">
+                                      Changes
+                                    </p>
+                                    <pre className="bg-muted p-2 rounded text-xs overflow-auto max-h-40">
+                                      {JSON.stringify(entry.changes, null, 2)}
+                                    </pre>
+                                  </div>
+                                )}
+                              {entry.metadata &&
+                                Object.keys(entry.metadata).length > 0 && (
+                                  <div className="col-span-2">
+                                    <p className="text-muted-foreground mb-1">
+                                      Metadata
+                                    </p>
+                                    <pre className="bg-muted p-2 rounded text-xs overflow-auto max-h-40">
+                                      {JSON.stringify(entry.metadata, null, 2)}
+                                    </pre>
+                                  </div>
+                                )}
                             </div>
                           </TableCell>
                         </TableRow>
                       )}
                     </React.Fragment>
-                  )
+                  );
                 })}
               </TableBody>
             </Table>
@@ -504,5 +533,5 @@ export function AuditLogSettings() {
         )}
       </CardContent>
     </Card>
-  )
+  );
 }

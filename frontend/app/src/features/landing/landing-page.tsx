@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import { Link } from 'react-router-dom'
+import { useState } from "react";
+import { Link } from "react-router-dom";
 import {
   Search,
   Zap,
@@ -10,12 +10,12 @@ import {
   ArrowRight,
   Check,
   ExternalLink,
-} from 'lucide-react'
+} from "lucide-react";
 
-type TabId = 'install' | 'docs' | 'pricing'
+type TabId = "install" | "docs" | "pricing";
 
 export function LandingPage() {
-  const [activeTab, setActiveTab] = useState<TabId>('install')
+  const [activeTab, setActiveTab] = useState<TabId>("install");
 
   return (
     <div className="landing-page">
@@ -36,20 +36,20 @@ export function LandingPage() {
 
             <div className="landing-tabs">
               <button
-                className={`landing-tab ${activeTab === 'install' ? 'active' : ''}`}
-                onClick={() => setActiveTab('install')}
+                className={`landing-tab ${activeTab === "install" ? "active" : ""}`}
+                onClick={() => setActiveTab("install")}
               >
                 Install
               </button>
               <button
-                className={`landing-tab ${activeTab === 'docs' ? 'active' : ''}`}
-                onClick={() => setActiveTab('docs')}
+                className={`landing-tab ${activeTab === "docs" ? "active" : ""}`}
+                onClick={() => setActiveTab("docs")}
               >
                 Docs
               </button>
               <button
-                className={`landing-tab ${activeTab === 'pricing' ? 'active' : ''}`}
-                onClick={() => setActiveTab('pricing')}
+                className={`landing-tab ${activeTab === "pricing" ? "active" : ""}`}
+                onClick={() => setActiveTab("pricing")}
               >
                 Pricing
               </button>
@@ -62,7 +62,11 @@ export function LandingPage() {
                 rel="noopener noreferrer"
                 className="landing-github-link"
               >
-                <svg viewBox="0 0 24 24" className="h-5 w-5" fill="currentColor">
+                <svg
+                  viewBox="0 0 24 24"
+                  className="h-5 w-5"
+                  fill="currentColor"
+                >
                   <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z" />
                 </svg>
               </a>
@@ -80,9 +84,9 @@ export function LandingPage() {
 
       {/* Main content based on active tab */}
       <main className="landing-main">
-        {activeTab === 'install' && <InstallSection />}
-        {activeTab === 'docs' && <DocsSection />}
-        {activeTab === 'pricing' && <PricingSection />}
+        {activeTab === "install" && <InstallSection />}
+        {activeTab === "docs" && <DocsSection />}
+        {activeTab === "pricing" && <PricingSection />}
       </main>
 
       {/* Footer */}
@@ -101,24 +105,30 @@ export function LandingPage() {
               </p>
             </div>
             <div className="landing-footer-links">
-              <a href="https://github.com/dataing/dataing" target="_blank" rel="noopener noreferrer">
+              <a
+                href="https://github.com/dataing/dataing"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
                 GitHub
               </a>
-              <a href="#" onClick={() => setActiveTab('docs')}>
+              <a href="#" onClick={() => setActiveTab("docs")}>
                 Documentation
               </a>
-              <a href="#" onClick={() => setActiveTab('pricing')}>
+              <a href="#" onClick={() => setActiveTab("pricing")}>
                 Pricing
               </a>
             </div>
           </div>
           <div className="landing-footer-bottom">
-            <p>&copy; {new Date().getFullYear()} Dataing. Open-core software.</p>
+            <p>
+              &copy; {new Date().getFullYear()} Dataing. Open-core software.
+            </p>
           </div>
         </div>
       </footer>
     </div>
-  )
+  );
 }
 
 function InstallSection() {
@@ -133,12 +143,14 @@ function InstallSection() {
               Open Source
             </div>
             <h1 className="landing-title">
-              <span className="landing-title-accent">Autonomous</span> data quality
+              <span className="landing-title-accent">Autonomous</span> data
+              quality
               <br />
               investigation platform
             </h1>
             <p className="landing-subtitle">
-              Detect anomalies. Generate hypotheses. Test with SQL. Synthesize root causes.
+              Detect anomalies. Generate hypotheses. Test with SQL. Synthesize
+              root causes.
               <br />
               All powered by LLMs working in parallel.
             </p>
@@ -166,7 +178,9 @@ function InstallSection() {
               </div>
               <div className="landing-install-commands">
                 <code>
-                  <span className="landing-code-comment"># Clone and setup</span>
+                  <span className="landing-code-comment">
+                    # Clone and setup
+                  </span>
                   <br />
                   git clone https://github.com/bordumb/dataing.git
                   <br />
@@ -175,7 +189,9 @@ function InstallSection() {
                   just setup
                   <br />
                   <br />
-                  <span className="landing-code-comment"># Run development stack</span>
+                  <span className="landing-code-comment">
+                    # Run development stack
+                  </span>
                   <br />
                   just dev
                 </code>
@@ -257,48 +273,50 @@ function InstallSection() {
         </div>
       </section>
     </>
-  )
+  );
 }
 
 function DocsSection() {
   const docLinks = [
     {
-      title: 'Getting Started',
-      description: 'Installation, configuration, and your first investigation',
-      href: 'https://docs.dataing.io/getting-started',
+      title: "Getting Started",
+      description: "Installation, configuration, and your first investigation",
+      href: "https://docs.dataing.io/getting-started",
       icon: <Terminal />,
     },
     {
-      title: 'Architecture',
-      description: 'Understanding the maistro workflow engine and bond agent runtime',
-      href: 'https://docs.dataing.io/architecture',
+      title: "Architecture",
+      description:
+        "Understanding the maistro workflow engine and bond agent runtime",
+      href: "https://docs.dataing.io/architecture",
       icon: <GitBranch />,
     },
     {
-      title: 'Data Sources',
-      description: 'Connect SQL databases, document stores, and enterprise systems',
-      href: 'https://docs.dataing.io/datasources',
+      title: "Data Sources",
+      description:
+        "Connect SQL databases, document stores, and enterprise systems",
+      href: "https://docs.dataing.io/datasources",
       icon: <Database />,
     },
     {
-      title: 'Lineage Providers',
-      description: 'Integrate with OpenLineage, dbt, Dagster, Airflow, DataHub',
-      href: 'https://docs.dataing.io/lineage',
+      title: "Lineage Providers",
+      description: "Integrate with OpenLineage, dbt, Dagster, Airflow, DataHub",
+      href: "https://docs.dataing.io/lineage",
       icon: <GitBranch />,
     },
     {
-      title: 'API Reference',
-      description: 'REST API endpoints for programmatic access',
-      href: 'https://docs.dataing.io/api',
+      title: "API Reference",
+      description: "REST API endpoints for programmatic access",
+      href: "https://docs.dataing.io/api",
       icon: <Zap />,
     },
     {
-      title: 'Enterprise Edition',
-      description: 'SSO, SCIM, audit logging, and advanced datasource adapters',
-      href: 'https://docs.dataing.io/enterprise',
+      title: "Enterprise Edition",
+      description: "SSO, SCIM, audit logging, and advanced datasource adapters",
+      href: "https://docs.dataing.io/enterprise",
       icon: <Shield />,
     },
-  ]
+  ];
 
   return (
     <section className="landing-docs">
@@ -344,7 +362,7 @@ function DocsSection() {
         </div>
       </div>
     </section>
-  )
+  );
 }
 
 function PricingSection() {
@@ -417,9 +435,7 @@ function PricingSection() {
                 <span className="landing-price-amount">$49</span>
                 <span className="landing-price-period">/user/month</span>
               </div>
-              <p className="landing-pricing-desc">
-                For growing data teams
-              </p>
+              <p className="landing-pricing-desc">For growing data teams</p>
             </div>
             <ul className="landing-pricing-features">
               <li>
@@ -460,9 +476,7 @@ function PricingSection() {
               <div className="landing-pricing-price">
                 <span className="landing-price-amount">Custom</span>
               </div>
-              <p className="landing-pricing-desc">
-                For large organizations
-              </p>
+              <p className="landing-pricing-desc">For large organizations</p>
             </div>
             <ul className="landing-pricing-features">
               <li>
@@ -490,7 +504,10 @@ function PricingSection() {
                 Dedicated support
               </li>
             </ul>
-            <a href="mailto:sales@dataing.io" className="landing-btn-secondary landing-btn-full">
+            <a
+              href="mailto:sales@dataing.io"
+              className="landing-btn-secondary landing-btn-full"
+            >
               Contact Sales
               <ArrowRight className="h-4 w-4" />
             </a>
@@ -498,7 +515,7 @@ function PricingSection() {
         </div>
       </div>
     </section>
-  )
+  );
 }
 
 function FeatureCard({
@@ -507,18 +524,21 @@ function FeatureCard({
   description,
   delay,
 }: {
-  icon: React.ReactNode
-  title: string
-  description: string
-  delay: number
+  icon: React.ReactNode;
+  title: string;
+  description: string;
+  delay: number;
 }) {
   return (
-    <div className="landing-feature-card" style={{ animationDelay: `${delay}ms` }}>
+    <div
+      className="landing-feature-card"
+      style={{ animationDelay: `${delay}ms` }}
+    >
       <div className="landing-feature-icon">{icon}</div>
       <h3 className="landing-feature-title">{title}</h3>
       <p className="landing-feature-desc">{description}</p>
     </div>
-  )
+  );
 }
 
 function DataFlowAnimation() {
@@ -528,8 +548,16 @@ function DataFlowAnimation() {
       <defs>
         <linearGradient id="lineGrad" x1="0%" y1="0%" x2="100%" y2="0%">
           <stop offset="0%" stopColor="var(--landing-accent)" stopOpacity="0" />
-          <stop offset="50%" stopColor="var(--landing-accent)" stopOpacity="0.8" />
-          <stop offset="100%" stopColor="var(--landing-accent)" stopOpacity="0" />
+          <stop
+            offset="50%"
+            stopColor="var(--landing-accent)"
+            stopOpacity="0.8"
+          />
+          <stop
+            offset="100%"
+            stopColor="var(--landing-accent)"
+            stopOpacity="0"
+          />
         </linearGradient>
         <filter id="glow">
           <feGaussianBlur stdDeviation="2" result="coloredBlur" />
@@ -628,10 +656,16 @@ function DataFlowAnimation() {
 
       {/* Labels */}
       <g className="landing-labels">
-        <text x="60" y="50" className="landing-label">Data Sources</text>
-        <text x="200" y="195" className="landing-label">Analysis</text>
-        <text x="340" y="250" className="landing-label">Insights</text>
+        <text x="60" y="50" className="landing-label">
+          Data Sources
+        </text>
+        <text x="200" y="195" className="landing-label">
+          Analysis
+        </text>
+        <text x="340" y="250" className="landing-label">
+          Insights
+        </text>
       </g>
     </svg>
-  )
+  );
 }

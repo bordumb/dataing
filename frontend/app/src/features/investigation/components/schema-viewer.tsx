@@ -1,9 +1,9 @@
-import { Loader2, Table as TableIcon, Database, Key } from 'lucide-react'
-import type { SchemaTable, SchemaColumn } from '@/lib/api/datasources'
+import { Loader2, Table as TableIcon, Database, Key } from "lucide-react";
+import type { SchemaTable, SchemaColumn } from "@/lib/api/datasources";
 
 interface SchemaViewerProps {
-  table: SchemaTable | null
-  isLoading: boolean
+  table: SchemaTable | null;
+  isLoading: boolean;
 }
 
 export function SchemaViewer({ table, isLoading }: SchemaViewerProps) {
@@ -12,7 +12,7 @@ export function SchemaViewer({ table, isLoading }: SchemaViewerProps) {
       <div className="flex items-center justify-center rounded-xl border border-border bg-muted/20 p-8">
         <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
       </div>
-    )
+    );
   }
 
   if (!table) {
@@ -22,7 +22,7 @@ export function SchemaViewer({ table, isLoading }: SchemaViewerProps) {
           Enter a dataset identifier to preview its schema
         </p>
       </div>
-    )
+    );
   }
 
   return (
@@ -35,7 +35,8 @@ export function SchemaViewer({ table, isLoading }: SchemaViewerProps) {
       {table.row_count && (
         <div className="mt-3 flex flex-wrap gap-3 text-xs text-muted-foreground">
           <span className="flex items-center gap-1">
-            <Database className="h-3 w-3" />~{table.row_count.toLocaleString()} rows
+            <Database className="h-3 w-3" />~{table.row_count.toLocaleString()}{" "}
+            rows
           </span>
         </div>
       )}
@@ -55,7 +56,9 @@ export function SchemaViewer({ table, isLoading }: SchemaViewerProps) {
                   {column.is_primary_key && (
                     <Key className="h-3 w-3 text-amber-500" />
                   )}
-                  <span className="truncate text-sm font-medium">{column.name}</span>
+                  <span className="truncate text-sm font-medium">
+                    {column.name}
+                  </span>
                   {column.nullable && (
                     <span className="rounded bg-amber-500/10 px-1 py-0.5 text-[10px] font-medium text-amber-600 dark:text-amber-400">
                       nullable
@@ -71,5 +74,5 @@ export function SchemaViewer({ table, isLoading }: SchemaViewerProps) {
         </div>
       </div>
     </div>
-  )
+  );
 }

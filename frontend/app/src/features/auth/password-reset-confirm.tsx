@@ -4,84 +4,93 @@
  * Allows users to set a new password using a reset token from the email link.
  */
 
-import * as React from 'react'
-import { Link, useSearchParams, useNavigate } from 'react-router-dom'
-import { Search, Lock, ArrowLeft, CheckCircle, AlertCircle } from 'lucide-react'
+import * as React from "react";
+import { Link, useSearchParams, useNavigate } from "react-router-dom";
+import {
+  Search,
+  Lock,
+  ArrowLeft,
+  CheckCircle,
+  AlertCircle,
+} from "lucide-react";
 
-import { Button } from '@/components/ui/Button'
-import { Input } from '@/components/ui/Input'
-import { Label } from '@/components/ui/label'
+import { Button } from "@/components/ui/Button";
+import { Input } from "@/components/ui/Input";
+import { Label } from "@/components/ui/label";
 import {
   Card,
   CardContent,
   CardDescription,
   CardHeader,
   CardTitle,
-} from '@/components/ui/Card'
-import { Alert, AlertDescription } from '@/components/ui/alert'
+} from "@/components/ui/Card";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000'
+const API_URL = import.meta.env.VITE_API_URL || "http://localhost:8000";
 
 export function PasswordResetConfirm() {
-  const [searchParams] = useSearchParams()
-  const navigate = useNavigate()
-  const token = searchParams.get('token')
+  const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
+  const token = searchParams.get("token");
 
-  const [password, setPassword] = React.useState('')
-  const [confirmPassword, setConfirmPassword] = React.useState('')
-  const [isLoading, setIsLoading] = React.useState(false)
-  const [error, setError] = React.useState<string | null>(null)
-  const [isSuccess, setIsSuccess] = React.useState(false)
+  const [password, setPassword] = React.useState("");
+  const [confirmPassword, setConfirmPassword] = React.useState("");
+  const [isLoading, setIsLoading] = React.useState(false);
+  const [error, setError] = React.useState<string | null>(null);
+  const [isSuccess, setIsSuccess] = React.useState(false);
 
   // Redirect to request page if no token
   React.useEffect(() => {
     if (!token) {
-      navigate('/password-reset', { replace: true })
+      navigate("/password-reset", { replace: true });
     }
-  }, [token, navigate])
+  }, [token, navigate]);
 
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setError(null)
+    e.preventDefault();
+    setError(null);
 
     // Validate passwords match
     if (password !== confirmPassword) {
-      setError('Passwords do not match')
-      return
+      setError("Passwords do not match");
+      return;
     }
 
     // Validate password length
     if (password.length < 8) {
-      setError('Password must be at least 8 characters')
-      return
+      setError("Password must be at least 8 characters");
+      return;
     }
 
-    setIsLoading(true)
+    setIsLoading(true);
 
     try {
-      const response = await fetch(`${API_URL}/api/v1/auth/password-reset/confirm`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
+      const response = await fetch(
+        `${API_URL}/api/v1/auth/password-reset/confirm`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ token, new_password: password }),
         },
-        body: JSON.stringify({ token, new_password: password }),
-      })
+      );
 
       if (!response.ok) {
-        const data = await response.json()
-        throw new Error(data.detail || 'Failed to reset password')
+        const data = await response.json();
+        throw new Error(data.detail || "Failed to reset password");
       }
 
-      setIsSuccess(true)
+      setIsSuccess(true);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'An error occurred')
+      setError(err instanceof Error ? err.message : "An error occurred");
     } finally {
-      setIsLoading(false)
+      setIsLoading(false);
     }
-  }
+  };
 
   if (!token) {
-    return null // Will redirect
+    return null; // Will redirect
   }
 
   return (
@@ -94,12 +103,12 @@ export function PasswordResetConfirm() {
             </div>
           </div>
           <CardTitle className="text-2xl font-bold">
-            {isSuccess ? 'Password Reset' : 'Create New Password'}
+            {isSuccess ? "Password Reset" : "Create New Password"}
           </CardTitle>
           <CardDescription>
             {isSuccess
-              ? 'Your password has been reset successfully'
-              : 'Enter your new password below'}
+              ? "Your password has been reset successfully"
+              : "Enter your new password below"}
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -168,7 +177,7 @@ export function PasswordResetConfirm() {
                 className="w-full"
                 disabled={isLoading || !password || !confirmPassword}
               >
-                {isLoading ? 'Resetting...' : 'Reset Password'}
+                {isLoading ? "Resetting..." : "Reset Password"}
               </Button>
 
               <Link
@@ -183,5 +192,5 @@ export function PasswordResetConfirm() {
         </CardContent>
       </Card>
     </div>
-  )
+  );
 }

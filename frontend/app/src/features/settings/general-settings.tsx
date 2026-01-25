@@ -1,11 +1,17 @@
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card'
-import { Button } from '@/components/ui/Button'
-import { Input } from '@/components/ui/Input'
-import { Label } from '@/components/ui/label'
-import { useJwtAuth } from '@/lib/auth/jwt-context'
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/Card";
+import { Button } from "@/components/ui/Button";
+import { Input } from "@/components/ui/Input";
+import { Label } from "@/components/ui/label";
+import { useJwtAuth } from "@/lib/auth/jwt-context";
 
 export function GeneralSettings() {
-  const { org } = useJwtAuth()
+  const { org } = useJwtAuth();
 
   return (
     <Card>
@@ -20,7 +26,7 @@ export function GeneralSettings() {
           <Label htmlFor="org-name">Organization Name</Label>
           <Input
             id="org-name"
-            defaultValue={org?.name ?? ''}
+            defaultValue={org?.name ?? ""}
             placeholder="Your organization"
           />
         </div>
@@ -28,7 +34,7 @@ export function GeneralSettings() {
           <Label htmlFor="org-slug">Organization Slug</Label>
           <Input
             id="org-slug"
-            defaultValue={org?.slug ?? ''}
+            defaultValue={org?.slug ?? ""}
             placeholder="your-org"
             disabled
           />
@@ -39,5 +45,5 @@ export function GeneralSettings() {
         <Button>Save Changes</Button>
       </CardContent>
     </Card>
-  )
+  );
 }

@@ -1,22 +1,24 @@
-import type { UpgradeError } from '@/components/shared/upgrade-required-modal'
+import type { UpgradeError } from "@/components/shared/upgrade-required-modal";
 
-type UpgradeErrorListener = (error: UpgradeError | null) => void
+type UpgradeErrorListener = (error: UpgradeError | null) => void;
 
-let currentError: UpgradeError | null = null
-const listeners: Set<UpgradeErrorListener> = new Set()
+let currentError: UpgradeError | null = null;
+const listeners: Set<UpgradeErrorListener> = new Set();
 
 export function setUpgradeError(error: UpgradeError | null) {
-  currentError = error
-  listeners.forEach((listener) => listener(error))
+  currentError = error;
+  listeners.forEach((listener) => listener(error));
 }
 
-export function subscribeToUpgradeError(listener: UpgradeErrorListener): () => void {
-  listeners.add(listener)
+export function subscribeToUpgradeError(
+  listener: UpgradeErrorListener,
+): () => void {
+  listeners.add(listener);
   return () => {
-    listeners.delete(listener)
-  }
+    listeners.delete(listener);
+  };
 }
 
 export function getUpgradeError() {
-  return currentError
+  return currentError;
 }

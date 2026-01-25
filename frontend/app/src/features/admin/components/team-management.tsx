@@ -2,17 +2,17 @@
  * Team management component for admin users.
  */
 
-import * as React from 'react'
-import { Plus, Trash2, Users } from 'lucide-react'
+import * as React from "react";
+import { Plus, Trash2, Users } from "lucide-react";
 
-import { Button } from '@/components/ui/Button'
+import { Button } from "@/components/ui/Button";
 import {
   Card,
   CardContent,
   CardDescription,
   CardHeader,
   CardTitle,
-} from '@/components/ui/Card'
+} from "@/components/ui/Card";
 import {
   Dialog,
   DialogContent,
@@ -21,9 +21,9 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
-} from '@/components/ui/dialog'
-import { Input } from '@/components/ui/Input'
-import { Label } from '@/components/ui/label'
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/Input";
+import { Label } from "@/components/ui/label";
 import {
   Table,
   TableBody,
@@ -31,115 +31,117 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from '@/components/ui/table'
-import { useJwtAuth } from '@/lib/auth'
+} from "@/components/ui/table";
+import { useJwtAuth } from "@/lib/auth";
 
 interface Team {
-  id: string
-  name: string
-  org_id: string
-  created_at: string
+  id: string;
+  name: string;
+  org_id: string;
+  created_at: string;
 }
 
-const API_BASE = '/api/v1/teams'
+const API_BASE = "/api/v1/teams";
 
 export function TeamManagement() {
-  const { accessToken } = useJwtAuth()
-  const [teams, setTeams] = React.useState<Team[]>([])
-  const [loading, setLoading] = React.useState(true)
-  const [error, setError] = React.useState<string | null>(null)
-  const [createDialogOpen, setCreateDialogOpen] = React.useState(false)
-  const [newTeamName, setNewTeamName] = React.useState('')
-  const [creating, setCreating] = React.useState(false)
+  const { accessToken } = useJwtAuth();
+  const [teams, setTeams] = React.useState<Team[]>([]);
+  const [loading, setLoading] = React.useState(true);
+  const [error, setError] = React.useState<string | null>(null);
+  const [createDialogOpen, setCreateDialogOpen] = React.useState(false);
+  const [newTeamName, setNewTeamName] = React.useState("");
+  const [creating, setCreating] = React.useState(false);
 
   const fetchTeams = React.useCallback(async () => {
-    if (!accessToken) return
+    if (!accessToken) return;
 
-    setLoading(true)
-    setError(null)
+    setLoading(true);
+    setError(null);
 
     try {
       const response = await fetch(API_BASE, {
         headers: {
           Authorization: `Bearer ${accessToken}`,
         },
-      })
+      });
       if (!response.ok) {
-        throw new Error(`HTTP ${response.status}`)
+        throw new Error(`HTTP ${response.status}`);
       }
-      const data = await response.json()
-      setTeams(data)
+      const data = await response.json();
+      setTeams(data);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load teams')
+      setError(err instanceof Error ? err.message : "Failed to load teams");
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }, [accessToken])
+  }, [accessToken]);
 
   React.useEffect(() => {
-    fetchTeams()
-  }, [fetchTeams])
+    fetchTeams();
+  }, [fetchTeams]);
 
   const handleCreateTeam = async () => {
-    if (!accessToken || !newTeamName.trim()) return
+    if (!accessToken || !newTeamName.trim()) return;
 
-    setCreating(true)
+    setCreating(true);
     try {
       const response = await fetch(API_BASE, {
-        method: 'POST',
+        method: "POST",
         headers: {
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
           Authorization: `Bearer ${accessToken}`,
         },
         body: JSON.stringify({ name: newTeamName.trim() }),
-      })
+      });
 
       if (!response.ok) {
-        const error = await response.json().catch(() => ({}))
-        throw new Error(error.detail || `HTTP ${response.status}`)
+        const error = await response.json().catch(() => ({}));
+        throw new Error(error.detail || `HTTP ${response.status}`);
       }
 
-      setNewTeamName('')
-      setCreateDialogOpen(false)
-      await fetchTeams()
+      setNewTeamName("");
+      setCreateDialogOpen(false);
+      await fetchTeams();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to create team')
+      setError(err instanceof Error ? err.message : "Failed to create team");
     } finally {
-      setCreating(false)
+      setCreating(false);
     }
-  }
+  };
 
   const handleDeleteTeam = async (teamId: string) => {
-    if (!accessToken) return
-    if (!confirm('Are you sure you want to delete this team?')) return
+    if (!accessToken) return;
+    if (!confirm("Are you sure you want to delete this team?")) return;
 
     try {
       const response = await fetch(`${API_BASE}/${teamId}`, {
-        method: 'DELETE',
+        method: "DELETE",
         headers: {
           Authorization: `Bearer ${accessToken}`,
         },
-      })
+      });
 
       if (!response.ok) {
-        const error = await response.json().catch(() => ({}))
-        throw new Error(error.detail || `HTTP ${response.status}`)
+        const error = await response.json().catch(() => ({}));
+        throw new Error(error.detail || `HTTP ${response.status}`);
       }
 
-      await fetchTeams()
+      await fetchTeams();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to delete team')
+      setError(err instanceof Error ? err.message : "Failed to delete team");
     }
-  }
+  };
 
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
         <div>
-          <CardTitle className="text-xl font-semibold">Team Management</CardTitle>
+          <CardTitle className="text-xl font-semibold">
+            Team Management
+          </CardTitle>
           <CardDescription>
-            Create and manage teams within your organization. Teams help scope access
-            to specific data sources.
+            Create and manage teams within your organization. Teams help scope
+            access to specific data sources.
           </CardDescription>
         </div>
         <Dialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>
@@ -165,8 +167,8 @@ export function TeamManagement() {
                   value={newTeamName}
                   onChange={(e) => setNewTeamName(e.target.value)}
                   onKeyDown={(e) => {
-                    if (e.key === 'Enter' && newTeamName.trim()) {
-                      handleCreateTeam()
+                    if (e.key === "Enter" && newTeamName.trim()) {
+                      handleCreateTeam();
                     }
                   }}
                 />
@@ -184,7 +186,7 @@ export function TeamManagement() {
                 onClick={handleCreateTeam}
                 disabled={creating || !newTeamName.trim()}
               >
-                {creating ? 'Creating...' : 'Create'}
+                {creating ? "Creating..." : "Create"}
               </Button>
             </DialogFooter>
           </DialogContent>
@@ -205,7 +207,9 @@ export function TeamManagement() {
           <div className="flex flex-col items-center justify-center py-8 text-muted-foreground">
             <Users className="h-12 w-12 mb-4 opacity-50" />
             <p>No teams yet</p>
-            <p className="text-sm">Create a team to organize users and scope access.</p>
+            <p className="text-sm">
+              Create a team to organize users and scope access.
+            </p>
           </div>
         ) : (
           <Table>
@@ -239,5 +243,5 @@ export function TeamManagement() {
         )}
       </CardContent>
     </Card>
-  )
+  );
 }

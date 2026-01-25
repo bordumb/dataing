@@ -44,9 +44,7 @@ def get_temporal_client(request: Request) -> TemporalInvestigationClient:
     Raises:
         HTTPException: If Temporal client is not configured.
     """
-    client: TemporalInvestigationClient | None = getattr(
-        request.app.state, "temporal_client", None
-    )
+    client: TemporalInvestigationClient | None = getattr(request.app.state, "temporal_client", None)
     if client is None:
         raise HTTPException(
             status_code=503,
@@ -130,9 +128,7 @@ class CreateRunRequest(BaseModel):
     """
 
     goal: str = Field(..., description="Investigation goal/question")
-    bundle_id: str | None = Field(
-        default=None, description="Existing bundle ID to use"
-    )
+    bundle_id: str | None = Field(default=None, description="Existing bundle ID to use")
     bundle: InlineBundleRequest | None = Field(
         default=None, description="Inline bundle specification"
     )
@@ -259,9 +255,7 @@ async def create_run(
     )
     # Create a mock response object for the bundle endpoint
     bundle_response_obj = Response()
-    bundle_result = await create_bundle(
-        request, bundle_request, auth, bundle_response_obj
-    )
+    bundle_result = await create_bundle(request, bundle_request, auth, bundle_response_obj)
     bundle_id = bundle_result.bundle_id
     bundle_hash = bundle_result.bundle_hash
     assets_list = [
@@ -280,9 +274,7 @@ async def create_run(
 
     if not datasource_id:
         try:
-            datasource_id = await resolve_datasource_id(
-                request, auth.tenant_id, explicit_id=None
-            )
+            datasource_id = await resolve_datasource_id(request, auth.tenant_id, explicit_id=None)
         except ValueError:
             # No default datasource, use a placeholder for demo
             datasource_id = UUID("00000000-0000-0000-0000-000000000003")

@@ -1,98 +1,106 @@
-import { useState } from 'react'
-import { ThumbsUp, ThumbsDown } from 'lucide-react'
-import { Button } from '@/components/ui/Button'
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
-import { Input } from '@/components/ui/Input'
-import { useInvestigationFeedbackContext } from '../context/InvestigationFeedbackContext'
-import { TargetType } from '@/lib/api/investigation-feedback'
-import { cn } from '@/lib/utils'
+import { useState } from "react";
+import { ThumbsUp, ThumbsDown } from "lucide-react";
+import { Button } from "@/components/ui/Button";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { Input } from "@/components/ui/Input";
+import { useInvestigationFeedbackContext } from "../context/InvestigationFeedbackContext";
+import { TargetType } from "@/lib/api/investigation-feedback";
+import { cn } from "@/lib/utils";
 
-const REASON_OPTIONS: Record<TargetType, { positive: string[]; negative: string[] }> = {
+const REASON_OPTIONS: Record<
+  TargetType,
+  { positive: string[]; negative: string[] }
+> = {
   hypothesis: {
-    positive: ['Right direction', 'Key insight'],
-    negative: ['Dead end', 'Already known'],
+    positive: ["Right direction", "Key insight"],
+    negative: ["Dead end", "Already known"],
   },
   query: {
-    positive: ['Useful data', 'Confirmed suspicion'],
-    negative: ['Wrong table', 'Inconclusive'],
+    positive: ["Useful data", "Confirmed suspicion"],
+    negative: ["Wrong table", "Inconclusive"],
   },
   evidence: {
-    positive: ['Key proof', 'Clear signal'],
-    negative: ['Noise', 'Misleading'],
+    positive: ["Key proof", "Clear signal"],
+    negative: ["Noise", "Misleading"],
   },
   synthesis: {
-    positive: ['Solved it', 'Actionable'],
-    negative: ['Partial answer', 'Missed root cause'],
+    positive: ["Solved it", "Actionable"],
+    negative: ["Partial answer", "Missed root cause"],
   },
   investigation: {
-    positive: ['Saved time', 'Found the issue'],
-    negative: ['No value', 'Wrong conclusion'],
+    positive: ["Saved time", "Found the issue"],
+    negative: ["No value", "Wrong conclusion"],
   },
   recommendation: {
-    positive: ['Will implement', 'Good advice'],
-    negative: ['Not applicable', 'Already done'],
+    positive: ["Will implement", "Good advice"],
+    negative: ["Not applicable", "Already done"],
   },
-}
+};
 
 interface InvestigationFeedbackButtonsProps {
-  targetType: TargetType
-  targetId: string
+  targetType: TargetType;
+  targetId: string;
 }
 
 export function InvestigationFeedbackButtons({
   targetType,
   targetId,
 }: InvestigationFeedbackButtonsProps) {
-  const { getRating, submitFeedback } = useInvestigationFeedbackContext()
-  const [openPopover, setOpenPopover] = useState<'up' | 'down' | null>(null)
-  const [comment, setComment] = useState('')
+  const { getRating, submitFeedback } = useInvestigationFeedbackContext();
+  const [openPopover, setOpenPopover] = useState<"up" | "down" | null>(null);
+  const [comment, setComment] = useState("");
 
-  const currentRating = getRating(targetType, targetId)
-  const reasons = REASON_OPTIONS[targetType]
+  const currentRating = getRating(targetType, targetId);
+  const reasons = REASON_OPTIONS[targetType];
 
   // Get display text (prefer reason over comment, truncate if needed)
-  const displayText = currentRating?.reason || currentRating?.comment
-  const maxLength = 20
-  const truncatedText = displayText && displayText.length > maxLength
-    ? displayText.slice(0, maxLength) + '...'
-    : displayText
+  const displayText = currentRating?.reason || currentRating?.comment;
+  const maxLength = 20;
+  const truncatedText =
+    displayText && displayText.length > maxLength
+      ? displayText.slice(0, maxLength) + "..."
+      : displayText;
 
   const handleRatingClick = (rating: 1 | -1) => {
-    setOpenPopover(rating === 1 ? 'up' : 'down')
-  }
+    setOpenPopover(rating === 1 ? "up" : "down");
+  };
 
   const handleReasonClick = (reason: string) => {
-    const rating = openPopover === 'up' ? 1 : -1
+    const rating = openPopover === "up" ? 1 : -1;
     submitFeedback({
       target_type: targetType,
       target_id: targetId,
       rating,
       reason,
       comment: comment || undefined,
-    })
-    setOpenPopover(null)
-    setComment('')
-  }
+    });
+    setOpenPopover(null);
+    setComment("");
+  };
 
   const handleCommentSubmit = () => {
-    if (!comment.trim()) return
-    const rating = openPopover === 'up' ? 1 : -1
+    if (!comment.trim()) return;
+    const rating = openPopover === "up" ? 1 : -1;
     submitFeedback({
       target_type: targetType,
       target_id: targetId,
       rating,
       comment: comment.trim(),
-    })
-    setOpenPopover(null)
-    setComment('')
-  }
+    });
+    setOpenPopover(null);
+    setComment("");
+  };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && comment.trim()) {
-      e.preventDefault()
-      handleCommentSubmit()
+    if (e.key === "Enter" && comment.trim()) {
+      e.preventDefault();
+      handleCommentSubmit();
     }
-  }
+  };
 
   return (
     <div className="flex items-center gap-1">
@@ -100,8 +108,8 @@ export function InvestigationFeedbackButtons({
       {displayText && (
         <span
           className={cn(
-            'text-xs max-w-[120px] truncate',
-            currentRating?.rating === 1 ? 'text-green-600' : 'text-red-600'
+            "text-xs max-w-[120px] truncate",
+            currentRating?.rating === 1 ? "text-green-600" : "text-red-600",
           )}
           title={displayText}
         >
@@ -109,14 +117,17 @@ export function InvestigationFeedbackButtons({
         </span>
       )}
 
-      <Popover open={openPopover === 'up'} onOpenChange={(open) => !open && setOpenPopover(null)}>
+      <Popover
+        open={openPopover === "up"}
+        onOpenChange={(open) => !open && setOpenPopover(null)}
+      >
         <PopoverTrigger asChild>
           <Button
             variant="ghost"
             size="sm"
             className={cn(
-              'h-7 w-7 p-0',
-              currentRating?.rating === 1 && 'text-green-600 bg-green-50'
+              "h-7 w-7 p-0",
+              currentRating?.rating === 1 && "text-green-600 bg-green-50",
             )}
             onClick={() => handleRatingClick(1)}
           >
@@ -134,9 +145,9 @@ export function InvestigationFeedbackButtons({
                 size="sm"
                 className="text-xs"
                 onClick={(e) => {
-                  e.preventDefault()
-                  e.stopPropagation()
-                  handleReasonClick(reason)
+                  e.preventDefault();
+                  e.stopPropagation();
+                  handleReasonClick(reason);
                 }}
               >
                 {reason}
@@ -154,7 +165,7 @@ export function InvestigationFeedbackButtons({
       </Popover>
 
       <Popover
-        open={openPopover === 'down'}
+        open={openPopover === "down"}
         onOpenChange={(open) => !open && setOpenPopover(null)}
       >
         <PopoverTrigger asChild>
@@ -162,8 +173,8 @@ export function InvestigationFeedbackButtons({
             variant="ghost"
             size="sm"
             className={cn(
-              'h-7 w-7 p-0',
-              currentRating?.rating === -1 && 'text-red-600 bg-red-50'
+              "h-7 w-7 p-0",
+              currentRating?.rating === -1 && "text-red-600 bg-red-50",
             )}
             onClick={() => handleRatingClick(-1)}
           >
@@ -181,9 +192,9 @@ export function InvestigationFeedbackButtons({
                 size="sm"
                 className="text-xs"
                 onClick={(e) => {
-                  e.preventDefault()
-                  e.stopPropagation()
-                  handleReasonClick(reason)
+                  e.preventDefault();
+                  e.stopPropagation();
+                  handleReasonClick(reason);
                 }}
               >
                 {reason}
@@ -200,5 +211,5 @@ export function InvestigationFeedbackButtons({
         </PopoverContent>
       </Popover>
     </div>
-  )
+  );
 }

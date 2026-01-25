@@ -1,26 +1,26 @@
-import * as React from 'react'
-import { Plus, Database, AlertCircle, RefreshCw } from 'lucide-react'
-import { Link } from 'react-router-dom'
+import * as React from "react";
+import { Plus, Database, AlertCircle, RefreshCw } from "lucide-react";
+import { Link } from "react-router-dom";
 
-import { Button } from '@/components/ui/Button'
-import { PageHeader } from '@/components/shared/page-header'
-import { useDataSources } from '@/lib/api/datasources'
-import { DataTable } from '@/components/data-table/data-table'
-import { datasourceColumns } from './datasource-columns'
-import { DataSourceForm } from './datasource-form'
-import { LoadingSpinner } from '@/components/shared/loading-spinner'
-import { EmptyState } from '@/components/shared/empty-state'
+import { Button } from "@/components/ui/Button";
+import { PageHeader } from "@/components/shared/page-header";
+import { useDataSources } from "@/lib/api/datasources";
+import { DataTable } from "@/components/data-table/data-table";
+import { datasourceColumns } from "./datasource-columns";
+import { DataSourceForm } from "./datasource-form";
+import { LoadingSpinner } from "@/components/shared/loading-spinner";
+import { EmptyState } from "@/components/shared/empty-state";
 
 export function DataSourcePage() {
-  const [formOpen, setFormOpen] = React.useState(false)
-  const { data: datasources, isLoading, error, refetch } = useDataSources()
+  const [formOpen, setFormOpen] = React.useState(false);
+  const { data: datasources, isLoading, error, refetch } = useDataSources();
 
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-12">
         <LoadingSpinner size="lg" />
       </div>
-    )
+    );
   }
 
   if (error) {
@@ -29,9 +29,11 @@ export function DataSourcePage() {
         <div className="flex items-center gap-3 rounded-lg border border-destructive/50 bg-destructive/10 p-4 max-w-lg">
           <AlertCircle className="h-5 w-5 text-destructive flex-shrink-0" />
           <div>
-            <p className="font-medium text-destructive">Failed to load data sources</p>
+            <p className="font-medium text-destructive">
+              Failed to load data sources
+            </p>
             <p className="text-sm text-muted-foreground mt-1">
-              {error.message || 'Please check your API key and try again.'}
+              {error.message || "Please check your API key and try again."}
             </p>
           </div>
         </div>
@@ -45,7 +47,7 @@ export function DataSourcePage() {
           </Link>
         </div>
       </div>
-    )
+    );
   }
 
   return (
@@ -84,5 +86,5 @@ export function DataSourcePage() {
 
       <DataSourceForm open={formOpen} onOpenChange={setFormOpen} />
     </div>
-  )
+  );
 }

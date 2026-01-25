@@ -1,11 +1,26 @@
-import * as React from 'react'
-import { Plus, Copy, Eye, EyeOff, Trash2, Key, Loader2, ExternalLink } from 'lucide-react'
-import { toast } from 'sonner'
+import * as React from "react";
+import {
+  Plus,
+  Copy,
+  Eye,
+  EyeOff,
+  Trash2,
+  Key,
+  Loader2,
+  ExternalLink,
+} from "lucide-react";
+import { toast } from "sonner";
 
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card'
-import { Button } from '@/components/ui/Button'
-import { Input } from '@/components/ui/Input'
-import { Label } from '@/components/ui/label'
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/Card";
+import { Button } from "@/components/ui/Button";
+import { Input } from "@/components/ui/Input";
+import { Label } from "@/components/ui/label";
 import {
   Dialog,
   DialogContent,
@@ -13,76 +28,78 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from '@/components/ui/dialog'
-import { EmptyState } from '@/components/shared/empty-state'
-import { Alert, AlertDescription } from '@/components/ui/alert'
+} from "@/components/ui/dialog";
+import { EmptyState } from "@/components/shared/empty-state";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
 interface SCIMToken {
-  id: string
-  description: string
-  prefix: string
-  created_at: string
-  last_used_at: string | null
+  id: string;
+  description: string;
+  prefix: string;
+  created_at: string;
+  last_used_at: string | null;
 }
 
 export function SCIMTokensSettings() {
-  const [tokens, setTokens] = React.useState<SCIMToken[]>([])
-  const [showDialog, setShowDialog] = React.useState(false)
-  const [newDescription, setNewDescription] = React.useState('')
-  const [generatedToken, setGeneratedToken] = React.useState<string | null>(null)
-  const [showToken, setShowToken] = React.useState(false)
-  const [isGenerating, setIsGenerating] = React.useState(false)
+  const [tokens, setTokens] = React.useState<SCIMToken[]>([]);
+  const [showDialog, setShowDialog] = React.useState(false);
+  const [newDescription, setNewDescription] = React.useState("");
+  const [generatedToken, setGeneratedToken] = React.useState<string | null>(
+    null,
+  );
+  const [showToken, setShowToken] = React.useState(false);
+  const [isGenerating, setIsGenerating] = React.useState(false);
 
   const generateToken = async () => {
-    setIsGenerating(true)
+    setIsGenerating(true);
     try {
       // TODO: Call API to generate SCIM token
-      await new Promise((resolve) => setTimeout(resolve, 1000))
+      await new Promise((resolve) => setTimeout(resolve, 1000));
 
       // Simulate token generation
-      const token = `scim_${Math.random().toString(36).substring(2)}${Math.random().toString(36).substring(2)}${Math.random().toString(36).substring(2)}`
-      setGeneratedToken(token)
+      const token = `scim_${Math.random().toString(36).substring(2)}${Math.random().toString(36).substring(2)}${Math.random().toString(36).substring(2)}`;
+      setGeneratedToken(token);
 
       setTokens([
         ...tokens,
         {
           id: Date.now().toString(),
           description: newDescription,
-          prefix: token.substring(0, 12) + '...',
+          prefix: token.substring(0, 12) + "...",
           created_at: new Date().toISOString(),
           last_used_at: null,
         },
-      ])
+      ]);
     } catch {
-      toast.error('Failed to generate SCIM token')
+      toast.error("Failed to generate SCIM token");
     } finally {
-      setIsGenerating(false)
+      setIsGenerating(false);
     }
-  }
+  };
 
   const copyToClipboard = async (text: string) => {
-    await navigator.clipboard.writeText(text)
-    toast.success('Copied to clipboard')
-  }
+    await navigator.clipboard.writeText(text);
+    toast.success("Copied to clipboard");
+  };
 
   const closeDialog = () => {
-    setShowDialog(false)
-    setNewDescription('')
-    setGeneratedToken(null)
-    setShowToken(false)
-  }
+    setShowDialog(false);
+    setNewDescription("");
+    setGeneratedToken(null);
+    setShowToken(false);
+  };
 
   const handleDeleteToken = async (token: SCIMToken) => {
     try {
       // TODO: Call API to revoke token
-      setTokens(tokens.filter((t) => t.id !== token.id))
-      toast.success('SCIM token revoked')
+      setTokens(tokens.filter((t) => t.id !== token.id));
+      toast.success("SCIM token revoked");
     } catch {
-      toast.error('Failed to revoke token')
+      toast.error("Failed to revoke token");
     }
-  }
+  };
 
-  const scimBaseUrl = `${window.location.origin}/api/scim/v2`
+  const scimBaseUrl = `${window.location.origin}/api/scim/v2`;
 
   return (
     <>
@@ -90,7 +107,8 @@ export function SCIMTokensSettings() {
         <CardHeader>
           <CardTitle>SCIM Provisioning</CardTitle>
           <CardDescription>
-            Configure SCIM 2.0 tokens to enable automatic user provisioning from your identity provider.
+            Configure SCIM 2.0 tokens to enable automatic user provisioning from
+            your identity provider.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
@@ -143,9 +161,14 @@ export function SCIMTokensSettings() {
                         {token.prefix}
                       </p>
                       <p className="text-xs text-muted-foreground mt-1">
-                        Created: {new Date(token.created_at).toLocaleDateString()}
+                        Created:{" "}
+                        {new Date(token.created_at).toLocaleDateString()}
                         {token.last_used_at && (
-                          <> | Last used: {new Date(token.last_used_at).toLocaleDateString()}</>
+                          <>
+                            {" "}
+                            | Last used:{" "}
+                            {new Date(token.last_used_at).toLocaleDateString()}
+                          </>
                         )}
                       </p>
                     </div>
@@ -241,19 +264,21 @@ export function SCIMTokensSettings() {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>
-              {generatedToken ? 'SCIM Token Created' : 'Create SCIM Token'}
+              {generatedToken ? "SCIM Token Created" : "Create SCIM Token"}
             </DialogTitle>
             <DialogDescription>
               {generatedToken
                 ? "Copy your SCIM token now. You won't be able to see it again!"
-                : 'Create a bearer token for SCIM provisioning.'}
+                : "Create a bearer token for SCIM provisioning."}
             </DialogDescription>
           </DialogHeader>
 
           {generatedToken ? (
             <div className="space-y-4">
               <div className="p-4 bg-muted rounded-lg font-mono text-sm break-all flex items-center justify-between gap-2">
-                <span className="flex-1">{showToken ? generatedToken : '•'.repeat(48)}</span>
+                <span className="flex-1">
+                  {showToken ? generatedToken : "•".repeat(48)}
+                </span>
                 <div className="flex gap-1 flex-shrink-0">
                   <Button
                     variant="ghost"
@@ -277,8 +302,11 @@ export function SCIMTokensSettings() {
               </div>
               <Alert>
                 <AlertDescription>
-                  Use this token as the Bearer token in your identity provider's SCIM configuration.
-                  Example header: <code>Authorization: Bearer {generatedToken.substring(0, 12)}...</code>
+                  Use this token as the Bearer token in your identity provider's
+                  SCIM configuration. Example header:{" "}
+                  <code>
+                    Authorization: Bearer {generatedToken.substring(0, 12)}...
+                  </code>
                 </AlertDescription>
               </Alert>
               <DialogFooter>
@@ -288,8 +316,8 @@ export function SCIMTokensSettings() {
           ) : (
             <form
               onSubmit={(e) => {
-                e.preventDefault()
-                generateToken()
+                e.preventDefault();
+                generateToken();
               }}
               className="space-y-4"
             >
@@ -310,14 +338,17 @@ export function SCIMTokensSettings() {
                 <Button type="button" variant="outline" onClick={closeDialog}>
                   Cancel
                 </Button>
-                <Button type="submit" disabled={!newDescription || isGenerating}>
+                <Button
+                  type="submit"
+                  disabled={!newDescription || isGenerating}
+                >
                   {isGenerating ? (
                     <>
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                       Generating...
                     </>
                   ) : (
-                    'Create Token'
+                    "Create Token"
                   )}
                 </Button>
               </DialogFooter>
@@ -326,5 +357,5 @@ export function SCIMTokensSettings() {
         </DialogContent>
       </Dialog>
     </>
-  )
+  );
 }

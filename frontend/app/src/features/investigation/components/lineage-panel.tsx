@@ -1,54 +1,56 @@
-import { useMemo } from 'react'
+import { useMemo } from "react";
 import {
   Loader2,
   Database,
   Table as TableIcon,
   ArrowUpRight,
   ArrowDownRight,
-} from 'lucide-react'
+} from "lucide-react";
 
 interface LineagePanelProps {
-  tableName: string | null
-  isLoading: boolean
+  tableName: string | null;
+  isLoading: boolean;
 }
 
 export function LineagePanel({ tableName, isLoading }: LineagePanelProps) {
   const mockLineage = useMemo(() => {
-    if (!tableName) return { upstream: [], downstream: [] }
-    const name = tableName.toLowerCase()
-    const upstream: string[] = []
-    const downstream: string[] = []
+    if (!tableName) return { upstream: [], downstream: [] };
+    const name = tableName.toLowerCase();
+    const upstream: string[] = [];
+    const downstream: string[] = [];
 
-    if (name.includes('orders') || name.includes('order')) {
-      upstream.push('raw.customers', 'raw.products')
-      downstream.push('analytics.daily_sales', 'reporting.order_summary')
-    } else if (name.includes('users') || name.includes('customer')) {
-      upstream.push('raw.signups', 'external.crm_data')
-      downstream.push('analytics.user_cohorts')
-    } else if (name.includes('events')) {
-      upstream.push('raw.clickstream')
-      downstream.push('analytics.funnels')
+    if (name.includes("orders") || name.includes("order")) {
+      upstream.push("raw.customers", "raw.products");
+      downstream.push("analytics.daily_sales", "reporting.order_summary");
+    } else if (name.includes("users") || name.includes("customer")) {
+      upstream.push("raw.signups", "external.crm_data");
+      downstream.push("analytics.user_cohorts");
+    } else if (name.includes("events")) {
+      upstream.push("raw.clickstream");
+      downstream.push("analytics.funnels");
     } else {
-      upstream.push(`raw.${name}_source`)
-      downstream.push(`analytics.${name}_agg`)
+      upstream.push(`raw.${name}_source`);
+      downstream.push(`analytics.${name}_agg`);
     }
-    return { upstream, downstream }
-  }, [tableName])
+    return { upstream, downstream };
+  }, [tableName]);
 
   if (isLoading) {
     return (
       <div className="flex items-center justify-center rounded-xl border border-border bg-muted/20 p-8">
         <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
       </div>
-    )
+    );
   }
 
   if (!tableName) {
     return (
       <div className="rounded-xl border border-dashed border-border bg-muted/10 p-8 text-center">
-        <p className="text-sm text-muted-foreground">Select a dataset to view lineage</p>
+        <p className="text-sm text-muted-foreground">
+          Select a dataset to view lineage
+        </p>
       </div>
-    )
+    );
   }
 
   return (
@@ -102,5 +104,5 @@ export function LineagePanel({ tableName, isLoading }: LineagePanelProps) {
         </div>
       </div>
     </div>
-  )
+  );
 }

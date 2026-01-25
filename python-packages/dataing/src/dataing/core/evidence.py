@@ -109,9 +109,7 @@ class HypothesisEvidence(EvidenceBase):
     kind: Literal[EvidenceKind.HYPOTHESIS] = EvidenceKind.HYPOTHESIS
     hypothesis_id: str = Field(..., description="ID of the hypothesis evaluated")
     hypothesis_text: str = Field(..., description="The hypothesis statement")
-    confidence: float = Field(
-        ..., ge=0.0, le=1.0, description="Confidence score 0-1"
-    )
+    confidence: float = Field(..., ge=0.0, le=1.0, description="Confidence score 0-1")
     supporting_facts: list[str] = Field(
         default_factory=list, description="Facts supporting the hypothesis"
     )
@@ -124,12 +122,8 @@ class LineageTraceEvidence(EvidenceBase):
 
     kind: Literal[EvidenceKind.LINEAGE_TRACE] = EvidenceKind.LINEAGE_TRACE
     root_dataset: str = Field(..., description="Starting dataset for trace")
-    upstream: list[str] = Field(
-        default_factory=list, description="Upstream datasets"
-    )
-    downstream: list[str] = Field(
-        default_factory=list, description="Downstream datasets"
-    )
+    upstream: list[str] = Field(default_factory=list, description="Upstream datasets")
+    downstream: list[str] = Field(default_factory=list, description="Downstream datasets")
     edges: list[dict[str, str]] = Field(
         default_factory=list, description="Lineage edges with source/target"
     )
@@ -145,9 +139,7 @@ class SchemaSnapshotEvidence(EvidenceBase):
         description="Column definitions with name, type, nullable",
     )
     row_count: int | None = Field(default=None, description="Approximate row count")
-    last_modified: datetime | None = Field(
-        default=None, description="Last modification time"
-    )
+    last_modified: datetime | None = Field(default=None, description="Last modification time")
 
 
 class MetricCalculationEvidence(EvidenceBase):
@@ -157,9 +149,7 @@ class MetricCalculationEvidence(EvidenceBase):
     metric_name: str = Field(..., description="Name of the metric")
     metric_type: str = Field(..., description="Type of metric (count, rate, etc.)")
     value: float = Field(..., description="Calculated metric value")
-    expected_value: float | None = Field(
-        default=None, description="Expected/baseline value"
-    )
+    expected_value: float | None = Field(default=None, description="Expected/baseline value")
     deviation_pct: float | None = Field(
         default=None, description="Percentage deviation from expected"
     )
@@ -173,18 +163,10 @@ class RunSummaryEvidence(EvidenceBase):
 
     kind: Literal[EvidenceKind.RUN_SUMMARY] = EvidenceKind.RUN_SUMMARY
     root_cause: str | None = Field(default=None, description="Identified root cause")
-    confidence: float = Field(
-        default=0.0, ge=0.0, le=1.0, description="Confidence in finding"
-    )
-    recommendations: list[str] = Field(
-        default_factory=list, description="Recommended actions"
-    )
-    hypotheses_evaluated: int = Field(
-        default=0, description="Number of hypotheses evaluated"
-    )
-    queries_executed: int = Field(
-        default=0, description="Number of queries executed"
-    )
+    confidence: float = Field(default=0.0, ge=0.0, le=1.0, description="Confidence in finding")
+    recommendations: list[str] = Field(default_factory=list, description="Recommended actions")
+    hypotheses_evaluated: int = Field(default=0, description="Number of hypotheses evaluated")
+    queries_executed: int = Field(default=0, description="Number of queries executed")
     duration_seconds: float = Field(default=0.0, description="Total run duration")
 
 

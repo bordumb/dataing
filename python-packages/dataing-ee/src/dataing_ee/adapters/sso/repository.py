@@ -148,7 +148,7 @@ class SSORepository:
         updates.append("updated_at = NOW()")
         query = f"""
             UPDATE sso_configs
-            SET {', '.join(updates)}
+            SET {", ".join(updates)}
             WHERE id = $1
             RETURNING id, org_id, provider_type, display_name, is_enabled,
                       oidc_issuer_url, oidc_client_id,

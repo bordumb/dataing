@@ -1,4 +1,4 @@
-import { Link, useLocation } from 'react-router-dom'
+import { Link, useLocation } from "react-router-dom";
 import {
   Search,
   Database,
@@ -11,7 +11,7 @@ import {
   LogOut,
   Shield,
   CircleDot,
-} from 'lucide-react'
+} from "lucide-react";
 
 import {
   Sidebar,
@@ -25,81 +25,81 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
   useSidebar,
-} from '@/components/ui/sidebar'
+} from "@/components/ui/sidebar";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu'
-import { Avatar, AvatarFallback } from '@/components/ui/avatar'
-import { Badge } from '@/components/ui/Badge'
-import { useJwtAuth } from '@/lib/auth/jwt-context'
-import { useDemoRoleContext } from '@/lib/auth/demo-role-context'
-import { useNotifications } from '@/lib/notifications'
+} from "@/components/ui/dropdown-menu";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Badge } from "@/components/ui/Badge";
+import { useJwtAuth } from "@/lib/auth/jwt-context";
+import { useDemoRoleContext } from "@/lib/auth/demo-role-context";
+import { useNotifications } from "@/lib/notifications";
 // IMPORTANT: OrgSelector is critical for multi-tenant support - DO NOT REMOVE
-import { OrgSelector } from '@/lib/auth/org-selector'
+import { OrgSelector } from "@/lib/auth/org-selector";
 
 const mainNavItems = [
   {
-    title: 'Dashboard',
-    url: '/',
+    title: "Dashboard",
+    url: "/",
     icon: LayoutDashboard,
   },
   {
-    title: 'Investigations',
-    url: '/investigations',
+    title: "Investigations",
+    url: "/investigations",
     icon: Search,
   },
   {
-    title: 'Issues',
-    url: '/issues',
+    title: "Issues",
+    url: "/issues",
     icon: CircleDot,
   },
   {
-    title: 'Data Sources',
-    url: '/datasources',
+    title: "Data Sources",
+    url: "/datasources",
     icon: Database,
   },
   {
-    title: 'Usage',
-    url: '/usage',
+    title: "Usage",
+    url: "/usage",
     icon: BarChart3,
   },
   {
-    title: 'Notifications',
-    url: '/notifications',
+    title: "Notifications",
+    url: "/notifications",
     icon: Bell,
   },
-]
+];
 
 export function AppSidebar() {
-  const location = useLocation()
-  const { state } = useSidebar()
-  const { logout, org } = useJwtAuth()
-  const { canAccessAdmin } = useDemoRoleContext()
-  const { unreadCount } = useNotifications()
+  const location = useLocation();
+  const { state } = useSidebar();
+  const { logout, org } = useJwtAuth();
+  const { canAccessAdmin } = useDemoRoleContext();
+  const { unreadCount } = useNotifications();
 
   // Build settings nav items based on role
   // Admin link only visible to admin/owner roles
   const settingsNavItems = [
     {
-      title: 'Settings',
-      url: '/settings',
+      title: "Settings",
+      url: "/settings",
       icon: Settings,
     },
     // Only show Admin to admin/owner roles
     ...(canAccessAdmin
       ? [
           {
-            title: 'Admin',
-            url: '/admin',
+            title: "Admin",
+            url: "/admin",
             icon: Shield,
           },
         ]
       : []),
-  ]
+  ];
 
   return (
     <Sidebar collapsible="icon">
@@ -114,7 +114,7 @@ export function AppSidebar() {
                 <div className="grid flex-1 text-left text-sm leading-tight">
                   <span className="truncate font-semibold">Dataing</span>
                   <span className="truncate text-xs text-muted-foreground">
-                    {org?.name ?? 'Data Quality'}
+                    {org?.name ?? "Data Quality"}
                   </span>
                 </div>
               </Link>
@@ -156,16 +156,22 @@ export function AppSidebar() {
                 <SidebarMenuItem key={item.url}>
                   <SidebarMenuButton
                     asChild
-                    isActive={location.pathname === item.url ||
-                      (item.url !== '/' && location.pathname.startsWith(item.url))}
+                    isActive={
+                      location.pathname === item.url ||
+                      (item.url !== "/" &&
+                        location.pathname.startsWith(item.url))
+                    }
                     tooltip={item.title}
                   >
                     <Link to={item.url}>
                       <item.icon className="size-4" />
                       <span>{item.title}</span>
-                      {item.title === 'Notifications' && unreadCount > 0 && (
-                        <Badge variant="destructive" className="ml-auto h-5 min-w-[1.25rem] px-1 text-xs">
-                          {unreadCount > 99 ? '99+' : unreadCount}
+                      {item.title === "Notifications" && unreadCount > 0 && (
+                        <Badge
+                          variant="destructive"
+                          className="ml-auto h-5 min-w-[1.25rem] px-1 text-xs"
+                        >
+                          {unreadCount > 99 ? "99+" : unreadCount}
                         </Badge>
                       )}
                     </Link>
@@ -187,7 +193,8 @@ export function AppSidebar() {
                     asChild
                     isActive={
                       location.pathname === item.url ||
-                      (item.url !== '/settings' && location.pathname.startsWith(item.url))
+                      (item.url !== "/settings" &&
+                        location.pathname.startsWith(item.url))
                     }
                     tooltip={item.title}
                   >
@@ -201,7 +208,6 @@ export function AppSidebar() {
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
-
       </SidebarContent>
 
       <SidebarFooter>
@@ -215,15 +221,15 @@ export function AppSidebar() {
                 >
                   <Avatar className="h-8 w-8 rounded-lg">
                     <AvatarFallback className="rounded-lg">
-                      {org?.name?.charAt(0) ?? 'U'}
+                      {org?.name?.charAt(0) ?? "U"}
                     </AvatarFallback>
                   </Avatar>
                   <div className="grid flex-1 text-left text-sm leading-tight">
                     <span className="truncate font-semibold">
-                      {org?.name ?? 'User'}
+                      {org?.name ?? "User"}
                     </span>
                     <span className="truncate text-xs">
-                      {org?.slug ?? 'Organization'}
+                      {org?.slug ?? "Organization"}
                     </span>
                   </div>
                   <ChevronUp className="ml-auto size-4" />
@@ -231,7 +237,7 @@ export function AppSidebar() {
               </DropdownMenuTrigger>
               <DropdownMenuContent
                 className="w-[--radix-dropdown-menu-trigger-width] min-w-56 rounded-lg"
-                side={state === 'collapsed' ? 'right' : 'top'}
+                side={state === "collapsed" ? "right" : "top"}
                 align="end"
                 sideOffset={4}
               >
@@ -252,5 +258,5 @@ export function AppSidebar() {
         </SidebarMenu>
       </SidebarFooter>
     </Sidebar>
-  )
+  );
 }

@@ -1,23 +1,29 @@
-import * as React from 'react'
-import { Check, X, AlertCircle } from 'lucide-react'
-import { toast } from 'sonner'
+import * as React from "react";
+import { Check, X, AlertCircle } from "lucide-react";
+import { toast } from "sonner";
 
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card'
-import { Button } from '@/components/ui/Button'
-import { Textarea } from '@/components/ui/textarea'
-import { Badge } from '@/components/ui/Badge'
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/Card";
+import { Button } from "@/components/ui/Button";
+import { Textarea } from "@/components/ui/textarea";
+import { Badge } from "@/components/ui/Badge";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 interface ContextReviewProps {
-  investigationId: string
+  investigationId: string;
   context: {
-    query: string
-    purpose: string
-    tables_accessed: string[]
-    estimated_rows: number
-  }
-  onApprove: (comment?: string) => void
-  onReject: (reason: string) => void
+    query: string;
+    purpose: string;
+    tables_accessed: string[];
+    estimated_rows: number;
+  };
+  onApprove: (comment?: string) => void;
+  onReject: (reason: string) => void;
 }
 
 export function ContextReview({
@@ -26,38 +32,38 @@ export function ContextReview({
   onApprove,
   onReject,
 }: ContextReviewProps) {
-  const [comment, setComment] = React.useState('')
-  const [rejectReason, setRejectReason] = React.useState('')
-  const [showRejectForm, setShowRejectForm] = React.useState(false)
-  const [isSubmitting, setIsSubmitting] = React.useState(false)
+  const [comment, setComment] = React.useState("");
+  const [rejectReason, setRejectReason] = React.useState("");
+  const [showRejectForm, setShowRejectForm] = React.useState(false);
+  const [isSubmitting, setIsSubmitting] = React.useState(false);
 
   const handleApprove = async () => {
-    setIsSubmitting(true)
+    setIsSubmitting(true);
     try {
-      await onApprove(comment || undefined)
-      toast.success('Context approved')
+      await onApprove(comment || undefined);
+      toast.success("Context approved");
     } catch (error) {
-      toast.error('Failed to approve context')
+      toast.error("Failed to approve context");
     } finally {
-      setIsSubmitting(false)
+      setIsSubmitting(false);
     }
-  }
+  };
 
   const handleReject = async () => {
     if (!rejectReason.trim()) {
-      toast.error('Please provide a reason for rejection')
-      return
+      toast.error("Please provide a reason for rejection");
+      return;
     }
-    setIsSubmitting(true)
+    setIsSubmitting(true);
     try {
-      await onReject(rejectReason)
-      toast.success('Context rejected')
+      await onReject(rejectReason);
+      toast.success("Context rejected");
     } catch (error) {
-      toast.error('Failed to reject context')
+      toast.error("Failed to reject context");
     } finally {
-      setIsSubmitting(false)
+      setIsSubmitting(false);
     }
-  }
+  };
 
   return (
     <Card>
@@ -66,7 +72,8 @@ export function ContextReview({
           <div>
             <CardTitle>Human-in-the-Loop Review</CardTitle>
             <CardDescription>
-              Review and approve the proposed context for investigation {investigationId}
+              Review and approve the proposed context for investigation{" "}
+              {investigationId}
             </CardDescription>
           </div>
           <Badge variant="warning">Pending Approval</Badge>
@@ -77,7 +84,8 @@ export function ContextReview({
           <AlertCircle className="h-4 w-4" />
           <AlertTitle>Context Review Required</AlertTitle>
           <AlertDescription>
-            The system is requesting approval to access the following data. Please review carefully before approving.
+            The system is requesting approval to access the following data.
+            Please review carefully before approving.
           </AlertDescription>
         </Alert>
 
@@ -101,7 +109,8 @@ export function ContextReview({
           <div>
             <h4 className="font-medium mb-2">Estimated Data Volume</h4>
             <p className="text-sm text-muted-foreground">
-              Approximately {context.estimated_rows.toLocaleString()} rows will be analyzed
+              Approximately {context.estimated_rows.toLocaleString()} rows will
+              be analyzed
             </p>
           </div>
 
@@ -169,8 +178,8 @@ export function ContextReview({
               <Button
                 variant="outline"
                 onClick={() => {
-                  setShowRejectForm(false)
-                  setRejectReason('')
+                  setShowRejectForm(false);
+                  setRejectReason("");
                 }}
                 disabled={isSubmitting}
               >
@@ -181,5 +190,5 @@ export function ContextReview({
         )}
       </CardContent>
     </Card>
-  )
+  );
 }

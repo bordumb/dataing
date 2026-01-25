@@ -1,30 +1,36 @@
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card'
-import { Checkbox } from '@/components/ui/checkbox'
-import { Label } from '@/components/ui/label'
-import { Button } from '@/components/ui/Button'
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/Card";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Label } from "@/components/ui/label";
+import { Button } from "@/components/ui/Button";
 
 const NOTIFICATION_SETTINGS = [
   {
-    id: 'investigation_complete',
-    label: 'Investigation Complete',
-    description: 'Get notified when an investigation finishes.',
+    id: "investigation_complete",
+    label: "Investigation Complete",
+    description: "Get notified when an investigation finishes.",
   },
   {
-    id: 'approval_required',
-    label: 'Approval Required',
-    description: 'Get notified when human-in-the-loop approval is needed.',
+    id: "approval_required",
+    label: "Approval Required",
+    description: "Get notified when human-in-the-loop approval is needed.",
   },
   {
-    id: 'error_alerts',
-    label: 'Error Alerts',
-    description: 'Get notified when investigations fail or encounter errors.',
+    id: "error_alerts",
+    label: "Error Alerts",
+    description: "Get notified when investigations fail or encounter errors.",
   },
   {
-    id: 'weekly_digest',
-    label: 'Weekly Digest',
-    description: 'Receive a weekly summary of investigation activity.',
+    id: "weekly_digest",
+    label: "Weekly Digest",
+    description: "Receive a weekly summary of investigation activity.",
   },
-]
+];
 
 export function NotificationSettings() {
   return (
@@ -52,5 +58,5 @@ export function NotificationSettings() {
         <Button className="mt-4">Save Preferences</Button>
       </CardContent>
     </Card>
-  )
+  );
 }

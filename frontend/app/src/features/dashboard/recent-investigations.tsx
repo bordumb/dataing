@@ -1,28 +1,28 @@
-import { Link } from 'react-router-dom'
-import { useInvestigations } from '@/lib/api/investigations'
-import { Badge } from '@/components/ui/Badge'
-import { Skeleton } from '@/components/ui/skeleton'
-import { formatDate } from '@/lib/utils'
-import { EmptyState } from '@/components/shared/empty-state'
-import { Search } from 'lucide-react'
-import { Button } from '@/components/ui/Button'
+import { Link } from "react-router-dom";
+import { useInvestigations } from "@/lib/api/investigations";
+import { Badge } from "@/components/ui/Badge";
+import { Skeleton } from "@/components/ui/skeleton";
+import { formatDate } from "@/lib/utils";
+import { EmptyState } from "@/components/shared/empty-state";
+import { Search } from "lucide-react";
+import { Button } from "@/components/ui/Button";
 
 function getStatusVariant(status: string) {
   switch (status) {
-    case 'completed':
-      return 'success'
-    case 'failed':
-      return 'destructive'
-    case 'started':
-    case 'in_progress':
-      return 'warning'
+    case "completed":
+      return "success";
+    case "failed":
+      return "destructive";
+    case "started":
+    case "in_progress":
+      return "warning";
     default:
-      return 'secondary'
+      return "secondary";
   }
 }
 
 export function RecentInvestigations() {
-  const { data: investigations, isLoading, error } = useInvestigations()
+  const { data: investigations, isLoading, error } = useInvestigations();
 
   if (isLoading) {
     return (
@@ -37,7 +37,7 @@ export function RecentInvestigations() {
           </div>
         ))}
       </div>
-    )
+    );
   }
 
   if (error) {
@@ -45,7 +45,7 @@ export function RecentInvestigations() {
       <div className="text-center py-4 text-destructive">
         Failed to load investigations
       </div>
-    )
+    );
   }
 
   if (!investigations?.length) {
@@ -60,10 +60,10 @@ export function RecentInvestigations() {
           </Button>
         }
       />
-    )
+    );
   }
 
-  const recentInvestigations = investigations.slice(0, 5)
+  const recentInvestigations = investigations.slice(0, 5);
 
   return (
     <div className="space-y-4">
@@ -91,5 +91,5 @@ export function RecentInvestigations() {
         </Link>
       )}
     </div>
-  )
+  );
 }

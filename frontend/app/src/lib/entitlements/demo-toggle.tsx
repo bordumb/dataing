@@ -8,8 +8,8 @@
  * Keyboard shortcut: Ctrl+Shift+P to cycle plans
  */
 
-import { useState, useEffect, useCallback } from 'react'
-import type { Entitlements, Plan } from './types'
+import { useState, useEffect, useCallback } from "react";
+import type { Entitlements, Plan } from "./types";
 
 /**
  * Demo entitlements data for each plan tier.
@@ -17,7 +17,7 @@ import type { Entitlements, Plan } from './types'
  */
 export const DEMO_ENTITLEMENTS: Record<Plan, Entitlements> = {
   free: {
-    plan: 'free',
+    plan: "free",
     features: {
       sso_oidc: false,
       sso_saml: false,
@@ -32,7 +32,7 @@ export const DEMO_ENTITLEMENTS: Record<Plan, Entitlements> = {
     },
   },
   pro: {
-    plan: 'pro',
+    plan: "pro",
     features: {
       sso_oidc: false,
       sso_saml: false,
@@ -47,7 +47,7 @@ export const DEMO_ENTITLEMENTS: Record<Plan, Entitlements> = {
     },
   },
   enterprise: {
-    plan: 'enterprise',
+    plan: "enterprise",
     features: {
       sso_oidc: true,
       sso_saml: true,
@@ -61,15 +61,15 @@ export const DEMO_ENTITLEMENTS: Record<Plan, Entitlements> = {
       max_investigations_per_month: { limit: -1, usage: 500 },
     },
   },
-}
+};
 
-const PLAN_ORDER: Plan[] = ['free', 'pro', 'enterprise']
+const PLAN_ORDER: Plan[] = ["free", "pro", "enterprise"];
 
 interface UseDemoEntitlementsReturn {
-  entitlements: Entitlements
-  plan: Plan
-  setPlan: (plan: Plan) => void
-  cyclePlan: () => void
+  entitlements: Entitlements;
+  plan: Plan;
+  setPlan: (plan: Plan) => void;
+  cyclePlan: () => void;
 }
 
 /**
@@ -81,35 +81,35 @@ interface UseDemoEntitlementsReturn {
  * const { entitlements, plan, setPlan } = useDemoEntitlements()
  */
 export function useDemoEntitlements(): UseDemoEntitlementsReturn {
-  const [plan, setPlan] = useState<Plan>('free')
+  const [plan, setPlan] = useState<Plan>("free");
 
   const cyclePlan = useCallback(() => {
     setPlan((current) => {
-      const currentIndex = PLAN_ORDER.indexOf(current)
-      const nextIndex = (currentIndex + 1) % PLAN_ORDER.length
-      return PLAN_ORDER[nextIndex]
-    })
-  }, [])
+      const currentIndex = PLAN_ORDER.indexOf(current);
+      const nextIndex = (currentIndex + 1) % PLAN_ORDER.length;
+      return PLAN_ORDER[nextIndex];
+    });
+  }, []);
 
   // Keyboard shortcut: Ctrl+Shift+P to cycle plans (dev only)
   useEffect(() => {
-    if (import.meta.env.PROD) return
+    if (import.meta.env.PROD) return;
 
     const handler = (e: KeyboardEvent) => {
-      if (e.ctrlKey && e.shiftKey && e.key === 'P') {
-        e.preventDefault()
-        cyclePlan()
+      if (e.ctrlKey && e.shiftKey && e.key === "P") {
+        e.preventDefault();
+        cyclePlan();
       }
-    }
+    };
 
-    window.addEventListener('keydown', handler)
-    return () => window.removeEventListener('keydown', handler)
-  }, [cyclePlan])
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [cyclePlan]);
 
   return {
     entitlements: DEMO_ENTITLEMENTS[plan],
     plan,
     setPlan,
     cyclePlan,
-  }
+  };
 }

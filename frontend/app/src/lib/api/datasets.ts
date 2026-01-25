@@ -1,12 +1,12 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   listDatasourceDatasetsApiV1DatasourcesDatasourceIdDatasetsGet,
   syncDatasourceSchemaApiV1DatasourcesDatasourceIdSyncPost,
-} from './generated/datasources/datasources'
+} from "./generated/datasources/datasources";
 import {
   getDatasetApiV1DatasetsDatasetIdGet,
   getDatasetInvestigationsApiV1DatasetsDatasetIdInvestigationsGet,
-} from './generated/datasets/datasets'
+} from "./generated/datasets/datasets";
 import type {
   DatasetSummary,
   DatasetDetailResponse,
@@ -14,27 +14,36 @@ import type {
   DatasetInvestigationsResponse,
   InvestigationSummary,
   SyncResponse,
-} from './model'
-import { queryKeys } from './query-keys'
+} from "./model";
+import { queryKeys } from "./query-keys";
 
 // Re-export types for convenience
-export type { DatasetSummary, DatasetDetailResponse, InvestigationSummary, SyncResponse }
-export type Dataset = DatasetSummary
-export type DatasetDetail = DatasetDetailResponse
-export type DatasetListResponse = DatasourceDatasetsResponse
+export type {
+  DatasetSummary,
+  DatasetDetailResponse,
+  InvestigationSummary,
+  SyncResponse,
+};
+export type Dataset = DatasetSummary;
+export type DatasetDetail = DatasetDetailResponse;
+export type DatasetListResponse = DatasourceDatasetsResponse;
 
 /**
  * Hook to fetch datasets for a datasource.
  */
 export function useDatasets(datasourceId: string | null) {
   return useQuery({
-    queryKey: datasourceId ? queryKeys.datasets.all(datasourceId) : ['disabled'],
+    queryKey: datasourceId
+      ? queryKeys.datasets.all(datasourceId)
+      : ["disabled"],
     queryFn: async (): Promise<DatasourceDatasetsResponse> => {
-      if (!datasourceId) throw new Error('No datasource ID')
-      return listDatasourceDatasetsApiV1DatasourcesDatasourceIdDatasetsGet(datasourceId)
+      if (!datasourceId) throw new Error("No datasource ID");
+      return listDatasourceDatasetsApiV1DatasourcesDatasourceIdDatasetsGet(
+        datasourceId,
+      );
     },
     enabled: !!datasourceId,
-  })
+  });
 }
 
 /**
@@ -42,13 +51,13 @@ export function useDatasets(datasourceId: string | null) {
  */
 export function useDataset(datasetId: string | null) {
   return useQuery({
-    queryKey: datasetId ? queryKeys.datasets.detail(datasetId) : ['disabled'],
+    queryKey: datasetId ? queryKeys.datasets.detail(datasetId) : ["disabled"],
     queryFn: async (): Promise<DatasetDetailResponse> => {
-      if (!datasetId) throw new Error('No dataset ID')
-      return getDatasetApiV1DatasetsDatasetIdGet(datasetId)
+      if (!datasetId) throw new Error("No dataset ID");
+      return getDatasetApiV1DatasetsDatasetIdGet(datasetId);
     },
     enabled: !!datasetId,
-  })
+  });
 }
 
 /**
@@ -56,29 +65,35 @@ export function useDataset(datasetId: string | null) {
  */
 export function useDatasetInvestigations(datasetId: string | null) {
   return useQuery({
-    queryKey: datasetId ? queryKeys.datasets.investigations(datasetId) : ['disabled'],
+    queryKey: datasetId
+      ? queryKeys.datasets.investigations(datasetId)
+      : ["disabled"],
     queryFn: async (): Promise<DatasetInvestigationsResponse> => {
-      if (!datasetId) throw new Error('No dataset ID')
-      return getDatasetInvestigationsApiV1DatasetsDatasetIdInvestigationsGet(datasetId)
+      if (!datasetId) throw new Error("No dataset ID");
+      return getDatasetInvestigationsApiV1DatasetsDatasetIdInvestigationsGet(
+        datasetId,
+      );
     },
     enabled: !!datasetId,
-  })
+  });
 }
 
 /**
  * Hook to sync a datasource's schema and update datasets.
  */
 export function useSyncDatasource() {
-  const queryClient = useQueryClient()
+  const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: async (datasourceId: string): Promise<SyncResponse> => {
-      return syncDatasourceSchemaApiV1DatasourcesDatasourceIdSyncPost(datasourceId)
+      return syncDatasourceSchemaApiV1DatasourcesDatasourceIdSyncPost(
+        datasourceId,
+      );
     },
     onSuccess: (_, datasourceId) => {
       queryClient.invalidateQueries({
         queryKey: queryKeys.datasets.all(datasourceId),
-      })
+      });
     },
-  })
+  });
 }

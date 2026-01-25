@@ -1,35 +1,35 @@
-import { useState } from 'react'
-import { Link } from 'react-router-dom'
-import type { UseQueryResult } from '@tanstack/react-query'
-import { Plus, Search, Filter, ChevronLeft, ChevronRight } from 'lucide-react'
+import { useState } from "react";
+import { Link } from "react-router-dom";
+import type { UseQueryResult } from "@tanstack/react-query";
+import { Plus, Search, Filter, ChevronLeft, ChevronRight } from "lucide-react";
 import {
   useIssues,
   getStatusVariant,
   getStatusLabel,
   getPriorityVariant,
   getSeverityVariant,
-} from '@/lib/api/issues'
-import type { IssueResponse, IssueListResponse } from '@/lib/api/issues'
-import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card'
-import { Badge } from '@/components/ui/Badge'
-import { Button } from '@/components/ui/Button'
-import { Input } from '@/components/ui/Input'
+} from "@/lib/api/issues";
+import type { IssueResponse, IssueListResponse } from "@/lib/api/issues";
+import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/Card";
+import { Badge } from "@/components/ui/Badge";
+import { Button } from "@/components/ui/Button";
+import { Input } from "@/components/ui/Input";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from '@/components/ui/select'
-import { AsyncBoundary } from '@/components/async-boundary'
-import { formatDate } from '@/lib/utils'
+} from "@/components/ui/select";
+import { AsyncBoundary } from "@/components/async-boundary";
+import { formatDate } from "@/lib/utils";
 
 interface IssueFilters {
-  status?: string
-  priority?: string
-  severity?: string
-  search?: string
-  cursor?: string
+  status?: string;
+  priority?: string;
+  severity?: string;
+  search?: string;
+  cursor?: string;
 }
 
 function IssueCard({ issue }: { issue: IssueResponse }) {
@@ -39,17 +39,25 @@ function IssueCard({ issue }: { issue: IssueResponse }) {
         <CardHeader className="pb-2">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <span className="text-muted-foreground font-mono text-sm">#{issue.number}</span>
+              <span className="text-muted-foreground font-mono text-sm">
+                #{issue.number}
+              </span>
               <CardTitle className="text-lg">{issue.title}</CardTitle>
             </div>
             <div className="flex items-center gap-2">
               {issue.priority && (
-                <Badge variant={getPriorityVariant(issue.priority)}>{issue.priority}</Badge>
+                <Badge variant={getPriorityVariant(issue.priority)}>
+                  {issue.priority}
+                </Badge>
               )}
               {issue.severity && (
-                <Badge variant={getSeverityVariant(issue.severity)}>{issue.severity}</Badge>
+                <Badge variant={getSeverityVariant(issue.severity)}>
+                  {issue.severity}
+                </Badge>
               )}
-              <Badge variant={getStatusVariant(issue.status)}>{getStatusLabel(issue.status)}</Badge>
+              <Badge variant={getStatusVariant(issue.status)}>
+                {getStatusLabel(issue.status)}
+              </Badge>
             </div>
           </div>
         </CardHeader>
@@ -75,7 +83,7 @@ function IssueCard({ issue }: { issue: IssueResponse }) {
         </CardContent>
       </Card>
     </Link>
-  )
+  );
 }
 
 function IssueListContent({
@@ -84,10 +92,10 @@ function IssueListContent({
   onPrevPage,
   hasPrevPage,
 }: {
-  data: IssueListResponse
-  onNextPage: () => void
-  onPrevPage: () => void
-  hasPrevPage: boolean
+  data: IssueListResponse;
+  onNextPage: () => void;
+  onPrevPage: () => void;
+  hasPrevPage: boolean;
 }) {
   if (data.items.length === 0) {
     return (
@@ -99,7 +107,7 @@ function IssueListContent({
           </Link>
         </CardContent>
       </Card>
-    )
+    );
   }
 
   return (
@@ -110,25 +118,35 @@ function IssueListContent({
 
       {(data.has_more || hasPrevPage) && (
         <div className="flex items-center justify-between pt-4">
-          <Button variant="outline" disabled={!hasPrevPage} onClick={onPrevPage}>
+          <Button
+            variant="outline"
+            disabled={!hasPrevPage}
+            onClick={onPrevPage}
+          >
             <ChevronLeft className="h-4 w-4 mr-1" />
             Previous
           </Button>
-          <span className="text-sm text-muted-foreground">{data.total} total issues</span>
-          <Button variant="outline" disabled={!data.has_more} onClick={onNextPage}>
+          <span className="text-sm text-muted-foreground">
+            {data.total} total issues
+          </span>
+          <Button
+            variant="outline"
+            disabled={!data.has_more}
+            onClick={onNextPage}
+          >
             Next
             <ChevronRight className="h-4 w-4 ml-1" />
           </Button>
         </div>
       )}
     </div>
-  )
+  );
 }
 
 export function IssueList() {
-  const [filters, setFilters] = useState<IssueFilters>({})
-  const [searchInput, setSearchInput] = useState('')
-  const [cursorHistory, setCursorHistory] = useState<string[]>([])
+  const [filters, setFilters] = useState<IssueFilters>({});
+  const [searchInput, setSearchInput] = useState("");
+  const [cursorHistory, setCursorHistory] = useState<string[]>([]);
 
   const query = useIssues({
     status: filters.status,
@@ -136,33 +154,40 @@ export function IssueList() {
     severity: filters.severity,
     search: filters.search,
     cursor: filters.cursor,
-  })
+  });
 
   const handleSearch = () => {
-    setFilters((prev) => ({ ...prev, search: searchInput || undefined, cursor: undefined }))
-    setCursorHistory([])
-  }
+    setFilters((prev) => ({
+      ...prev,
+      search: searchInput || undefined,
+      cursor: undefined,
+    }));
+    setCursorHistory([]);
+  };
 
-  const handleFilterChange = (key: keyof IssueFilters, value: string | undefined) => {
-    setFilters((prev) => ({ ...prev, [key]: value, cursor: undefined }))
-    setCursorHistory([])
-  }
+  const handleFilterChange = (
+    key: keyof IssueFilters,
+    value: string | undefined,
+  ) => {
+    setFilters((prev) => ({ ...prev, [key]: value, cursor: undefined }));
+    setCursorHistory([]);
+  };
 
   const handleNextPage = () => {
-    const nextCursor = query.data?.next_cursor
+    const nextCursor = query.data?.next_cursor;
     if (nextCursor) {
-      setCursorHistory((prev) => [...prev, filters.cursor || ''])
-      setFilters((prev) => ({ ...prev, cursor: nextCursor }))
+      setCursorHistory((prev) => [...prev, filters.cursor || ""]);
+      setFilters((prev) => ({ ...prev, cursor: nextCursor }));
     }
-  }
+  };
 
   const handlePrevPage = () => {
     if (cursorHistory.length > 0) {
-      const prevCursor = cursorHistory[cursorHistory.length - 1]
-      setCursorHistory((prev) => prev.slice(0, -1))
-      setFilters((prev) => ({ ...prev, cursor: prevCursor || undefined }))
+      const prevCursor = cursorHistory[cursorHistory.length - 1];
+      setCursorHistory((prev) => prev.slice(0, -1));
+      setFilters((prev) => ({ ...prev, cursor: prevCursor || undefined }));
     }
-  }
+  };
 
   return (
     <div>
@@ -182,7 +207,7 @@ export function IssueList() {
             placeholder="Search issues..."
             value={searchInput}
             onChange={(e) => setSearchInput(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
+            onKeyDown={(e) => e.key === "Enter" && handleSearch()}
             className="max-w-sm"
           />
           <Button variant="outline" size="icon" onClick={handleSearch}>
@@ -194,8 +219,10 @@ export function IssueList() {
           <Filter className="h-4 w-4 text-muted-foreground" />
 
           <Select
-            value={filters.status || 'all'}
-            onValueChange={(v) => handleFilterChange('status', v === 'all' ? undefined : v)}
+            value={filters.status || "all"}
+            onValueChange={(v) =>
+              handleFilterChange("status", v === "all" ? undefined : v)
+            }
           >
             <SelectTrigger className="w-[130px]">
               <SelectValue placeholder="Status" />
@@ -212,8 +239,10 @@ export function IssueList() {
           </Select>
 
           <Select
-            value={filters.priority || 'all'}
-            onValueChange={(v) => handleFilterChange('priority', v === 'all' ? undefined : v)}
+            value={filters.priority || "all"}
+            onValueChange={(v) =>
+              handleFilterChange("priority", v === "all" ? undefined : v)
+            }
           >
             <SelectTrigger className="w-[120px]">
               <SelectValue placeholder="Priority" />
@@ -229,8 +258,10 @@ export function IssueList() {
           </Select>
 
           <Select
-            value={filters.severity || 'all'}
-            onValueChange={(v) => handleFilterChange('severity', v === 'all' ? undefined : v)}
+            value={filters.severity || "all"}
+            onValueChange={(v) =>
+              handleFilterChange("severity", v === "all" ? undefined : v)
+            }
           >
             <SelectTrigger className="w-[120px]">
               <SelectValue placeholder="Severity" />
@@ -246,7 +277,9 @@ export function IssueList() {
         </div>
       </div>
 
-      <AsyncBoundary query={query as unknown as UseQueryResult<IssueListResponse, Error>}>
+      <AsyncBoundary
+        query={query as unknown as UseQueryResult<IssueListResponse, Error>}
+      >
         {(data) => (
           <IssueListContent
             data={data}
@@ -257,5 +290,5 @@ export function IssueList() {
         )}
       </AsyncBoundary>
     </div>
-  )
+  );
 }

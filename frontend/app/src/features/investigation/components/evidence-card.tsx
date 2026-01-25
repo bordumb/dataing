@@ -2,9 +2,9 @@
  * Evidence card component for displaying investigation evidence nicely.
  */
 
-import { useState } from 'react'
-import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter'
-import { oneDark } from 'react-syntax-highlighter/dist/esm/styles/prism'
+import { useState } from "react";
+import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
+import { oneDark } from "react-syntax-highlighter/dist/esm/styles/prism";
 import {
   CheckCircle2,
   XCircle,
@@ -13,46 +13,46 @@ import {
   ChevronUp,
   Database,
   Brain,
-} from 'lucide-react'
-import { Badge } from '@/components/ui/Badge'
-import { Card, CardContent } from '@/components/ui/Card'
-import { InvestigationFeedbackButtons } from './InvestigationFeedbackButtons'
+} from "lucide-react";
+import { Badge } from "@/components/ui/Badge";
+import { Card, CardContent } from "@/components/ui/Card";
+import { InvestigationFeedbackButtons } from "./InvestigationFeedbackButtons";
 
 // Evidence can come in various formats from the API
-type EvidenceItem = Record<string, unknown>
+type EvidenceItem = Record<string, unknown>;
 
 interface EvidenceCardProps {
-  evidence: EvidenceItem
-  index: number
+  evidence: EvidenceItem;
+  index: number;
 }
 
 // Safe accessor functions for evidence properties
 function getStringField(ev: EvidenceItem, ...keys: string[]): string {
   for (const key of keys) {
-    const value = ev[key]
-    if (typeof value === 'string') return value
+    const value = ev[key];
+    if (typeof value === "string") return value;
   }
-  return ''
+  return "";
 }
 
 function getNumberField(ev: EvidenceItem, ...keys: string[]): number {
   for (const key of keys) {
-    const value = ev[key]
-    if (typeof value === 'number') return value
+    const value = ev[key];
+    if (typeof value === "number") return value;
   }
-  return 0
+  return 0;
 }
 
 function getBoolOrNull(ev: EvidenceItem, ...keys: string[]): boolean | null {
   for (const key of keys) {
-    const value = ev[key]
-    if (typeof value === 'boolean') return value
+    const value = ev[key];
+    if (typeof value === "boolean") return value;
   }
-  return null
+  return null;
 }
 
 function formatConfidence(confidence: number): string {
-  return `${Math.round(confidence * 100)}%`
+  return `${Math.round(confidence * 100)}%`;
 }
 
 function SupportBadge({ supports }: { supports: boolean | null }) {
@@ -62,7 +62,7 @@ function SupportBadge({ supports }: { supports: boolean | null }) {
         <CheckCircle2 className="h-3 w-3" />
         Supports
       </Badge>
-    )
+    );
   }
   if (supports === false) {
     return (
@@ -70,30 +70,49 @@ function SupportBadge({ supports }: { supports: boolean | null }) {
         <XCircle className="h-3 w-3" />
         Refutes
       </Badge>
-    )
+    );
   }
   return (
     <Badge variant="secondary" className="gap-1">
       <HelpCircle className="h-3 w-3" />
       Inconclusive
     </Badge>
-  )
+  );
 }
 
 export function EvidenceCard({ evidence, index }: EvidenceCardProps) {
-  const [isExpanded, setIsExpanded] = useState(false)
+  const [isExpanded, setIsExpanded] = useState(false);
 
   // Extract fields with fallbacks
-  const hypothesisId = getStringField(evidence, 'hypothesis_id', 'hypothesisId', 'id') || `#${index + 1}`
-  const query = getStringField(evidence, 'query', 'sql', 'sql_query')
-  const resultSummary = getStringField(evidence, 'result_summary', 'resultSummary', 'summary', 'result')
-  const rowCount = getNumberField(evidence, 'row_count', 'rowCount', 'rows')
-  const supports = getBoolOrNull(evidence, 'supports_hypothesis', 'supportsHypothesis', 'supports')
-  const confidence = getNumberField(evidence, 'confidence', 'score')
-  const interpretation = getStringField(evidence, 'interpretation', 'analysis', 'explanation', 'description')
+  const hypothesisId =
+    getStringField(evidence, "hypothesis_id", "hypothesisId", "id") ||
+    `#${index + 1}`;
+  const query = getStringField(evidence, "query", "sql", "sql_query");
+  const resultSummary = getStringField(
+    evidence,
+    "result_summary",
+    "resultSummary",
+    "summary",
+    "result",
+  );
+  const rowCount = getNumberField(evidence, "row_count", "rowCount", "rows");
+  const supports = getBoolOrNull(
+    evidence,
+    "supports_hypothesis",
+    "supportsHypothesis",
+    "supports",
+  );
+  const confidence = getNumberField(evidence, "confidence", "score");
+  const interpretation = getStringField(
+    evidence,
+    "interpretation",
+    "analysis",
+    "explanation",
+    "description",
+  );
 
   // If no structured data, show raw JSON as fallback
-  const hasStructuredData = query || interpretation || resultSummary
+  const hasStructuredData = query || interpretation || resultSummary;
 
   return (
     <Card className="overflow-hidden">
@@ -122,7 +141,7 @@ export function EvidenceCard({ evidence, index }: EvidenceCardProps) {
                 />
               </div>
               <p className="text-sm line-clamp-2">
-                {interpretation || resultSummary || 'Click to view details'}
+                {interpretation || resultSummary || "Click to view details"}
               </p>
             </div>
             <div className="shrink-0 text-muted-foreground">
@@ -160,9 +179,9 @@ export function EvidenceCard({ evidence, index }: EvidenceCardProps) {
                         style={oneDark}
                         customStyle={{
                           margin: 0,
-                          padding: '0.75rem',
-                          fontSize: '0.75rem',
-                          borderRadius: '0.375rem',
+                          padding: "0.75rem",
+                          fontSize: "0.75rem",
+                          borderRadius: "0.375rem",
                         }}
                         wrapLines
                         wrapLongLines
@@ -210,24 +229,28 @@ export function EvidenceCard({ evidence, index }: EvidenceCardProps) {
         )}
       </CardContent>
     </Card>
-  )
+  );
 }
 
 interface EvidenceListProps {
-  evidence: Record<string, unknown>[]
+  evidence: Record<string, unknown>[];
 }
 
 export function EvidenceList({ evidence }: EvidenceListProps) {
   if (evidence.length === 0) {
-    return null
+    return null;
   }
 
   return (
     <div className="space-y-3">
       <p className="text-sm font-medium">Evidence ({evidence.length})</p>
       {evidence.map((ev, i) => (
-        <EvidenceCard key={`${ev.hypothesis_id}-${i}`} evidence={ev} index={i} />
+        <EvidenceCard
+          key={`${ev.hypothesis_id}-${i}`}
+          evidence={ev}
+          index={i}
+        />
       ))}
     </div>
-  )
+  );
 }

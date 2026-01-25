@@ -1,1 +1,1 @@
-export { AuditLogSettings } from './audit-log-settings'
+export { AuditLogSettings } from "./audit-log-settings";

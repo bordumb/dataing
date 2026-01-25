@@ -1,34 +1,40 @@
-import * as React from 'react'
-import { Plus, Trash2, Globe } from 'lucide-react'
+import * as React from "react";
+import { Plus, Trash2, Globe } from "lucide-react";
 
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card'
-import { Button } from '@/components/ui/Button'
-import { Input } from '@/components/ui/Input'
-import { Label } from '@/components/ui/label'
-import { Checkbox } from '@/components/ui/checkbox'
-import { EmptyState } from '@/components/shared/empty-state'
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/Card";
+import { Button } from "@/components/ui/Button";
+import { Input } from "@/components/ui/Input";
+import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
+import { EmptyState } from "@/components/shared/empty-state";
 
 interface Webhook {
-  id: string
-  url: string
-  events: string[]
-  active: boolean
+  id: string;
+  url: string;
+  events: string[];
+  active: boolean;
 }
 
 const EVENT_TYPES = [
-  { id: 'investigation.started', label: 'Investigation Started' },
-  { id: 'investigation.completed', label: 'Investigation Completed' },
-  { id: 'investigation.failed', label: 'Investigation Failed' },
-  { id: 'approval.required', label: 'Approval Required' },
-]
+  { id: "investigation.started", label: "Investigation Started" },
+  { id: "investigation.completed", label: "Investigation Completed" },
+  { id: "investigation.failed", label: "Investigation Failed" },
+  { id: "approval.required", label: "Approval Required" },
+];
 
 export function WebhookSettings() {
-  const [webhooks, setWebhooks] = React.useState<Webhook[]>([])
-  const [showForm, setShowForm] = React.useState(false)
+  const [webhooks, setWebhooks] = React.useState<Webhook[]>([]);
+  const [showForm, setShowForm] = React.useState(false);
   const [newWebhook, setNewWebhook] = React.useState({
-    url: '',
+    url: "",
     events: [] as string[],
-  })
+  });
 
   const addWebhook = () => {
     if (newWebhook.url && newWebhook.events.length > 0) {
@@ -40,11 +46,11 @@ export function WebhookSettings() {
           events: newWebhook.events,
           active: true,
         },
-      ])
-      setNewWebhook({ url: '', events: [] })
-      setShowForm(false)
+      ]);
+      setNewWebhook({ url: "", events: [] });
+      setShowForm(false);
     }
-  }
+  };
 
   const toggleEvent = (eventId: string) => {
     setNewWebhook((prev) => ({
@@ -52,8 +58,8 @@ export function WebhookSettings() {
       events: prev.events.includes(eventId)
         ? prev.events.filter((e) => e !== eventId)
         : [...prev.events, eventId],
-    }))
-  }
+    }));
+  };
 
   return (
     <Card>
@@ -86,7 +92,7 @@ export function WebhookSettings() {
                 <div>
                   <p className="font-medium">{webhook.url}</p>
                   <p className="text-sm text-muted-foreground">
-                    Events: {webhook.events.join(', ')}
+                    Events: {webhook.events.join(", ")}
                   </p>
                 </div>
                 <Button
@@ -119,7 +125,10 @@ export function WebhookSettings() {
                   <Label>Events</Label>
                   <div className="space-y-2">
                     {EVENT_TYPES.map((event) => (
-                      <div key={event.id} className="flex items-center space-x-2">
+                      <div
+                        key={event.id}
+                        className="flex items-center space-x-2"
+                      >
                         <Checkbox
                           id={event.id}
                           checked={newWebhook.events.includes(event.id)}
@@ -151,5 +160,5 @@ export function WebhookSettings() {
         )}
       </CardContent>
     </Card>
-  )
+  );
 }

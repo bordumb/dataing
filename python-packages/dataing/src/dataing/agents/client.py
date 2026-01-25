@@ -7,11 +7,11 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
+from bond import BondAgent, StreamHandlers
 from pydantic_ai.models.anthropic import AnthropicModel
 from pydantic_ai.output import PromptedOutput
 from pydantic_ai.providers.anthropic import AnthropicProvider
 
-from bond import BondAgent, StreamHandlers
 from dataing.core.domain_types import (
     AnomalyAlert,
     Evidence,

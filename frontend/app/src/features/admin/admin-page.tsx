@@ -1,10 +1,10 @@
-import { PageHeader } from '@/components/shared/page-header'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { TeamsSettings } from '@/features/settings/teams/teams-settings'
-import { TagsSettings } from '@/features/settings/tags/tags-settings'
-import { PermissionsSettings } from '@/features/settings/permissions/permissions-settings'
-import { SSOSettings } from '@/features/settings/sso/sso-settings'
-import { AuditLogSettings } from '@/features/settings/audit'
+import { PageHeader } from "@/components/shared/page-header";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { TeamsSettings } from "@/features/settings/teams/teams-settings";
+import { TagsSettings } from "@/features/settings/tags/tags-settings";
+import { PermissionsSettings } from "@/features/settings/permissions/permissions-settings";
+import { SSOSettings } from "@/features/settings/sso/sso-settings";
+import { AuditLogSettings } from "@/features/settings/audit";
 
 export function AdminPage() {
   return (
@@ -38,5 +38,5 @@ export function AdminPage() {
         </TabsContent>
       </Tabs>
     </div>
-  )
+  );
 }

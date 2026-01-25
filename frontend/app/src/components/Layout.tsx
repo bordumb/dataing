@@ -1,5 +1,5 @@
-import { Outlet, Link } from 'react-router-dom'
-import { Search } from 'lucide-react'
+import { Outlet, Link } from "react-router-dom";
+import { Search } from "lucide-react";
 
 export function Layout() {
   return (
@@ -30,5 +30,5 @@ export function Layout() {
         <Outlet />
       </main>
     </div>
-  )
+  );
 }

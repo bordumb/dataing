@@ -1,42 +1,45 @@
-import { Component, ReactNode } from 'react'
-import { Button } from '@/components/ui/Button'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
-import { AlertTriangle } from 'lucide-react'
+import { Component, ReactNode } from "react";
+import { Button } from "@/components/ui/Button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
+import { AlertTriangle } from "lucide-react";
 
 interface ErrorBoundaryProps {
-  children: ReactNode
-  fallback?: ReactNode
-  onError?: (error: Error, errorInfo: React.ErrorInfo) => void
+  children: ReactNode;
+  fallback?: ReactNode;
+  onError?: (error: Error, errorInfo: React.ErrorInfo) => void;
 }
 
 interface ErrorBoundaryState {
-  hasError: boolean
-  error: Error | null
+  hasError: boolean;
+  error: Error | null;
 }
 
-export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
+export class ErrorBoundary extends Component<
+  ErrorBoundaryProps,
+  ErrorBoundaryState
+> {
   constructor(props: ErrorBoundaryProps) {
-    super(props)
-    this.state = { hasError: false, error: null }
+    super(props);
+    this.state = { hasError: false, error: null };
   }
 
   static getDerivedStateFromError(error: Error): ErrorBoundaryState {
-    return { hasError: true, error }
+    return { hasError: true, error };
   }
 
   componentDidCatch(error: Error, errorInfo: React.ErrorInfo): void {
-    console.error('Error caught by boundary:', error, errorInfo)
-    this.props.onError?.(error, errorInfo)
+    console.error("Error caught by boundary:", error, errorInfo);
+    this.props.onError?.(error, errorInfo);
   }
 
   handleReset = (): void => {
-    this.setState({ hasError: false, error: null })
-  }
+    this.setState({ hasError: false, error: null });
+  };
 
   render(): ReactNode {
     if (this.state.hasError) {
       if (this.props.fallback) {
-        return this.props.fallback
+        return this.props.fallback;
       }
 
       return (
@@ -58,25 +61,31 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
             )}
             <div className="flex gap-2">
               <Button onClick={this.handleReset}>Try Again</Button>
-              <Button variant="outline" onClick={() => window.location.reload()}>
+              <Button
+                variant="outline"
+                onClick={() => window.location.reload()}
+              >
                 Reload Page
               </Button>
             </div>
           </CardContent>
         </Card>
-      )
+      );
     }
 
-    return this.props.children
+    return this.props.children;
   }
 }
 
 interface FeatureErrorBoundaryProps {
-  feature: string
-  children: ReactNode
+  feature: string;
+  children: ReactNode;
 }
 
-export function FeatureErrorBoundary({ feature, children }: FeatureErrorBoundaryProps) {
+export function FeatureErrorBoundary({
+  feature,
+  children,
+}: FeatureErrorBoundaryProps) {
   return (
     <ErrorBoundary
       fallback={
@@ -95,5 +104,5 @@ export function FeatureErrorBoundary({ feature, children }: FeatureErrorBoundary
     >
       {children}
     </ErrorBoundary>
-  )
+  );
 }

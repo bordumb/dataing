@@ -101,9 +101,7 @@ class BundleRepository:
             return None
         return self._row_to_bundle(result)
 
-    async def get_bundle_by_hash(
-        self, tenant_id: UUID, bundle_hash: str
-    ) -> dict[str, Any] | None:
+    async def get_bundle_by_hash(self, tenant_id: UUID, bundle_hash: str) -> dict[str, Any] | None:
         """Get bundle by hash (content-addressable lookup).
 
         Args:

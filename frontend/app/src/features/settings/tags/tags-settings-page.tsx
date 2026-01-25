@@ -1,5 +1,5 @@
-import { PageHeader } from '@/components/shared/page-header'
-import { TagsSettings } from './tags-settings'
+import { PageHeader } from "@/components/shared/page-header";
+import { TagsSettings } from "./tags-settings";
 
 export function TagsSettingsPage() {
   return (
@@ -10,5 +10,5 @@ export function TagsSettingsPage() {
       />
       <TagsSettings />
     </div>
-  )
+  );
 }

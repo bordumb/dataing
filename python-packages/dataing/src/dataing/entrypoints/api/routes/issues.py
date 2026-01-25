@@ -657,7 +657,7 @@ async def update_issue(
 
     query = f"""
         UPDATE issues
-        SET {', '.join(updates)}
+        SET {", ".join(updates)}
         WHERE id = ${param_idx} AND tenant_id = ${param_idx + 1}
         RETURNING id, number, title, description, status, priority, severity,
                   dataset_id, assignee_user_id, acknowledged_by, created_by_user_id,

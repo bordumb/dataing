@@ -2,18 +2,18 @@
  * User management component for admin users.
  */
 
-import * as React from 'react'
-import { Plus, UserMinus, Shield, User, Crown, Eye } from 'lucide-react'
+import * as React from "react";
+import { Plus, UserMinus, Shield, User, Crown, Eye } from "lucide-react";
 
-import { Badge } from '@/components/ui/Badge'
-import { Button } from '@/components/ui/Button'
+import { Badge } from "@/components/ui/Badge";
+import { Button } from "@/components/ui/Button";
 import {
   Card,
   CardContent,
   CardDescription,
   CardHeader,
   CardTitle,
-} from '@/components/ui/Card'
+} from "@/components/ui/Card";
 import {
   Dialog,
   DialogContent,
@@ -22,16 +22,16 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
-} from '@/components/ui/dialog'
-import { Input } from '@/components/ui/Input'
-import { Label } from '@/components/ui/label'
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/Input";
+import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from '@/components/ui/select'
+} from "@/components/ui/select";
 import {
   Table,
   TableBody,
@@ -39,136 +39,141 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from '@/components/ui/table'
-import { useJwtAuth } from '@/lib/auth'
-import type { OrgRole } from '@/lib/auth'
+} from "@/components/ui/table";
+import { useJwtAuth } from "@/lib/auth";
+import type { OrgRole } from "@/lib/auth";
 
 interface OrgMember {
-  user_id: string
-  email: string
-  name: string | null
-  role: OrgRole
-  created_at: string
+  user_id: string;
+  email: string;
+  name: string | null;
+  role: OrgRole;
+  created_at: string;
 }
 
-const API_BASE = '/api/v1/users'
+const API_BASE = "/api/v1/users";
 
-const ROLE_ICONS: Record<OrgRole, React.ComponentType<{ className?: string }>> = {
+const ROLE_ICONS: Record<
+  OrgRole,
+  React.ComponentType<{ className?: string }>
+> = {
   owner: Crown,
   admin: Shield,
   member: User,
   viewer: Eye,
-}
+};
 
 const ROLE_COLORS: Record<OrgRole, string> = {
-  owner: 'bg-amber-500/10 text-amber-500 border-amber-500/20',
-  admin: 'bg-purple-500/10 text-purple-500 border-purple-500/20',
-  member: 'bg-blue-500/10 text-blue-500 border-blue-500/20',
-  viewer: 'bg-gray-500/10 text-gray-500 border-gray-500/20',
-}
+  owner: "bg-amber-500/10 text-amber-500 border-amber-500/20",
+  admin: "bg-purple-500/10 text-purple-500 border-purple-500/20",
+  member: "bg-blue-500/10 text-blue-500 border-blue-500/20",
+  viewer: "bg-gray-500/10 text-gray-500 border-gray-500/20",
+};
 
 export function UserManagement() {
-  const { accessToken, user: currentUser } = useJwtAuth()
-  const [members, setMembers] = React.useState<OrgMember[]>([])
-  const [loading, setLoading] = React.useState(true)
-  const [error, setError] = React.useState<string | null>(null)
-  const [inviteDialogOpen, setInviteDialogOpen] = React.useState(false)
-  const [inviteEmail, setInviteEmail] = React.useState('')
-  const [inviteRole, setInviteRole] = React.useState<OrgRole>('member')
-  const [inviting, setInviting] = React.useState(false)
+  const { accessToken, user: currentUser } = useJwtAuth();
+  const [members, setMembers] = React.useState<OrgMember[]>([]);
+  const [loading, setLoading] = React.useState(true);
+  const [error, setError] = React.useState<string | null>(null);
+  const [inviteDialogOpen, setInviteDialogOpen] = React.useState(false);
+  const [inviteEmail, setInviteEmail] = React.useState("");
+  const [inviteRole, setInviteRole] = React.useState<OrgRole>("member");
+  const [inviting, setInviting] = React.useState(false);
 
   const fetchMembers = React.useCallback(async () => {
-    if (!accessToken) return
+    if (!accessToken) return;
 
-    setLoading(true)
-    setError(null)
+    setLoading(true);
+    setError(null);
 
     try {
       const response = await fetch(`${API_BASE}/org-members`, {
         headers: {
           Authorization: `Bearer ${accessToken}`,
         },
-      })
+      });
       if (!response.ok) {
-        throw new Error(`HTTP ${response.status}`)
+        throw new Error(`HTTP ${response.status}`);
       }
-      const data = await response.json()
-      setMembers(data)
+      const data = await response.json();
+      setMembers(data);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load members')
+      setError(err instanceof Error ? err.message : "Failed to load members");
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }, [accessToken])
+  }, [accessToken]);
 
   React.useEffect(() => {
-    fetchMembers()
-  }, [fetchMembers])
+    fetchMembers();
+  }, [fetchMembers]);
 
   const handleInvite = async () => {
-    if (!accessToken || !inviteEmail.trim()) return
+    if (!accessToken || !inviteEmail.trim()) return;
 
-    setInviting(true)
+    setInviting(true);
     try {
       const response = await fetch(`${API_BASE}/invite`, {
-        method: 'POST',
+        method: "POST",
         headers: {
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
           Authorization: `Bearer ${accessToken}`,
         },
         body: JSON.stringify({
           email: inviteEmail.trim(),
           role: inviteRole,
         }),
-      })
+      });
 
       if (!response.ok) {
-        const error = await response.json().catch(() => ({}))
-        throw new Error(error.detail || `HTTP ${response.status}`)
+        const error = await response.json().catch(() => ({}));
+        throw new Error(error.detail || `HTTP ${response.status}`);
       }
 
-      setInviteEmail('')
-      setInviteRole('member')
-      setInviteDialogOpen(false)
-      await fetchMembers()
+      setInviteEmail("");
+      setInviteRole("member");
+      setInviteDialogOpen(false);
+      await fetchMembers();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to invite user')
+      setError(err instanceof Error ? err.message : "Failed to invite user");
     } finally {
-      setInviting(false)
+      setInviting(false);
     }
-  }
+  };
 
   const handleRemoveMember = async (userId: string) => {
-    if (!accessToken) return
-    if (!confirm('Are you sure you want to remove this member?')) return
+    if (!accessToken) return;
+    if (!confirm("Are you sure you want to remove this member?")) return;
 
     try {
       const response = await fetch(`${API_BASE}/${userId}/remove`, {
-        method: 'POST',
+        method: "POST",
         headers: {
           Authorization: `Bearer ${accessToken}`,
         },
-      })
+      });
 
       if (!response.ok) {
-        const error = await response.json().catch(() => ({}))
-        throw new Error(error.detail || `HTTP ${response.status}`)
+        const error = await response.json().catch(() => ({}));
+        throw new Error(error.detail || `HTTP ${response.status}`);
       }
 
-      await fetchMembers()
+      await fetchMembers();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to remove member')
+      setError(err instanceof Error ? err.message : "Failed to remove member");
     }
-  }
+  };
 
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
         <div>
-          <CardTitle className="text-xl font-semibold">User Management</CardTitle>
+          <CardTitle className="text-xl font-semibold">
+            User Management
+          </CardTitle>
           <CardDescription>
-            View and manage organization members. Owners can change roles and remove
-            users.
+            View and manage organization members. Owners can change roles and
+            remove users.
           </CardDescription>
         </div>
         <Dialog open={inviteDialogOpen} onOpenChange={setInviteDialogOpen}>
@@ -225,7 +230,7 @@ export function UserManagement() {
                 onClick={handleInvite}
                 disabled={inviting || !inviteEmail.trim()}
               >
-                {inviting ? 'Sending...' : 'Send Invite'}
+                {inviting ? "Sending..." : "Send Invite"}
               </Button>
             </DialogFooter>
           </DialogContent>
@@ -259,16 +264,16 @@ export function UserManagement() {
             </TableHeader>
             <TableBody>
               {members.map((member) => {
-                const RoleIcon = ROLE_ICONS[member.role]
-                const isCurrentUser = member.user_id === currentUser?.id
-                const isOwner = member.role === 'owner'
+                const RoleIcon = ROLE_ICONS[member.role];
+                const isCurrentUser = member.user_id === currentUser?.id;
+                const isOwner = member.role === "owner";
 
                 return (
                   <TableRow key={member.user_id}>
                     <TableCell>
                       <div className="flex flex-col">
                         <span className="font-medium">
-                          {member.name || 'Unnamed'}
+                          {member.name || "Unnamed"}
                           {isCurrentUser && (
                             <span className="ml-2 text-xs text-muted-foreground">
                               (you)
@@ -304,12 +309,12 @@ export function UserManagement() {
                       )}
                     </TableCell>
                   </TableRow>
-                )
+                );
               })}
             </TableBody>
           </Table>
         )}
       </CardContent>
     </Card>
-  )
+  );
 }

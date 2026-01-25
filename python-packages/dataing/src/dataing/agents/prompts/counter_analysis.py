@@ -75,10 +75,10 @@ def build_user(
 
     # Format evidence
     evidence_text = "\n\n".join(
-        f"""### {e.get('hypothesis_id', 'unknown')}
-- Supports: {e.get('supports_hypothesis', 'unknown')}
-- Confidence: {e.get('confidence', 0.0)}
-- Interpretation: {e.get('interpretation', 'N/A')[:200]}"""
+        f"""### {e.get("hypothesis_id", "unknown")}
+- Supports: {e.get("supports_hypothesis", "unknown")}
+- Confidence: {e.get("confidence", 0.0)}
+- Interpretation: {e.get("interpretation", "N/A")[:200]}"""
         for e in evidence
     )
 

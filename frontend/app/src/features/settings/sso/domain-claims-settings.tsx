@@ -1,4 +1,4 @@
-import * as React from 'react'
+import * as React from "react";
 import {
   Plus,
   Trash2,
@@ -9,13 +9,19 @@ import {
   RefreshCw,
   Copy,
   Loader2,
-} from 'lucide-react'
-import { toast } from 'sonner'
+} from "lucide-react";
+import { toast } from "sonner";
 
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card'
-import { Button } from '@/components/ui/Button'
-import { Input } from '@/components/ui/Input'
-import { Label } from '@/components/ui/label'
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/Card";
+import { Button } from "@/components/ui/Button";
+import { Input } from "@/components/ui/Input";
+import { Label } from "@/components/ui/label";
 import {
   Dialog,
   DialogContent,
@@ -23,137 +29,138 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from '@/components/ui/dialog'
-import { Badge } from '@/components/ui/Badge'
-import { EmptyState } from '@/components/shared/empty-state'
-import { Alert, AlertDescription } from '@/components/ui/alert'
+} from "@/components/ui/dialog";
+import { Badge } from "@/components/ui/Badge";
+import { EmptyState } from "@/components/shared/empty-state";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
-type VerificationStatus = 'pending' | 'verified' | 'failed'
+type VerificationStatus = "pending" | "verified" | "failed";
 
 interface DomainClaim {
-  id: string
-  domain: string
-  verification_status: VerificationStatus
-  verification_token: string
-  dns_record: string
-  created_at: string
-  verified_at: string | null
+  id: string;
+  domain: string;
+  verification_status: VerificationStatus;
+  verification_token: string;
+  dns_record: string;
+  created_at: string;
+  verified_at: string | null;
 }
 
 export function DomainClaimsSettings() {
-  const [domains, setDomains] = React.useState<DomainClaim[]>([])
-  const [showAddDialog, setShowAddDialog] = React.useState(false)
-  const [showVerifyDialog, setShowVerifyDialog] = React.useState(false)
-  const [selectedDomain, setSelectedDomain] = React.useState<DomainClaim | null>(null)
-  const [newDomain, setNewDomain] = React.useState('')
-  const [isAdding, setIsAdding] = React.useState(false)
-  const [isVerifying, setIsVerifying] = React.useState(false)
+  const [domains, setDomains] = React.useState<DomainClaim[]>([]);
+  const [showAddDialog, setShowAddDialog] = React.useState(false);
+  const [showVerifyDialog, setShowVerifyDialog] = React.useState(false);
+  const [selectedDomain, setSelectedDomain] =
+    React.useState<DomainClaim | null>(null);
+  const [newDomain, setNewDomain] = React.useState("");
+  const [isAdding, setIsAdding] = React.useState(false);
+  const [isVerifying, setIsVerifying] = React.useState(false);
 
   const handleAddDomain = async () => {
-    if (!newDomain) return
+    if (!newDomain) return;
 
-    setIsAdding(true)
+    setIsAdding(true);
     try {
       // TODO: Call API to add domain
-      await new Promise((resolve) => setTimeout(resolve, 1000))
+      await new Promise((resolve) => setTimeout(resolve, 1000));
 
       const newClaim: DomainClaim = {
         id: Date.now().toString(),
         domain: newDomain.toLowerCase(),
-        verification_status: 'pending',
+        verification_status: "pending",
         verification_token: `dataing-verify-${Math.random().toString(36).substring(2, 15)}`,
         dns_record: `_dataing-verification.${newDomain.toLowerCase()}`,
         created_at: new Date().toISOString(),
         verified_at: null,
-      }
+      };
 
-      setDomains([...domains, newClaim])
-      setSelectedDomain(newClaim)
-      setShowAddDialog(false)
-      setShowVerifyDialog(true)
-      setNewDomain('')
-      toast.success('Domain added. Complete DNS verification to claim it.')
+      setDomains([...domains, newClaim]);
+      setSelectedDomain(newClaim);
+      setShowAddDialog(false);
+      setShowVerifyDialog(true);
+      setNewDomain("");
+      toast.success("Domain added. Complete DNS verification to claim it.");
     } catch {
-      toast.error('Failed to add domain')
+      toast.error("Failed to add domain");
     } finally {
-      setIsAdding(false)
+      setIsAdding(false);
     }
-  }
+  };
 
   const handleVerifyDomain = async (domain: DomainClaim) => {
-    setIsVerifying(true)
+    setIsVerifying(true);
     try {
       // TODO: Call API to verify domain
-      await new Promise((resolve) => setTimeout(resolve, 2000))
+      await new Promise((resolve) => setTimeout(resolve, 2000));
 
       // Simulate verification result (random for demo)
-      const success = Math.random() > 0.3
+      const success = Math.random() > 0.3;
 
       setDomains(
         domains.map((d) =>
           d.id === domain.id
             ? {
                 ...d,
-                verification_status: success ? 'verified' : 'failed',
+                verification_status: success ? "verified" : "failed",
                 verified_at: success ? new Date().toISOString() : null,
               }
-            : d
-        )
-      )
+            : d,
+        ),
+      );
 
       if (success) {
-        toast.success(`Domain ${domain.domain} verified successfully`)
-        setShowVerifyDialog(false)
+        toast.success(`Domain ${domain.domain} verified successfully`);
+        setShowVerifyDialog(false);
       } else {
-        toast.error('DNS verification failed. Please check your DNS records.')
+        toast.error("DNS verification failed. Please check your DNS records.");
       }
     } catch {
-      toast.error('Failed to verify domain')
+      toast.error("Failed to verify domain");
     } finally {
-      setIsVerifying(false)
+      setIsVerifying(false);
     }
-  }
+  };
 
   const handleDeleteDomain = async (domain: DomainClaim) => {
     try {
       // TODO: Call API to delete domain
-      setDomains(domains.filter((d) => d.id !== domain.id))
-      toast.success('Domain removed')
+      setDomains(domains.filter((d) => d.id !== domain.id));
+      toast.success("Domain removed");
     } catch {
-      toast.error('Failed to remove domain')
+      toast.error("Failed to remove domain");
     }
-  }
+  };
 
   const copyToClipboard = async (text: string) => {
-    await navigator.clipboard.writeText(text)
-    toast.success('Copied to clipboard')
-  }
+    await navigator.clipboard.writeText(text);
+    toast.success("Copied to clipboard");
+  };
 
   const getStatusBadge = (status: VerificationStatus) => {
     switch (status) {
-      case 'verified':
+      case "verified":
         return (
           <Badge variant="default" className="bg-green-500">
             <CheckCircle className="mr-1 h-3 w-3" />
             Verified
           </Badge>
-        )
-      case 'pending':
+        );
+      case "pending":
         return (
           <Badge variant="secondary">
             <Clock className="mr-1 h-3 w-3" />
             Pending Verification
           </Badge>
-        )
-      case 'failed':
+        );
+      case "failed":
         return (
           <Badge variant="destructive">
             <XCircle className="mr-1 h-3 w-3" />
             Verification Failed
           </Badge>
-        )
+        );
     }
-  }
+  };
 
   return (
     <>
@@ -161,8 +168,8 @@ export function DomainClaimsSettings() {
         <CardHeader>
           <CardTitle>Domain Claims</CardTitle>
           <CardDescription>
-            Claim email domains to enable SSO for users with those email addresses.
-            Domain ownership is verified via DNS TXT records.
+            Claim email domains to enable SSO for users with those email
+            addresses. Domain ownership is verified via DNS TXT records.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -193,20 +200,25 @@ export function DomainClaimsSettings() {
                         {getStatusBadge(domain.verification_status)}
                       </div>
                       <p className="text-xs text-muted-foreground">
-                        Added: {new Date(domain.created_at).toLocaleDateString()}
+                        Added:{" "}
+                        {new Date(domain.created_at).toLocaleDateString()}
                         {domain.verified_at && (
-                          <> | Verified: {new Date(domain.verified_at).toLocaleDateString()}</>
+                          <>
+                            {" "}
+                            | Verified:{" "}
+                            {new Date(domain.verified_at).toLocaleDateString()}
+                          </>
                         )}
                       </p>
                     </div>
                     <div className="flex gap-2">
-                      {domain.verification_status !== 'verified' && (
+                      {domain.verification_status !== "verified" && (
                         <Button
                           variant="outline"
                           size="sm"
                           onClick={() => {
-                            setSelectedDomain(domain)
-                            setShowVerifyDialog(true)
+                            setSelectedDomain(domain);
+                            setShowVerifyDialog(true);
                           }}
                         >
                           <RefreshCw className="mr-2 h-4 w-4" />
@@ -244,8 +256,8 @@ export function DomainClaimsSettings() {
           </DialogHeader>
           <form
             onSubmit={(e) => {
-              e.preventDefault()
-              handleAddDomain()
+              e.preventDefault();
+              handleAddDomain();
             }}
             className="space-y-4"
           >
@@ -277,7 +289,7 @@ export function DomainClaimsSettings() {
                     Adding...
                   </>
                 ) : (
-                  'Add Domain'
+                  "Add Domain"
                 )}
               </Button>
             </DialogFooter>
@@ -303,13 +315,19 @@ export function DomainClaimsSettings() {
                   <div className="space-y-2">
                     <div className="flex items-center justify-between p-2 bg-muted rounded">
                       <div>
-                        <span className="text-xs text-muted-foreground">Name/Host:</span>
-                        <p className="font-mono text-sm">{selectedDomain.dns_record}</p>
+                        <span className="text-xs text-muted-foreground">
+                          Name/Host:
+                        </span>
+                        <p className="font-mono text-sm">
+                          {selectedDomain.dns_record}
+                        </p>
                       </div>
                       <Button
                         variant="ghost"
                         size="icon"
-                        onClick={() => copyToClipboard(selectedDomain.dns_record)}
+                        onClick={() =>
+                          copyToClipboard(selectedDomain.dns_record)
+                        }
                       >
                         <Copy className="h-4 w-4" />
                       </Button>
@@ -317,7 +335,9 @@ export function DomainClaimsSettings() {
 
                     <div className="flex items-center justify-between p-2 bg-muted rounded">
                       <div>
-                        <span className="text-xs text-muted-foreground">Value:</span>
+                        <span className="text-xs text-muted-foreground">
+                          Value:
+                        </span>
                         <p className="font-mono text-sm break-all">
                           {selectedDomain.verification_token}
                         </p>
@@ -325,7 +345,9 @@ export function DomainClaimsSettings() {
                       <Button
                         variant="ghost"
                         size="icon"
-                        onClick={() => copyToClipboard(selectedDomain.verification_token)}
+                        onClick={() =>
+                          copyToClipboard(selectedDomain.verification_token)
+                        }
                       >
                         <Copy className="h-4 w-4" />
                       </Button>
@@ -333,7 +355,9 @@ export function DomainClaimsSettings() {
 
                     <div className="flex items-center justify-between p-2 bg-muted rounded">
                       <div>
-                        <span className="text-xs text-muted-foreground">Type:</span>
+                        <span className="text-xs text-muted-foreground">
+                          Type:
+                        </span>
                         <p className="font-mono text-sm">TXT</p>
                       </div>
                     </div>
@@ -346,7 +370,10 @@ export function DomainClaimsSettings() {
               </Alert>
 
               <DialogFooter>
-                <Button variant="outline" onClick={() => setShowVerifyDialog(false)}>
+                <Button
+                  variant="outline"
+                  onClick={() => setShowVerifyDialog(false)}
+                >
                   I'll do this later
                 </Button>
                 <Button
@@ -371,5 +398,5 @@ export function DomainClaimsSettings() {
         </DialogContent>
       </Dialog>
     </>
-  )
+  );
 }

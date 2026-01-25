@@ -1,8 +1,8 @@
-import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter'
-import { oneDark } from 'react-syntax-highlighter/dist/esm/styles/prism'
+import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
+import { oneDark } from "react-syntax-highlighter/dist/esm/styles/prism";
 
 interface SqlExplainerProps {
-  sql: string
+  sql: string;
 }
 
 export function SqlExplainer({ sql }: SqlExplainerProps) {
@@ -13,8 +13,8 @@ export function SqlExplainer({ sql }: SqlExplainerProps) {
         style={oneDark}
         customStyle={{
           margin: 0,
-          padding: '1rem',
-          fontSize: '0.75rem',
+          padding: "1rem",
+          fontSize: "0.75rem",
         }}
         wrapLines
         wrapLongLines
@@ -22,5 +22,5 @@ export function SqlExplainer({ sql }: SqlExplainerProps) {
         {sql}
       </SyntaxHighlighter>
     </div>
-  )
+  );
 }

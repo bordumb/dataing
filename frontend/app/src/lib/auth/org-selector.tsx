@@ -6,87 +6,89 @@
  * In API key auth mode, it will render nothing (returns null).
  */
 
-import * as React from 'react'
-import { Check, ChevronsUpDown, Building2 } from 'lucide-react'
+import * as React from "react";
+import { Check, ChevronsUpDown, Building2 } from "lucide-react";
 
-import { cn } from '@/lib/utils'
-import { Button } from '@/components/ui/Button'
+import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/Button";
 import {
   Command,
   CommandEmpty,
   CommandGroup,
   CommandItem,
   CommandList,
-} from '@/components/ui/command'
+} from "@/components/ui/command";
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
-} from '@/components/ui/popover'
+} from "@/components/ui/popover";
 
-import { getUserOrgs } from './api'
-import type { OrgMembership } from './types'
+import { getUserOrgs } from "./api";
+import type { OrgMembership } from "./types";
 
 // Safe hook to check if JWT auth is available
 function useJwtAuthSafe() {
   // Try to get the context, return null if not available
   const [authState, setAuthState] = React.useState<{
-    org: { id: string; name: string } | null
-    accessToken: string | null
-    switchOrg: ((orgId: string, orgName?: string, orgSlug?: string) => Promise<void>) | null
-  } | null>(null)
+    org: { id: string; name: string } | null;
+    accessToken: string | null;
+    switchOrg:
+      | ((orgId: string, orgName?: string, orgSlug?: string) => Promise<void>)
+      | null;
+  } | null>(null);
 
   React.useEffect(() => {
     // Check if JWT auth data is in localStorage (indicating JWT auth mode)
-    const accessToken = localStorage.getItem('dataing_access_token')
-    const orgJson = localStorage.getItem('dataing_org')
+    const accessToken = localStorage.getItem("dataing_access_token");
+    const orgJson = localStorage.getItem("dataing_org");
 
     if (accessToken && orgJson) {
       try {
-        const org = JSON.parse(orgJson)
+        const org = JSON.parse(orgJson);
         setAuthState({
           org,
           accessToken,
           switchOrg: null, // Cannot switch in safe mode
-        })
+        });
       } catch {
-        setAuthState(null)
+        setAuthState(null);
       }
     }
-  }, [])
+  }, []);
 
-  return authState
+  return authState;
 }
 
 export function OrgSelector() {
   // Use safe hook that doesn't throw if JWT context is missing
-  const authState = useJwtAuthSafe()
-  const [open, setOpen] = React.useState(false)
-  const [orgs, setOrgs] = React.useState<OrgMembership[]>([])
-  const [loading, setLoading] = React.useState(true)
+  const authState = useJwtAuthSafe();
+  const [open, setOpen] = React.useState(false);
+  const [orgs, setOrgs] = React.useState<OrgMembership[]>([]);
+  const [loading, setLoading] = React.useState(true);
 
   // Extract values from authState (may be null in API key auth mode)
-  const org = authState?.org
-  const accessToken = authState?.accessToken
+  const org = authState?.org;
+  const accessToken = authState?.accessToken;
 
   // Fetch organizations on mount (when authenticated with JWT)
   React.useEffect(() => {
     if (!accessToken) {
-      setLoading(false)
-      return
+      setLoading(false);
+      return;
     }
 
-    setLoading(true)
+    setLoading(true);
     getUserOrgs(accessToken)
       .then(setOrgs)
       .catch(console.error)
-      .finally(() => setLoading(false))
-  }, [accessToken])
+      .finally(() => setLoading(false));
+  }, [accessToken]);
 
   // Don't render in API key auth mode (no JWT context)
   // or while loading, or if only one org
   if (!authState || loading || orgs.length <= 1) {
-    return null
+    return null;
   }
 
   // Note: Org switching is disabled in safe mode (would need full JWT context)
@@ -104,7 +106,7 @@ export function OrgSelector() {
         >
           <Building2 className="mr-2 h-4 w-4 shrink-0" />
           <span className="truncate flex-1 text-left">
-            {org?.name ?? 'Select org...'}
+            {org?.name ?? "Select org..."}
           </span>
           <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
         </Button>
@@ -122,10 +124,10 @@ export function OrgSelector() {
                 >
                   <Check
                     className={cn(
-                      'mr-2 h-4 w-4',
+                      "mr-2 h-4 w-4",
                       org?.id === membership.org_id
-                        ? 'opacity-100'
-                        : 'opacity-0'
+                        ? "opacity-100"
+                        : "opacity-0",
                     )}
                   />
                   <div className="flex flex-col">
@@ -141,5 +143,5 @@ export function OrgSelector() {
         </Command>
       </PopoverContent>
     </Popover>
-  )
+  );
 }

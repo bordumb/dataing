@@ -1,7 +1,7 @@
-import { useState, useEffect, useRef } from 'react'
-import { Button } from '@/components/ui/Button'
-import { Input } from '@/components/ui/Input'
-import { useTableSearch, SchemaTable } from '@/lib/api/datasources'
+import { useState, useEffect, useRef } from "react";
+import { Button } from "@/components/ui/Button";
+import { Input } from "@/components/ui/Input";
+import { useTableSearch, SchemaTable } from "@/lib/api/datasources";
 import {
   Database,
   Server,
@@ -11,7 +11,7 @@ import {
   Search,
   Loader2,
   X,
-} from 'lucide-react'
+} from "lucide-react";
 
 // Source type icons
 const SOURCE_ICONS: Record<string, typeof Database> = {
@@ -32,26 +32,26 @@ const SOURCE_ICONS: Record<string, typeof Database> = {
   salesforce: Database,
   hubspot: Database,
   stripe: Database,
-}
+};
 
 interface DataSourceOption {
-  id: string
-  name: string
-  type: string
+  id: string;
+  name: string;
+  type: string;
 }
 
 interface DatasetEntryProps {
-  datasourceId: string
-  datasourceType: string
-  identifier: string
-  onDatasourceChange: (id: string) => void
-  onIdentifierChange: (value: string) => void
-  onRemove: () => void
-  canRemove: boolean
-  disabled?: boolean
-  autoFocus?: boolean
-  dataSources: DataSourceOption[]
-  onTableSelect: (table: SchemaTable) => void
+  datasourceId: string;
+  datasourceType: string;
+  identifier: string;
+  onDatasourceChange: (id: string) => void;
+  onIdentifierChange: (value: string) => void;
+  onRemove: () => void;
+  canRemove: boolean;
+  disabled?: boolean;
+  autoFocus?: boolean;
+  dataSources: DataSourceOption[];
+  onTableSelect: (table: SchemaTable) => void;
 }
 
 export function DatasetEntry({
@@ -67,17 +67,17 @@ export function DatasetEntry({
   dataSources,
   onTableSelect,
 }: DatasetEntryProps) {
-  const [isOpen, setIsOpen] = useState(false)
-  const [searchTerm, setSearchTerm] = useState('')
-  const inputRef = useRef<HTMLInputElement>(null)
-  const dropdownRef = useRef<HTMLDivElement>(null)
+  const [isOpen, setIsOpen] = useState(false);
+  const [searchTerm, setSearchTerm] = useState("");
+  const inputRef = useRef<HTMLInputElement>(null);
+  const dropdownRef = useRef<HTMLDivElement>(null);
 
-  const { data: tables, isLoading } = useTableSearch(datasourceId, searchTerm)
+  const { data: tables, isLoading } = useTableSearch(datasourceId, searchTerm);
 
   useEffect(() => {
-    const timer = setTimeout(() => setSearchTerm(identifier), 300)
-    return () => clearTimeout(timer)
-  }, [identifier])
+    const timer = setTimeout(() => setSearchTerm(identifier), 300);
+    return () => clearTimeout(timer);
+  }, [identifier]);
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -87,20 +87,20 @@ export function DatasetEntry({
         inputRef.current &&
         !inputRef.current.contains(event.target as Node)
       ) {
-        setIsOpen(false)
+        setIsOpen(false);
       }
     }
-    document.addEventListener('mousedown', handleClickOutside)
-    return () => document.removeEventListener('mousedown', handleClickOutside)
-  }, [])
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
   const handleSelect = (table: SchemaTable) => {
-    onIdentifierChange(table.native_path)
-    onTableSelect(table)
-    setIsOpen(false)
-  }
+    onIdentifierChange(table.native_path);
+    onTableSelect(table);
+    setIsOpen(false);
+  };
 
-  const Icon = SOURCE_ICONS[datasourceType] || Database
+  const Icon = SOURCE_ICONS[datasourceType] || Database;
 
   return (
     <div className="flex items-center gap-2 rounded-lg border border-border bg-muted/30 p-2">
@@ -129,13 +129,15 @@ export function DatasetEntry({
           ref={inputRef}
           value={identifier}
           onChange={(e) => {
-            onIdentifierChange(e.target.value)
-            setIsOpen(true)
+            onIdentifierChange(e.target.value);
+            setIsOpen(true);
           }}
           onFocus={() => setIsOpen(true)}
           disabled={disabled || !datasourceId}
           autoFocus={autoFocus}
-          placeholder={datasourceId ? 'Search for table...' : 'Select a data source first'}
+          placeholder={
+            datasourceId ? "Search for table..." : "Select a data source first"
+          }
           className="pr-8"
         />
         <Search className="absolute right-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
@@ -172,7 +174,9 @@ export function DatasetEntry({
                 )}
               </div>
             ) : identifier.length >= 2 ? (
-              <div className="p-3 text-sm text-muted-foreground">No tables found</div>
+              <div className="p-3 text-sm text-muted-foreground">
+                No tables found
+              </div>
             ) : (
               <div className="p-3 text-sm text-muted-foreground">
                 Type at least 2 characters to search...
@@ -193,8 +197,8 @@ export function DatasetEntry({
         <X className="h-4 w-4" />
       </Button>
     </div>
-  )
+  );
 }
 
 // Re-export the SOURCE_ICONS for use in other components if needed
-export { SOURCE_ICONS }
+export { SOURCE_ICONS };

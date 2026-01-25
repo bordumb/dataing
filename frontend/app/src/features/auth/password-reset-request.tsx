@@ -7,82 +7,95 @@
  * - admin_contact: Shows admin contact info (SSO orgs)
  */
 
-import * as React from 'react'
-import { Link } from 'react-router-dom'
-import { Search, Mail, ArrowLeft, CheckCircle, Terminal, UserCog } from 'lucide-react'
+import * as React from "react";
+import { Link } from "react-router-dom";
+import {
+  Search,
+  Mail,
+  ArrowLeft,
+  CheckCircle,
+  Terminal,
+  UserCog,
+} from "lucide-react";
 
-import { Button } from '@/components/ui/Button'
-import { Input } from '@/components/ui/Input'
-import { Label } from '@/components/ui/label'
+import { Button } from "@/components/ui/Button";
+import { Input } from "@/components/ui/Input";
+import { Label } from "@/components/ui/label";
 import {
   Card,
   CardContent,
   CardDescription,
   CardHeader,
   CardTitle,
-} from '@/components/ui/Card'
-import { Alert, AlertDescription } from '@/components/ui/alert'
+} from "@/components/ui/Card";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000'
+const API_URL = import.meta.env.VITE_API_URL || "http://localhost:8000";
 
 interface RecoveryMethod {
-  type: string
-  message: string
-  action_url?: string | null
-  admin_email?: string | null
+  type: string;
+  message: string;
+  action_url?: string | null;
+  admin_email?: string | null;
 }
 
 export function PasswordResetRequest() {
-  const [email, setEmail] = React.useState('')
-  const [isLoading, setIsLoading] = React.useState(false)
-  const [error, setError] = React.useState<string | null>(null)
-  const [isSuccess, setIsSuccess] = React.useState(false)
-  const [recoveryType, setRecoveryType] = React.useState<string>('email')
-  const [adminEmail, setAdminEmail] = React.useState<string | null>(null)
+  const [email, setEmail] = React.useState("");
+  const [isLoading, setIsLoading] = React.useState(false);
+  const [error, setError] = React.useState<string | null>(null);
+  const [isSuccess, setIsSuccess] = React.useState(false);
+  const [recoveryType, setRecoveryType] = React.useState<string>("email");
+  const [adminEmail, setAdminEmail] = React.useState<string | null>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setError(null)
-    setIsLoading(true)
+    e.preventDefault();
+    setError(null);
+    setIsLoading(true);
 
     try {
       // First, get the recovery method to know what type of message to show
-      const methodResponse = await fetch(`${API_URL}/api/v1/auth/password-reset/recovery-method`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email }),
-      })
+      const methodResponse = await fetch(
+        `${API_URL}/api/v1/auth/password-reset/recovery-method`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email }),
+        },
+      );
 
       if (methodResponse.ok) {
-        const method: RecoveryMethod = await methodResponse.json()
-        setRecoveryType(method.type)
-        setAdminEmail(method.admin_email ?? null)
+        const method: RecoveryMethod = await methodResponse.json();
+        setRecoveryType(method.type);
+        setAdminEmail(method.admin_email ?? null);
       }
 
       // Then request the password reset
-      const response = await fetch(`${API_URL}/api/v1/auth/password-reset/request`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email }),
-      })
+      const response = await fetch(
+        `${API_URL}/api/v1/auth/password-reset/request`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email }),
+        },
+      );
 
       if (!response.ok) {
-        const data = await response.json()
-        throw new Error(data.detail || 'Failed to request password reset')
+        const data = await response.json();
+        throw new Error(data.detail || "Failed to request password reset");
       }
 
-      setIsSuccess(true)
+      setIsSuccess(true);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'An error occurred')
+      setError(err instanceof Error ? err.message : "An error occurred");
     } finally {
-      setIsLoading(false)
+      setIsLoading(false);
     }
-  }
+  };
 
   // Render different success messages based on recovery type
   const renderSuccessMessage = () => {
     switch (recoveryType) {
-      case 'console':
+      case "console":
         return (
           <div className="space-y-4">
             <Alert className="bg-blue-50 border-blue-200">
@@ -101,9 +114,9 @@ export function PasswordResetRequest() {
               Back to login
             </Link>
           </div>
-        )
+        );
 
-      case 'admin_contact':
+      case "admin_contact":
         return (
           <div className="space-y-4">
             <Alert className="bg-amber-50 border-amber-200">
@@ -113,7 +126,7 @@ export function PasswordResetRequest() {
                 administrator to reset your password.
                 {adminEmail && (
                   <p className="mt-2">
-                    <strong>Admin contact:</strong>{' '}
+                    <strong>Admin contact:</strong>{" "}
                     <a
                       href={`mailto:${adminEmail}`}
                       className="text-primary hover:underline"
@@ -132,9 +145,9 @@ export function PasswordResetRequest() {
               Back to login
             </Link>
           </div>
-        )
+        );
 
-      case 'email':
+      case "email":
       default:
         return (
           <div className="space-y-4">
@@ -146,12 +159,12 @@ export function PasswordResetRequest() {
               </AlertDescription>
             </Alert>
             <p className="text-sm text-muted-foreground text-center">
-              Didn't receive the email? Check your spam folder or{' '}
+              Didn't receive the email? Check your spam folder or{" "}
               <button
                 type="button"
                 onClick={() => {
-                  setIsSuccess(false)
-                  setEmail('')
+                  setIsSuccess(false);
+                  setEmail("");
                 }}
                 className="text-primary hover:underline"
               >
@@ -167,9 +180,9 @@ export function PasswordResetRequest() {
               Back to login
             </Link>
           </div>
-        )
+        );
     }
-  }
+  };
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-background p-4">
@@ -183,11 +196,11 @@ export function PasswordResetRequest() {
           <CardTitle className="text-2xl font-bold">Reset Password</CardTitle>
           <CardDescription>
             {isSuccess
-              ? recoveryType === 'console'
-                ? 'Check the server console'
-                : recoveryType === 'admin_contact'
-                  ? 'Contact your administrator'
-                  : 'Check your email for reset instructions'
+              ? recoveryType === "console"
+                ? "Check the server console"
+                : recoveryType === "admin_contact"
+                  ? "Contact your administrator"
+                  : "Check your email for reset instructions"
               : "Enter your email and we'll help you reset your password"}
           </CardDescription>
         </CardHeader>
@@ -220,7 +233,7 @@ export function PasswordResetRequest() {
                 className="w-full"
                 disabled={isLoading || !email}
               >
-                {isLoading ? 'Sending...' : 'Reset Password'}
+                {isLoading ? "Sending..." : "Reset Password"}
               </Button>
 
               <Link
@@ -235,5 +248,5 @@ export function PasswordResetRequest() {
         </CardContent>
       </Card>
     </div>
-  )
+  );
 }

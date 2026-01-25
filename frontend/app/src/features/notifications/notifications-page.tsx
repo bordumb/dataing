@@ -2,15 +2,18 @@
  * Notifications page displaying real-time notifications with mark-as-read functionality.
  */
 
-import { Bell, Check } from 'lucide-react'
-import { PageHeader } from '@/components/shared/page-header'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
-import { Button } from '@/components/ui/Button'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { Skeleton } from '@/components/ui/skeleton'
-import { NotificationCard } from './components/notification-card'
-import { useNotificationsList, useUnreadCount } from './hooks/use-notifications-list'
-import { useMarkAsRead, useMarkAllAsRead } from './hooks/use-mark-read'
+import { Bell, Check } from "lucide-react";
+import { PageHeader } from "@/components/shared/page-header";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
+import { Button } from "@/components/ui/Button";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Skeleton } from "@/components/ui/skeleton";
+import { NotificationCard } from "./components/notification-card";
+import {
+  useNotificationsList,
+  useUnreadCount,
+} from "./hooks/use-notifications-list";
+import { useMarkAsRead, useMarkAllAsRead } from "./hooks/use-mark-read";
 
 function NotificationSkeleton() {
   return (
@@ -24,26 +27,26 @@ function NotificationSkeleton() {
         </div>
       </div>
     </div>
-  )
+  );
 }
 
 export function NotificationsPage() {
-  const { data, isLoading, error } = useNotificationsList()
-  const { data: unreadData } = useUnreadCount()
-  const markAsRead = useMarkAsRead()
-  const markAllAsRead = useMarkAllAsRead()
+  const { data, isLoading, error } = useNotificationsList();
+  const { data: unreadData } = useUnreadCount();
+  const markAsRead = useMarkAsRead();
+  const markAllAsRead = useMarkAllAsRead();
 
-  const allNotifications = data?.items ?? []
-  const unreadNotifications = allNotifications.filter((n) => !n.read_at)
-  const unreadCount = unreadData?.count ?? unreadNotifications.length
+  const allNotifications = data?.items ?? [];
+  const unreadNotifications = allNotifications.filter((n) => !n.read_at);
+  const unreadCount = unreadData?.count ?? unreadNotifications.length;
 
   const handleMarkAsRead = (id: string) => {
-    markAsRead.mutate(id)
-  }
+    markAsRead.mutate(id);
+  };
 
   const handleMarkAllAsRead = () => {
-    markAllAsRead.mutate()
-  }
+    markAllAsRead.mutate();
+  };
 
   if (error) {
     return (
@@ -60,7 +63,7 @@ export function NotificationsPage() {
           </CardContent>
         </Card>
       </div>
-    )
+    );
   }
 
   return (
@@ -74,7 +77,7 @@ export function NotificationsPage() {
         <div className="flex items-center gap-2">
           <Bell className="size-5" />
           <span className="text-sm text-muted-foreground">
-            {unreadCount} unread notification{unreadCount !== 1 ? 's' : ''}
+            {unreadCount} unread notification{unreadCount !== 1 ? "s" : ""}
           </span>
         </div>
         {unreadCount > 0 && (
@@ -85,7 +88,7 @@ export function NotificationsPage() {
             disabled={markAllAsRead.isPending}
           >
             <Check className="size-4 mr-2" />
-            {markAllAsRead.isPending ? 'Marking...' : 'Mark all as read'}
+            {markAllAsRead.isPending ? "Marking..." : "Mark all as read"}
           </Button>
         )}
       </div>
@@ -97,8 +100,12 @@ export function NotificationsPage() {
         <CardContent>
           <Tabs defaultValue="all">
             <TabsList className="mb-4">
-              <TabsTrigger value="all">All ({allNotifications.length})</TabsTrigger>
-              <TabsTrigger value="unread">Unread ({unreadNotifications.length})</TabsTrigger>
+              <TabsTrigger value="all">
+                All ({allNotifications.length})
+              </TabsTrigger>
+              <TabsTrigger value="unread">
+                Unread ({unreadNotifications.length})
+              </TabsTrigger>
             </TabsList>
 
             <TabsContent value="all" className="space-y-3">
@@ -147,5 +154,5 @@ export function NotificationsPage() {
         </CardContent>
       </Card>
     </div>
-  )
+  );
 }

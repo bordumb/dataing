@@ -1,88 +1,103 @@
-import * as React from 'react'
-import { Save, TestTube, Loader2, CheckCircle, XCircle, Shield } from 'lucide-react'
-import { toast } from 'sonner'
+import * as React from "react";
+import {
+  Save,
+  TestTube,
+  Loader2,
+  CheckCircle,
+  XCircle,
+  Shield,
+} from "lucide-react";
+import { toast } from "sonner";
 
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card'
-import { Button } from '@/components/ui/Button'
-import { Input } from '@/components/ui/Input'
-import { Label } from '@/components/ui/label'
-import { Switch } from '@/components/ui/switch'
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/Card";
+import { Button } from "@/components/ui/Button";
+import { Input } from "@/components/ui/Input";
+import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from '@/components/ui/select'
-import { Alert, AlertDescription } from '@/components/ui/alert'
+} from "@/components/ui/select";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
-type ProviderType = 'none' | 'oidc' | 'saml'
+type ProviderType = "none" | "oidc" | "saml";
 
 interface SSOConfig {
-  provider_type: ProviderType
-  is_enabled: boolean
-  display_name: string
+  provider_type: ProviderType;
+  is_enabled: boolean;
+  display_name: string;
   // OIDC fields
-  oidc_issuer_url: string
-  oidc_client_id: string
-  oidc_client_secret: string
+  oidc_issuer_url: string;
+  oidc_client_id: string;
+  oidc_client_secret: string;
   // SAML fields
-  saml_idp_metadata_url: string
-  saml_idp_entity_id: string
-  saml_certificate: string
+  saml_idp_metadata_url: string;
+  saml_idp_entity_id: string;
+  saml_certificate: string;
 }
 
 const initialConfig: SSOConfig = {
-  provider_type: 'none',
+  provider_type: "none",
   is_enabled: false,
-  display_name: '',
-  oidc_issuer_url: '',
-  oidc_client_id: '',
-  oidc_client_secret: '',
-  saml_idp_metadata_url: '',
-  saml_idp_entity_id: '',
-  saml_certificate: '',
-}
+  display_name: "",
+  oidc_issuer_url: "",
+  oidc_client_id: "",
+  oidc_client_secret: "",
+  saml_idp_metadata_url: "",
+  saml_idp_entity_id: "",
+  saml_certificate: "",
+};
 
 export function SSOConfigSettings() {
-  const [config, setConfig] = React.useState<SSOConfig>(initialConfig)
-  const [isSaving, setIsSaving] = React.useState(false)
-  const [isTesting, setIsTesting] = React.useState(false)
-  const [testResult, setTestResult] = React.useState<'success' | 'error' | null>(null)
+  const [config, setConfig] = React.useState<SSOConfig>(initialConfig);
+  const [isSaving, setIsSaving] = React.useState(false);
+  const [isTesting, setIsTesting] = React.useState(false);
+  const [testResult, setTestResult] = React.useState<
+    "success" | "error" | null
+  >(null);
 
   const handleSave = async () => {
-    setIsSaving(true)
+    setIsSaving(true);
     try {
       // TODO: Call API to save SSO config
-      await new Promise((resolve) => setTimeout(resolve, 1000))
-      toast.success('SSO configuration saved')
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+      toast.success("SSO configuration saved");
     } catch {
-      toast.error('Failed to save SSO configuration')
+      toast.error("Failed to save SSO configuration");
     } finally {
-      setIsSaving(false)
+      setIsSaving(false);
     }
-  }
+  };
 
   const handleTestConnection = async () => {
-    setIsTesting(true)
-    setTestResult(null)
+    setIsTesting(true);
+    setTestResult(null);
     try {
       // TODO: Call API to test SSO connection
-      await new Promise((resolve) => setTimeout(resolve, 2000))
-      setTestResult('success')
-      toast.success('SSO connection test passed')
+      await new Promise((resolve) => setTimeout(resolve, 2000));
+      setTestResult("success");
+      toast.success("SSO connection test passed");
     } catch {
-      setTestResult('error')
-      toast.error('SSO connection test failed')
+      setTestResult("error");
+      toast.error("SSO connection test failed");
     } finally {
-      setIsTesting(false)
+      setIsTesting(false);
     }
-  }
+  };
 
   const updateConfig = (updates: Partial<SSOConfig>) => {
-    setConfig((prev) => ({ ...prev, ...updates }))
-    setTestResult(null) // Reset test result when config changes
-  }
+    setConfig((prev) => ({ ...prev, ...updates }));
+    setTestResult(null); // Reset test result when config changes
+  };
 
   return (
     <div className="space-y-6">
@@ -98,12 +113,15 @@ export function SSOConfigSettings() {
             <div className="space-y-0.5">
               <Label>Enable SSO</Label>
               <p className="text-sm text-muted-foreground">
-                When enabled, users with claimed domains will use SSO to sign in.
+                When enabled, users with claimed domains will use SSO to sign
+                in.
               </p>
             </div>
             <Switch
               checked={config.is_enabled}
-              onCheckedChange={(checked) => updateConfig({ is_enabled: checked })}
+              onCheckedChange={(checked) =>
+                updateConfig({ is_enabled: checked })
+              }
             />
           </div>
 
@@ -143,7 +161,7 @@ export function SSOConfigSettings() {
         </CardContent>
       </Card>
 
-      {config.provider_type === 'oidc' && (
+      {config.provider_type === "oidc" && (
         <Card>
           <CardHeader>
             <CardTitle>OpenID Connect Configuration</CardTitle>
@@ -157,11 +175,14 @@ export function SSOConfigSettings() {
               <Input
                 id="issuer-url"
                 value={config.oidc_issuer_url}
-                onChange={(e) => updateConfig({ oidc_issuer_url: e.target.value })}
+                onChange={(e) =>
+                  updateConfig({ oidc_issuer_url: e.target.value })
+                }
                 placeholder="https://your-idp.example.com"
               />
               <p className="text-sm text-muted-foreground">
-                The base URL of your identity provider (e.g., https://login.microsoftonline.com/tenant-id/v2.0)
+                The base URL of your identity provider (e.g.,
+                https://login.microsoftonline.com/tenant-id/v2.0)
               </p>
             </div>
 
@@ -170,7 +191,9 @@ export function SSOConfigSettings() {
               <Input
                 id="client-id"
                 value={config.oidc_client_id}
-                onChange={(e) => updateConfig({ oidc_client_id: e.target.value })}
+                onChange={(e) =>
+                  updateConfig({ oidc_client_id: e.target.value })
+                }
                 placeholder="your-client-id"
               />
             </div>
@@ -181,7 +204,9 @@ export function SSOConfigSettings() {
                 id="client-secret"
                 type="password"
                 value={config.oidc_client_secret}
-                onChange={(e) => updateConfig({ oidc_client_secret: e.target.value })}
+                onChange={(e) =>
+                  updateConfig({ oidc_client_secret: e.target.value })
+                }
                 placeholder="your-client-secret"
               />
               <p className="text-sm text-muted-foreground">
@@ -192,7 +217,8 @@ export function SSOConfigSettings() {
             <Alert>
               <Shield className="h-4 w-4" />
               <AlertDescription>
-                <strong>Redirect URI:</strong> Add this URL to your identity provider's allowed redirect URIs:
+                <strong>Redirect URI:</strong> Add this URL to your identity
+                provider's allowed redirect URIs:
                 <code className="ml-2 px-2 py-1 bg-muted rounded text-sm">
                   {window.location.origin}/auth/sso/callback
                 </code>
@@ -202,7 +228,7 @@ export function SSOConfigSettings() {
         </Card>
       )}
 
-      {config.provider_type === 'saml' && (
+      {config.provider_type === "saml" && (
         <Card>
           <CardHeader>
             <CardTitle>SAML 2.0 Configuration</CardTitle>
@@ -216,7 +242,9 @@ export function SSOConfigSettings() {
               <Input
                 id="metadata-url"
                 value={config.saml_idp_metadata_url}
-                onChange={(e) => updateConfig({ saml_idp_metadata_url: e.target.value })}
+                onChange={(e) =>
+                  updateConfig({ saml_idp_metadata_url: e.target.value })
+                }
                 placeholder="https://your-idp.example.com/metadata"
               />
               <p className="text-sm text-muted-foreground">
@@ -229,7 +257,9 @@ export function SSOConfigSettings() {
               <Input
                 id="entity-id"
                 value={config.saml_idp_entity_id}
-                onChange={(e) => updateConfig({ saml_idp_entity_id: e.target.value })}
+                onChange={(e) =>
+                  updateConfig({ saml_idp_entity_id: e.target.value })
+                }
                 placeholder="https://your-idp.example.com"
               />
             </div>
@@ -240,7 +270,9 @@ export function SSOConfigSettings() {
                 id="certificate"
                 className="flex min-h-[120px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 font-mono"
                 value={config.saml_certificate}
-                onChange={(e) => updateConfig({ saml_certificate: e.target.value })}
+                onChange={(e) =>
+                  updateConfig({ saml_certificate: e.target.value })
+                }
                 placeholder="-----BEGIN CERTIFICATE-----&#10;...&#10;-----END CERTIFICATE-----"
               />
               <p className="text-sm text-muted-foreground">
@@ -251,7 +283,8 @@ export function SSOConfigSettings() {
             <Alert>
               <Shield className="h-4 w-4" />
               <AlertDescription>
-                <strong>ACS URL:</strong> Configure this as your Assertion Consumer Service URL:
+                <strong>ACS URL:</strong> Configure this as your Assertion
+                Consumer Service URL:
                 <code className="ml-2 px-2 py-1 bg-muted rounded text-sm">
                   {window.location.origin}/api/v1/auth/sso/saml/acs
                 </code>
@@ -261,7 +294,7 @@ export function SSOConfigSettings() {
         </Card>
       )}
 
-      {config.provider_type !== 'none' && (
+      {config.provider_type !== "none" && (
         <div className="flex gap-4">
           <Button
             variant="outline"
@@ -273,12 +306,12 @@ export function SSOConfigSettings() {
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                 Testing...
               </>
-            ) : testResult === 'success' ? (
+            ) : testResult === "success" ? (
               <>
                 <CheckCircle className="mr-2 h-4 w-4 text-green-500" />
                 Test Passed
               </>
-            ) : testResult === 'error' ? (
+            ) : testResult === "error" ? (
               <>
                 <XCircle className="mr-2 h-4 w-4 text-destructive" />
                 Test Failed
@@ -307,5 +340,5 @@ export function SSOConfigSettings() {
         </div>
       )}
     </div>
-  )
+  );
 }

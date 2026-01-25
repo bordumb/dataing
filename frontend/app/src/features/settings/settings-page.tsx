@@ -1,9 +1,9 @@
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { GeneralSettings } from './general-settings'
-import { WebhookSettings } from './webhook-settings'
-import { NotificationSettings } from './notification-settings'
-import { ApiKeySettings } from './api-key-settings'
-import { PageHeader } from '@/components/shared/page-header'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { GeneralSettings } from "./general-settings";
+import { WebhookSettings } from "./webhook-settings";
+import { NotificationSettings } from "./notification-settings";
+import { ApiKeySettings } from "./api-key-settings";
+import { PageHeader } from "@/components/shared/page-header";
 
 export function SettingsPage() {
   return (
@@ -38,5 +38,5 @@ export function SettingsPage() {
         </TabsContent>
       </Tabs>
     </div>
-  )
+  );
 }

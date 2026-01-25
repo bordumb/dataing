@@ -31,9 +31,7 @@ class AssetInstanceResult(BaseModel):
     datasource_id: str = Field(description="Datasource ID")
     datasource_name: str = Field(description="Human-readable datasource name")
     platform: str = Field(description="Database platform type (postgres, snowflake, etc.)")
-    match_reason: str = Field(
-        description="Why this result matched: name_prefix, path_match, fuzzy"
-    )
+    match_reason: str = Field(description="Why this result matched: name_prefix, path_match, fuzzy")
 
 
 class AssetInstanceSearchResponse(BaseModel):

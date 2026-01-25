@@ -1,10 +1,10 @@
-import { useState, useCallback, useEffect } from 'react'
+import { useState, useCallback, useEffect } from "react";
 
-type VoteValue = 1 | -1 | null
+type VoteValue = 1 | -1 | null;
 
 interface UseVoteStateReturn {
-  getVote: (commentId: string) => VoteValue
-  setVote: (commentId: string, vote: VoteValue) => void
+  getVote: (commentId: string) => VoteValue;
+  setVote: (commentId: string, vote: VoteValue) => void;
 }
 
 /**
@@ -12,37 +12,37 @@ interface UseVoteStateReturn {
  * This provides optimistic UI while the backend is the source of truth.
  */
 export function useVoteState(datasetId: string): UseVoteStateReturn {
-  const storageKey = `votes:${datasetId}`
+  const storageKey = `votes:${datasetId}`;
 
   const [votes, setVotes] = useState<Record<string, VoteValue>>(() => {
-    if (typeof window === 'undefined') return {}
+    if (typeof window === "undefined") return {};
     try {
-      const stored = localStorage.getItem(storageKey)
-      return stored ? JSON.parse(stored) : {}
+      const stored = localStorage.getItem(storageKey);
+      return stored ? JSON.parse(stored) : {};
     } catch {
-      return {}
+      return {};
     }
-  })
+  });
 
   // Persist to localStorage when votes change
   useEffect(() => {
     try {
-      localStorage.setItem(storageKey, JSON.stringify(votes))
+      localStorage.setItem(storageKey, JSON.stringify(votes));
     } catch {
       // Ignore localStorage errors
     }
-  }, [votes, storageKey])
+  }, [votes, storageKey]);
 
   const getVote = useCallback(
     (commentId: string): VoteValue => {
-      return votes[commentId] ?? null
+      return votes[commentId] ?? null;
     },
-    [votes]
-  )
+    [votes],
+  );
 
   const setVote = useCallback((commentId: string, vote: VoteValue) => {
-    setVotes((prev) => ({ ...prev, [commentId]: vote }))
-  }, [])
+    setVotes((prev) => ({ ...prev, [commentId]: vote }));
+  }, []);
 
-  return { getVote, setVote }
+  return { getVote, setVote };
 }

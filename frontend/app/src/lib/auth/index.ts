@@ -14,28 +14,39 @@ export type {
   RefreshRequest,
   RegisterRequest,
   User,
-} from './types'
+} from "./types";
 
 // API
-export { login, register, refreshToken, getCurrentUser, getUserOrgs, AuthApiError } from './api'
+export {
+  login,
+  register,
+  refreshToken,
+  getCurrentUser,
+  getUserOrgs,
+  AuthApiError,
+} from "./api";
 
 // Legacy API key auth (for backwards compatibility during migration)
-export { AuthProvider, RequireAuth, useAuth } from './context'
+export { AuthProvider, RequireAuth, useAuth } from "./context";
 
 // JWT auth
-export { JwtAuthProvider, RequireJwtAuth, useJwtAuth } from './jwt-context'
+export { JwtAuthProvider, RequireJwtAuth, useJwtAuth } from "./jwt-context";
 
 // Demo role toggle
-export { DemoRoleToggle } from './demo-role-toggle'
+export { DemoRoleToggle } from "./demo-role-toggle";
 
 // User impersonation (for multi-user demo testing)
-export { ImpersonationProvider, useImpersonation, DEMO_USERS } from './impersonation-context'
-export type { DemoUser } from './impersonation-context'
-export { ImpersonateUserToggle } from './impersonate-user-toggle'
+export {
+  ImpersonationProvider,
+  useImpersonation,
+  DEMO_USERS,
+} from "./impersonation-context";
+export type { DemoUser } from "./impersonation-context";
+export { ImpersonateUserToggle } from "./impersonate-user-toggle";
 
 // Role utilities
-export { useRole } from './use-role'
-export { RoleGuard, ExactRoleGuard } from './role-guard'
+export { useRole } from "./use-role";
+export { RoleGuard, ExactRoleGuard } from "./role-guard";
 
 // Org selector
-export { OrgSelector } from './org-selector'
+export { OrgSelector } from "./org-selector";

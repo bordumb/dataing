@@ -1,48 +1,56 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import customInstance from './client'
-import { queryKeys } from './query-keys'
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import customInstance from "./client";
+import { queryKeys } from "./query-keys";
 
-export type TargetType = 'hypothesis' | 'query' | 'evidence' | 'synthesis' | 'investigation' | 'recommendation'
+export type TargetType =
+  | "hypothesis"
+  | "query"
+  | "evidence"
+  | "synthesis"
+  | "investigation"
+  | "recommendation";
 
 export interface FeedbackCreate {
-  target_type: TargetType
-  target_id: string
-  investigation_id: string
-  rating: 1 | -1
-  reason?: string
-  comment?: string
+  target_type: TargetType;
+  target_id: string;
+  investigation_id: string;
+  rating: 1 | -1;
+  reason?: string;
+  comment?: string;
 }
 
 export interface FeedbackResponse {
-  id: string
-  created_at: string
+  id: string;
+  created_at: string;
 }
 
 export interface FeedbackItem {
-  id: string
-  target_type: string
-  target_id: string
-  rating: number
-  reason: string | null
-  comment: string | null
-  created_at: string
+  id: string;
+  target_type: string;
+  target_id: string;
+  rating: number;
+  reason: string | null;
+  comment: string | null;
+  created_at: string;
 }
 
 async function submitInvestigationFeedback(
-  data: FeedbackCreate
+  data: FeedbackCreate,
 ): Promise<FeedbackResponse> {
   return customInstance<FeedbackResponse>({
-    url: '/api/v1/investigation-feedback/',
-    method: 'POST',
+    url: "/api/v1/investigation-feedback/",
+    method: "POST",
     data,
-  })
+  });
 }
 
-async function getInvestigationFeedback(investigationId: string): Promise<FeedbackItem[]> {
+async function getInvestigationFeedback(
+  investigationId: string,
+): Promise<FeedbackItem[]> {
   return customInstance<FeedbackItem[]>({
     url: `/api/v1/investigation-feedback/investigations/${investigationId}`,
-    method: 'GET',
-  })
+    method: "GET",
+  });
 }
 
 export function useInvestigationFeedback(investigationId: string) {
@@ -50,18 +58,19 @@ export function useInvestigationFeedback(investigationId: string) {
     queryKey: queryKeys.investigationFeedback.investigation(investigationId),
     queryFn: () => getInvestigationFeedback(investigationId),
     enabled: !!investigationId,
-  })
+  });
 }
 
 export function useSubmitInvestigationFeedback(investigationId: string) {
-  const queryClient = useQueryClient()
+  const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: submitInvestigationFeedback,
     onSuccess: () => {
       queryClient.invalidateQueries({
-        queryKey: queryKeys.investigationFeedback.investigation(investigationId),
-      })
+        queryKey:
+          queryKeys.investigationFeedback.investigation(investigationId),
+      });
     },
-  })
+  });
 }

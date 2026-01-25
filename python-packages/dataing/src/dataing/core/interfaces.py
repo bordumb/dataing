@@ -14,6 +14,7 @@ from uuid import UUID
 
 if TYPE_CHECKING:
     from bond import StreamHandlers
+
     from dataing.adapters.datasource.base import BaseAdapter
     from dataing.adapters.datasource.types import QueryResult, SchemaFilter, SchemaResponse
 

@@ -3,42 +3,53 @@
  * Shows the relationship between main and user branches.
  */
 
-import { GitBranch, GitMerge, User } from 'lucide-react'
-import { Badge } from '@/components/ui/Badge'
-import type { BranchState } from '@/lib/api/investigations'
+import { GitBranch, GitMerge, User } from "lucide-react";
+import { Badge } from "@/components/ui/Badge";
+import type { BranchState } from "@/lib/api/investigations";
 
 interface BranchNodeProps {
-  branch: BranchState
-  label: string
-  isMain?: boolean
-  ownerName?: string
-  isSelected?: boolean
-  onClick?: () => void
+  branch: BranchState;
+  label: string;
+  isMain?: boolean;
+  ownerName?: string;
+  isSelected?: boolean;
+  onClick?: () => void;
 }
 
-function BranchNode({ branch, label, isMain, ownerName, isSelected, onClick }: BranchNodeProps) {
-  const statusColor = {
-    active: 'bg-blue-500',
-    completed: 'bg-green-500',
-    suspended: 'bg-yellow-500',
-    merged: 'bg-purple-500',
-    abandoned: 'bg-red-500',
-  }[branch.status] || 'bg-gray-500'
+function BranchNode({
+  branch,
+  label,
+  isMain,
+  ownerName,
+  isSelected,
+  onClick,
+}: BranchNodeProps) {
+  const statusColor =
+    {
+      active: "bg-blue-500",
+      completed: "bg-green-500",
+      suspended: "bg-yellow-500",
+      merged: "bg-purple-500",
+      abandoned: "bg-red-500",
+    }[branch.status] || "bg-gray-500";
 
   return (
     <button
       onClick={onClick}
       className={`
         flex items-center gap-2 px-3 py-2 rounded-lg border transition-all
-        ${isSelected
-          ? 'border-primary bg-primary/5 ring-2 ring-primary/20'
-          : 'border-border hover:border-primary/50 hover:bg-muted/50'
+        ${
+          isSelected
+            ? "border-primary bg-primary/5 ring-2 ring-primary/20"
+            : "border-border hover:border-primary/50 hover:bg-muted/50"
         }
-        ${onClick ? 'cursor-pointer' : 'cursor-default'}
+        ${onClick ? "cursor-pointer" : "cursor-default"}
       `}
     >
       <div className={`h-2 w-2 rounded-full ${statusColor}`} />
-      <GitBranch className={`h-4 w-4 ${isMain ? 'text-primary' : 'text-muted-foreground'}`} />
+      <GitBranch
+        className={`h-4 w-4 ${isMain ? "text-primary" : "text-muted-foreground"}`}
+      />
       <span className="text-sm font-medium">{label}</span>
       {ownerName && (
         <Badge variant="outline" className="gap-1 text-xs">
@@ -47,21 +58,24 @@ function BranchNode({ branch, label, isMain, ownerName, isSelected, onClick }: B
         </Badge>
       )}
       {branch.can_merge && (
-        <Badge variant="secondary" className="gap-1 text-xs bg-purple-100 text-purple-700">
+        <Badge
+          variant="secondary"
+          className="gap-1 text-xs bg-purple-100 text-purple-700"
+        >
           <GitMerge className="h-3 w-3" />
           Ready to merge
         </Badge>
       )}
     </button>
-  )
+  );
 }
 
 interface BranchTreeProps {
-  mainBranch: BranchState
-  userBranch: BranchState | null
-  currentUserName?: string
-  selectedBranchId?: string
-  onSelectBranch?: (branchId: string) => void
+  mainBranch: BranchState;
+  userBranch: BranchState | null;
+  currentUserName?: string;
+  selectedBranchId?: string;
+  onSelectBranch?: (branchId: string) => void;
 }
 
 export function BranchTree({
@@ -86,7 +100,11 @@ export function BranchTree({
             label="Main Branch"
             isMain
             isSelected={selectedBranchId === mainBranch.branch_id}
-            onClick={onSelectBranch ? () => onSelectBranch(mainBranch.branch_id) : undefined}
+            onClick={
+              onSelectBranch
+                ? () => onSelectBranch(mainBranch.branch_id)
+                : undefined
+            }
           />
 
           {/* Connection line to user branch */}
@@ -107,11 +125,15 @@ export function BranchTree({
               label="Your Branch"
               ownerName={currentUserName}
               isSelected={selectedBranchId === userBranch.branch_id}
-              onClick={onSelectBranch ? () => onSelectBranch(userBranch.branch_id) : undefined}
+              onClick={
+                onSelectBranch
+                  ? () => onSelectBranch(userBranch.branch_id)
+                  : undefined
+              }
             />
           </div>
         )}
       </div>
     </div>
-  )
+  );
 }

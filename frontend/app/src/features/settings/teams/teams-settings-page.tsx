@@ -1,5 +1,5 @@
-import { PageHeader } from '@/components/shared/page-header'
-import { TeamsSettings } from './teams-settings'
+import { PageHeader } from "@/components/shared/page-header";
+import { TeamsSettings } from "./teams-settings";
 
 export function TeamsSettingsPage() {
   return (
@@ -10,5 +10,5 @@ export function TeamsSettingsPage() {
       />
       <TeamsSettings />
     </div>
-  )
+  );
 }

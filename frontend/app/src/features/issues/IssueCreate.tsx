@@ -1,92 +1,106 @@
-import { useState, useEffect, useCallback } from 'react'
-import { useNavigate, Link } from 'react-router-dom'
-import { ArrowLeft, Loader2, X, Plus, AlertCircle } from 'lucide-react'
-import { useCreateIssue, useInvalidateIssues } from '@/lib/api/issues'
-import type { IssueCreate as IssueCreateType } from '@/lib/api/issues'
-import { useDataSources, SchemaTable } from '@/lib/api/datasources'
-import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card'
-import { Button } from '@/components/ui/Button'
-import { Input } from '@/components/ui/Input'
-import { Textarea } from '@/components/ui/textarea'
+import { useState, useEffect, useCallback } from "react";
+import { useNavigate, Link } from "react-router-dom";
+import { ArrowLeft, Loader2, X, Plus, AlertCircle } from "lucide-react";
+import { useCreateIssue, useInvalidateIssues } from "@/lib/api/issues";
+import type { IssueCreate as IssueCreateType } from "@/lib/api/issues";
+import { useDataSources, SchemaTable } from "@/lib/api/datasources";
+import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/Card";
+import { Button } from "@/components/ui/Button";
+import { Input } from "@/components/ui/Input";
+import { Textarea } from "@/components/ui/textarea";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from '@/components/ui/select'
-import { Badge } from '@/components/ui/Badge'
+} from "@/components/ui/select";
+import { Badge } from "@/components/ui/Badge";
 import {
   DatePicker,
   DatePickerValue,
   stringToDatePickerValue,
-} from '@/components/ui/DatePicker'
-import { DatasetEntry, SchemaViewer } from '@/features/investigation/components'
+} from "@/components/ui/DatePicker";
+import {
+  DatasetEntry,
+  SchemaViewer,
+} from "@/features/investigation/components";
 
 interface Dataset {
-  id: string
-  datasourceId: string
-  identifier: string
+  id: string;
+  datasourceId: string;
+  identifier: string;
 }
 
 interface FormData {
-  title: string
-  description: string
-  priority: string
-  severity: string
-  column_name: string
-  labels: string[]
+  title: string;
+  description: string;
+  priority: string;
+  severity: string;
+  column_name: string;
+  labels: string[];
 }
 
 export function IssueCreate() {
-  const navigate = useNavigate()
-  const createIssue = useCreateIssue()
-  const invalidate = useInvalidateIssues()
-  const [labelInput, setLabelInput] = useState('')
-  const [selectedTable, setSelectedTable] = useState<SchemaTable | null>(null)
+  const navigate = useNavigate();
+  const createIssue = useCreateIssue();
+  const invalidate = useInvalidateIssues();
+  const [labelInput, setLabelInput] = useState("");
+  const [selectedTable, setSelectedTable] = useState<SchemaTable | null>(null);
 
   const [datasets, setDatasets] = useState<Dataset[]>([
-    { id: crypto.randomUUID(), datasourceId: '', identifier: '' },
-  ])
+    { id: crypto.randomUUID(), datasourceId: "", identifier: "" },
+  ]);
 
   const [issueDate, setIssueDate] = useState<DatePickerValue>(() =>
-    stringToDatePickerValue(new Date().toISOString().split('T')[0])
-  )
+    stringToDatePickerValue(new Date().toISOString().split("T")[0]),
+  );
 
   const [formData, setFormData] = useState<FormData>({
-    title: '',
-    description: '',
-    priority: '',
-    severity: '',
-    column_name: '',
+    title: "",
+    description: "",
+    priority: "",
+    severity: "",
+    column_name: "",
     labels: [],
-  })
+  });
 
-  const { data: dataSources, isLoading: isLoadingDataSources, error: dataSourcesError } = useDataSources()
+  const {
+    data: dataSources,
+    isLoading: isLoadingDataSources,
+    error: dataSourcesError,
+  } = useDataSources();
 
   // Auto-select first datasource
   useEffect(() => {
     if (dataSources && dataSources.length > 0 && !datasets[0].datasourceId) {
       setDatasets((prev) =>
-        prev.map((ds, i) => (i === 0 ? { ...ds, datasourceId: dataSources[0].id } : ds))
-      )
+        prev.map((ds, i) =>
+          i === 0 ? { ...ds, datasourceId: dataSources[0].id } : ds,
+        ),
+      );
     }
-  }, [dataSources, datasets])
+  }, [dataSources, datasets]);
 
   const updateDataset = useCallback(
-    (id: string, updates: Partial<{ datasourceId: string; identifier: string }>) => {
-      setDatasets((prev) => prev.map((ds) => (ds.id === id ? { ...ds, ...updates } : ds)))
-      if (updates.identifier === '' || updates.datasourceId) {
-        setSelectedTable(null)
+    (
+      id: string,
+      updates: Partial<{ datasourceId: string; identifier: string }>,
+    ) => {
+      setDatasets((prev) =>
+        prev.map((ds) => (ds.id === id ? { ...ds, ...updates } : ds)),
+      );
+      if (updates.identifier === "" || updates.datasourceId) {
+        setSelectedTable(null);
       }
     },
-    []
-  )
+    [],
+  );
 
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    const primaryDataset = datasets[0]
-    if (!formData.title.trim() || !primaryDataset.identifier.trim()) return
+    e.preventDefault();
+    const primaryDataset = datasets[0];
+    if (!formData.title.trim() || !primaryDataset.identifier.trim()) return;
 
     try {
       const payload: IssueCreateType = {
@@ -96,57 +110,60 @@ export function IssueCreate() {
         severity: formData.severity || undefined,
         dataset_id: primaryDataset.identifier,
         labels: formData.labels.length > 0 ? formData.labels : undefined,
-      }
+      };
 
-      const result = await createIssue.mutateAsync({ data: payload })
-      invalidate.invalidateList()
-      navigate(`/issues/${result.id}`)
+      const result = await createIssue.mutateAsync({ data: payload });
+      invalidate.invalidateList();
+      navigate(`/issues/${result.id}`);
     } catch (error) {
-      console.error('Failed to create issue:', error)
+      console.error("Failed to create issue:", error);
     }
-  }
+  };
 
   const handleChange = (
-    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
+    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>,
   ) => {
-    setFormData((prev) => ({ ...prev, [e.target.name]: e.target.value }))
-  }
+    setFormData((prev) => ({ ...prev, [e.target.name]: e.target.value }));
+  };
 
   const handleSelectChange = (name: string, value: string) => {
-    setFormData((prev) => ({ ...prev, [name]: value === 'none' ? '' : value }))
-  }
+    setFormData((prev) => ({ ...prev, [name]: value === "none" ? "" : value }));
+  };
 
   const handleAddLabel = () => {
-    const label = labelInput.trim().toLowerCase()
+    const label = labelInput.trim().toLowerCase();
     if (label && !formData.labels.includes(label)) {
-      setFormData((prev) => ({ ...prev, labels: [...prev.labels, label] }))
-      setLabelInput('')
+      setFormData((prev) => ({ ...prev, labels: [...prev.labels, label] }));
+      setLabelInput("");
     }
-  }
+  };
 
   const handleRemoveLabel = (label: string) => {
     setFormData((prev) => ({
       ...prev,
       labels: prev.labels.filter((l) => l !== label),
-    }))
-  }
+    }));
+  };
 
   const handleLabelKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter') {
-      e.preventDefault()
-      handleAddLabel()
+    if (e.key === "Enter") {
+      e.preventDefault();
+      handleAddLabel();
     }
-  }
+  };
 
-  const primaryDataset = datasets[0]
-  const isSubmitDisabled = createIssue.isPending || !formData.title.trim() || !primaryDataset.identifier.trim()
+  const primaryDataset = datasets[0];
+  const isSubmitDisabled =
+    createIssue.isPending ||
+    !formData.title.trim() ||
+    !primaryDataset.identifier.trim();
 
   if (isLoadingDataSources) {
     return (
       <div className="flex h-64 items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
       </div>
-    )
+    );
   }
 
   return (
@@ -165,9 +182,12 @@ export function IssueCreate() {
         <div className="flex items-center gap-3 rounded-lg border border-destructive/50 bg-destructive/10 p-4">
           <AlertCircle className="h-5 w-5 text-destructive" />
           <div>
-            <p className="font-medium text-destructive">Failed to load data sources</p>
+            <p className="font-medium text-destructive">
+              Failed to load data sources
+            </p>
             <p className="text-sm text-muted-foreground">
-              {dataSourcesError.message}. Please check your settings and try again.
+              {dataSourcesError.message}. Please check your settings and try
+              again.
             </p>
           </div>
           <Link to="/settings" className="ml-auto">
@@ -209,10 +229,18 @@ export function IssueCreate() {
                   </label>
                   <DatasetEntry
                     datasourceId={primaryDataset.datasourceId}
-                    datasourceType={dataSources?.find((d) => d.id === primaryDataset.datasourceId)?.type || 'postgresql'}
+                    datasourceType={
+                      dataSources?.find(
+                        (d) => d.id === primaryDataset.datasourceId,
+                      )?.type || "postgresql"
+                    }
                     identifier={primaryDataset.identifier}
-                    onDatasourceChange={(id) => updateDataset(primaryDataset.id, { datasourceId: id })}
-                    onIdentifierChange={(val) => updateDataset(primaryDataset.id, { identifier: val })}
+                    onDatasourceChange={(id) =>
+                      updateDataset(primaryDataset.id, { datasourceId: id })
+                    }
+                    onIdentifierChange={(val) =>
+                      updateDataset(primaryDataset.id, { identifier: val })
+                    }
                     onRemove={() => {}}
                     canRemove={false}
                     disabled={createIssue.isPending}
@@ -220,7 +248,8 @@ export function IssueCreate() {
                     onTableSelect={setSelectedTable}
                   />
                   <p className="text-xs text-muted-foreground">
-                    Select the dataset affected by this issue. Required for spawning investigations.
+                    Select the dataset affected by this issue. Required for
+                    spawning investigations.
                   </p>
                 </div>
 
@@ -229,10 +258,7 @@ export function IssueCreate() {
                     <label className="mb-1.5 block text-sm font-medium">
                       Issue Date
                     </label>
-                    <DatePicker
-                      value={issueDate}
-                      onChange={setIssueDate}
-                    />
+                    <DatePicker value={issueDate} onChange={setIssueDate} />
                     <p className="mt-1 text-xs text-muted-foreground">
                       When was the issue first observed?
                     </p>
@@ -276,8 +302,8 @@ export function IssueCreate() {
                       Priority
                     </label>
                     <Select
-                      value={formData.priority || 'none'}
-                      onValueChange={(v) => handleSelectChange('priority', v)}
+                      value={formData.priority || "none"}
+                      onValueChange={(v) => handleSelectChange("priority", v)}
                       disabled={createIssue.isPending}
                     >
                       <SelectTrigger>
@@ -299,8 +325,8 @@ export function IssueCreate() {
                       Severity
                     </label>
                     <Select
-                      value={formData.severity || 'none'}
-                      onValueChange={(v) => handleSelectChange('severity', v)}
+                      value={formData.severity || "none"}
+                      onValueChange={(v) => handleSelectChange("severity", v)}
                       disabled={createIssue.isPending}
                     >
                       <SelectTrigger>
@@ -343,7 +369,11 @@ export function IssueCreate() {
                   {formData.labels.length > 0 && (
                     <div className="flex flex-wrap gap-2 mt-2">
                       {formData.labels.map((label) => (
-                        <Badge key={label} variant="secondary" className="gap-1">
+                        <Badge
+                          key={label}
+                          variant="secondary"
+                          className="gap-1"
+                        >
                           {label}
                           <button
                             type="button"
@@ -367,7 +397,10 @@ export function IssueCreate() {
 
                 <div className="flex justify-end gap-3 border-t border-border pt-4">
                   <Link to="/issues">
-                    <Button variant="secondary" disabled={createIssue.isPending}>
+                    <Button
+                      variant="secondary"
+                      disabled={createIssue.isPending}
+                    >
                       Cancel
                     </Button>
                   </Link>
@@ -378,7 +411,7 @@ export function IssueCreate() {
                         Creating...
                       </>
                     ) : (
-                      'Create Issue'
+                      "Create Issue"
                     )}
                   </Button>
                 </div>
@@ -398,16 +431,16 @@ export function IssueCreate() {
               </CardHeader>
               <CardContent className="text-sm text-muted-foreground space-y-3">
                 <p>
-                  <strong>Title:</strong> Be specific and concise. Good: "NULL values
-                  in user_id column since Jan 15"
+                  <strong>Title:</strong> Be specific and concise. Good: "NULL
+                  values in user_id column since Jan 15"
                 </p>
                 <p>
-                  <strong>Dataset:</strong> Select the table or dataset where the
-                  issue was observed.
+                  <strong>Dataset:</strong> Select the table or dataset where
+                  the issue was observed.
                 </p>
                 <p>
-                  <strong>Priority:</strong> P0/P1 for production-impacting issues,
-                  P2/P3 for non-urgent improvements.
+                  <strong>Priority:</strong> P0/P1 for production-impacting
+                  issues, P2/P3 for non-urgent improvements.
                 </p>
               </CardContent>
             </Card>
@@ -415,5 +448,5 @@ export function IssueCreate() {
         </div>
       </div>
     </div>
-  )
+  );
 }

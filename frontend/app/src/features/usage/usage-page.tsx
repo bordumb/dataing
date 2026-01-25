@@ -1,27 +1,33 @@
-import { Search, Zap, DollarSign, Database } from 'lucide-react'
+import { Search, Zap, DollarSign, Database } from "lucide-react";
 
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card'
-import { Skeleton } from '@/components/ui/skeleton'
-import { PageHeader } from '@/components/shared/page-header'
-import { useUsageMetrics } from '@/lib/api/usage'
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/Card";
+import { Skeleton } from "@/components/ui/skeleton";
+import { PageHeader } from "@/components/shared/page-header";
+import { useUsageMetrics } from "@/lib/api/usage";
 
 export function UsagePage() {
-  const { data: metrics, isLoading, isError } = useUsageMetrics()
+  const { data: metrics, isLoading, isError } = useUsageMetrics();
 
   // Format currency
   const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
+    return new Intl.NumberFormat("en-US", {
+      style: "currency",
+      currency: "USD",
       minimumFractionDigits: 2,
       maximumFractionDigits: 4,
-    }).format(value)
-  }
+    }).format(value);
+  };
 
   // Format large numbers
   const formatNumber = (value: number) => {
-    return new Intl.NumberFormat('en-US').format(value)
-  }
+    return new Intl.NumberFormat("en-US").format(value);
+  };
 
   return (
     <div className="space-y-6">
@@ -57,9 +63,7 @@ export function UsagePage() {
                 <div className="text-2xl font-bold">
                   {formatNumber(metrics?.investigations ?? 0)}
                 </div>
-                <p className="text-xs text-muted-foreground mt-1">
-                  This month
-                </p>
+                <p className="text-xs text-muted-foreground mt-1">This month</p>
               </>
             )}
           </CardContent>
@@ -80,9 +84,7 @@ export function UsagePage() {
                 <div className="text-2xl font-bold">
                   {formatNumber(metrics?.query_executions ?? 0)}
                 </div>
-                <p className="text-xs text-muted-foreground mt-1">
-                  This month
-                </p>
+                <p className="text-xs text-muted-foreground mt-1">This month</p>
               </>
             )}
           </CardContent>
@@ -90,9 +92,7 @@ export function UsagePage() {
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">
-              LLM Tokens
-            </CardTitle>
+            <CardTitle className="text-sm font-medium">LLM Tokens</CardTitle>
             <Zap className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
@@ -113,9 +113,7 @@ export function UsagePage() {
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">
-              Total Cost
-            </CardTitle>
+            <CardTitle className="text-sm font-medium">Total Cost</CardTitle>
             <DollarSign className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
@@ -126,9 +124,7 @@ export function UsagePage() {
                 <div className="text-2xl font-bold">
                   {formatCurrency(metrics?.total_cost ?? 0)}
                 </div>
-                <p className="text-xs text-muted-foreground mt-1">
-                  This month
-                </p>
+                <p className="text-xs text-muted-foreground mt-1">This month</p>
               </>
             )}
           </CardContent>
@@ -138,9 +134,7 @@ export function UsagePage() {
       <Card>
         <CardHeader>
           <CardTitle>Current Plan</CardTitle>
-          <CardDescription>
-            You are on the Professional plan.
-          </CardDescription>
+          <CardDescription>You are on the Professional plan.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid gap-4 md:grid-cols-2">
@@ -156,13 +150,13 @@ export function UsagePage() {
             <div>
               <h4 className="font-medium">Usage Notes</h4>
               <p className="mt-2 text-sm text-muted-foreground">
-                Usage metrics refresh automatically every 5 seconds.
-                Costs are calculated based on LLM token usage and query executions.
+                Usage metrics refresh automatically every 5 seconds. Costs are
+                calculated based on LLM token usage and query executions.
               </p>
             </div>
           </div>
         </CardContent>
       </Card>
     </div>
-  )
+  );
 }

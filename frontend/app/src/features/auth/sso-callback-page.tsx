@@ -1,82 +1,90 @@
-import * as React from 'react'
-import { useNavigate, useSearchParams } from 'react-router-dom'
-import { Search, Loader2, AlertCircle } from 'lucide-react'
+import * as React from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
+import { Search, Loader2, AlertCircle } from "lucide-react";
 
-import { Button } from '@/components/ui/Button'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card'
-import { useJwtAuth } from '@/lib/auth/jwt-context'
+import { Button } from "@/components/ui/Button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/Card";
+import { useJwtAuth } from "@/lib/auth/jwt-context";
 
-type CallbackStatus = 'processing' | 'success' | 'error'
+type CallbackStatus = "processing" | "success" | "error";
 
 export function SSOCallbackPage() {
-  const [status, setStatus] = React.useState<CallbackStatus>('processing')
-  const [error, setError] = React.useState<string | null>(null)
+  const [status, setStatus] = React.useState<CallbackStatus>("processing");
+  const [error, setError] = React.useState<string | null>(null);
 
-  const { login } = useJwtAuth()
-  const navigate = useNavigate()
-  const [searchParams] = useSearchParams()
+  const { login } = useJwtAuth();
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
 
   React.useEffect(() => {
     const handleCallback = async () => {
-      const code = searchParams.get('code')
-      const state = searchParams.get('state')
-      const errorParam = searchParams.get('error')
-      const errorDescription = searchParams.get('error_description')
+      const code = searchParams.get("code");
+      const state = searchParams.get("state");
+      const errorParam = searchParams.get("error");
+      const errorDescription = searchParams.get("error_description");
 
       // Handle error from IdP
       if (errorParam) {
-        setStatus('error')
-        setError(errorDescription || `Authentication failed: ${errorParam}`)
-        return
+        setStatus("error");
+        setError(errorDescription || `Authentication failed: ${errorParam}`);
+        return;
       }
 
       // Missing required params
       if (!code || !state) {
-        setStatus('error')
-        setError('Invalid callback: missing authorization code or state')
-        return
+        setStatus("error");
+        setError("Invalid callback: missing authorization code or state");
+        return;
       }
 
       try {
         // Exchange code for tokens via backend
-        const response = await fetch('/api/v1/auth/sso/callback', {
-          method: 'POST',
+        const response = await fetch("/api/v1/auth/sso/callback", {
+          method: "POST",
           headers: {
-            'Content-Type': 'application/json',
+            "Content-Type": "application/json",
           },
           body: JSON.stringify({ code, state }),
-        })
+        });
 
         if (!response.ok) {
-          const errorData = await response.json()
-          throw new Error(errorData.detail || 'Failed to complete authentication')
+          const errorData = await response.json();
+          throw new Error(
+            errorData.detail || "Failed to complete authentication",
+          );
         }
 
-        const data = await response.json()
+        const data = await response.json();
 
         if (data.access_token) {
-          setStatus('success')
-          await login(data.access_token)
+          setStatus("success");
+          await login(data.access_token);
 
           // Redirect to dashboard after short delay
           setTimeout(() => {
-            navigate('/', { replace: true })
-          }, 1000)
+            navigate("/", { replace: true });
+          }, 1000);
         } else {
-          throw new Error('No access token received')
+          throw new Error("No access token received");
         }
       } catch (err) {
-        setStatus('error')
-        setError(err instanceof Error ? err.message : 'Authentication failed')
+        setStatus("error");
+        setError(err instanceof Error ? err.message : "Authentication failed");
       }
-    }
+    };
 
-    handleCallback()
-  }, [searchParams, login, navigate])
+    handleCallback();
+  }, [searchParams, login, navigate]);
 
   const handleRetry = () => {
-    navigate('/login', { replace: true })
-  }
+    navigate("/login", { replace: true });
+  };
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-background p-4">
@@ -88,24 +96,25 @@ export function SSOCallbackPage() {
             </div>
           </div>
           <CardTitle className="text-2xl font-bold">
-            {status === 'processing' && 'Signing you in...'}
-            {status === 'success' && 'Success!'}
-            {status === 'error' && 'Authentication Failed'}
+            {status === "processing" && "Signing you in..."}
+            {status === "success" && "Success!"}
+            {status === "error" && "Authentication Failed"}
           </CardTitle>
           <CardDescription>
-            {status === 'processing' && 'Please wait while we complete your sign in.'}
-            {status === 'success' && 'Redirecting to dashboard...'}
-            {status === 'error' && 'There was a problem signing you in.'}
+            {status === "processing" &&
+              "Please wait while we complete your sign in."}
+            {status === "success" && "Redirecting to dashboard..."}
+            {status === "error" && "There was a problem signing you in."}
           </CardDescription>
         </CardHeader>
         <CardContent>
-          {status === 'processing' && (
+          {status === "processing" && (
             <div className="flex justify-center py-8">
               <Loader2 className="h-8 w-8 animate-spin text-primary" />
             </div>
           )}
 
-          {status === 'success' && (
+          {status === "success" && (
             <div className="flex justify-center py-8">
               <div className="flex h-16 w-16 items-center justify-center rounded-full bg-green-100 text-green-600">
                 <svg
@@ -125,7 +134,7 @@ export function SSOCallbackPage() {
             </div>
           )}
 
-          {status === 'error' && (
+          {status === "error" && (
             <div className="space-y-4">
               <div className="flex justify-center">
                 <div className="flex h-16 w-16 items-center justify-center rounded-full bg-destructive/10 text-destructive">
@@ -139,10 +148,7 @@ export function SSOCallbackPage() {
                 </p>
               )}
 
-              <Button
-                onClick={handleRetry}
-                className="w-full"
-              >
+              <Button onClick={handleRetry} className="w-full">
                 Try again
               </Button>
             </div>
@@ -150,5 +156,5 @@ export function SSOCallbackPage() {
         </CardContent>
       </Card>
     </div>
-  )
+  );
 }

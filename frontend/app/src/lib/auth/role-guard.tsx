@@ -4,20 +4,20 @@
  * Show/hide UI elements based on user role.
  */
 
-import { type ReactNode, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { useRole } from './use-role'
-import type { OrgRole } from './types'
+import { type ReactNode, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
+import { useRole } from "./use-role";
+import type { OrgRole } from "./types";
 
 interface RoleGuardProps {
   /** Minimum role required to view children */
-  minRole: OrgRole
+  minRole: OrgRole;
   /** Content to show if user has required role */
-  children: ReactNode
+  children: ReactNode;
   /** Optional content to show if user lacks required role (for component-level use) */
-  fallback?: ReactNode
+  fallback?: ReactNode;
   /** Redirect path if user lacks required role (for page-level use) */
-  redirectTo?: string
+  redirectTo?: string;
 }
 
 /**
@@ -38,35 +38,40 @@ interface RoleGuardProps {
  *   <AdminOnlyButton />
  * </RoleGuard>
  */
-export function RoleGuard({ minRole, children, fallback = null, redirectTo }: RoleGuardProps) {
-  const { hasRole } = useRole()
-  const navigate = useNavigate()
-  const hasAccess = hasRole(minRole)
+export function RoleGuard({
+  minRole,
+  children,
+  fallback = null,
+  redirectTo,
+}: RoleGuardProps) {
+  const { hasRole } = useRole();
+  const navigate = useNavigate();
+  const hasAccess = hasRole(minRole);
 
   useEffect(() => {
     if (!hasAccess && redirectTo) {
-      navigate(redirectTo, { replace: true })
+      navigate(redirectTo, { replace: true });
     }
-  }, [hasAccess, redirectTo, navigate])
+  }, [hasAccess, redirectTo, navigate]);
 
   if (!hasAccess) {
     // If redirecting, render nothing while redirect happens
     if (redirectTo) {
-      return null
+      return null;
     }
-    return <>{fallback}</>
+    return <>{fallback}</>;
   }
 
-  return <>{children}</>
+  return <>{children}</>;
 }
 
 interface ExactRoleGuardProps {
   /** Exact role required (not higher) */
-  role: OrgRole
+  role: OrgRole;
   /** Content to show if user has exact role */
-  children: ReactNode
+  children: ReactNode;
   /** Optional content to show if user lacks exact role */
-  fallback?: ReactNode
+  fallback?: ReactNode;
 }
 
 /**
@@ -77,12 +82,16 @@ interface ExactRoleGuardProps {
  *   <ViewerOnlyMessage />
  * </ExactRoleGuard>
  */
-export function ExactRoleGuard({ role, children, fallback = null }: ExactRoleGuardProps) {
-  const { role: userRole } = useRole()
+export function ExactRoleGuard({
+  role,
+  children,
+  fallback = null,
+}: ExactRoleGuardProps) {
+  const { role: userRole } = useRole();
 
   if (userRole !== role) {
-    return <>{fallback}</>
+    return <>{fallback}</>;
   }
 
-  return <>{children}</>
+  return <>{children}</>;
 }

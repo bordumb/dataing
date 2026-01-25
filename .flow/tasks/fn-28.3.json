@@ -1,16 +1,25 @@
 {
-  "assignee": null,
+  "assignee": "bordumbb@gmail.com",
   "claim_note": "",
-  "claimed_at": null,
+  "claimed_at": "2026-01-25T20:57:53.572309Z",
   "created_at": "2026-01-25T20:44:53.787258Z",
   "depends_on": [
     "fn-28.1"
   ],
   "epic": "fn-28",
+  "evidence": {
+    "commits": [
+      "5ffe1dc83287c9441a7070ce78f3579585efbf2c"
+    ],
+    "prs": [],
+    "tests": [
+      "uv run pytest python-packages/dataing-cli/tests/test_config.py -v (21 passed)"
+    ]
+  },
   "id": "fn-28.3",
   "priority": null,
   "spec_path": ".flow/tasks/fn-28.3.md",
-  "status": "todo",
+  "status": "done",
   "title": "Config management: XDG paths, keyring, TOML parsing",
-  "updated_at": "2026-01-25T20:45:48.073698Z"
+  "updated_at": "2026-01-25T20:59:47.089725Z"
 }

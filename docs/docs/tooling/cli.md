@@ -198,7 +198,7 @@ created_at timestamp
 Start a new investigation.
 
 ```bash
-dataing run start analytics.orders --goal "investigate null spike in customer_id"
+dataing run start main.orders --goal "investigate null spike in customer_id"
 ```
 
 By default, the CLI streams progress in real-time:

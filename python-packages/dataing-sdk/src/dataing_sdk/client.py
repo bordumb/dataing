@@ -1041,12 +1041,14 @@ class DataingClient:
                     except json.JSONDecodeError:
                         pass
 
+                    # Check for terminal events before resetting
+                    is_terminal = event_type in ("run_completed", "run_failed")
+
                     # Reset for next event
                     event_type = None
                     event_data = ""
 
-                    # Check for terminal events
-                    if event_type in ("run_completed", "run_failed"):
+                    if is_terminal:
                         break
 
     # --- Health check ---

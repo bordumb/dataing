@@ -558,6 +558,122 @@ class TestIssueData:
         assert data.labels == ["bug"]
 
 
+class TestToAnomalyAlert:
+    """Test to_anomaly_alert conversion method."""
+
+    def test_monte_carlo_to_anomaly_alert(self) -> None:
+        """Test Monte Carlo adapter creates valid AnomalyAlert."""
+        adapter = MonteCarloAdapter()
+        issue_data = IssueData(
+            title="Freshness issue on orders table",
+            description="Data is stale",
+            severity="high",
+            dataset_id="db.schema.orders",
+            external_url="https://getmontecarlo.com/incident/123",
+            metadata={
+                "mc_incident_id": "inc-123",
+                "mc_type": "freshness",
+                "mc_tables": ["db.schema.orders", "db.schema.order_items"],
+            },
+        )
+
+        alert = adapter.to_anomaly_alert(issue_data, fingerprint="mc_incident_inc-123")
+
+        assert alert.source_system == "monte_carlo"
+        assert alert.source_alert_id == "mc_incident_inc-123"
+        assert alert.severity == "high"
+        assert alert.anomaly_type == "freshness"
+        assert "db.schema.orders" in alert.dataset_ids
+        assert alert.source_url == "https://getmontecarlo.com/incident/123"
+        assert alert.metric_spec.metric_type == "description"
+        assert "freshness" in alert.metric_spec.expression.lower()
+
+    def test_great_expectations_to_anomaly_alert(self) -> None:
+        """Test Great Expectations adapter creates valid AnomalyAlert."""
+        adapter = GreatExpectationsAdapter()
+        issue_data = IssueData(
+            title="Data Quality Check Failed - orders_suite",
+            description="3 expectations failed",
+            severity="critical",
+            dataset_id="orders",
+            external_url="https://ge-docs.example.com/results/123",
+            metadata={
+                "ge_suite": "orders_suite",
+                "ge_checkpoint": "daily_check",
+                "ge_run_id": "run-456",
+                "ge_statistics": {
+                    "evaluated_expectations": 10,
+                    "unsuccessful_expectations": 3,
+                    "success_percent": 70.0,
+                },
+            },
+        )
+
+        alert = adapter.to_anomaly_alert(issue_data, fingerprint="ge_run-456_orders_suite")
+
+        assert alert.source_system == "great_expectations"
+        assert alert.source_alert_id == "ge_run-456_orders_suite"
+        assert alert.severity == "critical"
+        assert "orders" in alert.dataset_ids
+        assert alert.source_url == "https://ge-docs.example.com/results/123"
+        assert "orders_suite" in alert.metric_spec.expression
+        assert "(3/10 failed)" in alert.metric_spec.display_name
+
+    def test_to_anomaly_alert_with_values(self) -> None:
+        """Test to_anomaly_alert uses expected/actual values from metadata."""
+        adapter = MonteCarloAdapter()
+        issue_data = IssueData(
+            title="Volume anomaly",
+            severity="medium",
+            metadata={
+                "expected_value": 1000.0,
+                "actual_value": 500.0,
+                "deviation_pct": 50.0,
+            },
+        )
+
+        alert = adapter.to_anomaly_alert(issue_data, fingerprint="test-123")
+
+        assert alert.expected_value == 1000.0
+        assert alert.actual_value == 500.0
+        assert alert.deviation_pct == 50.0
+
+    def test_to_anomaly_alert_calculates_deviation(self) -> None:
+        """Test deviation is calculated if not provided."""
+        adapter = MonteCarloAdapter()
+        issue_data = IssueData(
+            title="Row count anomaly",
+            severity="low",
+            metadata={
+                "expected_value": 100.0,
+                "actual_value": 80.0,
+            },
+        )
+
+        alert = adapter.to_anomaly_alert(issue_data, fingerprint="test-456")
+
+        assert alert.deviation_pct == 20.0  # (100-80)/100 * 100
+
+    def test_anomaly_type_mapping_monte_carlo(self) -> None:
+        """Test Monte Carlo type mapping."""
+        adapter = MonteCarloAdapter()
+
+        test_cases = [
+            ("volume", "row_count"),
+            ("field_health", "null_rate"),
+            ("freshness", "freshness"),
+            ("dimension_tracking", "distribution"),
+        ]
+
+        for mc_type, expected_type in test_cases:
+            issue_data = IssueData(
+                title=f"{mc_type} issue",
+                metadata={"mc_type": mc_type},
+            )
+            alert = adapter.to_anomaly_alert(issue_data, fingerprint=f"test-{mc_type}")
+            assert alert.anomaly_type == expected_type, f"Failed for {mc_type}"
+
+
 class TestWebhookRequest:
     """Test WebhookRequest dataclass."""
 

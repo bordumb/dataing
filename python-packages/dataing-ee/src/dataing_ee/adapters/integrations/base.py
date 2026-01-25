@@ -6,7 +6,10 @@ import hashlib
 import hmac
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
+from datetime import date
 from typing import Any
+
+from dataing.core.domain_types import AnomalyAlert, MetricSpec
 
 
 @dataclass
@@ -246,3 +249,112 @@ class IntegrationAdapter(ABC):
 
         payload_str = json.dumps(payload, sort_keys=True)
         return hashlib.sha256(payload_str.encode()).hexdigest()[:16]
+
+    def to_anomaly_alert(
+        self,
+        issue_data: IssueData,
+        fingerprint: str,
+    ) -> AnomalyAlert:
+        """Convert IssueData to AnomalyAlert for investigation.
+
+        Args:
+            issue_data: Parsed issue data from the webhook
+            fingerprint: Unique identifier for this event (used as source_alert_id)
+
+        Returns:
+            AnomalyAlert ready for investigation
+        """
+        # Extract dataset_ids
+        dataset_ids = []
+        if issue_data.dataset_id:
+            dataset_ids.append(issue_data.dataset_id)
+        # Also check metadata for additional tables
+        if issue_data.metadata.get("tables"):
+            tables = issue_data.metadata["tables"]
+            if isinstance(tables, list):
+                dataset_ids.extend([t for t in tables if t not in dataset_ids])
+        if not dataset_ids:
+            dataset_ids = ["unknown"]
+
+        # Map anomaly type - subclasses should override for provider-specific mapping
+        anomaly_type = self._map_anomaly_type(issue_data)
+
+        # Build metric_spec from available info
+        metric_spec = self._build_metric_spec(issue_data, anomaly_type)
+
+        # Extract values from metadata if available
+        expected_value = float(issue_data.metadata.get("expected_value", 0.0))
+        actual_value = float(issue_data.metadata.get("actual_value", 0.0))
+        deviation_pct = float(issue_data.metadata.get("deviation_pct", 0.0))
+
+        # Calculate deviation if we have expected/actual but not deviation
+        if expected_value != 0 and actual_value != 0 and deviation_pct == 0:
+            deviation_pct = abs((actual_value - expected_value) / expected_value) * 100
+
+        return AnomalyAlert(
+            dataset_ids=dataset_ids,
+            metric_spec=metric_spec,
+            anomaly_type=anomaly_type,
+            expected_value=expected_value,
+            actual_value=actual_value,
+            deviation_pct=deviation_pct,
+            anomaly_date=date.today().isoformat(),
+            severity=issue_data.severity or "medium",
+            source_system=self.provider,
+            source_alert_id=fingerprint,
+            source_url=issue_data.external_url,
+            metadata={
+                k: v
+                for k, v in issue_data.metadata.items()
+                if isinstance(v, str | int | float | bool)
+            },
+        )
+
+    def _map_anomaly_type(self, issue_data: IssueData) -> str:
+        """Map provider-specific type to standard anomaly type.
+
+        Subclasses should override for provider-specific mapping.
+        """
+        # Check metadata for type hints
+        if issue_data.metadata.get("anomaly_type"):
+            return str(issue_data.metadata["anomaly_type"])
+
+        # Default based on common patterns in title/description
+        title = (issue_data.title or "").lower()
+        if "null" in title or "missing" in title:
+            return "null_rate"
+        if "volume" in title or "row" in title or "count" in title:
+            return "row_count"
+        if "fresh" in title or "stale" in title or "delay" in title:
+            return "freshness"
+        if "schema" in title or "column" in title:
+            return "schema_drift"
+        if "duplicate" in title or "unique" in title:
+            return "duplicate_rate"
+        return "custom"
+
+    def _build_metric_spec(
+        self,
+        issue_data: IssueData,
+        anomaly_type: str,
+    ) -> MetricSpec:
+        """Build MetricSpec from issue data.
+
+        Subclasses can override for provider-specific metric extraction.
+        """
+        # Try to get column from metadata
+        column = issue_data.metadata.get("column")
+        if column and isinstance(column, str):
+            return MetricSpec.from_column(
+                column_name=column,
+                display_name=issue_data.title or column,
+            )
+
+        # Default to description-based metric
+        return MetricSpec(
+            metric_type="description",
+            expression=issue_data.title or "Unknown metric",
+            display_name=issue_data.title or "Unknown",
+            columns_referenced=[],
+            source_url=issue_data.external_url,
+        )

@@ -1,0 +1,19 @@
+{
+  "assignee": null,
+  "claim_note": "",
+  "claimed_at": null,
+  "created_at": "2026-01-25T20:44:54.335776Z",
+  "depends_on": [
+    "fn-28.2",
+    "fn-28.3",
+    "fn-28.4",
+    "fn-28.8"
+  ],
+  "epic": "fn-28",
+  "id": "fn-28.6",
+  "priority": null,
+  "spec_path": ".flow/tasks/fn-28.6.md",
+  "status": "todo",
+  "title": "Implement ds commands: list, test, attach, schema",
+  "updated_at": "2026-01-25T20:46:36.281735Z"
+}

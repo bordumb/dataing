@@ -1,0 +1,16 @@
+{
+  "assignee": null,
+  "claim_note": "",
+  "claimed_at": null,
+  "created_at": "2026-01-25T20:44:53.787258Z",
+  "depends_on": [
+    "fn-28.1"
+  ],
+  "epic": "fn-28",
+  "id": "fn-28.3",
+  "priority": null,
+  "spec_path": ".flow/tasks/fn-28.3.md",
+  "status": "todo",
+  "title": "Config management: XDG paths, keyring, TOML parsing",
+  "updated_at": "2026-01-25T20:45:48.073698Z"
+}

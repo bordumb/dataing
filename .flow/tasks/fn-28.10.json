@@ -1,0 +1,19 @@
+{
+  "assignee": null,
+  "claim_note": "",
+  "claimed_at": null,
+  "created_at": "2026-01-25T20:44:55.037239Z",
+  "depends_on": [
+    "fn-28.5",
+    "fn-28.6",
+    "fn-28.7",
+    "fn-28.9"
+  ],
+  "epic": "fn-28",
+  "id": "fn-28.10",
+  "priority": null,
+  "spec_path": ".flow/tasks/fn-28.10.md",
+  "status": "todo",
+  "title": "Unit tests for CLI commands and config",
+  "updated_at": "2026-01-25T20:47:49.709954Z"
+}

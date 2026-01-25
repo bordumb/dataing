@@ -1,0 +1,16 @@
+{
+  "assignee": null,
+  "claim_note": "",
+  "claimed_at": null,
+  "created_at": "2026-01-25T20:44:53.965699Z",
+  "depends_on": [
+    "fn-28.1"
+  ],
+  "epic": "fn-28",
+  "id": "fn-28.4",
+  "priority": null,
+  "spec_path": ".flow/tasks/fn-28.4.md",
+  "status": "todo",
+  "title": "Main entry point with callback and subcommand registration",
+  "updated_at": "2026-01-25T20:46:34.799462Z"
+}

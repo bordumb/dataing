@@ -20,6 +20,10 @@ import { customInstance } from "../../client";
 This endpoint allows external systems to create issues via HTTP webhook.
 Requests must be signed with HMAC-SHA256 using the shared secret.
 
+Optional JSON Schema validation can be configured via:
+- WEBHOOK_JSON_SCHEMA environment variable (inline JSON schema)
+- X-JSON-Schema header (base64-encoded JSON schema, overrides env config)
+
 Idempotency: If source_provider and source_external_id are provided,
 duplicate webhooks will return the existing issue instead of creating
 a new one.

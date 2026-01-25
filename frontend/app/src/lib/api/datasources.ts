@@ -59,7 +59,7 @@ export function useDataSources() {
     queryFn: async () => {
       try {
         const response = await listDatasourcesApiV1DatasourcesGet();
-        return response.data_sources;
+        return response.items;
       } catch (error) {
         console.error("Failed to fetch datasources:", error);
         throw error;

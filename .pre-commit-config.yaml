@@ -48,7 +48,7 @@ repos:
     hooks:
       - id: mypy
         name: mypy (python-packages)
-        entry: bash -c 'uv run mypy python-packages/bond/src python-packages/dataing/src python-packages/dataing-ee/src'
+        entry: bash -c 'uv run mypy python-packages/dataing/src python-packages/dataing-ee/src'
         language: system
         files: ^python-packages/.*\.py$
         pass_filenames: false

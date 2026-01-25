@@ -278,9 +278,7 @@ class ResolvedAsset(BaseModel):
     asset: AssetRef
     datasource_id: str | None = None
     dataset_id: str = Field(..., description="Canonical URN")
-    dataset_type: str | None = Field(
-        default=None, description="TABLE, VIEW, MODEL, etc."
-    )
+    dataset_type: str | None = Field(default=None, description="TABLE, VIEW, MODEL, etc.")
 
 
 class ContextBundle(BaseModel):
@@ -439,7 +437,7 @@ class Run(BaseModel):
             ID: {html_module.escape(self.run_id[:16])}...<br>
             Bundle Hash: {html_module.escape(self.bundle_hash)}
         </div>
-        """
+        """  # noqa: E501
 
 
 class StreamEvent(BaseModel):
@@ -571,21 +569,21 @@ class RunEvidence(BaseModel):
         color = kind_colors.get(kind.lower(), "#6b7280")
 
         parts = [
-            f'<div style="font-family: monospace; padding: 10px; border: 1px solid #ccc; border-radius: 4px;">',
-            f'<strong>Evidence</strong>',
-            f'<span style="background: {color}; color: white; padding: 2px 8px; border-radius: 4px; margin-left: 8px;">'
-            f'{html_module.escape(kind.upper())}'
-            f'</span>',
+            '<div style="font-family: monospace; padding: 10px; border: 1px solid #ccc; border-radius: 4px;">',  # noqa: E501
+            "<strong>Evidence</strong>",
+            f'<span style="background: {color}; color: white; padding: 2px 8px; border-radius: 4px; margin-left: 8px;">'  # noqa: E501
+            f"{html_module.escape(kind.upper())}"
+            f"</span>",
         ]
         if self.confidence is not None:
-            parts.append(f' <small>({int(self.confidence * 100)}% confidence)</small>')
-        parts.append('<br>')
+            parts.append(f" <small>({int(self.confidence * 100)}% confidence)</small>")
+        parts.append("<br>")
         if self.result_summary:
-            parts.append(f'{html_module.escape(self.result_summary)}<br>')
+            parts.append(f"{html_module.escape(self.result_summary)}<br>")
         if self.conclusion:
-            parts.append(f'<strong>Conclusion:</strong> {html_module.escape(self.conclusion)}')
-        parts.append('</div>')
-        return ''.join(parts)
+            parts.append(f"<strong>Conclusion:</strong> {html_module.escape(self.conclusion)}")
+        parts.append("</div>")
+        return "".join(parts)
 
 
 # --- Rich Evidence Types (matching backend schema) ---
@@ -599,9 +597,7 @@ class RichEvidenceBase(BaseModel):
     seq: int = Field(..., ge=1, description="Sequence number for ordering")
     kind: EvidenceKind = Field(..., description="Evidence type discriminator")
     timestamp: datetime = Field(..., description="When evidence was created")
-    prev_hash: str | None = Field(
-        default=None, description="Hash of previous evidence in chain"
-    )
+    prev_hash: str | None = Field(default=None, description="Hash of previous evidence in chain")
     content_hash: str = Field(..., description="SHA256 hash of content")
 
 
@@ -626,9 +622,7 @@ class HypothesisEvidence(RichEvidenceBase):
     hypothesis_id: str = Field(..., description="ID of the hypothesis")
     hypothesis_text: str = Field(..., description="The hypothesis statement")
     confidence: float = Field(..., ge=0.0, le=1.0, description="Confidence 0-1")
-    supporting_facts: list[str] = Field(
-        default_factory=list, description="Supporting facts"
-    )
+    supporting_facts: list[str] = Field(default_factory=list, description="Supporting facts")
     verdict: HypothesisVerdict = Field(..., description="Evaluation verdict")
     reasoning: str = Field(default="", description="Explanation of verdict")
 
@@ -640,9 +634,7 @@ class LineageTraceEvidence(RichEvidenceBase):
     root_dataset: str = Field(..., description="Starting dataset")
     upstream: list[str] = Field(default_factory=list, description="Upstream datasets")
     downstream: list[str] = Field(default_factory=list, description="Downstream datasets")
-    edges: list[dict[str, str]] = Field(
-        default_factory=list, description="Lineage edges"
-    )
+    edges: list[dict[str, str]] = Field(default_factory=list, description="Lineage edges")
 
 
 class SchemaSnapshotEvidence(RichEvidenceBase):
@@ -650,9 +642,7 @@ class SchemaSnapshotEvidence(RichEvidenceBase):
 
     kind: EvidenceKind = EvidenceKind.SCHEMA_SNAPSHOT
     dataset: str = Field(..., description="Dataset name")
-    columns: list[dict[str, Any]] = Field(
-        default_factory=list, description="Column definitions"
-    )
+    columns: list[dict[str, Any]] = Field(default_factory=list, description="Column definitions")
     row_count: int | None = Field(default=None, description="Approximate row count")
     last_modified: datetime | None = Field(default=None, description="Last modified")
 
@@ -666,9 +656,7 @@ class MetricCalculationEvidence(RichEvidenceBase):
     value: float = Field(..., description="Calculated value")
     expected_value: float | None = Field(default=None, description="Expected value")
     deviation_pct: float | None = Field(default=None, description="Deviation %")
-    dimensions: dict[str, str] = Field(
-        default_factory=dict, description="Dimension values"
-    )
+    dimensions: dict[str, str] = Field(default_factory=dict, description="Dimension values")
 
 
 class RunSummaryEvidence(RichEvidenceBase):
@@ -677,9 +665,7 @@ class RunSummaryEvidence(RichEvidenceBase):
     kind: EvidenceKind = EvidenceKind.RUN_SUMMARY
     root_cause: str | None = Field(default=None, description="Identified root cause")
     confidence: float = Field(default=0.0, description="Confidence in finding")
-    recommendations: list[str] = Field(
-        default_factory=list, description="Recommended actions"
-    )
+    recommendations: list[str] = Field(default_factory=list, description="Recommended actions")
     hypotheses_evaluated: int = Field(default=0, description="Hypotheses evaluated")
     queries_executed: int = Field(default=0, description="Queries executed")
     duration_seconds: float = Field(default=0.0, description="Total duration")
@@ -757,27 +743,37 @@ class QueryResult(BaseModel):
         if not self.rows:
             return "<p><em>No data</em></p>"
 
-        col_names = [c.get("name", f"col{i}") for i, c in enumerate(self.columns)] if self.columns else list(self.rows[0].keys())
+        col_names = (
+            [c.get("name", f"col{i}") for i, c in enumerate(self.columns)]
+            if self.columns
+            else list(self.rows[0].keys())
+        )
 
         parts = ['<table style="border-collapse: collapse;">']
-        parts.append('<thead><tr>')
+        parts.append("<thead><tr>")
         for col in col_names:
-            parts.append(f'<th style="border: 1px solid #ddd; padding: 8px; background: #f5f5f5;">{html_module.escape(str(col))}</th>')
-        parts.append('</tr></thead>')
-        parts.append('<tbody>')
+            parts.append(
+                f'<th style="border: 1px solid #ddd; padding: 8px; background: #f5f5f5;">{html_module.escape(str(col))}</th>'  # noqa: E501
+            )
+        parts.append("</tr></thead>")
+        parts.append("<tbody>")
         for row in self.rows[:50]:
-            parts.append('<tr>')
+            parts.append("<tr>")
             for col in col_names:
                 val = row.get(col)
                 if val is None:
-                    parts.append('<td style="border: 1px solid #ddd; padding: 8px; color: #999;"><em>NULL</em></td>')
+                    parts.append(
+                        '<td style="border: 1px solid #ddd; padding: 8px; color: #999;"><em>NULL</em></td>'  # noqa: E501
+                    )
                 else:
-                    parts.append(f'<td style="border: 1px solid #ddd; padding: 8px;">{html_module.escape(str(val))}</td>')
-            parts.append('</tr>')
-        parts.append('</tbody></table>')
+                    parts.append(
+                        f'<td style="border: 1px solid #ddd; padding: 8px;">{html_module.escape(str(val))}</td>'  # noqa: E501
+                    )
+            parts.append("</tr>")
+        parts.append("</tbody></table>")
         if len(self.rows) > 50:
-            parts.append(f'<p><em>Showing 50 of {len(self.rows)} rows</em></p>')
-        return ''.join(parts)
+            parts.append(f"<p><em>Showing 50 of {len(self.rows)} rows</em></p>")
+        return "".join(parts)
 
 
 class DiffResult(BaseModel):
@@ -826,7 +822,7 @@ class DiffResult(BaseModel):
 
 
 class ExplainResult(BaseModel):
-    """Natural language explanation of context with insights.
+    r"""Natural language explanation of context with insights.
 
     ExplainResult is returned by `Context.explain` and provides an
     LLM-generated analysis of the assets, lineage, and any anomalies.
@@ -845,11 +841,11 @@ class ExplainResult(BaseModel):
         print("Summary:")
         print(explanation.summary)
 
-        print("\\nKey Insights:")
+        print("\nKey Insights:")
         for insight in explanation.insights:
             print(f"  - {insight}")
 
-        print("\\nRecommendations:")
+        print("\nRecommendations:")
         for rec in explanation.recommendations:
             print(f"  - {rec}")
         ```
@@ -867,4 +863,120 @@ class ExplainResult(BaseModel):
     related_assets: list[str] = Field(
         default_factory=list,
         description="URNs of related assets that may be relevant",
+    )
+
+
+# --- Datasource Types ---
+
+
+class Datasource(BaseModel):
+    """A datasource connection.
+
+    Represents a configured datasource in the Dataing platform.
+
+    Attributes:
+        id: Unique datasource identifier.
+        name: Human-readable name for the datasource.
+        source_type: Type of datasource (postgres, snowflake, bigquery, etc.).
+        status: Connection status (connected, disconnected, error).
+
+    Example:
+        ```python
+        datasources = client.list_datasources()
+        for ds in datasources:
+            print(f"{ds.name}: {ds.status}")
+        ```
+    """
+
+    id: str = Field(..., description="Unique datasource identifier")
+    name: str = Field(..., description="Human-readable datasource name")
+    source_type: str = Field(..., description="Type of datasource")
+    status: str | None = Field(
+        default=None,
+        description="Connection status (connected, disconnected, error)",
+    )
+
+
+class ConnectionTestResult(BaseModel):
+    """Result of testing a datasource connection.
+
+    Returned by `DataingClient.test_datasource` to indicate whether
+    a datasource can be reached and queried.
+
+    Attributes:
+        success: Whether the connection test succeeded.
+        latency_ms: Connection latency in milliseconds (if successful).
+        error: Error message (if connection failed).
+
+    Example:
+        ```python
+        result = client.test_datasource("ds-prod-123")
+        if result.success:
+            print(f"Connected in {result.latency_ms}ms")
+        else:
+            print(f"Failed: {result.error}")
+        ```
+    """
+
+    success: bool = Field(..., description="Whether the connection test succeeded")
+    latency_ms: int | None = Field(
+        default=None,
+        description="Connection latency in milliseconds",
+    )
+    error: str | None = Field(
+        default=None,
+        description="Error message if connection failed",
+    )
+
+
+class ColumnSchema(BaseModel):
+    """Schema for a table column.
+
+    Attributes:
+        name: Column name.
+        data_type: Column data type (VARCHAR, INTEGER, etc.).
+        nullable: Whether the column allows NULL values.
+    """
+
+    name: str = Field(..., description="Column name")
+    data_type: str = Field(..., description="Column data type")
+    nullable: bool = Field(default=True, description="Whether column allows NULL")
+
+
+class TableSchema(BaseModel):
+    """Schema for a database table.
+
+    Attributes:
+        name: Fully qualified table name (schema.table).
+        columns: List of column definitions.
+    """
+
+    name: str = Field(..., description="Table name")
+    columns: list[ColumnSchema] = Field(
+        default_factory=list,
+        description="Column definitions",
+    )
+
+
+class DatasourceSchema(BaseModel):
+    """Schema for a datasource.
+
+    Contains the complete schema information for all tables in a datasource.
+
+    Attributes:
+        tables: List of table schemas.
+
+    Example:
+        ```python
+        schema = client.get_schema("ds-prod-123")
+        for table in schema.tables:
+            print(f"Table: {table.name}")
+            for col in table.columns:
+                print(f"  {col.name}: {col.data_type}")
+        ```
+    """
+
+    tables: list[TableSchema] = Field(
+        default_factory=list,
+        description="List of table schemas",
     )

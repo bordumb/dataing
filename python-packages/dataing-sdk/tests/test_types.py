@@ -253,18 +253,17 @@ class TestDatasourceTypes:
         result = ConnectionTestResult(success=True, latency_ms=42)
         assert result.success is True
         assert result.latency_ms == 42
-        assert result.error is None
+        assert result.message is None
 
     def test_test_connection_result_failure(self) -> None:
         """Test ConnectionTestResult for failure case."""
-        result = ConnectionTestResult(success=False, error="Connection refused")
+        result = ConnectionTestResult(success=False, message="Connection refused")
         assert result.success is False
         assert result.latency_ms is None
-        assert result.error == "Connection refused"
+        assert result.message == "Connection refused"
 
     def test_test_connection_result_from_backend(self) -> None:
-        """Test ConnectionTestResult parses backend response with 'message' field."""
-        # Backend API returns 'message' but SDK uses 'error'
+        """Test ConnectionTestResult parses backend response."""
         backend_data = {
             "success": False,
             "message": "Connection refused",
@@ -272,7 +271,7 @@ class TestDatasourceTypes:
         }
         result = ConnectionTestResult.model_validate(backend_data)
         assert result.success is False
-        assert result.error == "Connection refused"  # Mapped from 'message'
+        assert result.message == "Connection refused"
 
     def test_column_schema(self) -> None:
         """Test ColumnSchema."""

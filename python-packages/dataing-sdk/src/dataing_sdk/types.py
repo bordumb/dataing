@@ -908,7 +908,7 @@ class ConnectionTestResult(BaseModel):
     Attributes:
         success: Whether the connection test succeeded.
         latency_ms: Connection latency in milliseconds (if successful).
-        error: Error message (if connection failed).
+        message: Status message (error details if failed, success message otherwise).
 
     Example:
         ```python
@@ -916,7 +916,7 @@ class ConnectionTestResult(BaseModel):
         if result.success:
             print(f"Connected in {result.latency_ms}ms")
         else:
-            print(f"Failed: {result.error}")
+            print(f"Failed: {result.message}")
         ```
     """
 
@@ -925,13 +925,10 @@ class ConnectionTestResult(BaseModel):
         default=None,
         description="Connection latency in milliseconds",
     )
-    error: str | None = Field(
+    message: str | None = Field(
         default=None,
-        alias="message",
-        description="Error message if connection failed",
+        description="Status message (error details if failed)",
     )
-
-    model_config = {"populate_by_name": True}
 
 
 class ColumnSchema(BaseModel):

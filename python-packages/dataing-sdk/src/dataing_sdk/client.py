@@ -1119,9 +1119,7 @@ class DataingClient:
 
         response = self._request("GET", "/api/v1/datasources")
         data = response.json()
-        # Backend returns "data_sources" key
-        items = data.get("data_sources", data.get("items", []))
-        return [Datasource.model_validate(ds) for ds in items]
+        return [Datasource.model_validate(ds) for ds in data.get("items", [])]
 
     async def async_list_datasources(self) -> list:
         """Async version of `list_datasources`.
@@ -1132,9 +1130,7 @@ class DataingClient:
 
         response = await self._async_request("GET", "/api/v1/datasources")
         data = response.json()
-        # Backend returns "data_sources" key
-        items = data.get("data_sources", data.get("items", []))
-        return [Datasource.model_validate(ds) for ds in items]
+        return [Datasource.model_validate(ds) for ds in data.get("items", [])]
 
     def test_datasource(self, datasource_id: str):
         """Test connectivity to a datasource.
@@ -1216,17 +1212,15 @@ class DataingClient:
     def _parse_schema_response(self, data: dict[str, Any]) -> Any:
         """Parse backend schema response into SDK DatasourceSchema.
 
-        The backend returns a hierarchical catalog structure:
-        {catalogs: [{schemas: [{tables: [...]}]}]}
-
-        This method flattens it into a simple list of tables.
+        The backend returns both a hierarchical catalog structure and a flattened
+        tables list for convenience. This method prefers the flattened tables.
         """
         from .types import ColumnSchema, DatasourceSchema, TableSchema
 
         tables = []
 
-        # If response already has "tables" key, use it directly
-        if "tables" in data:
+        # Prefer flattened tables list if available
+        if "tables" in data and data["tables"]:
             for tbl in data["tables"]:
                 columns = [
                     ColumnSchema(
@@ -1237,13 +1231,12 @@ class DataingClient:
                     for col in tbl.get("columns", [])
                 ]
                 tables.append(TableSchema(name=tbl["name"], columns=columns))
-        # Otherwise, extract from catalog hierarchy
+        # Fall back to extracting from catalog hierarchy
         elif "catalogs" in data:
             for catalog in data.get("catalogs", []):
                 for schema in catalog.get("schemas", []):
                     schema_name = schema.get("name", "")
                     for tbl in schema.get("tables", []):
-                        # Build fully qualified name
                         tbl_name = tbl.get("name", "")
                         full_name = f"{schema_name}.{tbl_name}" if schema_name else tbl_name
 

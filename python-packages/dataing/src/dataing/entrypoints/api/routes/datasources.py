@@ -82,7 +82,7 @@ class DataSourceResponse(BaseModel):
 class DataSourceListResponse(BaseModel):
     """Response for listing data sources."""
 
-    data_sources: list[DataSourceResponse]
+    items: list[DataSourceResponse]
     total: int
 
 
@@ -140,6 +140,10 @@ class SchemaResponseModel(BaseModel):
     source_category: str
     fetched_at: datetime
     catalogs: list[dict[str, Any]]
+    tables: list[dict[str, Any]] = Field(
+        default_factory=list,
+        description="Flattened list of tables (schema.table format) for convenience",
+    )
 
 
 class QueryRequest(BaseModel):
@@ -433,7 +437,7 @@ async def list_datasources(
         )
 
     return DataSourceListResponse(
-        data_sources=responses,
+        items=responses,
         total=len(responses),
     )
 
@@ -615,12 +619,27 @@ async def get_datasource_schema(
         async with adapter:
             schema = await adapter.get_schema(schema_filter)
 
+        # Build flattened tables list for convenience
+        tables_flat: list[dict[str, Any]] = []
+        for catalog in schema.catalogs:
+            for schema_obj in catalog.schemas:
+                for table in schema_obj.tables:
+                    tables_flat.append(
+                        {
+                            "name": f"{schema_obj.name}.{table.name}",
+                            "table_type": table.table_type,
+                            "columns": [col.model_dump() for col in table.columns],
+                            "row_count": table.row_count,
+                        }
+                    )
+
         return SchemaResponseModel(
             source_id=str(datasource_id),
             source_type=schema.source_type.value,
             source_category=schema.source_category.value,
             fetched_at=schema.fetched_at,
             catalogs=[cat.model_dump() for cat in schema.catalogs],
+            tables=tables_flat,
         )
     except Exception as e:
         raise HTTPException(

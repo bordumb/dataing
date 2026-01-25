@@ -75,7 +75,7 @@ def test_datasource(
             msg += f" ({result.latency_ms}ms)"
         console.print(msg)
     else:
-        console.print(f"[red]-[/red] Connection failed: {result.error}")
+        console.print(f"[red]-[/red] Connection failed: {result.message}")
         raise typer.Exit(1)
 
 

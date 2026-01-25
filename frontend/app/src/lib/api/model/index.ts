@@ -569,3 +569,4 @@ export * from "./webhookResponseLastStatus";
 export * from "./webhookResponseLastTriggeredAt";
 export * from "./weeklyUsageListResponse";
 export * from "./weeklyUsageResponse";
+export * from "./schemaResponseModelTablesItem";

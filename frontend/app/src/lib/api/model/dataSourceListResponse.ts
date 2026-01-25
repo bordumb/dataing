@@ -11,6 +11,6 @@ import type { DataSourceResponse } from "./dataSourceResponse";
  * Response for listing data sources.
  */
 export interface DataSourceListResponse {
-  data_sources: DataSourceResponse[];
+  items: DataSourceResponse[];
   total: number;
 }

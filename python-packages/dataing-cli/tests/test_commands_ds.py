@@ -79,7 +79,7 @@ class TestDsTestCommand:
     ) -> None:
         """Test ds test with successful connection."""
         mock_client_patch.test_datasource.return_value = MagicMock(
-            success=True, latency_ms=50, error=None
+            success=True, latency_ms=50, message=None
         )
 
         result = runner.invoke(app, ["ds", "test", "ds-123"])
@@ -96,7 +96,7 @@ class TestDsTestCommand:
     ) -> None:
         """Test ds test with failed connection."""
         mock_client_patch.test_datasource.return_value = MagicMock(
-            success=False, latency_ms=None, error="Connection refused"
+            success=False, latency_ms=None, message="Connection refused"
         )
 
         result = runner.invoke(app, ["ds", "test", "ds-123"])
@@ -115,11 +115,11 @@ class TestDsTestCommand:
         mock_result = MagicMock()
         mock_result.success = True
         mock_result.latency_ms = 50
-        mock_result.error = None
+        mock_result.message = None
         mock_result.model_dump.return_value = {
             "success": True,
             "latency_ms": 50,
-            "error": None,
+            "message": None,
         }
         mock_client_patch.test_datasource.return_value = mock_result
 

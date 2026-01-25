@@ -64,6 +64,104 @@ def main(
         console.print(ctx.get_help())
 
 
+@app.command()
+def init(
+    ctx: typer.Context,
+    url: Annotated[
+        str,
+        typer.Option(
+            "--url",
+            "-u",
+            prompt="Backend URL",
+            help="Dataing backend URL",
+        ),
+    ] = "http://localhost:8000",
+    api_key: Annotated[
+        str,
+        typer.Option(
+            "--api-key",
+            "-k",
+            prompt=True,
+            hide_input=True,
+            help="API key for authentication",
+        ),
+    ] = ...,
+    no_keyring: Annotated[
+        bool,
+        typer.Option(
+            "--no-keyring",
+            help="Store API key in config file instead of OS keychain",
+        ),
+    ] = False,
+) -> None:
+    """Initialize CLI configuration."""
+    from dataing_sdk import DataingClient
+
+    from dataing_cli.config import get_config_path, save_api_key, save_config
+
+    # Test connection first
+    with console.status("[bold blue]Testing connection..."):
+        try:
+            client = DataingClient(base_url=url, api_key=api_key)
+            client.health()
+        except Exception as e:
+            console.print(f"[red]Connection failed:[/red] {e}")
+            raise typer.Exit(1) from None
+
+    # Save config
+    save_config({"api_url": url})
+    success, message = save_api_key(api_key, use_keyring=not no_keyring)
+
+    if "less secure" in message.lower() or "warning" in message.lower():
+        console.print(f"[yellow]Warning:[/yellow] {message}")
+
+    console.print(f"[green]+[/green] Configuration saved to {get_config_path()}")
+
+
+@app.command()
+def status(ctx: typer.Context) -> None:
+    """Check connection and show current configuration."""
+    import json
+
+    from dataing_cli.config import ConfigError, get_api_key, get_client, load_config
+    from dataing_cli.display import print_status
+
+    state = ctx.obj
+    config = load_config()
+    api_key = get_api_key(state.api_key if state else None)
+
+    connected = False
+    error = None
+
+    try:
+        client = get_client(
+            api_key=state.api_key if state else None,
+            base_url=state.base_url if state else None,
+        )
+        client.health()
+        connected = True
+    except ConfigError as e:
+        error = str(e)
+    except Exception as e:
+        error = str(e)
+
+    if state and state.json_output:
+        result = {
+            "connected": connected,
+            "url": config.get("api_url"),
+            "api_key_configured": bool(api_key),
+            "default_datasource": config.get("default_datasource_name"),
+        }
+        if error:
+            result["error"] = error
+        console.print(json.dumps(result, indent=2))
+    else:
+        print_status(config, api_key, connected, error)
+
+    if not connected:
+        raise typer.Exit(1)
+
+
 # Register subcommand groups
 app.add_typer(run.app, name="run", help="Manage investigation runs")
 app.add_typer(ds.app, name="ds", help="Manage datasources")

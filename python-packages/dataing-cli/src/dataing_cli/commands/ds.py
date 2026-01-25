@@ -43,8 +43,7 @@ def list_datasources(ctx: typer.Context) -> None:
 
     for ds in datasources:
         status = "[green]*[/green]" if ds.status == "connected" else "[red]*[/red]"
-        id_display = f"{ds.id[:12]}..." if len(ds.id) > 12 else ds.id
-        table.add_row(id_display, ds.name, ds.source_type, status)
+        table.add_row(ds.id, ds.name, ds.source_type, status)
 
     console.print(table)
 

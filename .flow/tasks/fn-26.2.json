@@ -1,16 +1,23 @@
 {
-  "assignee": null,
+  "assignee": "bordumbb@gmail.com",
   "claim_note": "",
-  "claimed_at": null,
+  "claimed_at": "2026-01-25T01:09:42.079459Z",
   "created_at": "2026-01-25T00:57:42.647618Z",
   "depends_on": [
     "fn-26.1"
   ],
   "epic": "fn-26",
+  "evidence": {
+    "commits": [
+      "fe4350acd41849dcffee0938e69cc21f3c65f6e4"
+    ],
+    "prs": [],
+    "tests": []
+  },
   "id": "fn-26.2",
   "priority": null,
   "spec_path": ".flow/tasks/fn-26.2.md",
-  "status": "todo",
+  "status": "done",
   "title": "Update root pyproject.toml",
-  "updated_at": "2026-01-25T00:58:34.123379Z"
+  "updated_at": "2026-01-25T01:10:49.252925Z"
 }

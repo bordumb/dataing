@@ -1,16 +1,25 @@
 {
-  "assignee": null,
+  "assignee": "bordumbb@gmail.com",
   "claim_note": "",
-  "claimed_at": null,
+  "claimed_at": "2026-01-25T01:15:19.636841Z",
   "created_at": "2026-01-25T00:57:43.401629Z",
   "depends_on": [
     "fn-26.5"
   ],
   "epic": "fn-26",
+  "evidence": {
+    "commits": [
+      "3e5c81318743aa993ee6db7730c5c01498e96e6b"
+    ],
+    "prs": [],
+    "tests": [
+      "uv run pytest python-packages/dataing/tests/unit/core/test_state.py"
+    ]
+  },
   "id": "fn-26.6",
   "priority": null,
   "spec_path": ".flow/tasks/fn-26.6.md",
-  "status": "todo",
+  "status": "done",
   "title": "Delete python-packages/bond directory",
-  "updated_at": "2026-01-25T00:58:35.075971Z"
+  "updated_at": "2026-01-25T01:16:37.554837Z"
 }

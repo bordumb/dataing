@@ -19,7 +19,6 @@ import type {
   CreateDataSourceRequest,
   DataSourceListResponse,
   DataSourceResponse,
-  DataingEntrypointsApiRoutesDatasourcesTestConnectionResponse,
   DatasourceDatasetsResponse,
   GetDatasourceSchemaApiV1DatasourcesDatasourceIdSchemaGetParams,
   GetDatasourceSchemaApiV1V2DatasourcesDatasourceIdSchemaGetParams,
@@ -34,6 +33,7 @@ import type {
   StatsResponse,
   SyncResponse,
   TestConnectionRequest,
+  TestConnectionResponse,
 } from "../../model";
 import { customInstance } from "../../client";
 
@@ -129,14 +129,12 @@ a data source.
 export const testConnectionApiV1DatasourcesTestPost = (
   testConnectionRequest: TestConnectionRequest,
 ) => {
-  return customInstance<DataingEntrypointsApiRoutesDatasourcesTestConnectionResponse>(
-    {
-      url: `/api/v1/datasources/test`,
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      data: testConnectionRequest,
-    },
-  );
+  return customInstance<TestConnectionResponse>({
+    url: `/api/v1/datasources/test`,
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    data: testConnectionRequest,
+  });
 };
 
 export const getTestConnectionApiV1DatasourcesTestPostMutationOptions = <
@@ -207,14 +205,14 @@ export const useTestConnectionApiV1DatasourcesTestPost = <
  */
 export const listDatasourcesApiV1DatasourcesGet = (signal?: AbortSignal) => {
   return customInstance<DataSourceListResponse>({
-    url: `/api/v1/datasources/`,
+    url: `/api/v1/datasources`,
     method: "GET",
     signal,
   });
 };
 
 export const getListDatasourcesApiV1DatasourcesGetQueryKey = () => {
-  return [`/api/v1/datasources/`] as const;
+  return [`/api/v1/datasources`] as const;
 };
 
 export const getListDatasourcesApiV1DatasourcesGetQueryOptions = <
@@ -287,7 +285,7 @@ export const createDatasourceApiV1DatasourcesPost = (
   createDataSourceRequest: CreateDataSourceRequest,
 ) => {
   return customInstance<DataSourceResponse>({
-    url: `/api/v1/datasources/`,
+    url: `/api/v1/datasources`,
     method: "POST",
     headers: { "Content-Type": "application/json" },
     data: createDataSourceRequest,
@@ -557,9 +555,10 @@ export const useDeleteDatasourceApiV1DatasourcesDatasourceIdDelete = <
 export const testDatasourceConnectionApiV1DatasourcesDatasourceIdTestPost = (
   datasourceId: string,
 ) => {
-  return customInstance<DataingEntrypointsApiRoutesDatasourcesTestConnectionResponse>(
-    { url: `/api/v1/datasources/${datasourceId}/test`, method: "POST" },
-  );
+  return customInstance<TestConnectionResponse>({
+    url: `/api/v1/datasources/${datasourceId}/test`,
+    method: "POST",
+  });
 };
 
 export const getTestDatasourceConnectionApiV1DatasourcesDatasourceIdTestPostMutationOptions =
@@ -1325,14 +1324,12 @@ a data source.
 export const testConnectionApiV1V2DatasourcesTestPost = (
   testConnectionRequest: TestConnectionRequest,
 ) => {
-  return customInstance<DataingEntrypointsApiRoutesDatasourcesTestConnectionResponse>(
-    {
-      url: `/api/v1/v2/datasources/test`,
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      data: testConnectionRequest,
-    },
-  );
+  return customInstance<TestConnectionResponse>({
+    url: `/api/v1/v2/datasources/test`,
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    data: testConnectionRequest,
+  });
 };
 
 export const getTestConnectionApiV1V2DatasourcesTestPostMutationOptions = <
@@ -1404,14 +1401,14 @@ export const useTestConnectionApiV1V2DatasourcesTestPost = <
  */
 export const listDatasourcesApiV1V2DatasourcesGet = (signal?: AbortSignal) => {
   return customInstance<DataSourceListResponse>({
-    url: `/api/v1/v2/datasources/`,
+    url: `/api/v1/v2/datasources`,
     method: "GET",
     signal,
   });
 };
 
 export const getListDatasourcesApiV1V2DatasourcesGetQueryKey = () => {
-  return [`/api/v1/v2/datasources/`] as const;
+  return [`/api/v1/v2/datasources`] as const;
 };
 
 export const getListDatasourcesApiV1V2DatasourcesGetQueryOptions = <
@@ -1484,7 +1481,7 @@ export const createDatasourceApiV1V2DatasourcesPost = (
   createDataSourceRequest: CreateDataSourceRequest,
 ) => {
   return customInstance<DataSourceResponse>({
-    url: `/api/v1/v2/datasources/`,
+    url: `/api/v1/v2/datasources`,
     method: "POST",
     headers: { "Content-Type": "application/json" },
     data: createDataSourceRequest,
@@ -1754,9 +1751,10 @@ export const useDeleteDatasourceApiV1V2DatasourcesDatasourceIdDelete = <
 export const testDatasourceConnectionApiV1V2DatasourcesDatasourceIdTestPost = (
   datasourceId: string,
 ) => {
-  return customInstance<DataingEntrypointsApiRoutesDatasourcesTestConnectionResponse>(
-    { url: `/api/v1/v2/datasources/${datasourceId}/test`, method: "POST" },
-  );
+  return customInstance<TestConnectionResponse>({
+    url: `/api/v1/v2/datasources/${datasourceId}/test`,
+    method: "POST",
+  });
 };
 
 export const getTestDatasourceConnectionApiV1V2DatasourcesDatasourceIdTestPostMutationOptions =

@@ -1,16 +1,20 @@
 """Tests for SDK types."""
 
 import pytest
-
 from dataing_sdk import (
+    TERMINAL_STATUSES,
     AssetRef,
+    ColumnSchema,
+    ConnectionTestResult,
     DataingClient,
+    Datasource,
+    DatasourceSchema,
     DiffResult,
     EvidenceKind,
     ExplainResult,
     QueryResult,
     RunStatus,
-    TERMINAL_STATUSES,
+    TableSchema,
 )
 
 
@@ -31,9 +35,7 @@ class TestAssetRef:
 
     def test_from_urn_with_datasource(self) -> None:
         """Test parsing URN with datasource_id."""
-        asset = AssetRef.from_urn(
-            "snowflake://db.schema.table", datasource_id="ds-123"
-        )
+        asset = AssetRef.from_urn("snowflake://db.schema.table", datasource_id="ds-123")
         assert asset.platform == "snowflake"
         assert asset.name == "db.schema.table"
         assert asset.datasource_id == "ds-123"
@@ -205,3 +207,116 @@ class TestResultTypes:
         assert len(result.insights) == 2
         assert len(result.recommendations) == 2
         assert len(result.related_assets) == 2
+
+
+class TestDatasourceTypes:
+    """Tests for Datasource-related types."""
+
+    def test_datasource_required_fields(self) -> None:
+        """Test Datasource with required fields."""
+        ds = Datasource(
+            id="ds-abc123",
+            name="Production Postgres",
+            source_type="postgres",
+        )
+        assert ds.id == "ds-abc123"
+        assert ds.name == "Production Postgres"
+        assert ds.source_type == "postgres"
+        assert ds.status is None
+
+    def test_datasource_all_fields(self) -> None:
+        """Test Datasource with all fields."""
+        ds = Datasource(
+            id="ds-abc123",
+            name="Production Postgres",
+            source_type="postgres",
+            status="connected",
+        )
+        assert ds.status == "connected"
+
+    def test_datasource_from_backend_response(self) -> None:
+        """Test Datasource parses backend response with 'type' field."""
+        # Backend API returns 'type' but SDK uses 'source_type'
+        backend_data = {
+            "id": "ds-abc123",
+            "name": "Production Postgres",
+            "type": "postgres",
+            "status": "connected",
+        }
+        ds = Datasource.model_validate(backend_data)
+        assert ds.id == "ds-abc123"
+        assert ds.source_type == "postgres"  # Mapped from 'type'
+        assert ds.status == "connected"
+
+    def test_test_connection_result_success(self) -> None:
+        """Test ConnectionTestResult for success case."""
+        result = ConnectionTestResult(success=True, latency_ms=42)
+        assert result.success is True
+        assert result.latency_ms == 42
+        assert result.message is None
+
+    def test_test_connection_result_failure(self) -> None:
+        """Test ConnectionTestResult for failure case."""
+        result = ConnectionTestResult(success=False, message="Connection refused")
+        assert result.success is False
+        assert result.latency_ms is None
+        assert result.message == "Connection refused"
+
+    def test_test_connection_result_from_backend(self) -> None:
+        """Test ConnectionTestResult parses backend response."""
+        backend_data = {
+            "success": False,
+            "message": "Connection refused",
+            "latency_ms": None,
+        }
+        result = ConnectionTestResult.model_validate(backend_data)
+        assert result.success is False
+        assert result.message == "Connection refused"
+
+    def test_column_schema(self) -> None:
+        """Test ColumnSchema."""
+        col = ColumnSchema(name="id", data_type="INTEGER", nullable=False)
+        assert col.name == "id"
+        assert col.data_type == "INTEGER"
+        assert col.nullable is False
+
+    def test_column_schema_defaults(self) -> None:
+        """Test ColumnSchema default values."""
+        col = ColumnSchema(name="name", data_type="VARCHAR")
+        assert col.nullable is True
+
+    def test_table_schema(self) -> None:
+        """Test TableSchema."""
+        table = TableSchema(
+            name="public.orders",
+            columns=[
+                ColumnSchema(name="id", data_type="INTEGER", nullable=False),
+                ColumnSchema(name="customer_id", data_type="INTEGER"),
+            ],
+        )
+        assert table.name == "public.orders"
+        assert len(table.columns) == 2
+        assert table.columns[0].name == "id"
+
+    def test_datasource_schema(self) -> None:
+        """Test DatasourceSchema."""
+        schema = DatasourceSchema(
+            tables=[
+                TableSchema(
+                    name="public.orders",
+                    columns=[
+                        ColumnSchema(name="id", data_type="INTEGER"),
+                    ],
+                ),
+                TableSchema(
+                    name="public.customers",
+                    columns=[
+                        ColumnSchema(name="id", data_type="INTEGER"),
+                        ColumnSchema(name="email", data_type="VARCHAR"),
+                    ],
+                ),
+            ]
+        )
+        assert len(schema.tables) == 2
+        assert schema.tables[0].name == "public.orders"
+        assert len(schema.tables[1].columns) == 2

@@ -427,6 +427,7 @@ export * from "./schemaCommentResponseParentId";
 export * from "./schemaCommentUpdate";
 export * from "./schemaResponseModel";
 export * from "./schemaResponseModelCatalogsItem";
+export * from "./schemaResponseModelTablesItem";
 export * from "./searchAssetInstancesApiV1AssetInstancesSearchGetParams";
 export * from "./searchDatasetsApiV1LineageSearchGetParams";
 export * from "./searchResultsResponse";

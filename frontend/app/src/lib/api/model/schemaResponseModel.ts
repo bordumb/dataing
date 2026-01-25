@@ -6,6 +6,7 @@
  * OpenAPI spec version: 2.0.0
  */
 import type { SchemaResponseModelCatalogsItem } from "./schemaResponseModelCatalogsItem";
+import type { SchemaResponseModelTablesItem } from "./schemaResponseModelTablesItem";
 
 /**
  * Response for schema discovery.
@@ -16,4 +17,6 @@ export interface SchemaResponseModel {
   source_category: string;
   source_id: string;
   source_type: string;
+  /** Flattened list of tables (schema.table format) for convenience */
+  tables?: SchemaResponseModelTablesItem[];
 }

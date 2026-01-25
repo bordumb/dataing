@@ -1,0 +1,26 @@
+{
+  "assignee": "bordumbb@gmail.com",
+  "claim_note": "",
+  "claimed_at": "2026-01-25T21:16:09.349977Z",
+  "created_at": "2026-01-25T20:44:54.335776Z",
+  "depends_on": [
+    "fn-28.2",
+    "fn-28.3",
+    "fn-28.4",
+    "fn-28.8"
+  ],
+  "epic": "fn-28",
+  "evidence": {
+    "commits": [],
+    "prs": [],
+    "tests": [
+      "Manual verification: all ds commands have correct help and signatures"
+    ]
+  },
+  "id": "fn-28.6",
+  "priority": null,
+  "spec_path": ".flow/tasks/fn-28.6.md",
+  "status": "done",
+  "title": "Implement ds commands: list, test, attach, schema",
+  "updated_at": "2026-01-25T21:17:06.129301Z"
+}

@@ -1730,7 +1730,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/dataing__entrypoints__api__routes__datasources__TestConnectionResponse"
+                  "$ref": "#/components/schemas/TestConnectionResponse"
                 }
               }
             }
@@ -1748,14 +1748,14 @@
         }
       }
     },
-    "/api/v1/datasources/": {
+    "/api/v1/datasources": {
       "get": {
         "tags": [
           "datasources"
         ],
         "summary": "List Datasources",
         "description": "List all data sources for the current tenant.",
-        "operationId": "list_datasources_api_v1_datasources__get",
+        "operationId": "list_datasources_api_v1_datasources_get",
         "responses": {
           "200": {
             "description": "Successful Response",
@@ -1783,7 +1783,7 @@
         ],
         "summary": "Create Datasource",
         "description": "Create a new data source.\n\nTests the connection before saving. Returns 400 if connection test fails.",
-        "operationId": "create_datasource_api_v1_datasources__post",
+        "operationId": "create_datasource_api_v1_datasources_post",
         "requestBody": {
           "content": {
             "application/json": {
@@ -1955,7 +1955,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/dataing__entrypoints__api__routes__datasources__TestConnectionResponse"
+                  "$ref": "#/components/schemas/TestConnectionResponse"
                 }
               }
             }
@@ -2390,7 +2390,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/dataing__entrypoints__api__routes__datasources__TestConnectionResponse"
+                  "$ref": "#/components/schemas/TestConnectionResponse"
                 }
               }
             }
@@ -2408,14 +2408,14 @@
         }
       }
     },
-    "/api/v1/v2/datasources/": {
+    "/api/v1/v2/datasources": {
       "get": {
         "tags": [
           "datasources"
         ],
         "summary": "List Datasources",
         "description": "List all data sources for the current tenant.",
-        "operationId": "list_datasources_api_v1_v2_datasources__get",
+        "operationId": "list_datasources_api_v1_v2_datasources_get",
         "responses": {
           "200": {
             "description": "Successful Response",
@@ -2443,7 +2443,7 @@
         ],
         "summary": "Create Datasource",
         "description": "Create a new data source.\n\nTests the connection before saving. Returns 400 if connection test fails.",
-        "operationId": "create_datasource_api_v1_v2_datasources__post",
+        "operationId": "create_datasource_api_v1_v2_datasources_post",
         "requestBody": {
           "content": {
             "application/json": {
@@ -2615,7 +2615,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/dataing__entrypoints__api__routes__datasources__TestConnectionResponse"
+                  "$ref": "#/components/schemas/TestConnectionResponse"
                 }
               }
             }
@@ -3210,7 +3210,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/TestConnectionResponse"
+                  "$ref": "#/components/schemas/dataing__entrypoints__api__routes__credentials__TestConnectionResponse"
                 }
               }
             }
@@ -9968,12 +9968,12 @@
       },
       "DataSourceListResponse": {
         "properties": {
-          "data_sources": {
+          "items": {
             "items": {
               "$ref": "#/components/schemas/DataSourceResponse"
             },
             "type": "array",
-            "title": "Data Sources"
+            "title": "Items"
           },
           "total": {
             "type": "integer",
@@ -9982,7 +9982,7 @@
         },
         "type": "object",
         "required": [
-          "data_sources",
+          "items",
           "total"
         ],
         "title": "DataSourceListResponse",
@@ -13600,6 +13600,15 @@
             },
             "type": "array",
             "title": "Catalogs"
+          },
+          "tables": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Tables",
+            "description": "Flattened list of tables (schema.table format) for convenience"
           }
         },
         "type": "object",
@@ -14731,18 +14740,11 @@
             "type": "boolean",
             "title": "Success"
           },
-          "error": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Error"
+          "message": {
+            "type": "string",
+            "title": "Message"
           },
-          "tables_accessible": {
+          "latency_ms": {
             "anyOf": [
               {
                 "type": "integer"
@@ -14751,15 +14753,27 @@
                 "type": "null"
               }
             ],
-            "title": "Tables Accessible"
+            "title": "Latency Ms"
+          },
+          "server_version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Server Version"
           }
         },
         "type": "object",
         "required": [
-          "success"
+          "success",
+          "message"
         ],
         "title": "TestConnectionResponse",
-        "description": "Response for testing credentials."
+        "description": "Response for testing a connection."
       },
       "TokenResponse": {
         "properties": {
@@ -15309,28 +15323,13 @@
         "title": "LineageGraphResponse",
         "description": "Lineage graph response."
       },
-      "dataing__entrypoints__api__routes__datasources__TestConnectionResponse": {
+      "dataing__entrypoints__api__routes__credentials__TestConnectionResponse": {
         "properties": {
           "success": {
             "type": "boolean",
             "title": "Success"
           },
-          "message": {
-            "type": "string",
-            "title": "Message"
-          },
-          "latency_ms": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Latency Ms"
-          },
-          "server_version": {
+          "error": {
             "anyOf": [
               {
                 "type": "string"
@@ -15339,16 +15338,26 @@
                 "type": "null"
               }
             ],
-            "title": "Server Version"
+            "title": "Error"
+          },
+          "tables_accessible": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tables Accessible"
           }
         },
         "type": "object",
         "required": [
-          "success",
-          "message"
+          "success"
         ],
         "title": "TestConnectionResponse",
-        "description": "Response for testing a connection."
+        "description": "Response for testing credentials."
       },
       "dataing__entrypoints__api__routes__runs__AssetRefRequest": {
         "properties": {

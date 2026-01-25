@@ -1041,12 +1041,14 @@ class DataingClient:
                     except json.JSONDecodeError:
                         pass
 
+                    # Check for terminal events before resetting
+                    is_terminal = event_type in ("run_completed", "run_failed")
+
                     # Reset for next event
                     event_type = None
                     event_data = ""
 
-                    # Check for terminal events
-                    if event_type in ("run_completed", "run_failed"):
+                    if is_terminal:
                         break
 
     # --- Health check ---
@@ -1089,3 +1091,165 @@ class DataingClient:
         """
         response = await self._async_request("GET", "/health")
         return response.json()
+
+    # --- Datasource management ---
+
+    def list_datasources(self) -> list:
+        """List all datasources for the current tenant.
+
+        Retrieves all configured datasources accessible with the current API key.
+
+        Returns:
+            A list of Datasource objects.
+
+        Raises:
+            AuthError: If the API key is invalid.
+            ServerError: If the server is unreachable.
+
+        Example:
+            ```python
+            datasources = client.list_datasources()
+            for ds in datasources:
+                print(f"{ds.name} ({ds.source_type}): {ds.status}")
+            ```
+
+        See Also:
+            - `test_datasource`: Test connectivity to a datasource
+            - `get_schema`: Get schema information for a datasource
+        """
+        from .types import Datasource
+
+        response = self._request("GET", "/api/v1/datasources")
+        data = response.json()
+        return [Datasource.model_validate(ds) for ds in data.get("items", [])]
+
+    async def async_list_datasources(self) -> list:
+        """Async version of `list_datasources`.
+
+        See `list_datasources` for full documentation.
+        """
+        from .types import Datasource
+
+        response = await self._async_request("GET", "/api/v1/datasources")
+        data = response.json()
+        return [Datasource.model_validate(ds) for ds in data.get("items", [])]
+
+    def test_datasource(self, datasource_id: str):
+        """Test connectivity to a datasource.
+
+        Attempts to connect to the specified datasource and run a simple
+        query to verify connectivity.
+
+        Args:
+            datasource_id: The ID of the datasource to test.
+
+        Returns:
+            A ConnectionTestResult indicating success or failure.
+
+        Raises:
+            NotFoundError: If the datasource doesn't exist.
+            AuthError: If not authorized to access the datasource.
+
+        Example:
+            ```python
+            result = client.test_datasource("ds-prod-123")
+            if result.success:
+                print(f"Connected in {result.latency_ms}ms")
+            else:
+                print(f"Connection failed: {result.error}")
+            ```
+        """
+        from .types import ConnectionTestResult
+
+        response = self._request("POST", f"/api/v1/datasources/{datasource_id}/test")
+        return ConnectionTestResult.model_validate(response.json())
+
+    async def async_test_datasource(self, datasource_id: str):
+        """Async version of `test_datasource`.
+
+        See `test_datasource` for full documentation.
+        """
+        from .types import ConnectionTestResult
+
+        response = await self._async_request("POST", f"/api/v1/datasources/{datasource_id}/test")
+        return ConnectionTestResult.model_validate(response.json())
+
+    def get_schema(self, datasource_id: str):
+        r"""Get schema information for a datasource.
+
+        Retrieves the database schema including all tables and their columns
+        for the specified datasource.
+
+        Args:
+            datasource_id: The ID of the datasource.
+
+        Returns:
+            A DatasourceSchema containing table and column definitions.
+
+        Raises:
+            NotFoundError: If the datasource doesn't exist.
+            AuthError: If not authorized to access the datasource.
+
+        Example:
+            ```python
+            schema = client.get_schema("ds-prod-123")
+            for table in schema.tables:
+                print(f"\n{table.name}:")
+                for col in table.columns:
+                    null = "NULL" if col.nullable else "NOT NULL"
+                    print(f"  {col.name}: {col.data_type} {null}")
+            ```
+        """
+        response = self._request("GET", f"/api/v1/datasources/{datasource_id}/schema")
+        return self._parse_schema_response(response.json())
+
+    async def async_get_schema(self, datasource_id: str):
+        """Async version of `get_schema`.
+
+        See `get_schema` for full documentation.
+        """
+        response = await self._async_request("GET", f"/api/v1/datasources/{datasource_id}/schema")
+        return self._parse_schema_response(response.json())
+
+    def _parse_schema_response(self, data: dict[str, Any]) -> Any:
+        """Parse backend schema response into SDK DatasourceSchema.
+
+        The backend returns both a hierarchical catalog structure and a flattened
+        tables list for convenience. This method prefers the flattened tables.
+        """
+        from .types import ColumnSchema, DatasourceSchema, TableSchema
+
+        tables = []
+
+        # Prefer flattened tables list if available
+        if "tables" in data and data["tables"]:
+            for tbl in data["tables"]:
+                columns = [
+                    ColumnSchema(
+                        name=col.get("name", ""),
+                        data_type=col.get("data_type", col.get("type", "unknown")),
+                        nullable=col.get("nullable", True),
+                    )
+                    for col in tbl.get("columns", [])
+                ]
+                tables.append(TableSchema(name=tbl["name"], columns=columns))
+        # Fall back to extracting from catalog hierarchy
+        elif "catalogs" in data:
+            for catalog in data.get("catalogs", []):
+                for schema in catalog.get("schemas", []):
+                    schema_name = schema.get("name", "")
+                    for tbl in schema.get("tables", []):
+                        tbl_name = tbl.get("name", "")
+                        full_name = f"{schema_name}.{tbl_name}" if schema_name else tbl_name
+
+                        columns = [
+                            ColumnSchema(
+                                name=col.get("name", ""),
+                                data_type=col.get("data_type", col.get("type", "unknown")),
+                                nullable=col.get("nullable", True),
+                            )
+                            for col in tbl.get("columns", [])
+                        ]
+                        tables.append(TableSchema(name=full_name, columns=columns))
+
+        return DatasourceSchema(tables=tables)

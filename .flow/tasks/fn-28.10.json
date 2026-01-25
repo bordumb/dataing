@@ -1,0 +1,28 @@
+{
+  "assignee": "bordumbb@gmail.com",
+  "claim_note": "",
+  "claimed_at": "2026-01-25T21:20:46.172612Z",
+  "created_at": "2026-01-25T20:44:55.037239Z",
+  "depends_on": [
+    "fn-28.5",
+    "fn-28.6",
+    "fn-28.7",
+    "fn-28.9"
+  ],
+  "epic": "fn-28",
+  "evidence": {
+    "commits": [],
+    "prs": [],
+    "tests": [
+      "88 tests passing in dataing-cli/tests",
+      "87% overall coverage",
+      "Commands coverage: 96-99%"
+    ]
+  },
+  "id": "fn-28.10",
+  "priority": null,
+  "spec_path": ".flow/tasks/fn-28.10.md",
+  "status": "done",
+  "title": "Unit tests for CLI commands and config",
+  "updated_at": "2026-01-25T21:24:31.946119Z"
+}

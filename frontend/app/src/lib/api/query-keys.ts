@@ -16,7 +16,7 @@ export const queryKeys = {
 
   // Data Sources
   datasources: {
-    all: ["/api/v1/datasources/"] as const,
+    all: ["/api/v1/datasources"] as const,
     detail: (id: string) => [`/api/v1/datasources/${id}`] as const,
     schema: (id: string, params?: { search?: string }) =>
       params

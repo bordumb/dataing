@@ -1,0 +1,25 @@
+{
+  "assignee": "bordumbb@gmail.com",
+  "claim_note": "",
+  "claimed_at": "2026-01-25T20:54:58.079314Z",
+  "created_at": "2026-01-25T20:44:53.431305Z",
+  "depends_on": [],
+  "epic": "fn-28",
+  "evidence": {
+    "commits": [
+      "a70decf4c84be7479b8d73170d38a8f20d24bc87"
+    ],
+    "prs": [],
+    "tests": [
+      "uv pip install -e python-packages/dataing-cli",
+      "uv run dataing --help",
+      "uv run dataing --version"
+    ]
+  },
+  "id": "fn-28.1",
+  "priority": null,
+  "spec_path": ".flow/tasks/fn-28.1.md",
+  "status": "done",
+  "title": "Package scaffold: pyproject.toml and directory structure",
+  "updated_at": "2026-01-25T20:56:51.305630Z"
+}

@@ -15,8 +15,13 @@ from .exceptions import (
     ValidationError,
 )
 from .types import (
+    TERMINAL_STATUSES,
     AssetRef,
+    ColumnSchema,
+    ConnectionTestResult,
     ContextBundle,
+    Datasource,
+    DatasourceSchema,
     DiffResult,
     EvidenceKind,
     ExplainResult,
@@ -26,7 +31,7 @@ from .types import (
     RunEvidence,
     RunStatus,
     StreamEvent,
-    TERMINAL_STATUSES,
+    TableSchema,
 )
 
 __version__ = "0.1.0"
@@ -39,7 +44,10 @@ __all__ = [
     "from_sql",
     # Types
     "AssetRef",
+    "ColumnSchema",
     "ContextBundle",
+    "Datasource",
+    "DatasourceSchema",
     "DiffResult",
     "EvidenceKind",
     "ExplainResult",
@@ -49,7 +57,9 @@ __all__ = [
     "RunEvidence",
     "RunStatus",
     "StreamEvent",
+    "TableSchema",
     "TERMINAL_STATUSES",
+    "ConnectionTestResult",
     # Exceptions
     "DataingError",
     "AuthError",

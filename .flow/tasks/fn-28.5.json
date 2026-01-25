@@ -1,0 +1,24 @@
+{
+  "assignee": "bordumbb@gmail.com",
+  "claim_note": "",
+  "claimed_at": "2026-01-25T21:06:18.817991Z",
+  "created_at": "2026-01-25T20:44:54.157528Z",
+  "depends_on": [
+    "fn-28.3",
+    "fn-28.4"
+  ],
+  "epic": "fn-28",
+  "evidence": {
+    "commits": [],
+    "prs": [],
+    "tests": [
+      "Manual verification: init and status commands work correctly with all options"
+    ]
+  },
+  "id": "fn-28.5",
+  "priority": null,
+  "spec_path": ".flow/tasks/fn-28.5.md",
+  "status": "done",
+  "title": "Implement init and status commands",
+  "updated_at": "2026-01-25T21:07:45.478855Z"
+}

@@ -1,0 +1,13 @@
+{
+  "branch_name": "fn-27",
+  "created_at": "2026-01-25T03:42:13.221786Z",
+  "depends_on_epics": [],
+  "id": "fn-27",
+  "next_task": 1,
+  "plan_review_status": "unknown",
+  "plan_reviewed_at": null,
+  "spec_path": ".flow/specs/fn-27.md",
+  "status": "open",
+  "title": "Alert Ingestion Hub",
+  "updated_at": "2026-01-25T03:42:52.021232Z"
+}

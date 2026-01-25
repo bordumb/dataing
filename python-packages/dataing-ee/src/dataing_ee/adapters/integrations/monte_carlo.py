@@ -4,8 +4,22 @@ from __future__ import annotations
 
 from typing import Any
 
+from dataing.core.domain_types import MetricSpec
 from dataing_ee.adapters.integrations.base import IntegrationAdapter, IssueData, WebhookRequest
 from dataing_ee.adapters.integrations.registry import register_adapter
+
+# Monte Carlo anomaly type mapping to standard types
+MC_TYPE_MAP = {
+    "freshness": "freshness",
+    "volume": "row_count",
+    "field_health": "null_rate",
+    "dimension_tracking": "distribution",
+    "schema_change": "schema_drift",
+    "custom_sql": "custom",
+    "json_schema": "schema_drift",
+    "size": "row_count",
+    "byte_count": "row_count",
+}
 
 
 @register_adapter
@@ -209,3 +223,41 @@ class MonteCarloAdapter(IntegrationAdapter):
             "info": "low",
         }
         return severity_map.get(mc_severity.lower(), "medium")
+
+    def _map_anomaly_type(self, issue_data: IssueData) -> str:
+        """Map Monte Carlo monitor type to standard anomaly type."""
+        # Check for monitor type in metadata
+        mc_type = issue_data.metadata.get("mc_monitor_type") or issue_data.metadata.get("mc_type")
+        if mc_type and isinstance(mc_type, str):
+            mapped = MC_TYPE_MAP.get(mc_type.lower())
+            if mapped:
+                return mapped
+
+        # Fall back to base implementation
+        return super()._map_anomaly_type(issue_data)
+
+    def _build_metric_spec(
+        self,
+        issue_data: IssueData,
+        anomaly_type: str,
+    ) -> MetricSpec:
+        """Build MetricSpec from Monte Carlo metadata."""
+        # Get tables from metadata
+        tables = issue_data.metadata.get("mc_tables", [])
+        if isinstance(tables, list) and tables:
+            columns = tables  # Tables are often used as column references in MC context
+        else:
+            columns = []
+
+        # Use monitor type as expression if available
+        mc_type = issue_data.metadata.get("mc_monitor_type") or issue_data.metadata.get("mc_type")
+        if mc_type:
+            return MetricSpec(
+                metric_type="description",
+                expression=f"Monte Carlo {mc_type} monitor",
+                display_name=issue_data.title or f"{mc_type} alert",
+                columns_referenced=columns[:5] if columns else [],  # Limit to first 5
+                source_url=issue_data.external_url,
+            )
+
+        return super()._build_metric_spec(issue_data, anomaly_type)

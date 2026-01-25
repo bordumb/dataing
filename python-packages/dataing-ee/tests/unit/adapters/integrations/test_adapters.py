@@ -8,11 +8,13 @@ import time
 import pytest
 from dataing_ee.adapters.integrations import (
     AdapterRegistry,
+    DbtAdapter,
     GreatExpectationsAdapter,
     IssueData,
     JiraAdapter,
     MonteCarloAdapter,
     SlackAdapter,
+    SodaAdapter,
     WebhookRequest,
     get_adapter,
 )
@@ -65,6 +67,18 @@ class TestAdapterRegistry:
         assert adapter is not None
         assert isinstance(adapter, SlackAdapter)
 
+    def test_get_soda_adapter(self) -> None:
+        """Test getting Soda adapter."""
+        adapter = get_adapter("soda")
+        assert adapter is not None
+        assert isinstance(adapter, SodaAdapter)
+
+    def test_get_dbt_adapter(self) -> None:
+        """Test getting dbt adapter."""
+        adapter = get_adapter("dbt")
+        assert adapter is not None
+        assert isinstance(adapter, DbtAdapter)
+
     def test_get_unknown_adapter(self) -> None:
         """Test getting unknown adapter returns None."""
         adapter = get_adapter("unknown_provider")
@@ -77,10 +91,14 @@ class TestAdapterRegistry:
         assert "monte_carlo" in providers
         assert "great_expectations" in providers
         assert "slack" in providers
+        assert "soda" in providers
+        assert "dbt" in providers
 
     def test_has_provider(self) -> None:
         """Test checking provider exists."""
         assert AdapterRegistry.has("jira")
+        assert AdapterRegistry.has("soda")
+        assert AdapterRegistry.has("dbt")
         assert not AdapterRegistry.has("unknown")
 
 
@@ -532,6 +550,394 @@ class TestSlackAdapter:
         assert adapter.get_event_type(request) == "message"
 
 
+class TestSodaAdapter:
+    """Test Soda Cloud adapter."""
+
+    @pytest.fixture
+    def adapter(self) -> SodaAdapter:
+        """Create adapter instance."""
+        return SodaAdapter()
+
+    def test_verify_signature_valid(self, adapter: SodaAdapter) -> None:
+        """Test valid signature verification."""
+        secret = "test_secret"
+        body = b'{"check": {"id": "123"}}'
+        signature = "sha256=" + hmac.new(secret.encode(), body, hashlib.sha256).hexdigest()
+
+        request = WebhookRequest(
+            body=body,
+            headers={"X-Soda-Signature": signature},
+            query_params={},
+        )
+        assert adapter.verify_signature(request, secret) is True
+
+    def test_verify_signature_invalid(self, adapter: SodaAdapter) -> None:
+        """Test invalid signature is rejected."""
+        request = WebhookRequest(
+            body=b'{"check": {"id": "123"}}',
+            headers={"X-Soda-Signature": "sha256=invalid"},
+            query_params={},
+        )
+        assert adapter.verify_signature(request, "test_secret") is False
+
+    def test_parse_check_payload(self, adapter: SodaAdapter) -> None:
+        """Test parsing check failure payload."""
+        request = make_request(
+            {
+                "check": {
+                    "id": "chk-123",
+                    "name": "row_count > 0",
+                    "dataset": "orders",
+                    "type": "row_count",
+                    "outcome": "fail",
+                    "value": 0,
+                    "fail_threshold": 1,
+                    "definition": "row_count > 0",
+                },
+            }
+        )
+        issue_data = adapter.parse_payload(request)
+
+        assert "row_count > 0" in issue_data.title
+        assert "orders" in issue_data.title
+        assert issue_data.severity == "high"
+        assert issue_data.dataset_id == "orders"
+        assert issue_data.metadata["soda_check_id"] == "chk-123"
+        assert issue_data.metadata["soda_check_type"] == "row_count"
+
+    def test_parse_scan_payload(self, adapter: SodaAdapter) -> None:
+        """Test parsing scan failure payload."""
+        request = make_request(
+            {
+                "scan": {
+                    "id": "scan-456",
+                    "name": "daily_quality_check",
+                    "failed_checks": [
+                        {"name": "check1"},
+                        {"name": "check2"},
+                    ],
+                    "warn_checks": [{"name": "check3"}],
+                },
+            }
+        )
+        issue_data = adapter.parse_payload(request)
+
+        assert "daily_quality_check" in issue_data.title
+        assert "2 failed" in issue_data.title
+        assert "1 warnings" in issue_data.title
+        assert issue_data.severity == "high"  # 2 failures = high severity
+        assert issue_data.metadata["soda_failed_count"] == 2
+
+    def test_get_fingerprint_check(self, adapter: SodaAdapter) -> None:
+        """Test fingerprint from check ID."""
+        request = make_request({"check": {"id": "chk-789"}})
+        assert adapter.get_fingerprint(request) == "soda_check_chk-789"
+
+    def test_get_fingerprint_scan(self, adapter: SodaAdapter) -> None:
+        """Test fingerprint from scan ID."""
+        request = make_request({"scan": {"id": "scan-789"}})
+        assert adapter.get_fingerprint(request) == "soda_scan_scan-789"
+
+    def test_get_event_type_check_failed(self, adapter: SodaAdapter) -> None:
+        """Test event type for failed check."""
+        request = make_request({"check": {"outcome": "fail"}})
+        assert adapter.get_event_type(request) == "check.failed"
+
+    def test_get_event_type_check_warning(self, adapter: SodaAdapter) -> None:
+        """Test event type for warning check."""
+        request = make_request({"check": {"outcome": "warn"}})
+        assert adapter.get_event_type(request) == "check.warning"
+
+    def test_should_process_failure(self, adapter: SodaAdapter) -> None:
+        """Test should process failed check."""
+        request = make_request({"check": {"outcome": "fail"}})
+        assert adapter.should_process(request) is True
+
+    def test_should_not_process_pass(self, adapter: SodaAdapter) -> None:
+        """Test should not process passed check."""
+        request = make_request({"event_type": "check.passed"})
+        assert adapter.should_process(request) is False
+
+    def test_to_anomaly_alert(self, adapter: SodaAdapter) -> None:
+        """Test Soda adapter creates valid AnomalyAlert."""
+        issue_data = IssueData(
+            title="Soda Check Failed: row_count > 0 on orders",
+            severity="high",
+            dataset_id="orders",
+            metadata={
+                "soda_check_id": "chk-123",
+                "soda_check_type": "row_count",
+                "soda_dataset": "orders",
+                "expected_value": 1,
+                "actual_value": 0,
+            },
+        )
+
+        alert = adapter.to_anomaly_alert(issue_data, fingerprint="soda_check_chk-123")
+
+        assert alert.source_system == "soda"
+        assert alert.source_alert_id == "soda_check_chk-123"
+        assert alert.anomaly_type == "row_count"
+        assert "orders" in alert.dataset_ids
+
+
+class TestDbtAdapter:
+    """Test dbt Cloud adapter."""
+
+    @pytest.fixture
+    def adapter(self) -> DbtAdapter:
+        """Create adapter instance."""
+        return DbtAdapter()
+
+    def test_verify_signature_bearer_valid(self, adapter: DbtAdapter) -> None:
+        """Test valid signature with Bearer prefix."""
+        secret = "test_secret"
+        body = b'{"data": {"run": {"id": 123}}}'
+        signature = hmac.new(secret.encode(), body, hashlib.sha256).hexdigest()
+
+        request = WebhookRequest(
+            body=body,
+            headers={"Authorization": f"Bearer {signature}"},
+            query_params={},
+        )
+        assert adapter.verify_signature(request, secret) is True
+
+    def test_verify_signature_sha256_prefix_valid(self, adapter: DbtAdapter) -> None:
+        """Test valid signature with sha256= prefix."""
+        secret = "test_secret"
+        body = b'{"data": {"run": {"id": 123}}}'
+        signature = "sha256=" + hmac.new(secret.encode(), body, hashlib.sha256).hexdigest()
+
+        request = WebhookRequest(
+            body=body,
+            headers={"Authorization": signature},
+            query_params={},
+        )
+        assert adapter.verify_signature(request, secret) is True
+
+    def test_verify_signature_invalid(self, adapter: DbtAdapter) -> None:
+        """Test invalid signature is rejected."""
+        request = WebhookRequest(
+            body=b'{"data": {"run": {"id": 123}}}',
+            headers={"Authorization": "Bearer invalid"},
+            query_params={},
+        )
+        assert adapter.verify_signature(request, "test_secret") is False
+
+    def test_verify_signature_missing(self, adapter: DbtAdapter) -> None:
+        """Test missing signature is rejected."""
+        request = WebhookRequest(
+            body=b'{"data": {"run": {"id": 123}}}',
+            headers={},
+            query_params={},
+        )
+        assert adapter.verify_signature(request, "test_secret") is False
+
+    def test_parse_test_failures(self, adapter: DbtAdapter) -> None:
+        """Test parsing test failure payload."""
+        request = make_request(
+            {
+                "data": {
+                    "run": {
+                        "id": "run-123",
+                        "status": "error",
+                        "started_at": "2024-01-15T10:00:00Z",
+                    },
+                    "job": {
+                        "id": "job-456",
+                        "name": "Daily Transform",
+                    },
+                    "project": {"name": "analytics"},
+                    "account_id": "acc-789",
+                    "run_results": [
+                        {
+                            "unique_id": "test.project.not_null_orders_id",
+                            "status": "fail",
+                            "message": "Failed: null values found",
+                            "depends_on": {"nodes": ["model.project.orders"]},
+                        },
+                        {
+                            "unique_id": "test.project.unique_orders_id",
+                            "status": "fail",
+                            "message": "Failed: duplicate values found",
+                            "depends_on": {"nodes": ["model.project.orders"]},
+                        },
+                    ],
+                },
+            }
+        )
+        issue_data = adapter.parse_payload(request)
+
+        assert "2 test(s)" in issue_data.title
+        assert "Daily Transform" in issue_data.title
+        assert issue_data.severity == "medium"  # 2 failures = medium
+        assert issue_data.metadata["dbt_run_id"] == "run-123"
+        assert issue_data.metadata["dbt_test_count"] == 2
+        assert "dbt" in issue_data.labels
+        assert "test-failed" in issue_data.labels
+
+    def test_parse_run_failure(self, adapter: DbtAdapter) -> None:
+        """Test parsing general run failure (no test results)."""
+        request = make_request(
+            {
+                "data": {
+                    "run": {
+                        "id": "run-999",
+                        "status": "error",
+                        "status_message": "Compilation error in model",
+                    },
+                    "job": {"name": "Daily Transform"},
+                },
+            }
+        )
+        issue_data = adapter.parse_payload(request)
+
+        assert "dbt Run Failed" in issue_data.title
+        assert "Daily Transform" in issue_data.title
+        assert issue_data.severity == "high"
+        assert "Compilation error" in issue_data.description
+        assert "run-failed" in issue_data.labels
+
+    def test_parse_severity_critical(self, adapter: DbtAdapter) -> None:
+        """Test critical severity for 5+ failures."""
+        request = make_request(
+            {
+                "data": {
+                    "job": {"name": "Job"},
+                    "run_results": [
+                        {"unique_id": f"test.project.test_{i}", "status": "fail"} for i in range(5)
+                    ],
+                },
+            }
+        )
+        issue_data = adapter.parse_payload(request)
+        assert issue_data.severity == "critical"
+
+    def test_parse_severity_high(self, adapter: DbtAdapter) -> None:
+        """Test high severity for 3-4 failures."""
+        request = make_request(
+            {
+                "data": {
+                    "job": {"name": "Job"},
+                    "run_results": [
+                        {"unique_id": f"test.project.test_{i}", "status": "fail"} for i in range(3)
+                    ],
+                },
+            }
+        )
+        issue_data = adapter.parse_payload(request)
+        assert issue_data.severity == "high"
+
+    def test_get_fingerprint_run_id(self, adapter: DbtAdapter) -> None:
+        """Test fingerprint from run ID."""
+        request = make_request({"data": {"run": {"id": "run-abc"}}})
+        assert adapter.get_fingerprint(request) == "dbt_run_run-abc"
+
+    def test_get_fingerprint_event_id(self, adapter: DbtAdapter) -> None:
+        """Test fingerprint from event ID."""
+        request = make_request({"event_id": "evt-123"})
+        assert adapter.get_fingerprint(request) == "dbt_evt-123"
+
+    def test_get_fingerprint_fallback(self, adapter: DbtAdapter) -> None:
+        """Test fingerprint fallback to hash."""
+        request = make_request({"some": "data"})
+        fingerprint = adapter.get_fingerprint(request)
+        assert fingerprint.startswith("dbt_")
+
+    def test_get_event_type_explicit(self, adapter: DbtAdapter) -> None:
+        """Test event type from explicit field."""
+        request = make_request({"event_type": "job.run.errored"})
+        assert adapter.get_event_type(request) == "job.run.errored"
+
+    def test_get_event_type_from_status(self, adapter: DbtAdapter) -> None:
+        """Test event type inferred from run status."""
+        request = make_request({"data": {"run": {"status": "error"}}})
+        assert adapter.get_event_type(request) == "job.run.errored"
+
+    def test_should_process_error(self, adapter: DbtAdapter) -> None:
+        """Test should process errored runs."""
+        request = make_request({"event_type": "job.run.errored"})
+        assert adapter.should_process(request) is True
+
+    def test_should_not_process_success(self, adapter: DbtAdapter) -> None:
+        """Test should not process successful runs without test failures."""
+        request = make_request({"event_type": "job.run.completed", "data": {}})
+        assert adapter.should_process(request) is False
+
+    def test_should_process_completed_with_test_failures(self, adapter: DbtAdapter) -> None:
+        """Test should process completed runs that have test failures."""
+        request = make_request(
+            {
+                "event_type": "job.run.completed",
+                "data": {
+                    "run_results": [
+                        {"unique_id": "test.project.test_1", "status": "fail"},
+                    ],
+                },
+            }
+        )
+        assert adapter.should_process(request) is True
+
+    def test_to_anomaly_alert(self, adapter: DbtAdapter) -> None:
+        """Test dbt adapter creates valid AnomalyAlert."""
+        issue_data = IssueData(
+            title="dbt Test Failed: 2 test(s) in Daily Transform",
+            severity="medium",
+            dataset_id="orders",
+            metadata={
+                "dbt_run_id": "run-123",
+                "dbt_job_name": "Daily Transform",
+                "dbt_test_type": "not_null",
+                "dbt_model": "orders",
+                "dbt_test_names": ["not_null_orders_id", "unique_orders_id"],
+            },
+        )
+
+        alert = adapter.to_anomaly_alert(issue_data, fingerprint="dbt_run_run-123")
+
+        assert alert.source_system == "dbt"
+        assert alert.source_alert_id == "dbt_run_run-123"
+        assert alert.anomaly_type == "null_rate"  # mapped from not_null
+        assert "orders" in alert.dataset_ids
+
+    def test_anomaly_type_mapping(self, adapter: DbtAdapter) -> None:
+        """Test dbt test type to anomaly type mapping."""
+        test_cases = [
+            ("not_null", "null_rate"),
+            ("unique", "duplicate_rate"),
+            ("accepted_values", "distribution"),
+            ("relationships", "referential_integrity"),
+            ("freshness", "freshness"),
+        ]
+
+        for dbt_type, expected_type in test_cases:
+            issue_data = IssueData(
+                title=f"{dbt_type} test failure",
+                metadata={"dbt_test_type": dbt_type},
+            )
+            alert = adapter.to_anomaly_alert(issue_data, fingerprint=f"test-{dbt_type}")
+            assert alert.anomaly_type == expected_type, f"Failed for {dbt_type}"
+
+    def test_extract_model_from_depends_on(self, adapter: DbtAdapter) -> None:
+        """Test model extraction from test depends_on."""
+        request = make_request(
+            {
+                "data": {
+                    "job": {"name": "Job"},
+                    "run_results": [
+                        {
+                            "unique_id": "test.project.not_null_orders_id",
+                            "status": "fail",
+                            "depends_on": {"nodes": ["model.project.orders"]},
+                        },
+                    ],
+                },
+            }
+        )
+        issue_data = adapter.parse_payload(request)
+        assert issue_data.dataset_id == "orders"
+
+
 class TestIssueData:
     """Test IssueData dataclass."""
 
@@ -556,6 +962,122 @@ class TestIssueData:
         assert data.title == "Test Title"
         assert data.severity == "high"
         assert data.labels == ["bug"]
+
+
+class TestToAnomalyAlert:
+    """Test to_anomaly_alert conversion method."""
+
+    def test_monte_carlo_to_anomaly_alert(self) -> None:
+        """Test Monte Carlo adapter creates valid AnomalyAlert."""
+        adapter = MonteCarloAdapter()
+        issue_data = IssueData(
+            title="Freshness issue on orders table",
+            description="Data is stale",
+            severity="high",
+            dataset_id="db.schema.orders",
+            external_url="https://getmontecarlo.com/incident/123",
+            metadata={
+                "mc_incident_id": "inc-123",
+                "mc_type": "freshness",
+                "mc_tables": ["db.schema.orders", "db.schema.order_items"],
+            },
+        )
+
+        alert = adapter.to_anomaly_alert(issue_data, fingerprint="mc_incident_inc-123")
+
+        assert alert.source_system == "monte_carlo"
+        assert alert.source_alert_id == "mc_incident_inc-123"
+        assert alert.severity == "high"
+        assert alert.anomaly_type == "freshness"
+        assert "db.schema.orders" in alert.dataset_ids
+        assert alert.source_url == "https://getmontecarlo.com/incident/123"
+        assert alert.metric_spec.metric_type == "description"
+        assert "freshness" in alert.metric_spec.expression.lower()
+
+    def test_great_expectations_to_anomaly_alert(self) -> None:
+        """Test Great Expectations adapter creates valid AnomalyAlert."""
+        adapter = GreatExpectationsAdapter()
+        issue_data = IssueData(
+            title="Data Quality Check Failed - orders_suite",
+            description="3 expectations failed",
+            severity="critical",
+            dataset_id="orders",
+            external_url="https://ge-docs.example.com/results/123",
+            metadata={
+                "ge_suite": "orders_suite",
+                "ge_checkpoint": "daily_check",
+                "ge_run_id": "run-456",
+                "ge_statistics": {
+                    "evaluated_expectations": 10,
+                    "unsuccessful_expectations": 3,
+                    "success_percent": 70.0,
+                },
+            },
+        )
+
+        alert = adapter.to_anomaly_alert(issue_data, fingerprint="ge_run-456_orders_suite")
+
+        assert alert.source_system == "great_expectations"
+        assert alert.source_alert_id == "ge_run-456_orders_suite"
+        assert alert.severity == "critical"
+        assert "orders" in alert.dataset_ids
+        assert alert.source_url == "https://ge-docs.example.com/results/123"
+        assert "orders_suite" in alert.metric_spec.expression
+        assert "(3/10 failed)" in alert.metric_spec.display_name
+
+    def test_to_anomaly_alert_with_values(self) -> None:
+        """Test to_anomaly_alert uses expected/actual values from metadata."""
+        adapter = MonteCarloAdapter()
+        issue_data = IssueData(
+            title="Volume anomaly",
+            severity="medium",
+            metadata={
+                "expected_value": 1000.0,
+                "actual_value": 500.0,
+                "deviation_pct": 50.0,
+            },
+        )
+
+        alert = adapter.to_anomaly_alert(issue_data, fingerprint="test-123")
+
+        assert alert.expected_value == 1000.0
+        assert alert.actual_value == 500.0
+        assert alert.deviation_pct == 50.0
+
+    def test_to_anomaly_alert_calculates_deviation(self) -> None:
+        """Test deviation is calculated if not provided."""
+        adapter = MonteCarloAdapter()
+        issue_data = IssueData(
+            title="Row count anomaly",
+            severity="low",
+            metadata={
+                "expected_value": 100.0,
+                "actual_value": 80.0,
+            },
+        )
+
+        alert = adapter.to_anomaly_alert(issue_data, fingerprint="test-456")
+
+        assert alert.deviation_pct == 20.0  # (100-80)/100 * 100
+
+    def test_anomaly_type_mapping_monte_carlo(self) -> None:
+        """Test Monte Carlo type mapping."""
+        adapter = MonteCarloAdapter()
+
+        test_cases = [
+            ("volume", "row_count"),
+            ("field_health", "null_rate"),
+            ("freshness", "freshness"),
+            ("dimension_tracking", "distribution"),
+        ]
+
+        for mc_type, expected_type in test_cases:
+            issue_data = IssueData(
+                title=f"{mc_type} issue",
+                metadata={"mc_type": mc_type},
+            )
+            alert = adapter.to_anomaly_alert(issue_data, fingerprint=f"test-{mc_type}")
+            assert alert.anomaly_type == expected_type, f"Failed for {mc_type}"
 
 
 class TestWebhookRequest:

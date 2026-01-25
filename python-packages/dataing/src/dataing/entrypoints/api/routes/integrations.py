@@ -7,16 +7,20 @@ Policy evaluation determines the action taken: auto investigation, review, or is
 
 from __future__ import annotations
 
+import base64
 import hashlib
 import hmac
 import json
 import logging
 import os
 from datetime import UTC, datetime
+from functools import lru_cache
 from typing import Annotated, Any
 from uuid import UUID, uuid4
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Request, status
+from jsonschema import Draft7Validator
+from jsonschema.exceptions import SchemaError
 from pydantic import BaseModel, Field
 
 from dataing.adapters.db.app_db import AppDatabase
@@ -109,6 +113,99 @@ def get_webhook_secret() -> str | None:
 
 
 # ============================================================================
+# JSON Schema Validation
+# ============================================================================
+
+
+@lru_cache(maxsize=16)
+def _parse_json_schema(schema_json: str) -> dict[str, Any]:
+    """Parse and validate a JSON schema string. Cached for performance."""
+    try:
+        schema: dict[str, Any] = json.loads(schema_json)
+    except json.JSONDecodeError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Invalid JSON in schema: {e}",
+        ) from e
+
+    # Validate the schema itself
+    try:
+        Draft7Validator.check_schema(schema)
+    except SchemaError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Invalid JSON Schema: {e.message}",
+        ) from e
+
+    return schema
+
+
+def get_configured_schema() -> dict[str, Any] | None:
+    """Get the JSON schema from environment configuration.
+
+    Returns:
+        Parsed JSON schema dict, or None if not configured.
+    """
+    schema_json = os.getenv("WEBHOOK_JSON_SCHEMA")
+    if not schema_json:
+        return None
+
+    return _parse_json_schema(schema_json)
+
+
+def decode_header_schema(header_value: str) -> dict[str, Any]:
+    """Decode a base64-encoded JSON schema from header.
+
+    Args:
+        header_value: Base64-encoded JSON schema string
+
+    Returns:
+        Parsed JSON schema dict
+    """
+    try:
+        schema_json = base64.b64decode(header_value).decode("utf-8")
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Invalid base64 encoding in X-JSON-Schema header: {e}",
+        ) from e
+
+    return _parse_json_schema(schema_json)
+
+
+def validate_payload_against_schema(
+    payload: dict[str, Any],
+    schema: dict[str, Any],
+) -> None:
+    """Validate payload against JSON schema.
+
+    Args:
+        payload: The JSON payload to validate
+        schema: The JSON schema to validate against
+
+    Raises:
+        HTTPException: If validation fails
+    """
+    validator = Draft7Validator(schema)
+    errors = list(validator.iter_errors(payload))
+
+    if errors:
+        # Format error messages
+        error_messages = []
+        for error in errors[:5]:  # Limit to first 5 errors
+            path = ".".join(str(p) for p in error.absolute_path) if error.absolute_path else "root"
+            error_messages.append(f"{path}: {error.message}")
+
+        if len(errors) > 5:
+            error_messages.append(f"... and {len(errors) - 5} more errors")
+
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Schema validation failed: {'; '.join(error_messages)}",
+        )
+
+
+# ============================================================================
 # API Routes
 # ============================================================================
 
@@ -123,11 +220,16 @@ async def receive_generic_webhook(
     auth: AuthDep,
     db: AppDbDep,
     x_webhook_signature: str | None = Header(default=None),
+    x_json_schema: str | None = Header(default=None, description="Base64-encoded JSON Schema"),
 ) -> WebhookIssueResponse:
     """Receive a generic webhook to create an issue.
 
     This endpoint allows external systems to create issues via HTTP webhook.
     Requests must be signed with HMAC-SHA256 using the shared secret.
+
+    Optional JSON Schema validation can be configured via:
+    - WEBHOOK_JSON_SCHEMA environment variable (inline JSON schema)
+    - X-JSON-Schema header (base64-encoded JSON schema, overrides env config)
 
     Idempotency: If source_provider and source_external_id are provided,
     duplicate webhooks will return the existing issue instead of creating
@@ -152,11 +254,30 @@ async def receive_generic_webhook(
             detail="Invalid webhook signature",
         )
 
-    # Parse payload
+    # Parse raw JSON first
     try:
-        import json
-
         payload_dict = json.loads(body)
+    except json.JSONDecodeError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Invalid JSON payload: {e}",
+        ) from e
+
+    # JSON Schema validation (optional)
+    schema: dict[str, Any] | None = None
+    if x_json_schema:
+        # Header takes precedence
+        schema = decode_header_schema(x_json_schema)
+    else:
+        # Fall back to environment configuration
+        schema = get_configured_schema()
+
+    if schema:
+        validate_payload_against_schema(payload_dict, schema)
+        logger.debug(f"Schema validation passed for tenant={auth.tenant_id}")
+
+    # Parse with Pydantic model
+    try:
         payload = GenericWebhookPayload(**payload_dict)
     except Exception as e:
         logger.warning(f"Webhook payload invalid: {e}")

@@ -4,8 +4,35 @@ from __future__ import annotations
 
 from typing import Any
 
+from dataing.core.domain_types import MetricSpec
 from dataing_ee.adapters.integrations.base import IntegrationAdapter, IssueData, WebhookRequest
 from dataing_ee.adapters.integrations.registry import register_adapter
+
+# Great Expectations expectation type mapping to standard anomaly types
+GX_TYPE_MAP = {
+    # Null checks
+    "expect_column_values_to_not_be_null": "null_rate",
+    "expect_column_values_to_be_null": "null_rate",
+    # Uniqueness checks
+    "expect_column_values_to_be_unique": "duplicate_rate",
+    "expect_compound_columns_to_be_unique": "duplicate_rate",
+    # Distribution checks
+    "expect_column_values_to_be_in_set": "distribution",
+    "expect_column_distinct_values_to_be_in_set": "distribution",
+    "expect_column_distinct_values_to_equal_set": "distribution",
+    "expect_column_distinct_values_to_contain_set": "distribution",
+    # Row count checks
+    "expect_table_row_count_to_be_between": "row_count",
+    "expect_table_row_count_to_equal": "row_count",
+    # Schema checks
+    "expect_table_columns_to_match_ordered_list": "schema_drift",
+    "expect_table_columns_to_match_set": "schema_drift",
+    "expect_column_to_exist": "schema_drift",
+    # Type checks
+    "expect_column_values_to_be_of_type": "schema_drift",
+    # Freshness (custom)
+    "expect_column_max_to_be_between": "freshness",  # Often used for date freshness
+}
 
 
 @register_adapter
@@ -202,3 +229,64 @@ class GreatExpectationsAdapter(IntegrationAdapter):
         elif success_pct < 90:
             return "medium"
         return "low"
+
+    def _map_anomaly_type(self, issue_data: IssueData) -> str:
+        """Map Great Expectations expectation types to standard anomaly types."""
+        # Check for expectation types in metadata
+        statistics = issue_data.metadata.get("ge_statistics", {})
+
+        # If we have statistics with failed expectations, try to determine type
+        # from the most common failed expectation type
+        if isinstance(statistics, dict):
+            # This would require access to the failed expectations list
+            # which might be in a separate field
+            pass
+
+        # Check title for expectation type hints
+        title = (issue_data.title or "").lower()
+        for exp_type, anomaly_type in GX_TYPE_MAP.items():
+            if exp_type.replace("_", " ").replace("expect ", "") in title:
+                return anomaly_type
+
+        # Fall back to base implementation
+        return super()._map_anomaly_type(issue_data)
+
+    def _build_metric_spec(
+        self,
+        issue_data: IssueData,
+        anomaly_type: str,
+    ) -> MetricSpec:
+        """Build MetricSpec from Great Expectations metadata."""
+        suite_name = issue_data.metadata.get("ge_suite", "")
+        checkpoint = issue_data.metadata.get("ge_checkpoint", "")
+        statistics = issue_data.metadata.get("ge_statistics", {})
+
+        # Build expression from GE context
+        if suite_name:
+            expression = f"Great Expectations suite: {suite_name}"
+        elif checkpoint:
+            expression = f"Great Expectations checkpoint: {checkpoint}"
+        else:
+            expression = issue_data.title or "Great Expectations validation"
+
+        # Get column references if available
+        columns: list[str] = []
+        # Columns might be embedded in the title or description
+        if issue_data.dataset_id:
+            columns.append(issue_data.dataset_id)
+
+        # Include statistics in display name
+        display_name = issue_data.title or "GX Validation Failed"
+        if isinstance(statistics, dict):
+            failed = statistics.get("unsuccessful_expectations", 0)
+            total = statistics.get("evaluated_expectations", 0)
+            if total > 0:
+                display_name = f"{display_name} ({failed}/{total} failed)"
+
+        return MetricSpec(
+            metric_type="description",
+            expression=expression,
+            display_name=display_name,
+            columns_referenced=columns[:5],
+            source_url=issue_data.external_url,
+        )

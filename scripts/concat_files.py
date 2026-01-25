@@ -15,7 +15,8 @@ from pathlib import Path
 ROOT_DIR = Path(".")
 
 SEARCH_PREFIXES = [
-    "dataing",
+    "python-packages",
+    "frontend/jupyterlab-dataing/src",
     # "frontend",
     # "bond",
     # "maistro",
@@ -76,7 +77,7 @@ EXCLUDE = {
 
 ENCODING = "utf-8"
 
-OUTPUT_FILE = "all_code_and_configs.txt"
+OUTPUT_FILE = "dataing_all_code.txt"
 
 BANNER_CHAR = "─"
 BANNER_WIDTH = 160

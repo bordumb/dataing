@@ -7,6 +7,7 @@ from dataing_ee.adapters.integrations.base import (
 )
 
 # Import adapters to trigger registration
+from dataing_ee.adapters.integrations.dbt import DbtAdapter
 from dataing_ee.adapters.integrations.great_expectations import GreatExpectationsAdapter
 from dataing_ee.adapters.integrations.jira import JiraAdapter
 from dataing_ee.adapters.integrations.monte_carlo import MonteCarloAdapter
@@ -16,6 +17,7 @@ from dataing_ee.adapters.integrations.registry import (
     register_adapter,
 )
 from dataing_ee.adapters.integrations.slack import SlackAdapter
+from dataing_ee.adapters.integrations.soda import SodaAdapter
 
 __all__ = [
     "IntegrationAdapter",
@@ -25,8 +27,10 @@ __all__ = [
     "get_adapter",
     "register_adapter",
     # Adapters
+    "DbtAdapter",
     "JiraAdapter",
     "MonteCarloAdapter",
     "GreatExpectationsAdapter",
     "SlackAdapter",
+    "SodaAdapter",
 ]

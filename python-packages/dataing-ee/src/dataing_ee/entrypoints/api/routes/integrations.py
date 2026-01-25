@@ -8,19 +8,24 @@ from __future__ import annotations
 
 import hashlib
 import hmac
+import json
 import logging
 import secrets
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Annotated, Any
-from uuid import UUID
+from uuid import UUID, uuid4
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from pydantic import BaseModel, Field
 
 from dataing.adapters.db.app_db import AppDatabase
+from dataing.adapters.db.team_policy_repository import PolicyAction, TeamPolicyRepository
 from dataing.core.json_utils import to_json_string
-from dataing.entrypoints.api.deps import get_app_db
+from dataing.entrypoints.api.deps import get_app_db, resolve_datasource_id
 from dataing.entrypoints.api.middleware.auth import ApiKeyContext, require_scope, verify_api_key
+from dataing.services.policy import IssueContext, PolicyService
+from dataing_ee.adapters.integrations.base import IssueData, WebhookRequest
+from dataing_ee.adapters.integrations.registry import get_adapter
 from dataing_ee.models.integration import IntegrationEventStatus, IntegrationProvider
 
 logger = logging.getLogger(__name__)
@@ -38,7 +43,9 @@ AppDbDep = Annotated[AppDatabase, Depends(get_app_db)]
 # ============================================================================
 
 
-VALID_PROVIDERS = "^(jira|linear|pagerduty|opsgenie|monte_carlo|great_expectations|slack|custom)$"
+VALID_PROVIDERS = (
+    "^(jira|linear|pagerduty|opsgenie|monte_carlo|great_expectations|soda|dbt|slack|custom)$"
+)
 
 
 class IntegrationCreate(BaseModel):
@@ -454,6 +461,7 @@ async def receive_provider_webhook(
     """Receive a webhook from an integration provider.
 
     The webhook is verified using the provider-specific signature scheme.
+    Uses adapter classes for MC/GX when available, falls back to inline logic otherwise.
     Idempotency is enforced via the integration_events table.
     """
     if provider not in IntegrationProvider.all():
@@ -488,20 +496,51 @@ async def receive_provider_webhook(
     # Read body
     body = await request.body()
 
-    # Get signature header
-    sig_header_name = _get_signature_header_name(provider)
-    signature = request.headers.get(sig_header_name)
+    # Try to get adapter for this provider
+    adapter = get_adapter(provider)
+
+    # Build WebhookRequest for adapter if available
+    webhook_request: WebhookRequest | None = None
+    if adapter:
+        webhook_request = WebhookRequest(
+            body=body,
+            headers=dict(request.headers),
+            query_params=dict(request.query_params),
+        )
+
+        # Check if adapter wants to process this event
+        if not adapter.should_process(webhook_request):
+            logger.info(
+                f"Webhook skipped by adapter: integration={integration_id}, provider={provider}"
+            )
+            return {"status": "skipped", "reason": "filtered_by_adapter"}
 
     # Verify signature
     if integration["signing_secret"]:
-        if not _verify_provider_signature(body, signature, integration["signing_secret"], provider):
-            logger.warning(
-                f"Webhook signature invalid: integration={integration_id}, provider={provider}"
-            )
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Invalid webhook signature",
-            )
+        if adapter and webhook_request:
+            # Use adapter for signature verification
+            if not adapter.verify_signature(webhook_request, integration["signing_secret"]):
+                logger.warning(
+                    f"Webhook signature invalid: integration={integration_id}, provider={provider}"
+                )
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="Invalid webhook signature",
+                )
+        else:
+            # Fallback to inline verification
+            sig_header_name = _get_signature_header_name(provider)
+            signature = request.headers.get(sig_header_name)
+            if not _verify_provider_signature(
+                body, signature, integration["signing_secret"], provider
+            ):
+                logger.warning(
+                    f"Webhook signature invalid: integration={integration_id}, provider={provider}"
+                )
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="Invalid webhook signature",
+                )
 
     # Parse payload and compute idempotency key
     import json
@@ -514,10 +553,16 @@ async def receive_provider_webhook(
             detail=f"Invalid JSON: {e}",
         ) from e
 
-    # Extract idempotency key (provider-specific)
-    idempotency_key = _extract_idempotency_key(payload, provider, request)
+    # Extract idempotency key and event type (provider-specific)
+    if adapter and webhook_request:
+        # Use adapter for fingerprinting and event type
+        idempotency_key = adapter.get_fingerprint(webhook_request)
+        event_type = adapter.get_event_type(webhook_request)
+    else:
+        # Fallback to inline extraction
+        idempotency_key = _extract_idempotency_key(payload, provider, request)
+        event_type = _extract_event_type(payload, provider)
     payload_hash = hashlib.sha256(body).hexdigest()
-    event_type = _extract_event_type(payload, provider)
 
     # Check for existing event (idempotency)
     existing_event = await db.fetch_one(
@@ -569,9 +614,26 @@ async def receive_provider_webhook(
         """,
         integration_id,
     )
+    mappings_list = [dict(m) for m in mappings]
 
-    # Map payload to issue fields
-    issue_data = _map_payload_to_issue(payload, mappings, provider)
+    # Map payload to issue fields using adapter or fallback
+    if adapter and webhook_request:
+        # Use adapter for payload parsing - returns IssueData dataclass
+        issue_data_obj = adapter.parse_payload(webhook_request, mappings_list)
+        # Convert IssueData to dict for consistent access
+        issue_data: dict[str, Any] = {
+            "title": issue_data_obj.title,
+            "description": issue_data_obj.description,
+            "severity": issue_data_obj.severity,
+            "priority": issue_data_obj.priority,
+            "dataset_id": issue_data_obj.dataset_id,
+            "labels": issue_data_obj.labels,
+            "external_url": issue_data_obj.external_url,
+            "metadata": issue_data_obj.metadata,
+        }
+    else:
+        # Fallback to inline parsing
+        issue_data = _map_payload_to_issue(payload, mappings_list, provider)
 
     if not issue_data.get("title"):
         # Mark as skipped - no title means we can't create an issue
@@ -649,6 +711,19 @@ async def receive_provider_webhook(
         to_json_string(event_payload),
     )
 
+    # Evaluate policy and start auto-investigation if applicable
+    investigation_id = await _evaluate_and_start_investigation(
+        request=request,
+        db=db,
+        tenant_id=tenant_id,
+        issue_id=issue_id,
+        issue_data=issue_data,
+        adapter=adapter,
+        webhook_request=webhook_request,
+        idempotency_key=idempotency_key,
+        provider=provider,
+    )
+
     # Update integration event as processed
     await db.execute(
         """
@@ -673,15 +748,194 @@ async def receive_provider_webhook(
 
     logger.info(
         f"Webhook processed: integration={integration_id}, event={event_id}, "
-        f"issue={issue_id}, number={issue_number}, provider={provider}"
+        f"issue={issue_id}, number={issue_number}, provider={provider}, "
+        f"investigation={investigation_id}"
     )
 
-    return {
+    result: dict[str, Any] = {
         "status": "processed",
         "event_id": str(event_id),
         "issue_id": str(issue_id),
         "issue_number": issue_number,
     }
+    if investigation_id:
+        result["investigation_id"] = str(investigation_id)
+    return result
+
+
+async def _evaluate_and_start_investigation(
+    request: Request,
+    db: AppDatabase,
+    tenant_id: UUID,
+    issue_id: UUID,
+    issue_data: dict[str, Any],
+    adapter: Any,
+    webhook_request: WebhookRequest | None,
+    idempotency_key: str,
+    provider: str,
+) -> UUID | None:
+    """Evaluate policy and start auto-investigation if applicable.
+
+    Returns:
+        Investigation ID if started, None otherwise.
+    """
+    from dataing.temporal.client import TemporalInvestigationClient
+
+    # Get the default team for this tenant
+    policy_repo = TeamPolicyRepository(db)
+    team_id = await policy_repo.get_default_team_for_tenant(tenant_id)
+
+    if not team_id:
+        logger.debug(f"No team found for tenant={tenant_id}, skipping policy evaluation")
+        return None
+
+    # Build issue context for policy evaluation
+    context = IssueContext(
+        team_id=team_id,
+        dataset_id=issue_data.get("dataset_id"),
+        severity=issue_data.get("severity"),
+        source=provider,
+    )
+
+    # Evaluate policy
+    policy_service = PolicyService(db)
+    policy_result = await policy_service.evaluate(context)
+
+    logger.info(
+        f"Policy evaluated: issue={issue_id}, action={policy_result.action.value}, "
+        f"source={policy_result.source}, provider={provider}"
+    )
+
+    # Record policy evaluation event
+    await db.execute(
+        """
+        INSERT INTO issue_events (issue_id, event_type, actor_user_id, payload)
+        VALUES ($1, 'policy_evaluated', NULL, $2)
+        """,
+        issue_id,
+        to_json_string(
+            {
+                "action": policy_result.action.value,
+                "source": policy_result.source,
+                "policy_id": str(policy_result.policy_id) if policy_result.policy_id else None,
+                "override_id": str(policy_result.override_id)
+                if policy_result.override_id
+                else None,
+            }
+        ),
+    )
+
+    if policy_result.action != PolicyAction.AUTO:
+        return None
+
+    # Get Temporal client
+    temporal_client: TemporalInvestigationClient | None = getattr(
+        request.app.state, "temporal_client", None
+    )
+
+    if temporal_client is None:
+        logger.warning(
+            f"Temporal not configured, cannot start auto investigation for issue={issue_id}"
+        )
+        return None
+
+    # Build AnomalyAlert from issue data
+    if adapter and webhook_request:
+        # Use adapter to create proper IssueData then convert to AnomalyAlert
+        issue_data_obj = IssueData(
+            title=issue_data.get("title"),
+            description=issue_data.get("description"),
+            severity=issue_data.get("severity"),
+            priority=issue_data.get("priority"),
+            dataset_id=issue_data.get("dataset_id"),
+            labels=issue_data.get("labels", []),
+            external_url=issue_data.get("external_url"),
+            metadata=issue_data.get("metadata", {}),
+        )
+        anomaly_alert = adapter.to_anomaly_alert(issue_data_obj, idempotency_key)
+        alert_data = anomaly_alert.model_dump()
+    else:
+        # Fallback for providers without adapters
+        now = datetime.now(UTC)
+        alert_data = {
+            "dataset_ids": [issue_data.get("dataset_id")] if issue_data.get("dataset_id") else [],
+            "metric_spec": {
+                "metric_type": "description",
+                "expression": issue_data.get("title", ""),
+                "display_name": issue_data.get("title", "Integration Alert"),
+                "columns_referenced": [],
+            },
+            "anomaly_type": "integration_alert",
+            "expected_value": 0.0,
+            "actual_value": 0.0,
+            "deviation_pct": 0.0,
+            "anomaly_date": now.date().isoformat(),
+            "severity": issue_data.get("severity") or "medium",
+            "source_system": provider,
+            "source_alert_id": idempotency_key,
+        }
+
+    investigation_id = uuid4()
+
+    # Resolve datasource
+    try:
+        datasource_id = await resolve_datasource_id(request, tenant_id, explicit_id=None)
+    except ValueError:
+        # No default datasource, use placeholder
+        datasource_id = UUID("00000000-0000-0000-0000-000000000003")
+
+    # Add issue_id to alert data for back-linking
+    alert_data["issue_id"] = str(issue_id)
+    alert_data["datasource_id"] = str(datasource_id)
+
+    try:
+        # Create investigation record
+        await db.execute(
+            """
+            INSERT INTO investigations (id, tenant_id, alert)
+            VALUES ($1, $2, $3)
+            """,
+            investigation_id,
+            tenant_id,
+            json.dumps(alert_data),
+        )
+
+        # Start Temporal workflow
+        alert_summary = f"Auto investigation: {issue_data.get('title', 'Webhook alert')}"
+        await temporal_client.start_investigation(
+            investigation_id=str(investigation_id),
+            tenant_id=str(tenant_id),
+            datasource_id=str(datasource_id),
+            alert_data=alert_data,
+            alert_summary=alert_summary,
+        )
+
+        # Record investigation started event on issue
+        await db.execute(
+            """
+            INSERT INTO issue_events (issue_id, event_type, actor_user_id, payload)
+            VALUES ($1, 'investigation_started', NULL, $2)
+            """,
+            issue_id,
+            to_json_string(
+                {
+                    "investigation_id": str(investigation_id),
+                    "trigger": "auto_policy",
+                    "source_system": provider,
+                }
+            ),
+        )
+
+        logger.info(
+            f"Auto investigation started: investigation={investigation_id}, "
+            f"issue={issue_id}, provider={provider}"
+        )
+
+        return investigation_id
+
+    except Exception as e:
+        logger.error(f"Failed to start auto investigation for issue={issue_id}: {e}")
+        return None
 
 
 def _extract_idempotency_key(payload: dict[str, Any], provider: str, request: Request) -> str:

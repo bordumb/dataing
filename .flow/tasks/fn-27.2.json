@@ -1,0 +1,23 @@
+{
+  "assignee": "bordumbb@gmail.com",
+  "claim_note": "",
+  "claimed_at": "2026-01-25T03:54:07.916555Z",
+  "created_at": "2026-01-25T03:43:01.178472Z",
+  "depends_on": [],
+  "epic": "fn-27",
+  "evidence": {
+    "commits": [
+      "4125f740378ce76c17fc5e52b3150b9b32da5424"
+    ],
+    "prs": [],
+    "tests": [
+      "uv run pytest python-packages/dataing-ee/tests/unit/adapters/integrations/ -v"
+    ]
+  },
+  "id": "fn-27.2",
+  "priority": null,
+  "spec_path": ".flow/tasks/fn-27.2.md",
+  "status": "done",
+  "title": "Add to_anomaly_alert conversion to IntegrationAdapter",
+  "updated_at": "2026-01-25T03:58:31.985355Z"
+}

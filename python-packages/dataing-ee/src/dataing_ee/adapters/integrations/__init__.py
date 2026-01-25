@@ -16,6 +16,7 @@ from dataing_ee.adapters.integrations.registry import (
     register_adapter,
 )
 from dataing_ee.adapters.integrations.slack import SlackAdapter
+from dataing_ee.adapters.integrations.soda import SodaAdapter
 
 __all__ = [
     "IntegrationAdapter",
@@ -29,4 +30,5 @@ __all__ = [
     "MonteCarloAdapter",
     "GreatExpectationsAdapter",
     "SlackAdapter",
+    "SodaAdapter",
 ]

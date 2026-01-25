@@ -13,6 +13,7 @@ from dataing_ee.adapters.integrations import (
     JiraAdapter,
     MonteCarloAdapter,
     SlackAdapter,
+    SodaAdapter,
     WebhookRequest,
     get_adapter,
 )
@@ -65,6 +66,12 @@ class TestAdapterRegistry:
         assert adapter is not None
         assert isinstance(adapter, SlackAdapter)
 
+    def test_get_soda_adapter(self) -> None:
+        """Test getting Soda adapter."""
+        adapter = get_adapter("soda")
+        assert adapter is not None
+        assert isinstance(adapter, SodaAdapter)
+
     def test_get_unknown_adapter(self) -> None:
         """Test getting unknown adapter returns None."""
         adapter = get_adapter("unknown_provider")
@@ -77,10 +84,12 @@ class TestAdapterRegistry:
         assert "monte_carlo" in providers
         assert "great_expectations" in providers
         assert "slack" in providers
+        assert "soda" in providers
 
     def test_has_provider(self) -> None:
         """Test checking provider exists."""
         assert AdapterRegistry.has("jira")
+        assert AdapterRegistry.has("soda")
         assert not AdapterRegistry.has("unknown")
 
 
@@ -530,6 +539,137 @@ class TestSlackAdapter:
             }
         )
         assert adapter.get_event_type(request) == "message"
+
+
+class TestSodaAdapter:
+    """Test Soda Cloud adapter."""
+
+    @pytest.fixture
+    def adapter(self) -> SodaAdapter:
+        """Create adapter instance."""
+        return SodaAdapter()
+
+    def test_verify_signature_valid(self, adapter: SodaAdapter) -> None:
+        """Test valid signature verification."""
+        secret = "test_secret"
+        body = b'{"check": {"id": "123"}}'
+        signature = "sha256=" + hmac.new(secret.encode(), body, hashlib.sha256).hexdigest()
+
+        request = WebhookRequest(
+            body=body,
+            headers={"X-Soda-Signature": signature},
+            query_params={},
+        )
+        assert adapter.verify_signature(request, secret) is True
+
+    def test_verify_signature_invalid(self, adapter: SodaAdapter) -> None:
+        """Test invalid signature is rejected."""
+        request = WebhookRequest(
+            body=b'{"check": {"id": "123"}}',
+            headers={"X-Soda-Signature": "sha256=invalid"},
+            query_params={},
+        )
+        assert adapter.verify_signature(request, "test_secret") is False
+
+    def test_parse_check_payload(self, adapter: SodaAdapter) -> None:
+        """Test parsing check failure payload."""
+        request = make_request(
+            {
+                "check": {
+                    "id": "chk-123",
+                    "name": "row_count > 0",
+                    "dataset": "orders",
+                    "type": "row_count",
+                    "outcome": "fail",
+                    "value": 0,
+                    "fail_threshold": 1,
+                    "definition": "row_count > 0",
+                },
+            }
+        )
+        issue_data = adapter.parse_payload(request)
+
+        assert "row_count > 0" in issue_data.title
+        assert "orders" in issue_data.title
+        assert issue_data.severity == "high"
+        assert issue_data.dataset_id == "orders"
+        assert issue_data.metadata["soda_check_id"] == "chk-123"
+        assert issue_data.metadata["soda_check_type"] == "row_count"
+
+    def test_parse_scan_payload(self, adapter: SodaAdapter) -> None:
+        """Test parsing scan failure payload."""
+        request = make_request(
+            {
+                "scan": {
+                    "id": "scan-456",
+                    "name": "daily_quality_check",
+                    "failed_checks": [
+                        {"name": "check1"},
+                        {"name": "check2"},
+                    ],
+                    "warn_checks": [{"name": "check3"}],
+                },
+            }
+        )
+        issue_data = adapter.parse_payload(request)
+
+        assert "daily_quality_check" in issue_data.title
+        assert "2 failed" in issue_data.title
+        assert "1 warnings" in issue_data.title
+        assert issue_data.severity == "high"  # 2 failures = high severity
+        assert issue_data.metadata["soda_failed_count"] == 2
+
+    def test_get_fingerprint_check(self, adapter: SodaAdapter) -> None:
+        """Test fingerprint from check ID."""
+        request = make_request({"check": {"id": "chk-789"}})
+        assert adapter.get_fingerprint(request) == "soda_check_chk-789"
+
+    def test_get_fingerprint_scan(self, adapter: SodaAdapter) -> None:
+        """Test fingerprint from scan ID."""
+        request = make_request({"scan": {"id": "scan-789"}})
+        assert adapter.get_fingerprint(request) == "soda_scan_scan-789"
+
+    def test_get_event_type_check_failed(self, adapter: SodaAdapter) -> None:
+        """Test event type for failed check."""
+        request = make_request({"check": {"outcome": "fail"}})
+        assert adapter.get_event_type(request) == "check.failed"
+
+    def test_get_event_type_check_warning(self, adapter: SodaAdapter) -> None:
+        """Test event type for warning check."""
+        request = make_request({"check": {"outcome": "warn"}})
+        assert adapter.get_event_type(request) == "check.warning"
+
+    def test_should_process_failure(self, adapter: SodaAdapter) -> None:
+        """Test should process failed check."""
+        request = make_request({"check": {"outcome": "fail"}})
+        assert adapter.should_process(request) is True
+
+    def test_should_not_process_pass(self, adapter: SodaAdapter) -> None:
+        """Test should not process passed check."""
+        request = make_request({"event_type": "check.passed"})
+        assert adapter.should_process(request) is False
+
+    def test_to_anomaly_alert(self, adapter: SodaAdapter) -> None:
+        """Test Soda adapter creates valid AnomalyAlert."""
+        issue_data = IssueData(
+            title="Soda Check Failed: row_count > 0 on orders",
+            severity="high",
+            dataset_id="orders",
+            metadata={
+                "soda_check_id": "chk-123",
+                "soda_check_type": "row_count",
+                "soda_dataset": "orders",
+                "expected_value": 1,
+                "actual_value": 0,
+            },
+        )
+
+        alert = adapter.to_anomaly_alert(issue_data, fingerprint="soda_check_chk-123")
+
+        assert alert.source_system == "soda"
+        assert alert.source_alert_id == "soda_check_chk-123"
+        assert alert.anomaly_type == "row_count"
+        assert "orders" in alert.dataset_ids
 
 
 class TestIssueData:

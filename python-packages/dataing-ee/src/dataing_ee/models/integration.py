@@ -20,6 +20,8 @@ class IntegrationProvider:
     OPSGENIE = "opsgenie"
     MONTE_CARLO = "monte_carlo"
     GREAT_EXPECTATIONS = "great_expectations"
+    SODA = "soda"
+    DBT = "dbt"
     SLACK = "slack"
     CUSTOM = "custom"
 
@@ -33,6 +35,8 @@ class IntegrationProvider:
             cls.OPSGENIE,
             cls.MONTE_CARLO,
             cls.GREAT_EXPECTATIONS,
+            cls.SODA,
+            cls.DBT,
             cls.SLACK,
             cls.CUSTOM,
         ]

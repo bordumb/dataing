@@ -43,7 +43,9 @@ AppDbDep = Annotated[AppDatabase, Depends(get_app_db)]
 # ============================================================================
 
 
-VALID_PROVIDERS = "^(jira|linear|pagerduty|opsgenie|monte_carlo|great_expectations|slack|custom)$"
+VALID_PROVIDERS = (
+    "^(jira|linear|pagerduty|opsgenie|monte_carlo|great_expectations|soda|dbt|slack|custom)$"
+)
 
 
 class IntegrationCreate(BaseModel):

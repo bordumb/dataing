@@ -1,16 +1,23 @@
 {
-  "assignee": null,
+  "assignee": "bordumbb@gmail.com",
   "claim_note": "",
-  "claimed_at": null,
+  "claimed_at": "2026-01-25T21:13:39.302429Z",
   "created_at": "2026-01-25T20:44:54.862445Z",
   "depends_on": [
     "fn-28.1"
   ],
   "epic": "fn-28",
+  "evidence": {
+    "commits": [],
+    "prs": [],
+    "tests": [
+      "uv run pytest python-packages/dataing-cli/tests/test_errors.py -v (16 passed)"
+    ]
+  },
   "id": "fn-28.9",
   "priority": null,
   "spec_path": ".flow/tasks/fn-28.9.md",
-  "status": "todo",
+  "status": "done",
   "title": "Error handling: map SDK exceptions to CLI messages",
-  "updated_at": "2026-01-25T20:47:49.006227Z"
+  "updated_at": "2026-01-25T21:15:04.570763Z"
 }

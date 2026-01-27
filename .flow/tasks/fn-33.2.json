@@ -1,0 +1,16 @@
+{
+  "assignee": null,
+  "claim_note": "",
+  "claimed_at": null,
+  "created_at": "2026-01-27T21:24:35.869947Z",
+  "depends_on": [
+    "fn-33.1"
+  ],
+  "epic": "fn-33",
+  "id": "fn-33.2",
+  "priority": null,
+  "spec_path": ".flow/tasks/fn-33.2.md",
+  "status": "todo",
+  "title": "Bridge Temporal workflow evidence to hash chain and add root_hash",
+  "updated_at": "2026-01-27T21:27:05.843724Z"
+}

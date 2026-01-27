@@ -409,11 +409,6 @@ class EvidenceRepository:
             """
             INSERT INTO sdk_evidence (run_id, seq, kind, content, content_hash, prev_hash)
             VALUES ($1, $2, $3, $4, $5, $6)
-            ON CONFLICT (run_id, seq) DO UPDATE SET
-                kind = EXCLUDED.kind,
-                content = EXCLUDED.content,
-                content_hash = EXCLUDED.content_hash,
-                prev_hash = EXCLUDED.prev_hash
             RETURNING id, run_id, seq, kind, content, content_hash, prev_hash, created_at
             """,
             run_id,

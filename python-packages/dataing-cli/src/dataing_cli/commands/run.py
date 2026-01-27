@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import sys
 import time
 from typing import TYPE_CHECKING, Annotated, Any
 
@@ -158,6 +159,75 @@ def _wait_for_completion(client: DataingClient, run_id: str, state: Any) -> None
         raise typer.Exit(1)
 
 
+def _watch_run_plain_text(client: DataingClient, run_id: str) -> None:
+    """Stream events with plain text output (no ANSI codes).
+
+    Used when stdout is not a TTY (piped to file, tee, etc).
+
+    Args:
+        client: The DataingClient instance.
+        run_id: The run ID to watch.
+    """
+    start_time = time.time()
+    hypothesis_idx = 0
+
+    print(f"Streaming events for run {run_id}...")
+    print()
+
+    for event in client.stream_run(run_id):
+        event_type = event.event
+        elapsed_secs = time.time() - start_time
+        elapsed = f"[{int(elapsed_secs // 60):02d}:{int(elapsed_secs % 60):02d}]"
+        data = event.data or {}
+
+        if event_type == "run_started":
+            goal = data.get("goal", "")
+            print(f"{elapsed} run_started: Goal: {goal}")
+
+        elif event_type == "hypothesis_testing":
+            hypothesis_idx += 1
+            msg = data.get("hypothesis", "") or data.get("message", "Testing hypothesis")
+            print(f"{elapsed} hypothesis_testing: Hypothesis #{hypothesis_idx}: {msg}")
+
+        elif event_type == "run_progress":
+            msg = data.get("message", "")
+            if msg:
+                print(f"{elapsed} run_progress: {msg}")
+
+        elif event_type in ("run_evidence", "hypothesis_result"):
+            supports = data.get("supports_hypothesis", data.get("supports"))
+            if supports:
+                verdict = "Supports"
+            elif supports is False:
+                verdict = "Refutes"
+            else:
+                verdict = "Inconclusive"
+            interp = data.get("interpretation", "") or data.get("finding", "")
+            conf = data.get("confidence", 0)
+            conf_str = f" ({conf * 100:.0f}%)" if conf else ""
+            print(f"{elapsed} {event_type}: {verdict}{conf_str} - {interp}")
+
+        elif event_type == "run_completed":
+            root_cause = data.get("root_cause", "No root cause identified")
+            confidence = data.get("confidence", 0)
+            conf_pct = confidence * 100 if confidence and confidence <= 1 else (confidence or 0)
+            print(f"{elapsed} run_completed: {root_cause} (Confidence: {conf_pct:.0f}%)")
+            return
+
+        elif event_type == "run_failed":
+            error = data.get("error", "Unknown error")
+            print(f"{elapsed} run_failed: {error}")
+            raise typer.Exit(1)
+
+        elif event_type == "context_gathered":
+            msg = data.get("message", "Context gathered")
+            print(f"{elapsed} context_gathered: {msg}")
+
+        elif event_type == "run_heartbeat":
+            # Don't print heartbeats in plain text mode
+            pass
+
+
 def _watch_run(client: DataingClient, run_id: str, state: Any) -> None:
     """Stream and display run events with Rich Live timeline.
 
@@ -166,9 +236,8 @@ def _watch_run(client: DataingClient, run_id: str, state: Any) -> None:
         run_id: The run ID to watch.
         state: The CLI state object.
     """
-    console.print(f"\n[dim]Streaming events for run {run_id}...[/dim]\n")
-
     json_output = state.json_output if state else False
+    is_tty = sys.stdout.isatty()
 
     if json_output:
         # NDJSON mode: one compact JSON object per line
@@ -180,6 +249,14 @@ def _watch_run(client: DataingClient, run_id: str, state: Any) -> None:
                     raise typer.Exit(1)
                 return
         return
+
+    # Non-TTY mode: plain text output without ANSI codes
+    if not is_tty:
+        _watch_run_plain_text(client, run_id)
+        return
+
+    # TTY mode: Rich Live timeline display
+    console.print(f"\n[dim]Streaming events for run {run_id}...[/dim]\n")
 
     # Timeline display mode - accumulate panels progressively
     panels: list[Any] = []

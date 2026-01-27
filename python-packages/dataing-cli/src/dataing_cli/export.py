@@ -1,7 +1,9 @@
-"""Investigation export utilities for markdown report generation."""
+"""Investigation export utilities for markdown and JSON report generation."""
 
 from __future__ import annotations
 
+import hashlib
+import json
 from datetime import datetime
 from typing import Any
 
@@ -14,7 +16,9 @@ MARKDOWN_TEMPLATE = """\
 **Status:** {{ status }}{% if confidence %} | **Confidence:** {{ confidence_pct }}%{% endif %}
 
 **Generated:** {{ generated_at }}
-
+{% if chain_hash -%}
+**Evidence Chain Hash:** `{{ chain_hash }}`
+{% endif %}
 ---
 
 ## Summary
@@ -82,6 +86,23 @@ def _truncate_sql(sql: str, max_length: int = 2000) -> str:
     return sql[:max_length] + "\n-- ... (truncated)"
 
 
+def compute_chain_hash(evidence: list[dict[str, Any]]) -> str:
+    """Compute SHA256 hash of evidence chain for audit.
+
+    Uses canonical JSON (sorted keys, no whitespace) for deterministic hashing.
+
+    Args:
+        evidence: List of evidence dictionaries.
+
+    Returns:
+        64-character hexadecimal SHA256 hash string.
+    """
+    if not evidence:
+        return hashlib.sha256(b"[]").hexdigest()
+    canonical = json.dumps(evidence, sort_keys=True, separators=(",", ":"), default=str)
+    return hashlib.sha256(canonical.encode()).hexdigest()
+
+
 def render_markdown(investigation: dict[str, Any]) -> str:
     """Render investigation data as markdown report.
 
@@ -113,6 +134,9 @@ def render_markdown(investigation: dict[str, Any]) -> str:
         else:
             confidence_pct = round(confidence)
 
+    # Compute evidence chain hash
+    chain_hash = compute_chain_hash(evidence)
+
     context = {
         "investigation_id": investigation.get("investigation_id", "unknown"),
         "status": investigation.get("status", "unknown").upper(),
@@ -122,6 +146,44 @@ def render_markdown(investigation: dict[str, Any]) -> str:
         "confidence_pct": confidence_pct,
         "evidence": evidence,
         "recommendations": synthesis.get("recommendations", []),
+        "chain_hash": chain_hash,
     }
 
     return template.render(**context)
+
+
+def render_json(investigation: dict[str, Any]) -> str:
+    """Render investigation data as JSON.
+
+    Output structure matches the InvestigationStateResponse API schema
+    with an added chain_hash field for audit.
+
+    Args:
+        investigation: Investigation state dict with fields:
+            - investigation_id: str
+            - status: str
+            - main_branch: dict with synthesis and evidence
+
+    Returns:
+        Formatted JSON string (indented for readability).
+    """
+    main_branch = investigation.get("main_branch", {})
+    evidence = main_branch.get("evidence", [])
+
+    # Compute evidence chain hash
+    chain_hash = compute_chain_hash(evidence)
+
+    output = {
+        "investigation_id": investigation.get("investigation_id"),
+        "status": investigation.get("status"),
+        "chain_hash": chain_hash,
+        "generated_at": datetime.now().isoformat() + "Z",
+        "main_branch": {
+            "status": main_branch.get("status"),
+            "current_step": main_branch.get("current_step"),
+            "synthesis": main_branch.get("synthesis"),
+            "evidence": evidence,
+        },
+    }
+
+    return json.dumps(output, indent=2, default=str)

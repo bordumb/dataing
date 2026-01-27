@@ -1047,6 +1047,7 @@ class DataingClient:
             status=data.get("status", "unknown"),
             main_branch=main_branch,
             user_branch=user_branch,
+            root_hash=data.get("root_hash"),
         )
 
     def send_message(self, investigation_id: str, message: str) -> Any:
@@ -1122,6 +1123,48 @@ class DataingClient:
             investigation_id=str(data.get("investigation_id", investigation_id)),
         )
 
+    def verify_investigation(self, investigation_id: str) -> Any:
+        """Verify the evidence hash chain of an investigation.
+
+        Checks that the hash chain is intact and untampered by calling the
+        server-side verification endpoint.
+
+        Args:
+            investigation_id: The unique identifier of the investigation.
+
+        Returns:
+            A `ChainVerificationResult` with verification details.
+
+        Raises:
+            NotFoundError: If the investigation ID does not exist.
+            AuthError: If not authorized to access this investigation.
+
+        Example:
+            ```python
+            result = client.verify_investigation("inv-abc123")
+            if result.is_valid:
+                print(f"Valid chain: {result.evidence_count} items")
+            else:
+                print(f"Broken at seq {result.first_broken_seq}: {result.error}")
+            ```
+        """
+        from .types import ChainVerificationResult
+
+        response = self._request("GET", f"/api/v1/investigations/{investigation_id}/verify")
+        return ChainVerificationResult.model_validate(response.json())
+
+    async def async_verify_investigation(self, investigation_id: str) -> Any:
+        """Async version of `verify_investigation`.
+
+        See `verify_investigation` for full documentation.
+        """
+        from .types import ChainVerificationResult
+
+        response = await self._async_request(
+            "GET", f"/api/v1/investigations/{investigation_id}/verify"
+        )
+        return ChainVerificationResult.model_validate(response.json())
+
     async def async_get_investigation(self, investigation_id: str) -> Any:
         """Async version of `get_investigation`.
 
@@ -1159,6 +1202,7 @@ class DataingClient:
             status=data.get("status", "unknown"),
             main_branch=main_branch,
             user_branch=user_branch,
+            root_hash=data.get("root_hash"),
         )
 
     # --- Run status methods ---

@@ -227,6 +227,7 @@ def export_run(
     investigation_dict = {
         "investigation_id": investigation_state.investigation_id,
         "status": investigation_state.status,
+        "root_hash": getattr(investigation_state, "root_hash", None),
         "main_branch": {
             "status": investigation_state.main_branch.status,
             "current_step": investigation_state.main_branch.current_step,
@@ -248,6 +249,57 @@ def export_run(
     else:
         # Print to stdout (without Rich formatting for clean output)
         print(content)
+
+
+@app.command("verify")
+@cli_error_handler
+def verify_chain(
+    ctx: typer.Context,
+    investigation_id: Annotated[str, typer.Argument(help="Investigation ID to verify")],
+) -> None:
+    """Verify the evidence hash chain of an investigation.
+
+    Checks that the evidence chain is intact and untampered.
+
+    Exit codes:
+        0 = chain is valid
+        1 = chain is broken (tampered or corrupted)
+        2 = chain not available (pre-feature investigation)
+
+    Examples:
+        dataing run verify inv-abc123
+    """
+    state = ctx.obj
+    client = get_client(
+        api_key=state.api_key if state else None,
+        base_url=state.base_url if state else None,
+    )
+
+    with console.status("[bold blue]Verifying evidence chain..."):
+        result = client.verify_investigation(investigation_id)
+
+    if not result.chain_available:
+        console.print(
+            "[yellow]![/yellow] Chain not available for this investigation "
+            f"({result.evidence_count} evidence items, no chain data)"
+        )
+        raise typer.Exit(2)
+
+    if result.is_valid:
+        console.print(f"[green]+[/green] Chain valid: {result.evidence_count} evidence items")
+        if result.root_hash:
+            console.print(f"[green]+[/green] Root hash: [dim]{result.root_hash}[/dim]")
+        if result.root_hash_matches is True:
+            console.print("[green]+[/green] Root hash matches stored value")
+        elif result.root_hash_matches is False:
+            console.print("[yellow]![/yellow] Root hash does not match stored value")
+    else:
+        console.print(f"[red]-[/red] Chain broken: {result.evidence_count} evidence items")
+        if result.first_broken_seq is not None:
+            console.print(f"[red]-[/red] First broken link at seq {result.first_broken_seq}")
+        if result.error:
+            console.print(f"[red]-[/red] Error: {result.error}")
+        raise typer.Exit(1)
 
 
 def _wait_for_completion(client: DataingClient, run_id: str, state: Any) -> None:

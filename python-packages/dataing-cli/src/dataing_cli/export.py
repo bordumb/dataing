@@ -2,12 +2,18 @@
 
 from __future__ import annotations
 
-import hashlib
 import json
 from datetime import datetime
 from typing import Any
 
 from jinja2 import Environment
+
+# Chain metadata constants
+CHAIN_METADATA = {
+    "hash_algorithm": "sha256",
+    "canonicalization": "rfc8785",
+    "chain_version": "evidence_v1",
+}
 
 # Markdown report template
 MARKDOWN_TEMPLATE = """\
@@ -16,8 +22,13 @@ MARKDOWN_TEMPLATE = """\
 **Status:** {{ status }}{% if confidence %} | **Confidence:** {{ confidence_pct }}%{% endif %}
 
 **Generated:** {{ generated_at }}
-{% if chain_hash -%}
-**Evidence Chain Hash:** `{{ chain_hash }}`
+{% if root_hash -%}
+**Root Hash:** `{{ root_hash }}`
+{% endif -%}
+{% if has_chain_data -%}
+**Chain Metadata:** algorithm={{ chain_metadata.hash_algorithm }}, \
+canonicalization={{ chain_metadata.canonicalization }}, \
+version={{ chain_metadata.chain_version }}
 {% endif %}
 ---
 
@@ -49,6 +60,11 @@ _No root cause identified yet._
 {% endif -%}
 {% if item.confidence -%}
 **Confidence:** {{ (item.confidence * 100) | round | int }}%
+{% endif -%}
+{% if item.seq -%}
+**Chain:** seq={{ item.seq }}{% if item.content_hash %}, hash=`{{ item.content_hash[:16] }}...`\
+{% endif %}{% if item.prev_hash %}, prev=`{{ item.prev_hash[:16] }}...`{% endif %}
+
 {% endif %}
 
 {% endfor -%}
@@ -86,21 +102,16 @@ def _truncate_sql(sql: str, max_length: int = 2000) -> str:
     return sql[:max_length] + "\n-- ... (truncated)"
 
 
-def compute_chain_hash(evidence: list[dict[str, Any]]) -> str:
-    """Compute SHA256 hash of evidence chain for audit.
-
-    Uses canonical JSON (sorted keys, no whitespace) for deterministic hashing.
+def _has_chain_data(evidence: list[dict[str, Any]]) -> bool:
+    """Check if any evidence item has hash chain fields.
 
     Args:
         evidence: List of evidence dictionaries.
 
     Returns:
-        64-character hexadecimal SHA256 hash string.
+        True if at least one item has content_hash.
     """
-    if not evidence:
-        return hashlib.sha256(b"[]").hexdigest()
-    canonical = json.dumps(evidence, sort_keys=True, separators=(",", ":"), default=str)
-    return hashlib.sha256(canonical.encode()).hexdigest()
+    return any(item.get("content_hash") for item in evidence)
 
 
 def render_markdown(investigation: dict[str, Any]) -> str:
@@ -110,6 +121,7 @@ def render_markdown(investigation: dict[str, Any]) -> str:
         investigation: Investigation state dict with fields:
             - investigation_id: str
             - status: str
+            - root_hash: str | None
             - main_branch: dict with synthesis and evidence
 
     Returns:
@@ -134,8 +146,7 @@ def render_markdown(investigation: dict[str, Any]) -> str:
         else:
             confidence_pct = round(confidence)
 
-    # Compute evidence chain hash
-    chain_hash = compute_chain_hash(evidence)
+    has_chain = _has_chain_data(evidence)
 
     context = {
         "investigation_id": investigation.get("investigation_id", "unknown"),
@@ -146,7 +157,9 @@ def render_markdown(investigation: dict[str, Any]) -> str:
         "confidence_pct": confidence_pct,
         "evidence": evidence,
         "recommendations": synthesis.get("recommendations", []),
-        "chain_hash": chain_hash,
+        "root_hash": investigation.get("root_hash"),
+        "has_chain_data": has_chain,
+        "chain_metadata": CHAIN_METADATA if has_chain else None,
     }
 
     return template.render(**context)
@@ -156,12 +169,13 @@ def render_json(investigation: dict[str, Any]) -> str:
     """Render investigation data as JSON.
 
     Output structure matches the InvestigationStateResponse API schema
-    with an added chain_hash field for audit.
+    with chain metadata for external verification.
 
     Args:
         investigation: Investigation state dict with fields:
             - investigation_id: str
             - status: str
+            - root_hash: str | None
             - main_branch: dict with synthesis and evidence
 
     Returns:
@@ -169,15 +183,13 @@ def render_json(investigation: dict[str, Any]) -> str:
     """
     main_branch = investigation.get("main_branch", {})
     evidence = main_branch.get("evidence", [])
+    has_chain = _has_chain_data(evidence)
 
-    # Compute evidence chain hash
-    chain_hash = compute_chain_hash(evidence)
-
-    output = {
+    output: dict[str, Any] = {
         "investigation_id": investigation.get("investigation_id"),
         "status": investigation.get("status"),
-        "chain_hash": chain_hash,
         "generated_at": datetime.now().isoformat() + "Z",
+        "root_hash": investigation.get("root_hash"),
         "main_branch": {
             "status": main_branch.get("status"),
             "current_step": main_branch.get("current_step"),
@@ -185,5 +197,8 @@ def render_json(investigation: dict[str, Any]) -> str:
             "evidence": evidence,
         },
     }
+
+    if has_chain:
+        output["chain_metadata"] = CHAIN_METADATA
 
     return json.dumps(output, indent=2, default=str)

@@ -1027,6 +1027,7 @@ class InvestigationState(BaseModel):
     status: str = Field(..., description="Investigation status")
     main_branch: BranchState = Field(..., description="Main branch state")
     user_branch: BranchState | None = Field(default=None, description="User branch state")
+    root_hash: str | None = Field(default=None, description="Root hash of evidence chain")
 
     @property
     def run_id(self) -> str:
@@ -1084,6 +1085,46 @@ class Investigation(BaseModel):
             ID: {html_module.escape(self.investigation_id[:16])}...
         </div>
         """  # noqa: E501
+
+
+class ChainVerificationResult(BaseModel):
+    """Result of verifying an investigation's evidence hash chain.
+
+    Returned by `DataingClient.verify_investigation()` to indicate whether the
+    evidence chain is intact and untampered.
+
+    Attributes:
+        investigation_id: The investigation that was verified.
+        is_valid: Whether the hash chain is intact.
+        evidence_count: Number of evidence items in the chain.
+        root_hash: The root hash (hash of the final item), if available.
+        root_hash_matches: Whether stored root_hash matches computed root_hash.
+        first_broken_seq: Sequence number of first broken link, if any.
+        error: Human-readable error description, if chain is broken.
+        chain_available: Whether hash chain data exists for this investigation.
+
+    Example:
+        ```python
+        result = client.verify_investigation("inv-abc123")
+        if result.is_valid:
+            print(f"Chain valid: {result.evidence_count} items")
+        else:
+            print(f"Chain broken at seq {result.first_broken_seq}")
+        ```
+    """
+
+    investigation_id: str = Field(..., description="Investigation that was verified")
+    is_valid: bool = Field(..., description="Whether the hash chain is intact")
+    evidence_count: int = Field(..., description="Number of evidence items")
+    root_hash: str | None = Field(default=None, description="Root hash of the chain")
+    root_hash_matches: bool | None = Field(
+        default=None, description="Whether stored root_hash matches computed"
+    )
+    first_broken_seq: int | None = Field(
+        default=None, description="Sequence number of first broken link"
+    )
+    error: str | None = Field(default=None, description="Error description if chain is broken")
+    chain_available: bool = Field(default=True, description="Whether hash chain data exists")
 
 
 class SendMessageResponse(BaseModel):

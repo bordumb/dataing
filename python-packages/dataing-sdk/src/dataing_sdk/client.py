@@ -1645,3 +1645,84 @@ class DataingClient:
                         tables.append(TableSchema(name=full_name, columns=columns))
 
         return DatasourceSchema(tables=tables)
+
+    # --- Dataset-to-Repository Mapping methods ---
+
+    def create_repo_mapping(
+        self,
+        dataset_pattern: str,
+        repo_owner: str,
+        repo_name: str,
+        **kwargs: Any,
+    ) -> dict[str, Any]:
+        """Create a dataset-to-repository mapping."""
+        body: dict[str, Any] = {
+            "dataset_pattern": dataset_pattern,
+            "repo_owner": repo_owner,
+            "repo_name": repo_name,
+        }
+        for key in ("pattern_type", "file_path", "branch", "job_name", "metadata"):
+            if key in kwargs:
+                body[key] = kwargs[key]
+        response = self._request("POST", "/api/v1/dataset-repo-mappings", json=body)
+        result: dict[str, Any] = response.json()
+        return result
+
+    def list_repo_mappings(
+        self,
+        source: str | None = None,
+        suggestions_only: bool = False,
+    ) -> list[dict[str, Any]]:
+        """List dataset-to-repository mappings."""
+        if suggestions_only:
+            response = self._request("GET", "/api/v1/dataset-repo-mappings/suggestions")
+        else:
+            params: dict[str, Any] = {}
+            if source:
+                params["source"] = source
+            response = self._request("GET", "/api/v1/dataset-repo-mappings", params=params)
+        data = response.json()
+        result: list[dict[str, Any]] = data.get("items", [])
+        return result
+
+    def resolve_repo(self, dataset_id: str, include_all: bool = False) -> dict[str, Any]:
+        """Resolve the repository for a dataset."""
+        params: dict[str, Any] = {}
+        if include_all:
+            params["include_all"] = "true"
+        response = self._request("GET", f"/api/v1/datasets/{dataset_id}/repo", params=params)
+        result: dict[str, Any] = response.json()
+        return result
+
+    def confirm_repo_mapping(self, mapping_id: str) -> dict[str, Any]:
+        """Confirm a suggested repository mapping."""
+        response = self._request("POST", f"/api/v1/dataset-repo-mappings/{mapping_id}/confirm")
+        result: dict[str, Any] = response.json()
+        return result
+
+    def dismiss_repo_mapping(self, mapping_id: str) -> None:
+        """Dismiss a suggested repository mapping."""
+        self._request("POST", f"/api/v1/dataset-repo-mappings/{mapping_id}/dismiss")
+
+    def import_dbt_manifest(
+        self,
+        manifest_content: bytes,
+        repo_owner: str,
+        repo_name: str,
+        branch: str | None = None,
+    ) -> dict[str, Any]:
+        """Import repository mappings from a dbt manifest.json."""
+        params: dict[str, Any] = {
+            "repo_owner": repo_owner,
+            "repo_name": repo_name,
+        }
+        if branch:
+            params["branch"] = branch
+        response = self._request(
+            "POST",
+            "/api/v1/dataset-repo-mappings/import-dbt-manifest",
+            files={"file": ("manifest.json", manifest_content, "application/json")},
+            params=params,
+        )
+        result: dict[str, Any] = response.json()
+        return result

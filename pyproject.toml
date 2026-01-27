@@ -146,7 +146,10 @@ convention = "google"
 asyncio_mode = "auto"
 pythonpath = [".", "python-packages/dataing/src", "python-packages/dataing-ee/src", "python-packages/dataing/tests", "python-packages/dataing-ee/tests", "python-packages/dataing-sdk/src", "python-packages/dataing-notebook/src"]
 testpaths = ["python-packages/dataing/tests", "python-packages/dataing-ee/tests"]
-addopts = "-v --import-mode=importlib --cov=python-packages/dataing/src/dataing --cov=python-packages/dataing-ee/src/dataing_ee --cov-report=term-missing"
+addopts = "-v --import-mode=importlib --cov=python-packages/dataing/src/dataing --cov=python-packages/dataing-ee/src/dataing_ee --cov-report=term-missing -m 'not integration'"
+markers = [
+    "integration: tests requiring a running database (deselected by default)",
+]
 
 [dependency-groups]
 dev = [

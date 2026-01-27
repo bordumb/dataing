@@ -35,7 +35,7 @@ warn() {
 # =============================================================================
 # Test 1: Verify fixtures exist
 # =============================================================================
-echo "[1/7] Checking demo fixtures..."
+echo "[1/8] Checking demo fixtures..."
 
 if [ -d "demo/fixtures/null_spike" ]; then
     pass "null_spike fixture directory exists"
@@ -59,7 +59,7 @@ fi
 # Test 2: Verify all fixture scenarios exist
 # =============================================================================
 echo ""
-echo "[2/7] Checking all fixture scenarios..."
+echo "[2/8] Checking all fixture scenarios..."
 
 SCENARIOS=("baseline" "null_spike" "volume_drop" "schema_drift" "duplicates" "late_arriving" "orphaned_records")
 
@@ -75,7 +75,7 @@ done
 # Test 3: Verify fixture has anomaly (using DuckDB)
 # =============================================================================
 echo ""
-echo "[3/7] Verifying NULL spike anomaly in fixtures..."
+echo "[3/8] Verifying NULL spike anomaly in fixtures..."
 
 ANOMALY_CHECK=$(uv run python -c "
 import duckdb
@@ -104,7 +104,7 @@ fi
 # Test 4: Verify DuckDB adapter exists
 # =============================================================================
 echo ""
-echo "[4/7] Checking DuckDB adapter..."
+echo "[4/8] Checking DuckDB adapter..."
 
 if [ -f "backend/src/dataing/adapters/db/duckdb.py" ]; then
     pass "DuckDB adapter file exists"
@@ -123,7 +123,7 @@ fi
 # Test 5: Check demo mode in deps.py
 # =============================================================================
 echo ""
-echo "[5/7] Checking demo mode integration..."
+echo "[5/8] Checking demo mode integration..."
 
 if grep -q "DATADR_DEMO_MODE" backend/src/dataing/entrypoints/api/deps.py; then
     pass "Demo mode check present in deps.py"
@@ -141,7 +141,7 @@ fi
 # Test 6: Check docker-compose.demo.yml
 # =============================================================================
 echo ""
-echo "[6/7] Checking Docker Compose configuration..."
+echo "[6/8] Checking Docker Compose configuration..."
 
 if [ -f "docker-compose.demo.yml" ]; then
     pass "docker-compose.demo.yml exists"
@@ -159,7 +159,7 @@ fi
 # Test 7: Check justfile demo commands
 # =============================================================================
 echo ""
-echo "[7/7] Checking justfile demo commands..."
+echo "[7/8] Checking justfile demo commands..."
 
 if grep -q "^demo:" justfile; then
     pass "Demo command in justfile"
@@ -171,6 +171,24 @@ if grep -q "demo-fixtures" justfile; then
     pass "Demo-fixtures command in justfile"
 else
     fail "Demo-fixtures command missing in justfile"
+fi
+
+# =============================================================================
+# Test 8: Verify repo mappings feature
+# =============================================================================
+echo ""
+echo "[8/8] Checking repo mappings feature..."
+
+if [ -f "python-packages/dataing/migrations/030_dataset_repo_mappings.sql" ]; then
+    pass "Migration 030_dataset_repo_mappings.sql exists"
+else
+    fail "Migration 030_dataset_repo_mappings.sql missing"
+fi
+
+if grep -q "repo_mappings_router" python-packages/dataing/src/dataing/entrypoints/api/routes/__init__.py; then
+    pass "repo_mappings_router registered in routes"
+else
+    fail "repo_mappings_router not registered in routes/__init__.py"
 fi
 
 # =============================================================================

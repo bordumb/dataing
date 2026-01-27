@@ -67,6 +67,7 @@ def mock_client_patch(
     monkeypatch.setattr("dataing_cli.commands.ds.get_client", _get_client)
     monkeypatch.setattr("dataing_cli.commands.run.get_client", _get_client)
     monkeypatch.setattr("dataing_cli.commands.ask.get_client", _get_client)
+    monkeypatch.setattr("dataing_cli.commands.repo.get_client", _get_client)
     yield mock_client
 
 

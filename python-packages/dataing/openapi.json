@@ -1798,7 +1798,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/dataing__entrypoints__api__routes__datasources__TestConnectionResponse"
+                  "$ref": "#/components/schemas/TestConnectionResponse"
                 }
               }
             }
@@ -2023,7 +2023,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/dataing__entrypoints__api__routes__datasources__TestConnectionResponse"
+                  "$ref": "#/components/schemas/TestConnectionResponse"
                 }
               }
             }
@@ -2458,7 +2458,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/dataing__entrypoints__api__routes__datasources__TestConnectionResponse"
+                  "$ref": "#/components/schemas/TestConnectionResponse"
                 }
               }
             }
@@ -2683,7 +2683,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/dataing__entrypoints__api__routes__datasources__TestConnectionResponse"
+                  "$ref": "#/components/schemas/TestConnectionResponse"
                 }
               }
             }
@@ -3278,7 +3278,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/TestConnectionResponse"
+                  "$ref": "#/components/schemas/dataing__entrypoints__api__routes__credentials__TestConnectionResponse"
                 }
               }
             }
@@ -7157,6 +7157,639 @@
         }
       }
     },
+    "/api/v1/dataset-repo-mappings": {
+      "post": {
+        "tags": [
+          "dataset-repo-mappings"
+        ],
+        "summary": "Create Repo Mapping",
+        "description": "Create a dataset-to-repository mapping.",
+        "operationId": "create_repo_mapping_api_v1_dataset_repo_mappings_post",
+        "security": [
+          {
+            "APIKeyHeader": []
+          },
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateRepoMappingRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RepoMappingResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "dataset-repo-mappings"
+        ],
+        "summary": "List Repo Mappings",
+        "description": "List dataset-to-repository mappings with optional filters.",
+        "operationId": "list_repo_mappings_api_v1_dataset_repo_mappings_get",
+        "security": [
+          {
+            "APIKeyHeader": []
+          },
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "source",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Source"
+            }
+          },
+          {
+            "name": "confirmed",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Confirmed"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 200,
+              "minimum": 1,
+              "default": 50,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0,
+              "title": "Offset"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RepoMappingListResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/dataset-repo-mappings/{mapping_id}": {
+      "put": {
+        "tags": [
+          "dataset-repo-mappings"
+        ],
+        "summary": "Update Repo Mapping",
+        "description": "Update a dataset-to-repository mapping.",
+        "operationId": "update_repo_mapping_api_v1_dataset_repo_mappings__mapping_id__put",
+        "security": [
+          {
+            "APIKeyHeader": []
+          },
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "mapping_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Mapping Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateRepoMappingRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RepoMappingResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "dataset-repo-mappings"
+        ],
+        "summary": "Delete Repo Mapping",
+        "description": "Delete a dataset-to-repository mapping.",
+        "operationId": "delete_repo_mapping_api_v1_dataset_repo_mappings__mapping_id__delete",
+        "security": [
+          {
+            "APIKeyHeader": []
+          },
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "mapping_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Mapping Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "type": "boolean"
+                  },
+                  "title": "Response Delete Repo Mapping Api V1 Dataset Repo Mappings  Mapping Id  Delete"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/dataset-repo-mappings/bulk": {
+      "post": {
+        "tags": [
+          "dataset-repo-mappings"
+        ],
+        "summary": "Bulk Import Repo Mappings",
+        "description": "Bulk import dataset-to-repository mappings.",
+        "operationId": "bulk_import_repo_mappings_api_v1_dataset_repo_mappings_bulk_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BulkImportRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BulkImportResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "APIKeyHeader": []
+          },
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/dataset-repo-mappings/import-dbt-manifest": {
+      "post": {
+        "tags": [
+          "dataset-repo-mappings"
+        ],
+        "summary": "Import Dbt Manifest",
+        "description": "Import dataset-to-repository mappings from a dbt manifest.json.",
+        "operationId": "import_dbt_manifest_api_v1_dataset_repo_mappings_import_dbt_manifest_post",
+        "security": [
+          {
+            "APIKeyHeader": []
+          },
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "repo_owner",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "title": "Repo Owner"
+            }
+          },
+          {
+            "name": "repo_name",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "title": "Repo Name"
+            }
+          },
+          {
+            "name": "branch",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Branch"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_import_dbt_manifest_api_v1_dataset_repo_mappings_import_dbt_manifest_post"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DbtManifestImportResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/dataset-repo-mappings/suggestions": {
+      "get": {
+        "tags": [
+          "dataset-repo-mappings"
+        ],
+        "summary": "List Suggestions",
+        "description": "List unconfirmed (suggested) dataset-to-repository mappings.",
+        "operationId": "list_suggestions_api_v1_dataset_repo_mappings_suggestions_get",
+        "security": [
+          {
+            "APIKeyHeader": []
+          },
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 200,
+              "minimum": 1,
+              "default": 50,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0,
+              "title": "Offset"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RepoMappingListResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/dataset-repo-mappings/{mapping_id}/confirm": {
+      "post": {
+        "tags": [
+          "dataset-repo-mappings"
+        ],
+        "summary": "Confirm Suggestion",
+        "description": "Confirm a suggested mapping, promoting it to explicit.",
+        "operationId": "confirm_suggestion_api_v1_dataset_repo_mappings__mapping_id__confirm_post",
+        "security": [
+          {
+            "APIKeyHeader": []
+          },
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "mapping_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Mapping Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RepoMappingResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/dataset-repo-mappings/{mapping_id}/dismiss": {
+      "post": {
+        "tags": [
+          "dataset-repo-mappings"
+        ],
+        "summary": "Dismiss Suggestion",
+        "description": "Dismiss (delete) a suggested mapping.",
+        "operationId": "dismiss_suggestion_api_v1_dataset_repo_mappings__mapping_id__dismiss_post",
+        "security": [
+          {
+            "APIKeyHeader": []
+          },
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "mapping_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Mapping Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "type": "boolean"
+                  },
+                  "title": "Response Dismiss Suggestion Api V1 Dataset Repo Mappings  Mapping Id  Dismiss Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/datasets/{dataset_id}/repo": {
+      "get": {
+        "tags": [
+          "datasets"
+        ],
+        "summary": "Resolve Dataset Repo",
+        "description": "Resolve the best repository mapping for a dataset.\n\nReturns 200 with primary=null when no mapping found (never 404).\nThis enables graceful degradation in investigations.",
+        "operationId": "resolve_dataset_repo_api_v1_datasets__dataset_id__repo_get",
+        "security": [
+          {
+            "APIKeyHeader": []
+          },
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "dataset_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Dataset Id"
+            }
+          },
+          {
+            "name": "include_all",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false,
+              "title": "Include All"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DatasetRepoResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/teams/": {
       "get": {
         "tags": [
@@ -9116,6 +9749,20 @@
         "title": "AssetRefRequest",
         "description": "Asset reference in request."
       },
+      "Body_import_dbt_manifest_api_v1_dataset_repo_mappings_import_dbt_manifest_post": {
+        "properties": {
+          "file": {
+            "type": "string",
+            "format": "binary",
+            "title": "File"
+          }
+        },
+        "type": "object",
+        "required": [
+          "file"
+        ],
+        "title": "Body_import_dbt_manifest_api_v1_dataset_repo_mappings_import_dbt_manifest_post"
+      },
       "BranchStateResponse": {
         "properties": {
           "branch_id": {
@@ -9194,6 +9841,116 @@
         ],
         "title": "BranchStateResponse",
         "description": "State of a branch for API responses."
+      },
+      "BulkImportRequest": {
+        "properties": {
+          "mappings": {
+            "items": {
+              "$ref": "#/components/schemas/BulkRepoMappingItem"
+            },
+            "type": "array",
+            "maxItems": 1000,
+            "minItems": 1,
+            "title": "Mappings"
+          }
+        },
+        "type": "object",
+        "required": [
+          "mappings"
+        ],
+        "title": "BulkImportRequest",
+        "description": "Request to bulk import dataset-to-repository mappings."
+      },
+      "BulkImportResponse": {
+        "properties": {
+          "created": {
+            "type": "integer",
+            "title": "Created"
+          },
+          "errors": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Errors"
+          }
+        },
+        "type": "object",
+        "required": [
+          "created",
+          "errors"
+        ],
+        "title": "BulkImportResponse",
+        "description": "Response for bulk import."
+      },
+      "BulkRepoMappingItem": {
+        "properties": {
+          "dataset_pattern": {
+            "type": "string",
+            "maxLength": 500,
+            "minLength": 1,
+            "title": "Dataset Pattern"
+          },
+          "pattern_type": {
+            "type": "string",
+            "pattern": "^(exact|glob)$",
+            "title": "Pattern Type",
+            "default": "exact"
+          },
+          "repo_owner": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Repo Owner"
+          },
+          "repo_name": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Repo Name"
+          },
+          "file_path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "File Path"
+          },
+          "branch": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Branch"
+          },
+          "job_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Job Name"
+          }
+        },
+        "type": "object",
+        "required": [
+          "dataset_pattern",
+          "repo_owner",
+          "repo_name"
+        ],
+        "title": "BulkRepoMappingItem",
+        "description": "Single item in a bulk import request."
       },
       "CancelInvestigationResponse": {
         "properties": {
@@ -9470,6 +10227,87 @@
         ],
         "title": "CreateDataSourceRequest",
         "description": "Request to create a new data source."
+      },
+      "CreateRepoMappingRequest": {
+        "properties": {
+          "dataset_pattern": {
+            "type": "string",
+            "maxLength": 500,
+            "minLength": 1,
+            "title": "Dataset Pattern"
+          },
+          "pattern_type": {
+            "type": "string",
+            "pattern": "^(exact|glob)$",
+            "title": "Pattern Type",
+            "default": "exact"
+          },
+          "repo_owner": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Repo Owner"
+          },
+          "repo_name": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Repo Name"
+          },
+          "file_path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "File Path"
+          },
+          "branch": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Branch"
+          },
+          "job_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Job Name"
+          },
+          "metadata": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Metadata"
+          }
+        },
+        "type": "object",
+        "required": [
+          "dataset_pattern",
+          "repo_owner",
+          "repo_name"
+        ],
+        "title": "CreateRepoMappingRequest",
+        "description": "Request to create a dataset-to-repository mapping."
       },
       "CreateUserRequest": {
         "properties": {
@@ -9837,6 +10675,44 @@
         "title": "DatasetInvestigationsResponse",
         "description": "Response for dataset investigations."
       },
+      "DatasetRepoResponse": {
+        "properties": {
+          "dataset_id": {
+            "type": "string",
+            "title": "Dataset Id"
+          },
+          "primary": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ResolvedRepoResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "all_matches": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/ResolvedRepoResponse"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "All Matches"
+          }
+        },
+        "type": "object",
+        "required": [
+          "dataset_id"
+        ],
+        "title": "DatasetRepoResponse",
+        "description": "Response for resolving a dataset's repository."
+      },
       "DatasetResponse": {
         "properties": {
           "id": {
@@ -10055,6 +10931,33 @@
         ],
         "title": "DatasourceDatasetsResponse",
         "description": "Response for listing datasets of a datasource."
+      },
+      "DbtManifestImportResponse": {
+        "properties": {
+          "imported": {
+            "type": "integer",
+            "title": "Imported"
+          },
+          "skipped": {
+            "type": "integer",
+            "title": "Skipped"
+          },
+          "models": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Models"
+          }
+        },
+        "type": "object",
+        "required": [
+          "imported",
+          "skipped",
+          "models"
+        ],
+        "title": "DbtManifestImportResponse",
+        "description": "Response for dbt manifest import."
       },
       "DeleteCredentialsResponse": {
         "properties": {
@@ -12589,6 +13492,154 @@
         "title": "RejectRequest",
         "description": "Request to reject an investigation."
       },
+      "RepoMappingListResponse": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/RepoMappingResponse"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "total"
+        ],
+        "title": "RepoMappingListResponse",
+        "description": "Response for a list of dataset-to-repository mappings."
+      },
+      "RepoMappingResponse": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "dataset_pattern": {
+            "type": "string",
+            "title": "Dataset Pattern"
+          },
+          "pattern_type": {
+            "type": "string",
+            "title": "Pattern Type"
+          },
+          "priority": {
+            "type": "integer",
+            "title": "Priority"
+          },
+          "repo_owner": {
+            "type": "string",
+            "title": "Repo Owner"
+          },
+          "repo_name": {
+            "type": "string",
+            "title": "Repo Name"
+          },
+          "file_path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "File Path"
+          },
+          "branch": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Branch"
+          },
+          "job_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Job Name"
+          },
+          "source": {
+            "type": "string",
+            "title": "Source"
+          },
+          "confidence": {
+            "type": "number",
+            "title": "Confidence"
+          },
+          "confirmed": {
+            "type": "boolean",
+            "title": "Confirmed"
+          },
+          "metadata": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Metadata"
+          },
+          "last_verified_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Verified At"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "updated_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Updated At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "dataset_pattern",
+          "pattern_type",
+          "priority",
+          "repo_owner",
+          "repo_name",
+          "file_path",
+          "branch",
+          "job_name",
+          "source",
+          "confidence",
+          "confirmed",
+          "metadata",
+          "created_at"
+        ],
+        "title": "RepoMappingResponse",
+        "description": "Response for a dataset-to-repository mapping."
+      },
       "ResolvedAssetResponse": {
         "properties": {
           "asset": {
@@ -12630,6 +13681,71 @@
         ],
         "title": "ResolvedAssetResponse",
         "description": "Resolved asset in response."
+      },
+      "ResolvedRepoResponse": {
+        "properties": {
+          "repo_owner": {
+            "type": "string",
+            "title": "Repo Owner"
+          },
+          "repo_name": {
+            "type": "string",
+            "title": "Repo Name"
+          },
+          "file_path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "File Path"
+          },
+          "branch": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Branch"
+          },
+          "confidence": {
+            "type": "number",
+            "title": "Confidence"
+          },
+          "source": {
+            "type": "string",
+            "title": "Source"
+          },
+          "job_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Job Name"
+          }
+        },
+        "type": "object",
+        "required": [
+          "repo_owner",
+          "repo_name",
+          "file_path",
+          "branch",
+          "confidence",
+          "source",
+          "job_name"
+        ],
+        "title": "ResolvedRepoResponse",
+        "description": "A resolved repository match for a dataset."
       },
       "SLAPolicyCreate": {
         "properties": {
@@ -14225,18 +15341,11 @@
             "type": "boolean",
             "title": "Success"
           },
-          "error": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Error"
+          "message": {
+            "type": "string",
+            "title": "Message"
           },
-          "tables_accessible": {
+          "latency_ms": {
             "anyOf": [
               {
                 "type": "integer"
@@ -14245,15 +15354,27 @@
                 "type": "null"
               }
             ],
-            "title": "Tables Accessible"
+            "title": "Latency Ms"
+          },
+          "server_version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Server Version"
           }
         },
         "type": "object",
         "required": [
-          "success"
+          "success",
+          "message"
         ],
         "title": "TestConnectionResponse",
-        "description": "Response for testing credentials."
+        "description": "Response for testing a connection."
       },
       "TokenResponse": {
         "properties": {
@@ -14333,6 +15454,109 @@
         ],
         "title": "UnreadCountResponse",
         "description": "Unread notification count response."
+      },
+      "UpdateRepoMappingRequest": {
+        "properties": {
+          "dataset_pattern": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 500,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dataset Pattern"
+          },
+          "pattern_type": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^(exact|glob)$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pattern Type"
+          },
+          "repo_owner": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Repo Owner"
+          },
+          "repo_name": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Repo Name"
+          },
+          "file_path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "File Path"
+          },
+          "branch": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Branch"
+          },
+          "job_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Job Name"
+          },
+          "metadata": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Metadata"
+          }
+        },
+        "type": "object",
+        "title": "UpdateRepoMappingRequest",
+        "description": "Request to update a dataset-to-repository mapping."
       },
       "UpdateRoleRequest": {
         "properties": {
@@ -14770,28 +15994,13 @@
         "title": "WeeklyUsageResponse",
         "description": "Weekly usage statistics response."
       },
-      "dataing__entrypoints__api__routes__datasources__TestConnectionResponse": {
+      "dataing__entrypoints__api__routes__credentials__TestConnectionResponse": {
         "properties": {
           "success": {
             "type": "boolean",
             "title": "Success"
           },
-          "message": {
-            "type": "string",
-            "title": "Message"
-          },
-          "latency_ms": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Latency Ms"
-          },
-          "server_version": {
+          "error": {
             "anyOf": [
               {
                 "type": "string"
@@ -14800,16 +16009,26 @@
                 "type": "null"
               }
             ],
-            "title": "Server Version"
+            "title": "Error"
+          },
+          "tables_accessible": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tables Accessible"
           }
         },
         "type": "object",
         "required": [
-          "success",
-          "message"
+          "success"
         ],
         "title": "TestConnectionResponse",
-        "description": "Response for testing a connection."
+        "description": "Response for testing credentials."
       },
       "dataing__entrypoints__api__routes__lineage__LineageGraphResponse": {
         "properties": {

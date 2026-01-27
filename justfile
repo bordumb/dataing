@@ -188,6 +188,10 @@ test-ee:
 test-frontend:
     cd frontend/app && pnpm test
 
+# Run integration tests (requires running PostgreSQL — use `just demo-infra` first)
+test-integration:
+    uv run pytest python-packages/dataing/tests/integration/ -v -m integration
+
 # Run linters (CE + EE)
 lint:
     @echo "Linting dataing..."
@@ -448,6 +452,7 @@ demo: demo-fixtures
     PGPASSWORD=dataing psql -h localhost -U dataing -d dataing_demo -f python-packages/dataing/migrations/027_sdk_vp_fields.sql 2>&1 | grep -v "^NOTICE:" || true
     PGPASSWORD=dataing psql -h localhost -U dataing -d dataing_demo -f python-packages/dataing/migrations/028_team_policies.sql 2>&1 | grep -v "^NOTICE:" || true
     PGPASSWORD=dataing psql -h localhost -U dataing -d dataing_demo -f python-packages/dataing/migrations/029_analytics_events.sql 2>&1 | grep -v "^NOTICE:" || true
+    PGPASSWORD=dataing psql -h localhost -U dataing -d dataing_demo -f python-packages/dataing/migrations/030_dataset_repo_mappings.sql 2>&1 | grep -v "^NOTICE:" || true
 
     trap 'kill 0' EXIT
 

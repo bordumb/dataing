@@ -38,6 +38,71 @@ After running `just demo`, navigate to http://localhost:3000 and click "New Inve
 - For volume drop: it should find that EU events dropped 80% on days 5-6
 - The investigation typically takes 30-60 seconds to complete
 
+## Repository Mappings
+
+The repo-mappings feature links datasets to their source code repositories.
+
+### Quick Test via curl
+
+```bash
+# Create a mapping
+curl -s -X POST http://localhost:8000/api/v1/dataset-repo-mappings \
+  -H "X-API-Key: dd_demo_12345" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "dataset_pattern": "public.orders",
+    "repo_owner": "acme",
+    "repo_name": "etl-pipeline",
+    "file_path": "models/orders.sql"
+  }'
+
+# List all mappings
+curl -s http://localhost:8000/api/v1/dataset-repo-mappings \
+  -H "X-API-Key: dd_demo_12345"
+
+# Resolve repo for a dataset
+curl -s http://localhost:8000/api/v1/datasets/public.orders/repo \
+  -H "X-API-Key: dd_demo_12345"
+
+# Bulk import mappings
+curl -s -X POST http://localhost:8000/api/v1/dataset-repo-mappings/bulk \
+  -H "X-API-Key: dd_demo_12345" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "mappings": [
+      {"dataset_pattern": "public.users", "repo_owner": "acme", "repo_name": "etl-pipeline", "file_path": "models/users.sql"},
+      {"dataset_pattern": "public.events", "repo_owner": "acme", "repo_name": "etl-pipeline", "file_path": "models/events.sql"}
+    ]
+  }'
+```
+
+### Test via CLI
+
+```bash
+export DATAING_API_KEY=dd_demo_12345
+export DATAING_BASE_URL=http://localhost:8000
+
+dataing repo map public.orders acme/etl-pipeline --file-path models/orders.sql
+dataing repo show public.orders
+dataing repo list
+dataing repo import-dbt path/to/manifest.json --repo acme/etl-pipeline
+dataing repo confirm <mapping-id>
+dataing repo dismiss <mapping-id>
+```
+
+### Run Integration Tests
+
+```bash
+# Start infrastructure (PostgreSQL)
+just demo-infra
+
+# Run integration tests
+just test-integration
+
+# Or run directly
+uv run pytest python-packages/dataing/tests/integration/adapters/repo_mappings/ -v -m integration
+```
+
 ## Quick Start
 
 ```bash

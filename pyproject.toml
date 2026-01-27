@@ -37,6 +37,7 @@ dependencies = [
     "qdrant-client>=1.7.0",
     "sentence-transformers>=2.2.0",
     "temporalio>=1.7.1",
+    "rfc8785>=0.1.4",
 ]
 
 [project.optional-dependencies]

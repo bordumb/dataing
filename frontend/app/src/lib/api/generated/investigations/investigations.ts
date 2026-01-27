@@ -25,6 +25,7 @@ import type {
   SendUserInputApiV1InvestigationsInvestigationIdInputPost200,
   StartInvestigationRequest,
   StartInvestigationResponse,
+  StreamEventsApiV1InvestigationsInvestigationIdEventsGetParams,
   TemporalStatusResponse,
   UserInputRequest,
 } from "../../model";
@@ -956,6 +957,161 @@ export const useStreamUpdatesApiV1InvestigationsInvestigationIdStreamGet = <
   const queryOptions =
     getStreamUpdatesApiV1InvestigationsInvestigationIdStreamGetQueryOptions(
       investigationId,
+      options,
+    );
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  query.queryKey = queryOptions.queryKey;
+
+  return query;
+};
+
+/**
+ * Stream SSE events for an investigation.
+
+Events have an integer `seq` field for resumption.
+Use `?seq=N` to resume from sequence N.
+
+Returns 410 Gone if the replay window has expired.
+
+Args:
+    request: FastAPI request object.
+    investigation_id: UUID of the investigation.
+    auth: Authentication context from API key/JWT.
+    db: Application database.
+    temporal_client: Temporal client for status polling.
+    last_event_id: Optional sequence number to resume from.
+
+Returns:
+    EventSourceResponse with SSE stream.
+ * @summary Stream Events
+ */
+export const streamEventsApiV1InvestigationsInvestigationIdEventsGet = (
+  investigationId: string,
+  params?: StreamEventsApiV1InvestigationsInvestigationIdEventsGetParams,
+  signal?: AbortSignal,
+) => {
+  return customInstance<unknown>({
+    url: `/api/v1/investigations/${investigationId}/events`,
+    method: "GET",
+    params,
+    signal,
+  });
+};
+
+export const getStreamEventsApiV1InvestigationsInvestigationIdEventsGetQueryKey =
+  (
+    investigationId: string,
+    params?: StreamEventsApiV1InvestigationsInvestigationIdEventsGetParams,
+  ) => {
+    return [
+      `/api/v1/investigations/${investigationId}/events`,
+      ...(params ? [params] : []),
+    ] as const;
+  };
+
+export const getStreamEventsApiV1InvestigationsInvestigationIdEventsGetQueryOptions =
+  <
+    TData = Awaited<
+      ReturnType<typeof streamEventsApiV1InvestigationsInvestigationIdEventsGet>
+    >,
+    TError = HTTPValidationError,
+  >(
+    investigationId: string,
+    params?: StreamEventsApiV1InvestigationsInvestigationIdEventsGetParams,
+    options?: {
+      query?: Partial<
+        UseQueryOptions<
+          Awaited<
+            ReturnType<
+              typeof streamEventsApiV1InvestigationsInvestigationIdEventsGet
+            >
+          >,
+          TError,
+          TData
+        >
+      >;
+    },
+  ) => {
+    const { query: queryOptions } = options ?? {};
+
+    const queryKey =
+      queryOptions?.queryKey ??
+      getStreamEventsApiV1InvestigationsInvestigationIdEventsGetQueryKey(
+        investigationId,
+        params,
+      );
+
+    const queryFn: QueryFunction<
+      Awaited<
+        ReturnType<
+          typeof streamEventsApiV1InvestigationsInvestigationIdEventsGet
+        >
+      >
+    > = ({ signal }) =>
+      streamEventsApiV1InvestigationsInvestigationIdEventsGet(
+        investigationId,
+        params,
+        signal,
+      );
+
+    return {
+      queryKey,
+      queryFn,
+      enabled: !!investigationId,
+      ...queryOptions,
+    } as UseQueryOptions<
+      Awaited<
+        ReturnType<
+          typeof streamEventsApiV1InvestigationsInvestigationIdEventsGet
+        >
+      >,
+      TError,
+      TData
+    > & { queryKey: QueryKey };
+  };
+
+export type StreamEventsApiV1InvestigationsInvestigationIdEventsGetQueryResult =
+  NonNullable<
+    Awaited<
+      ReturnType<typeof streamEventsApiV1InvestigationsInvestigationIdEventsGet>
+    >
+  >;
+export type StreamEventsApiV1InvestigationsInvestigationIdEventsGetQueryError =
+  HTTPValidationError;
+
+/**
+ * @summary Stream Events
+ */
+export const useStreamEventsApiV1InvestigationsInvestigationIdEventsGet = <
+  TData = Awaited<
+    ReturnType<typeof streamEventsApiV1InvestigationsInvestigationIdEventsGet>
+  >,
+  TError = HTTPValidationError,
+>(
+  investigationId: string,
+  params?: StreamEventsApiV1InvestigationsInvestigationIdEventsGetParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<
+          ReturnType<
+            typeof streamEventsApiV1InvestigationsInvestigationIdEventsGet
+          >
+        >,
+        TError,
+        TData
+      >
+    >;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } => {
+  const queryOptions =
+    getStreamEventsApiV1InvestigationsInvestigationIdEventsGetQueryOptions(
+      investigationId,
+      params,
       options,
     );
 

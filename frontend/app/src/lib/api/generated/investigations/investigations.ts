@@ -17,6 +17,7 @@ import type {
 } from "@tanstack/react-query";
 import type {
   CancelInvestigationResponse,
+  ChainVerificationResponse,
   HTTPValidationError,
   InvestigationListItem,
   InvestigationStateResponse,
@@ -452,6 +453,153 @@ export const useGetInvestigationApiV1InvestigationsInvestigationIdGet = <
 
   return query;
 };
+
+/**
+ * Verify the integrity of an investigation's evidence hash chain.
+
+Validates that evidence items have not been tampered with by checking
+content hashes and chain linkage.
+
+Args:
+    investigation_id: UUID of the investigation.
+    auth: Authentication context from API key/JWT.
+    db: Application database.
+
+Returns:
+    ChainVerificationResponse with verification result.
+
+Raises:
+    HTTPException: If investigation not found.
+ * @summary Verify Investigation
+ */
+export const verifyInvestigationApiV1InvestigationsInvestigationIdVerifyGet = (
+  investigationId: string,
+  signal?: AbortSignal,
+) => {
+  return customInstance<ChainVerificationResponse>({
+    url: `/api/v1/investigations/${investigationId}/verify`,
+    method: "GET",
+    signal,
+  });
+};
+
+export const getVerifyInvestigationApiV1InvestigationsInvestigationIdVerifyGetQueryKey =
+  (investigationId: string) => {
+    return [`/api/v1/investigations/${investigationId}/verify`] as const;
+  };
+
+export const getVerifyInvestigationApiV1InvestigationsInvestigationIdVerifyGetQueryOptions =
+  <
+    TData = Awaited<
+      ReturnType<
+        typeof verifyInvestigationApiV1InvestigationsInvestigationIdVerifyGet
+      >
+    >,
+    TError = HTTPValidationError,
+  >(
+    investigationId: string,
+    options?: {
+      query?: Partial<
+        UseQueryOptions<
+          Awaited<
+            ReturnType<
+              typeof verifyInvestigationApiV1InvestigationsInvestigationIdVerifyGet
+            >
+          >,
+          TError,
+          TData
+        >
+      >;
+    },
+  ) => {
+    const { query: queryOptions } = options ?? {};
+
+    const queryKey =
+      queryOptions?.queryKey ??
+      getVerifyInvestigationApiV1InvestigationsInvestigationIdVerifyGetQueryKey(
+        investigationId,
+      );
+
+    const queryFn: QueryFunction<
+      Awaited<
+        ReturnType<
+          typeof verifyInvestigationApiV1InvestigationsInvestigationIdVerifyGet
+        >
+      >
+    > = ({ signal }) =>
+      verifyInvestigationApiV1InvestigationsInvestigationIdVerifyGet(
+        investigationId,
+        signal,
+      );
+
+    return {
+      queryKey,
+      queryFn,
+      enabled: !!investigationId,
+      ...queryOptions,
+    } as UseQueryOptions<
+      Awaited<
+        ReturnType<
+          typeof verifyInvestigationApiV1InvestigationsInvestigationIdVerifyGet
+        >
+      >,
+      TError,
+      TData
+    > & { queryKey: QueryKey };
+  };
+
+export type VerifyInvestigationApiV1InvestigationsInvestigationIdVerifyGetQueryResult =
+  NonNullable<
+    Awaited<
+      ReturnType<
+        typeof verifyInvestigationApiV1InvestigationsInvestigationIdVerifyGet
+      >
+    >
+  >;
+export type VerifyInvestigationApiV1InvestigationsInvestigationIdVerifyGetQueryError =
+  HTTPValidationError;
+
+/**
+ * @summary Verify Investigation
+ */
+export const useVerifyInvestigationApiV1InvestigationsInvestigationIdVerifyGet =
+  <
+    TData = Awaited<
+      ReturnType<
+        typeof verifyInvestigationApiV1InvestigationsInvestigationIdVerifyGet
+      >
+    >,
+    TError = HTTPValidationError,
+  >(
+    investigationId: string,
+    options?: {
+      query?: Partial<
+        UseQueryOptions<
+          Awaited<
+            ReturnType<
+              typeof verifyInvestigationApiV1InvestigationsInvestigationIdVerifyGet
+            >
+          >,
+          TError,
+          TData
+        >
+      >;
+    },
+  ): UseQueryResult<TData, TError> & { queryKey: QueryKey } => {
+    const queryOptions =
+      getVerifyInvestigationApiV1InvestigationsInvestigationIdVerifyGetQueryOptions(
+        investigationId,
+        options,
+      );
+
+    const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+      queryKey: QueryKey;
+    };
+
+    query.queryKey = queryOptions.queryKey;
+
+    return query;
+  };
 
 /**
  * Send a message to an investigation via Temporal signal.

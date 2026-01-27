@@ -2044,3 +2044,247 @@ class AppDatabase:
             LIMIT ${param_idx} OFFSET ${param_idx + 1}
         """
         return await self.fetch_all(query, *params)
+
+    # Dataset-to-Repository Mapping operations
+
+    async def create_repo_mapping(
+        self, tenant_id: UUID, mapping_data: dict[str, Any]
+    ) -> dict[str, Any]:
+        """Create a dataset-to-repository mapping."""
+        result = await self.execute_returning(
+            """INSERT INTO dataset_repo_mappings
+               (tenant_id, dataset_pattern, pattern_type, priority,
+                repo_owner, repo_name, file_path, branch, job_name,
+                source, confidence, confirmed, metadata)
+               VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+               RETURNING *""",
+            tenant_id,
+            mapping_data["dataset_pattern"],
+            mapping_data.get("pattern_type", "exact"),
+            mapping_data.get("priority", 0),
+            mapping_data["repo_owner"],
+            mapping_data["repo_name"],
+            mapping_data.get("file_path"),
+            mapping_data.get("branch"),
+            mapping_data.get("job_name"),
+            mapping_data.get("source", "manual"),
+            mapping_data.get("confidence", 1.0),
+            mapping_data.get("confirmed", True),
+            to_json_string(mapping_data.get("metadata", {})),
+        )
+        if result is None:
+            raise RuntimeError("Failed to create repo mapping")
+        return result
+
+    async def get_repo_mapping(self, mapping_id: UUID, tenant_id: UUID) -> dict[str, Any] | None:
+        """Get a repo mapping by ID."""
+        return await self.fetch_one(
+            "SELECT * FROM dataset_repo_mappings WHERE id = $1 AND tenant_id = $2",
+            mapping_id,
+            tenant_id,
+        )
+
+    async def list_repo_mappings(
+        self,
+        tenant_id: UUID,
+        source: str | None = None,
+        confirmed: bool | None = None,
+        limit: int = 50,
+        offset: int = 0,
+    ) -> list[dict[str, Any]]:
+        """List repo mappings with optional filters."""
+        conditions = ["tenant_id = $1"]
+        params: list[Any] = [tenant_id]
+        param_idx = 2
+
+        if source is not None:
+            conditions.append(f"source = ${param_idx}")
+            params.append(source)
+            param_idx += 1
+
+        if confirmed is not None:
+            conditions.append(f"confirmed = ${param_idx}")
+            params.append(confirmed)
+            param_idx += 1
+
+        where_clause = " AND ".join(conditions)
+        params.extend([limit, offset])
+
+        query = f"""
+            SELECT * FROM dataset_repo_mappings
+            WHERE {where_clause}
+            ORDER BY priority ASC, confidence DESC, created_at DESC
+            LIMIT ${param_idx} OFFSET ${param_idx + 1}
+        """
+        return await self.fetch_all(query, *params)
+
+    async def update_repo_mapping(
+        self, mapping_id: UUID, tenant_id: UUID, updates: dict[str, Any]
+    ) -> dict[str, Any] | None:
+        """Update a repo mapping."""
+        allowed_fields = {
+            "dataset_pattern",
+            "pattern_type",
+            "repo_owner",
+            "repo_name",
+            "file_path",
+            "branch",
+            "job_name",
+            "metadata",
+            "confidence",
+            "priority",
+        }
+        set_clauses = ["updated_at = NOW()"]
+        params: list[Any] = [mapping_id, tenant_id]
+        param_idx = 3
+
+        for field, value in updates.items():
+            if field not in allowed_fields:
+                continue
+            if field == "metadata":
+                set_clauses.append(f"metadata = ${param_idx}")
+                params.append(to_json_string(value))
+            else:
+                set_clauses.append(f"{field} = ${param_idx}")
+                params.append(value)
+            param_idx += 1
+
+        if len(set_clauses) == 1:
+            return await self.get_repo_mapping(mapping_id, tenant_id)
+
+        query = f"""
+            UPDATE dataset_repo_mappings
+            SET {", ".join(set_clauses)}
+            WHERE id = $1 AND tenant_id = $2
+            RETURNING *
+        """
+        return await self.execute_returning(query, *params)
+
+    async def delete_repo_mapping(self, mapping_id: UUID, tenant_id: UUID) -> bool:
+        """Delete a repo mapping."""
+        result = await self.execute(
+            "DELETE FROM dataset_repo_mappings WHERE id = $1 AND tenant_id = $2",
+            mapping_id,
+            tenant_id,
+        )
+        return result == "DELETE 1"
+
+    async def bulk_create_repo_mappings(
+        self, tenant_id: UUID, mappings: list[dict[str, Any]]
+    ) -> list[dict[str, Any]]:
+        """Bulk create repo mappings using upsert."""
+        results = []
+        for mapping in mappings:
+            result = await self.upsert_repo_mapping(
+                tenant_id=tenant_id,
+                dataset_pattern=mapping["dataset_pattern"],
+                repo_owner=mapping["repo_owner"],
+                repo_name=mapping["repo_name"],
+                defaults=mapping,
+            )
+            results.append(result)
+        return results
+
+    async def upsert_repo_mapping(
+        self,
+        tenant_id: UUID,
+        dataset_pattern: str,
+        repo_owner: str,
+        repo_name: str,
+        defaults: dict[str, Any],
+    ) -> dict[str, Any]:
+        """Insert or update a repo mapping on conflict."""
+        result = await self.execute_returning(
+            """INSERT INTO dataset_repo_mappings
+               (tenant_id, dataset_pattern, pattern_type, priority,
+                repo_owner, repo_name, file_path, branch, job_name,
+                source, confidence, confirmed, metadata)
+               VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+               ON CONFLICT (tenant_id, dataset_pattern, repo_owner, repo_name)
+               WHERE confirmed = true
+               DO UPDATE SET
+                   file_path = COALESCE(EXCLUDED.file_path, dataset_repo_mappings.file_path),
+                   branch = COALESCE(EXCLUDED.branch, dataset_repo_mappings.branch),
+                   job_name = COALESCE(EXCLUDED.job_name, dataset_repo_mappings.job_name),
+                   confidence = GREATEST(EXCLUDED.confidence, dataset_repo_mappings.confidence),
+                   metadata = EXCLUDED.metadata,
+                   last_verified_at = NOW(),
+                   updated_at = NOW()
+               RETURNING *""",
+            tenant_id,
+            dataset_pattern,
+            defaults.get("pattern_type", "exact"),
+            defaults.get("priority", 0),
+            repo_owner,
+            repo_name,
+            defaults.get("file_path"),
+            defaults.get("branch"),
+            defaults.get("job_name"),
+            defaults.get("source", "manual"),
+            defaults.get("confidence", 1.0),
+            defaults.get("confirmed", True),
+            to_json_string(defaults.get("metadata", {})),
+        )
+        if result is None:
+            raise RuntimeError("Failed to upsert repo mapping")
+        return result
+
+    async def resolve_repo_for_dataset(
+        self, tenant_id: UUID, dataset_id: str
+    ) -> list[dict[str, Any]]:
+        """Find all matching repo mappings for a dataset.
+
+        Returns exact matches and all glob patterns for the tenant,
+        ordered by priority ASC, confidence DESC, created_at DESC.
+        Glob pattern evaluation happens in Python (caller's responsibility).
+        """
+        normalized = dataset_id.lower().strip()
+        return await self.fetch_all(
+            """SELECT * FROM dataset_repo_mappings
+               WHERE tenant_id = $1
+                 AND confirmed = true
+                 AND (
+                     (pattern_type = 'exact' AND dataset_pattern = $2)
+                     OR pattern_type = 'glob'
+                 )
+               ORDER BY priority ASC, confidence DESC, created_at DESC""",
+            tenant_id,
+            normalized,
+        )
+
+    async def list_repo_mapping_suggestions(
+        self, tenant_id: UUID, limit: int = 50, offset: int = 0
+    ) -> list[dict[str, Any]]:
+        """List unconfirmed (suggested) repo mappings."""
+        return await self.fetch_all(
+            """SELECT * FROM dataset_repo_mappings
+               WHERE tenant_id = $1 AND confirmed = false
+               ORDER BY confidence DESC, created_at DESC
+               LIMIT $2 OFFSET $3""",
+            tenant_id,
+            limit,
+            offset,
+        )
+
+    async def confirm_repo_mapping(
+        self, mapping_id: UUID, tenant_id: UUID
+    ) -> dict[str, Any] | None:
+        """Confirm a suggested mapping, promoting it to explicit."""
+        return await self.execute_returning(
+            """UPDATE dataset_repo_mappings
+               SET confirmed = true, priority = 0, updated_at = NOW()
+               WHERE id = $1 AND tenant_id = $2 AND confirmed = false
+               RETURNING *""",
+            mapping_id,
+            tenant_id,
+        )
+
+    async def dismiss_repo_mapping(self, mapping_id: UUID, tenant_id: UUID) -> bool:
+        """Dismiss (delete) an unconfirmed suggestion."""
+        result = await self.execute(
+            """DELETE FROM dataset_repo_mappings
+               WHERE id = $1 AND tenant_id = $2 AND confirmed = false""",
+            mapping_id,
+            tenant_id,
+        )
+        return result == "DELETE 1"

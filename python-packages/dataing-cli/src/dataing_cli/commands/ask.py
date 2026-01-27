@@ -254,10 +254,7 @@ def _enter_repl(client: DataingClient, investigation_id: str, state: Any) -> Non
         investigation_id: The investigation ID.
         state: The CLI state object.
     """
-    # Placeholder - full implementation in fn-31.4
-    console.print(
-        f"\n[bold]Entering interactive mode for investigation {investigation_id[:8]}...[/bold]\n"
-        "[dim]REPL mode will be available in a future update.[/dim]\n"
-        '[dim]For now, use: dataing ask "your question"[/dim]'
-    )
-    raise typer.Exit(0)
+    from dataing_cli.repl import DataingREPL
+
+    repl = DataingREPL(client, investigation_id)
+    repl.run()

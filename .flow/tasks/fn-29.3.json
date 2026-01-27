@@ -1,14 +1,23 @@
 {
-  "assignee": null,
+  "assignee": "bordumbb@gmail.com",
   "claim_note": "",
-  "claimed_at": null,
+  "claimed_at": "2026-01-27T00:04:15.064915Z",
   "created_at": "2026-01-26T23:48:18.744453Z",
   "depends_on": [],
   "epic": "fn-29",
+  "evidence": {
+    "commits": [
+      "1ffbfe2a21b74a7543a74790b383f2f4c564e5ca"
+    ],
+    "prs": [],
+    "tests": [
+      "pytest python-packages/dataing-cli/tests/test_commands_run.py"
+    ]
+  },
   "id": "fn-29.3",
   "priority": null,
   "spec_path": ".flow/tasks/fn-29.3.md",
-  "status": "todo",
+  "status": "done",
   "title": "Add --no-stream flag with wait behavior",
-  "updated_at": "2026-01-26T23:49:53.116464Z"
+  "updated_at": "2026-01-27T00:05:50.163493Z"
 }

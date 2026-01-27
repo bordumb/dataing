@@ -14,6 +14,7 @@ from rich.text import Text  # Used for header panel
 
 from dataing_cli.config import get_client, get_frontend_url, load_config
 from dataing_cli.display import (
+    format_completion,
     format_evidence_item,
     format_hypothesis,
     format_query,
@@ -41,7 +42,11 @@ def start_run(
     ] = None,
     no_watch: Annotated[
         bool,
-        typer.Option("--no-watch", help="Don't stream progress"),
+        typer.Option("--no-watch", help="(Deprecated) Don't stream progress, exit after start"),
+    ] = False,
+    no_stream: Annotated[
+        bool,
+        typer.Option("--no-stream", help="Wait for completion and output final result only"),
     ] = False,
 ) -> None:
     """Start a new investigation run."""
@@ -75,11 +80,20 @@ def start_run(
     console.print(f"[green]+[/green] Started run: [cyan]{run.run_id}[/cyan]")
     console.print(f"[green]+[/green] View at: [link={inv_url}]{inv_url}[/link]")
 
-    if state and state.json_output:
-        console.print(json.dumps(run.model_dump(), indent=2, default=str))
+    # Handle --no-watch (deprecated): exit immediately after showing URL
+    if no_watch:
         return
 
-    if not no_watch:
+    # Handle --no-stream: wait silently, then output final result
+    if no_stream:
+        _wait_for_completion(client, run.run_id, state)
+        return
+
+    # Default: stream events with timeline display
+    if not (state and state.json_output):
+        _watch_run(client, run.run_id, state)
+    else:
+        # JSON output mode - handled by _watch_run
         _watch_run(client, run.run_id, state)
 
 
@@ -96,6 +110,52 @@ def watch_run(
         base_url=state.base_url if state else None,
     )
     _watch_run(client, run_id, state)
+
+
+def _wait_for_completion(client: DataingClient, run_id: str, state: Any) -> None:
+    """Wait silently for investigation completion and output final result.
+
+    Args:
+        client: The DataingClient instance.
+        run_id: The run ID to wait for.
+        state: The CLI state object.
+    """
+    json_output = state.json_output if state else False
+    final_event = None
+
+    # Stream silently, waiting for terminal event
+    with console.status("[bold blue]Waiting for investigation to complete..."):
+        for event in client.stream_run(run_id):
+            if event.is_terminal:
+                final_event = event
+                break
+
+    if final_event is None:
+        console.print("[red]Error:[/red] Stream ended without terminal event")
+        raise typer.Exit(1)
+
+    # Output final result
+    if json_output:
+        # NDJSON format for --json mode
+        print(json.dumps(final_event.model_dump(), separators=(",", ":"), default=str))
+    else:
+        # Rich formatted output
+        if final_event.event == "run_completed":
+            console.print(format_completion(final_event.data))
+        else:
+            # run_failed
+            error = final_event.data.get("error", "Unknown error")
+            console.print(
+                Panel(
+                    f"[red]-[/red] {error}",
+                    title="Failed",
+                    border_style="red",
+                )
+            )
+
+    # Exit with appropriate code
+    if final_event.event == "run_failed":
+        raise typer.Exit(1)
 
 
 def _watch_run(client: DataingClient, run_id: str, state: Any) -> None:

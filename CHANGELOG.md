@@ -1,3 +1,10 @@
+# [1.5.0](https://github.com/bordumb/dataing/compare/v1.4.0...v1.5.0) (2026-01-27)
+
+
+### Features
+
+* **cli:** add --date flag to match GUI anomaly_date parameter ([#89](https://github.com/bordumb/dataing/issues/89)) ([c7a4f7a](https://github.com/bordumb/dataing/commit/c7a4f7aaf711e2854690a4d76fdab436928abd00)), closes [#1](https://github.com/bordumb/dataing/issues/1) [#2](https://github.com/bordumb/dataing/issues/2)
+
 # [1.4.0](https://github.com/bordumb/dataing/compare/v1.3.0...v1.4.0) (2026-01-22)
 
 

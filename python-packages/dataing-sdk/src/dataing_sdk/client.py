@@ -1049,6 +1049,79 @@ class DataingClient:
             user_branch=user_branch,
         )
 
+    def send_message(self, investigation_id: str, message: str) -> Any:
+        """Send a user message to an investigation.
+
+        Sends a follow-up message to an ongoing investigation, allowing users
+        to provide additional context, ask questions, or redirect the
+        investigation focus.
+
+        Args:
+            investigation_id: The unique identifier of the investigation.
+            message: The user message text to send.
+
+        Returns:
+            A `SendMessageResponse` object with status and investigation_id.
+
+        Raises:
+            NotFoundError: If the investigation ID does not exist.
+            AuthError: If not authorized to access this investigation.
+            DataingError: If the message could not be sent.
+
+        Example:
+            ```python
+            inv = client.start_investigation(
+                dataset="main.orders",
+                anomaly_type="null_rate",
+                goal="Investigate nulls",
+            )
+
+            # Later, send a follow-up message
+            response = client.send_message(
+                inv.investigation_id,
+                "Can you also check the upstream data source?"
+            )
+            print(f"Message status: {response.status}")
+            ```
+
+        See Also:
+            - `start_investigation`: Start a new investigation
+            - `get_investigation`: Get current investigation state
+            - `stream_run`: Stream real-time events
+        """
+        from .types import SendMessageResponse
+
+        response = self._request(
+            "POST",
+            f"/api/v1/investigations/{investigation_id}/messages",
+            json={"message": message},
+        )
+        data = response.json()
+
+        return SendMessageResponse(
+            status=data.get("status", "unknown"),
+            investigation_id=str(data.get("investigation_id", investigation_id)),
+        )
+
+    async def async_send_message(self, investigation_id: str, message: str) -> Any:
+        """Async version of `send_message`.
+
+        See `send_message` for full documentation.
+        """
+        from .types import SendMessageResponse
+
+        response = await self._async_request(
+            "POST",
+            f"/api/v1/investigations/{investigation_id}/messages",
+            json={"message": message},
+        )
+        data = response.json()
+
+        return SendMessageResponse(
+            status=data.get("status", "unknown"),
+            investigation_id=str(data.get("investigation_id", investigation_id)),
+        )
+
     async def async_get_investigation(self, investigation_id: str) -> Any:
         """Async version of `get_investigation`.
 

@@ -1,0 +1,23 @@
+{
+  "assignee": "bordumbb@gmail.com",
+  "claim_note": "",
+  "claimed_at": "2026-01-27T04:03:46.710021Z",
+  "created_at": "2026-01-27T03:53:48.408668Z",
+  "depends_on": [],
+  "epic": "fn-31",
+  "evidence": {
+    "commits": [
+      "e5512056c2f02c3d8f192d5bfe2a06d2f0f411cb"
+    ],
+    "prs": [],
+    "tests": [
+      "uv run pytest python-packages/dataing-sdk/tests/ -v"
+    ]
+  },
+  "id": "fn-31.1",
+  "priority": null,
+  "spec_path": ".flow/tasks/fn-31.1.md",
+  "status": "done",
+  "title": "SDK: Add send_message method",
+  "updated_at": "2026-01-27T04:05:36.192950Z"
+}

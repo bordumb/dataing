@@ -1,0 +1,14 @@
+{
+  "assignee": null,
+  "claim_note": "",
+  "claimed_at": null,
+  "created_at": "2026-01-27T03:53:49.564405Z",
+  "depends_on": [],
+  "epic": "fn-31",
+  "id": "fn-31.2",
+  "priority": null,
+  "spec_path": ".flow/tasks/fn-31.2.md",
+  "status": "todo",
+  "title": "CLI: Add dependencies and config",
+  "updated_at": "2026-01-27T03:55:55.922773Z"
+}

@@ -1084,3 +1084,27 @@ class Investigation(BaseModel):
             ID: {html_module.escape(self.investigation_id[:16])}...
         </div>
         """  # noqa: E501
+
+
+class SendMessageResponse(BaseModel):
+    """Response from sending a user message to an investigation.
+
+    Returned by `DataingClient.send_message()` when sending follow-up
+    messages to an ongoing investigation.
+
+    Attributes:
+        status: Status of the message send operation (e.g., "message_sent").
+        investigation_id: ID of the investigation the message was sent to.
+
+    Example:
+        ```python
+        response = client.send_message(
+            investigation_id="abc123",
+            message="Can you investigate the upstream table?"
+        )
+        print(f"Status: {response.status}")
+        ```
+    """
+
+    status: str = Field(..., description="Status of the message send operation")
+    investigation_id: str = Field(..., description="Investigation the message was sent to")

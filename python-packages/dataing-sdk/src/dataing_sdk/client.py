@@ -627,18 +627,14 @@ class DataingClient:
     ) -> Run:
         """Create and start an investigation run.
 
-        This is the primary method for launching autonomous data quality
-        investigations. It resolves the specified assets, creates or reuses
-        a context bundle, and starts an investigation workflow that:
+        .. deprecated::
+            Use `start_investigation` instead for better investigation quality.
+            This method now internally calls `start_investigation` with the
+            ``user_query`` anomaly type.
 
-        1. Gathers context (schemas, statistics, lineage)
-        2. Generates hypotheses about potential root causes
-        3. Tests each hypothesis with SQL queries
-        4. Synthesizes findings into a conclusion
-
-        The run executes asynchronously on the server. Use `get_run` to
-        poll for status, `wait_for_run` to block until completion, or
-        `stream_run` for real-time event streaming.
+        This is the legacy method for launching investigations. It has been
+        updated to use the unified investigations endpoint (same as the GUI)
+        for consistent results.
 
         Args:
             assets: List of `dataing_sdk.types.AssetRef` objects
@@ -647,7 +643,7 @@ class DataingClient:
                 Be specific about the issue or question, e.g.,
                 ``"Why are there null values spiking in customer_id?"``
             bundle_id: Optional ID of an existing context bundle to reuse.
-                If provided, skips bundle creation for faster startup.
+                (Note: Currently ignored - provided for API compatibility)
 
         Returns:
             A `dataing_sdk.types.Run` object with the ``run_id``,
@@ -669,63 +665,48 @@ class DataingClient:
                 goal="Investigate the 40% drop in order volume yesterday"
             )
             print(f"Started run: {run.run_id}")
-            print(f"Status: {run.status}")  # RunStatus.PENDING or RUNNING
-            ```
-
-            With context reuse:
-
-            ```python
-            # Create context once
-            ctx = client.context("postgres://db.public.orders")
-
-            # Reuse for multiple investigations
-            run1 = client.run(
-                assets=ctx.assets,
-                goal="Check for null spikes",
-                bundle_id=ctx.bundle_id,
-            )
-            run2 = client.run(
-                assets=ctx.assets,
-                goal="Check for schema changes",
-                bundle_id=ctx.bundle_id,
-            )
             ```
 
         See Also:
+            - `start_investigation`: Preferred method with structured anomaly data
             - `get_run`: Check run status
             - `wait_for_run`: Block until run completes
             - `stream_run`: Stream real-time events
-            - `async_run`: Async version of this method
         """
+        import warnings
+        from datetime import datetime
+
         from .types import Run, RunStatus
 
-        payload: dict[str, Any] = {"goal": goal}
+        warnings.warn(
+            "run() is deprecated. Use start_investigation() for better results.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
 
-        # Always include assets for dataset identification
-        payload["bundle"] = {
-            "assets": [
-                {
-                    "platform": a.platform,
-                    "name": a.name,
-                    "datasource_id": a.datasource_id,
-                }
-                for a in assets
-            ]
-        }
+        if not assets:
+            raise ValidationError("At least one asset is required")
 
-        # Optionally include bundle_id for caching
-        if bundle_id:
-            payload["bundle_id"] = bundle_id
+        # Use first asset's name and datasource_id
+        first_asset = assets[0]
+        dataset = first_asset.name
+        datasource_id = first_asset.datasource_id
 
-        response = self._request("POST", "/api/v1/runs", json=payload)
-        data = response.json()
+        # Call start_investigation with user_query anomaly type
+        investigation = self.start_investigation(
+            dataset=dataset,
+            anomaly_type="user_query",
+            goal=goal,
+            datasource_id=datasource_id,
+        )
 
+        # Return a Run object for backward compatibility
         return Run(
-            run_id=data["run_id"],
-            bundle_id=data["bundle_id"],
-            bundle_hash=data["bundle_hash"],
-            status=RunStatus(data["status"]),
-            created_at=data["created_at"],
+            run_id=investigation.investigation_id,
+            bundle_id=bundle_id or investigation.investigation_id,
+            bundle_hash="",
+            status=RunStatus.RUNNING,
+            created_at=datetime.now(),
         )
 
     async def async_run(
@@ -736,37 +717,263 @@ class DataingClient:
     ) -> Run:
         """Async version of `run`.
 
+        .. deprecated::
+            Use `async_start_investigation` instead for better investigation quality.
+
         See `run` for full documentation.
         """
+        import warnings
+        from datetime import datetime
+
         from .types import Run, RunStatus
 
-        payload: dict[str, Any] = {"goal": goal}
+        warnings.warn(
+            "async_run() is deprecated. Use async_start_investigation() for better results.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
 
-        # Always include assets for dataset identification
-        payload["bundle"] = {
-            "assets": [
-                {
-                    "platform": a.platform,
-                    "name": a.name,
-                    "datasource_id": a.datasource_id,
-                }
-                for a in assets
-            ]
+        if not assets:
+            raise ValidationError("At least one asset is required")
+
+        # Use first asset's name and datasource_id
+        first_asset = assets[0]
+        dataset = first_asset.name
+        datasource_id = first_asset.datasource_id
+
+        # Call async_start_investigation with user_query anomaly type
+        investigation = await self.async_start_investigation(
+            dataset=dataset,
+            anomaly_type="user_query",
+            goal=goal,
+            datasource_id=datasource_id,
+        )
+
+        # Return a Run object for backward compatibility
+        return Run(
+            run_id=investigation.investigation_id,
+            bundle_id=bundle_id or investigation.investigation_id,
+            bundle_hash="",
+            status=RunStatus.RUNNING,
+            created_at=datetime.now(),
+        )
+
+    # --- Investigation methods (unified with GUI) ---
+
+    def start_investigation(
+        self,
+        dataset: str,
+        anomaly_type: str,
+        goal: str,
+        column: str | None = None,
+        expected_value: float = 0.0,
+        actual_value: float = 0.0,
+        deviation_pct: float | None = None,
+        severity: str = "medium",
+        datasource_id: str | None = None,
+        anomaly_date: str | None = None,
+    ) -> Any:
+        """Start an investigation using the same endpoint as the GUI.
+
+        This method provides a unified experience between CLI and GUI by calling
+        the same ``/api/v1/investigations`` endpoint with structured anomaly data.
+        This ensures consistent investigation quality across all interfaces.
+
+        Args:
+            dataset: The dataset to investigate in ``schema.table`` format.
+            anomaly_type: Type of anomaly being investigated. Common values:
+                - ``null_rate``: Null values in a column
+                - ``row_count``: Unexpected row count change
+                - ``freshness``: Data not updated as expected
+                - ``duplicate_rate``: Duplicate records detected
+                - ``schema_drift``: Schema changes detected
+                - ``custom``: Custom/other anomaly type
+            goal: Natural language description of what to investigate.
+            column: Optional column name if the anomaly is column-specific.
+            expected_value: Expected metric value (default 0.0).
+            actual_value: Actual observed metric value (default 0.0).
+            deviation_pct: Percentage deviation. If not provided, calculated
+                from expected and actual values.
+            severity: Alert severity level (``low``, ``medium``, ``high``, ``critical``).
+            datasource_id: Optional datasource UUID. If not provided, uses the
+                attached datasource or tenant default.
+            anomaly_date: Date of the anomaly in ``YYYY-MM-DD`` format.
+                Defaults to today.
+
+        Returns:
+            An `Investigation` object with ``investigation_id``, ``main_branch_id``,
+            and initial ``status``.
+
+        Raises:
+            ValidationError: If required fields are missing or invalid.
+            AuthError: If authentication fails.
+            ServerError: If the server encounters an error.
+
+        Example:
+            Full structured input (matches GUI experience):
+
+            ```python
+            inv = client.start_investigation(
+                dataset="main.orders",
+                anomaly_type="null_rate",
+                column="user_id",
+                expected_value=0.01,
+                actual_value=0.15,
+                goal="Investigate why user_id has null values",
+            )
+            print(f"Started: {inv.investigation_id}")
+            ```
+
+            Minimal input with sensible defaults:
+
+            ```python
+            inv = client.start_investigation(
+                dataset="main.orders",
+                anomaly_type="null_rate",
+                goal="Investigate null spike",
+            )
+            ```
+
+        See Also:
+            - `run`: Legacy method using runs endpoint
+            - `stream_run`: Stream real-time events
+            - `async_start_investigation`: Async version
+        """
+        from datetime import date
+
+        from .types import Investigation
+
+        # Calculate deviation if not provided
+        if deviation_pct is None:
+            if expected_value != 0:
+                deviation_pct = ((actual_value - expected_value) / expected_value) * 100
+            else:
+                deviation_pct = 0.0
+
+        # Use today's date if not provided
+        if anomaly_date is None:
+            anomaly_date = date.today().isoformat()
+
+        # Resolve datasource_id
+        ds_id = datasource_id or self._default_datasource_id
+
+        # Build metric_spec based on whether column is specified
+        if column:
+            metric_spec = {
+                "metric_type": "column",
+                "expression": column,
+                "display_name": f"{anomaly_type} on {column}",
+                "columns_referenced": [column],
+            }
+        else:
+            metric_spec = {
+                "metric_type": "description",
+                "expression": goal,
+                "display_name": anomaly_type,
+                "columns_referenced": [],
+            }
+
+        # Build alert payload matching AnomalyAlert structure
+        alert_payload = {
+            "dataset_ids": [dataset],
+            "metric_spec": metric_spec,
+            "anomaly_type": anomaly_type,
+            "expected_value": expected_value,
+            "actual_value": actual_value,
+            "deviation_pct": deviation_pct,
+            "anomaly_date": anomaly_date,
+            "severity": severity,
         }
 
-        # Optionally include bundle_id for caching
-        if bundle_id:
-            payload["bundle_id"] = bundle_id
+        # Build request payload
+        payload: dict[str, Any] = {"alert": alert_payload}
+        if ds_id:
+            payload["datasource_id"] = ds_id
 
-        response = await self._async_request("POST", "/api/v1/runs", json=payload)
+        response = self._request("POST", "/api/v1/investigations", json=payload)
         data = response.json()
 
-        return Run(
-            run_id=data["run_id"],
-            bundle_id=data["bundle_id"],
-            bundle_hash=data["bundle_hash"],
-            status=RunStatus(data["status"]),
-            created_at=data["created_at"],
+        return Investigation(
+            investigation_id=str(data["investigation_id"]),
+            main_branch_id=str(data["main_branch_id"]),
+            status=data.get("status", "queued"),
+        )
+
+    async def async_start_investigation(
+        self,
+        dataset: str,
+        anomaly_type: str,
+        goal: str,
+        column: str | None = None,
+        expected_value: float = 0.0,
+        actual_value: float = 0.0,
+        deviation_pct: float | None = None,
+        severity: str = "medium",
+        datasource_id: str | None = None,
+        anomaly_date: str | None = None,
+    ) -> Any:
+        """Async version of `start_investigation`.
+
+        See `start_investigation` for full documentation.
+        """
+        from datetime import date
+
+        from .types import Investigation
+
+        # Calculate deviation if not provided
+        if deviation_pct is None:
+            if expected_value != 0:
+                deviation_pct = ((actual_value - expected_value) / expected_value) * 100
+            else:
+                deviation_pct = 0.0
+
+        # Use today's date if not provided
+        if anomaly_date is None:
+            anomaly_date = date.today().isoformat()
+
+        # Resolve datasource_id
+        ds_id = datasource_id or self._default_datasource_id
+
+        # Build metric_spec based on whether column is specified
+        if column:
+            metric_spec = {
+                "metric_type": "column",
+                "expression": column,
+                "display_name": f"{anomaly_type} on {column}",
+                "columns_referenced": [column],
+            }
+        else:
+            metric_spec = {
+                "metric_type": "description",
+                "expression": goal,
+                "display_name": anomaly_type,
+                "columns_referenced": [],
+            }
+
+        # Build alert payload matching AnomalyAlert structure
+        alert_payload = {
+            "dataset_ids": [dataset],
+            "metric_spec": metric_spec,
+            "anomaly_type": anomaly_type,
+            "expected_value": expected_value,
+            "actual_value": actual_value,
+            "deviation_pct": deviation_pct,
+            "anomaly_date": anomaly_date,
+            "severity": severity,
+        }
+
+        # Build request payload
+        payload: dict[str, Any] = {"alert": alert_payload}
+        if ds_id:
+            payload["datasource_id"] = ds_id
+
+        response = await self._async_request("POST", "/api/v1/investigations", json=payload)
+        data = response.json()
+
+        return Investigation(
+            investigation_id=str(data["investigation_id"]),
+            main_branch_id=str(data["main_branch_id"]),
+            status=data.get("status", "queued"),
         )
 
     # --- Run status methods ---
@@ -998,7 +1205,7 @@ class DataingClient:
         """
         from .types import RunEvent
 
-        url = f"{self.base_url}/api/v1/runs/{run_id}/events"
+        url = f"{self.base_url}/api/v1/investigations/{run_id}/events"
         params = {}
         if last_seq is not None:
             params["seq"] = str(last_seq)

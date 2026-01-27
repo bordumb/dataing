@@ -982,3 +982,48 @@ class DatasourceSchema(BaseModel):
         default_factory=list,
         description="List of table schemas",
     )
+
+
+# --- Investigation Types ---
+
+
+class Investigation(BaseModel):
+    """An investigation started via the investigations API.
+
+    Attributes:
+        investigation_id: Unique identifier for the investigation.
+        main_branch_id: ID of the main investigation branch.
+        status: Current status (queued, running, completed, failed).
+        run_id: Alias for investigation_id (for compatibility with Run type).
+    """
+
+    investigation_id: str = Field(..., description="Unique investigation identifier")
+    main_branch_id: str = Field(..., description="Main branch identifier")
+    status: str = Field(default="queued", description="Current investigation status")
+
+    @property
+    def run_id(self) -> str:
+        """Alias for investigation_id (compatibility with Run type)."""
+        return self.investigation_id
+
+    def _repr_html_(self) -> str:
+        """Rich HTML representation for Jupyter notebooks."""
+        import html as html_module
+
+        status_colors = {
+            "queued": "#f59e0b",
+            "running": "#3b82f6",
+            "completed": "#10b981",
+            "failed": "#ef4444",
+            "cancelled": "#6b7280",
+        }
+        color = status_colors.get(self.status.lower(), "#6b7280")
+        return f"""
+        <div style="font-family: monospace; padding: 10px; border: 1px solid #ccc; border-radius: 4px;">
+            <strong>Investigation</strong>
+            <span style="background: {color}20; color: {color}; padding: 2px 8px; border-radius: 4px; margin-left: 8px;">
+                {html_module.escape(self.status.upper())}
+            </span><br>
+            ID: {html_module.escape(self.investigation_id[:16])}...
+        </div>
+        """  # noqa: E501

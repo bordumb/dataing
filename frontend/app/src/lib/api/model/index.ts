@@ -455,6 +455,7 @@ export * from "./stepHistoryItemResponse";
 export * from "./stepHistoryItemResponseTimestamp";
 export * from "./storeEvidenceRequest";
 export * from "./storeEvidenceRequestContent";
+export * from "./streamEventsApiV1InvestigationsInvestigationIdEventsGetParams";
 export * from "./streamEventsApiV1RunsRunIdEventsGetParams";
 export * from "./streamIssueEventsApiV1IssuesIssueIdStreamGetParams";
 export * from "./syncResponse";

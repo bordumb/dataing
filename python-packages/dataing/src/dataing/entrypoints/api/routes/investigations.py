@@ -10,11 +10,13 @@ import asyncio
 import json
 import logging
 from collections.abc import AsyncIterator
+from datetime import UTC, datetime
+from enum import Enum
 from typing import Annotated, Any
 from uuid import UUID, uuid4
 
-from fastapi import APIRouter, Depends, HTTPException, Request
-from pydantic import BaseModel
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from pydantic import BaseModel, Field
 from sse_starlette.sse import EventSourceResponse
 
 from dataing.adapters.db.app_db import AppDatabase
@@ -682,5 +684,189 @@ async def stream_updates(
         except asyncio.CancelledError:
             # Client disconnected
             logger.info(f"SSE stream cancelled for investigation {investigation_id}")
+
+    return EventSourceResponse(event_generator())
+
+
+# --- SSE Events Endpoint (unified with CLI) ---
+
+# SSE configuration
+HEARTBEAT_INTERVAL_SECONDS = 30
+REPLAY_WINDOW_SECONDS = 300  # 5 minutes
+
+
+class SSEEventType(str, Enum):
+    """External SSE event types (run_* prefix for CLI compatibility)."""
+
+    RUN_STARTED = "run_started"
+    RUN_PROGRESS = "run_progress"
+    RUN_EVIDENCE = "run_evidence"
+    RUN_COMPLETED = "run_completed"
+    RUN_FAILED = "run_failed"
+    RUN_HEARTBEAT = "run_heartbeat"
+
+
+class StreamEventResponse(BaseModel):
+    """SSE stream event."""
+
+    seq: int = Field(..., description="Resume cursor (integer)")
+    event: str
+    run_id: str
+    data: dict[str, Any]
+    timestamp: datetime
+
+
+@router.get("/{investigation_id}/events")
+async def stream_events(
+    request: Request,
+    investigation_id: UUID,
+    auth: AuthDep,
+    db: AppDbDep,
+    temporal_client: TemporalClientDep,
+    last_event_id: int | None = Query(
+        default=None, alias="seq", description="Resume from this sequence number"
+    ),
+) -> EventSourceResponse:
+    """Stream SSE events for an investigation.
+
+    Events have an integer `seq` field for resumption.
+    Use `?seq=N` to resume from sequence N.
+
+    Returns 410 Gone if the replay window has expired.
+
+    Args:
+        request: FastAPI request object.
+        investigation_id: UUID of the investigation.
+        auth: Authentication context from API key/JWT.
+        db: Application database.
+        temporal_client: Temporal client for status polling.
+        last_event_id: Optional sequence number to resume from.
+
+    Returns:
+        EventSourceResponse with SSE stream.
+    """
+    # Check if investigation exists in investigations table
+    result = await db.fetch_one(
+        "SELECT id FROM investigations WHERE id = $1 AND tenant_id = $2",
+        investigation_id,
+        auth.tenant_id,
+    )
+    if not result:
+        raise HTTPException(status_code=404, detail=f"Investigation not found: {investigation_id}")
+
+    async def event_generator() -> AsyncIterator[dict[str, Any]]:
+        """Generate SSE events by polling Temporal workflow status."""
+        seq = last_event_id or 0
+        last_step = None
+        last_heartbeat = datetime.now(UTC)
+
+        # Send initial run_started event
+        seq += 1
+        started_data = {
+            "seq": seq,
+            "event": SSEEventType.RUN_STARTED.value,
+            "run_id": str(investigation_id),
+            "data": {"investigation_id": str(investigation_id)},
+            "timestamp": datetime.now(UTC).isoformat(),
+        }
+        yield {
+            "event": SSEEventType.RUN_STARTED.value,
+            "id": str(seq),
+            "data": json.dumps(started_data),
+        }
+
+        while True:
+            try:
+                # Poll Temporal for current status
+                status = await temporal_client.get_status(str(investigation_id))
+
+                # Check for step changes and emit progress events
+                current_step = status.current_step
+                current_status = status.workflow_status
+
+                if current_step and current_step != last_step:
+                    seq += 1
+                    progress_data = {
+                        "seq": seq,
+                        "event": SSEEventType.RUN_PROGRESS.value,
+                        "run_id": str(investigation_id),
+                        "data": {
+                            "step": current_step,
+                            "progress": status.progress,
+                            "message": f"Step: {current_step}",
+                        },
+                        "timestamp": datetime.now(UTC).isoformat(),
+                    }
+                    yield {
+                        "event": SSEEventType.RUN_PROGRESS.value,
+                        "id": str(seq),
+                        "data": json.dumps(progress_data),
+                    }
+                    last_step = current_step
+
+                # Check for completion
+                if status.is_complete or status.is_cancelled:
+                    seq += 1
+                    if status.is_complete:
+                        event_type = SSEEventType.RUN_COMPLETED.value
+                    else:
+                        event_type = SSEEventType.RUN_FAILED.value
+                    synthesis = None
+                    if status.result:
+                        synthesis = status.result.synthesis
+                    completion_data = {
+                        "seq": seq,
+                        "event": event_type,
+                        "run_id": str(investigation_id),
+                        "data": {
+                            "status": current_status,
+                            "synthesis": synthesis,
+                            "is_cancelled": status.is_cancelled,
+                        },
+                        "timestamp": datetime.now(UTC).isoformat(),
+                    }
+                    yield {
+                        "event": event_type,
+                        "id": str(seq),
+                        "data": json.dumps(completion_data),
+                    }
+                    break
+
+            except Exception as e:
+                logger.warning(f"Failed to poll investigation status: {e}")
+                seq += 1
+                error_data = {
+                    "seq": seq,
+                    "event": SSEEventType.RUN_FAILED.value,
+                    "run_id": str(investigation_id),
+                    "data": {"error": str(e)},
+                    "timestamp": datetime.now(UTC).isoformat(),
+                }
+                yield {
+                    "event": SSEEventType.RUN_FAILED.value,
+                    "id": str(seq),
+                    "data": json.dumps(error_data),
+                }
+                break
+
+            # Send heartbeat if needed
+            now = datetime.now(UTC)
+            if (now - last_heartbeat).total_seconds() >= HEARTBEAT_INTERVAL_SECONDS:
+                last_heartbeat = now
+                heartbeat_data = {
+                    "seq": seq,
+                    "event": SSEEventType.RUN_HEARTBEAT.value,
+                    "run_id": str(investigation_id),
+                    "data": {},
+                    "timestamp": now.isoformat(),
+                }
+                yield {
+                    "event": SSEEventType.RUN_HEARTBEAT.value,
+                    "id": str(seq),
+                    "data": json.dumps(heartbeat_data),
+                }
+
+            # Wait before polling again
+            await asyncio.sleep(0.5)
 
     return EventSourceResponse(event_generator())

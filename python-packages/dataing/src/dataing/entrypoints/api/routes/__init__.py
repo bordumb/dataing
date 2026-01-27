@@ -33,7 +33,6 @@ from dataing.entrypoints.api.routes.permissions import (
 from dataing.entrypoints.api.routes.permissions import (
     router as permissions_router,
 )
-from dataing.entrypoints.api.routes.runs import router as runs_router
 from dataing.entrypoints.api.routes.schema_comments import router as schema_comments_router
 from dataing.entrypoints.api.routes.sla_policies import router as sla_policies_router
 from dataing.entrypoints.api.routes.tags import (
@@ -65,7 +64,6 @@ api_router.include_router(usage_router)
 api_router.include_router(analytics_router)  # Activation and weekly usage analytics
 api_router.include_router(lineage_router)
 api_router.include_router(bundles_router)  # Context bundles API
-api_router.include_router(runs_router)  # Runs API with SSE streaming
 api_router.include_router(notifications_router)
 api_router.include_router(investigation_feedback_router)
 api_router.include_router(schema_comments_router)

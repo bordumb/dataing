@@ -12,6 +12,7 @@ with workflow.unsafe.imports_passed_through():
     from dataing.temporal.activities import (
         CheckPatternsInput,
         CounterAnalyzeInput,
+        FinalizeEvidenceChainInput,
         GatherContextInput,
         GenerateHypothesesInput,
         SynthesizeInput,
@@ -47,6 +48,7 @@ class InvestigationResult:
     synthesis: dict[str, Any] = field(default_factory=dict)
     counter_analysis: dict[str, Any] | None = None
     user_feedback: dict[str, Any] | None = None
+    root_hash: str | None = None
 
 
 @dataclass
@@ -371,6 +373,38 @@ class InvestigationWorkflow:
                 synthesis=synthesis,
             )
 
+        # Step 5b: Finalize evidence chain (build hash chain and persist)
+        root_hash: str | None = None
+        try:
+            finalize_input = FinalizeEvidenceChainInput(
+                investigation_id=input.investigation_id,
+                evidence=evidence,
+                hypotheses=hypotheses,
+                synthesis=synthesis,
+            )
+            finalize_result = await workflow.execute_activity(
+                "finalize_evidence_chain",
+                finalize_input,
+                start_to_close_timeout=timedelta(minutes=2),
+            )
+            root_hash = finalize_result.get("root_hash")
+            if finalize_result.get("error"):
+                workflow.logger.warning(
+                    f"Evidence chain finalization warning: {finalize_result['error']}"
+                )
+        except CancelledError:
+            return InvestigationResult(
+                investigation_id=input.investigation_id,
+                status="cancelled",
+                context=context,
+                hypotheses=hypotheses,
+                evidence=evidence,
+                synthesis=synthesis,
+            )
+        except Exception as e:
+            # Non-fatal: investigation can complete without evidence chain
+            workflow.logger.warning(f"Evidence chain finalization failed: {e}")
+
         # Step 6: Counter-analysis if confidence is below threshold
         counter_analysis = None
         confidence = synthesis.get("confidence", 1.0)
@@ -421,6 +455,7 @@ class InvestigationWorkflow:
             evidence=evidence,
             synthesis=synthesis,
             counter_analysis=counter_analysis,
+            root_hash=root_hash,
         )
 
     async def _evaluate_hypotheses_parallel(

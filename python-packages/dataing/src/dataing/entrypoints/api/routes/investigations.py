@@ -94,6 +94,7 @@ class InvestigationStateResponse(BaseModel):
     status: str
     main_branch: BranchStateResponse
     user_branch: BranchStateResponse | None = None
+    root_hash: str | None = None
 
 
 class InvestigationListItem(BaseModel):
@@ -433,11 +434,14 @@ async def get_investigation(
             parent_branch_id=None,
         )
 
+        root_hash = getattr(status.result, "root_hash", None) if status.result else None
+
         return InvestigationStateResponse(
             investigation_id=investigation_id,
             status=status.workflow_status,
             main_branch=main_branch,
             user_branch=None,
+            root_hash=root_hash,
         )
     except Exception as e:
         logger.error(f"Failed to get Temporal investigation: {e}")

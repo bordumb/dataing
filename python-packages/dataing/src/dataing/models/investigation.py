@@ -57,6 +57,9 @@ class Investigation(BaseModel):
         JSONB, nullable=True
     )  # Serialized Finding
 
+    # Evidence chain
+    root_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
+
     # Timestamps
     started_at: Mapped[datetime | None] = mapped_column(nullable=True)
     completed_at: Mapped[datetime | None] = mapped_column(nullable=True)

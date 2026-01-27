@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import time
 from typing import TYPE_CHECKING, Any
 
 from rich.console import Console, Group
@@ -103,6 +104,206 @@ def format_completion(event: Any) -> Panel:
         f"[bold]Confidence:[/bold] {confidence:.0%}",
         title="Result",
         border_style="green",
+    )
+
+
+def format_timestamp(start_time: float) -> str:
+    """Format elapsed time since start as [MM:SS] string.
+
+    Args:
+        start_time: Unix timestamp of when the operation started.
+
+    Returns:
+        Elapsed time formatted as "[MM:SS]".
+    """
+    elapsed = time.time() - start_time
+    minutes = int(elapsed // 60)
+    seconds = int(elapsed % 60)
+    return f"[{minutes:02d}:{seconds:02d}]"
+
+
+def format_hypothesis(event: Any, index: int, elapsed: str) -> Panel:
+    """Format a hypothesis event as a blue-bordered panel.
+
+    Args:
+        event: A hypothesis event from the SDK or dict with event data.
+        index: The hypothesis number (1-based).
+        elapsed: Elapsed time string from format_timestamp.
+
+    Returns:
+        A Rich Panel with blue border showing the hypothesis.
+    """
+    # Extract hypothesis text from event data
+    data = getattr(event, "data", None) or (event.get("data") if isinstance(event, dict) else {})
+    if isinstance(data, dict):
+        hypothesis_text = (
+            data.get("hypothesis", "") or data.get("hypothesis_text", "") or data.get("message", "")
+        )
+    else:
+        hypothesis_text = (
+            getattr(data, "hypothesis", "")
+            or getattr(data, "hypothesis_text", "")
+            or getattr(data, "message", "")
+        )
+
+    hypothesis_text = hypothesis_text or "Testing hypothesis..."
+
+    return Panel(
+        escape(str(hypothesis_text)),
+        title=f"{elapsed} Hypothesis #{index}",
+        border_style="blue",
+    )
+
+
+def format_query(event: Any, elapsed: str) -> Panel:
+    """Format a query execution event as a yellow-bordered panel with SQL highlighting.
+
+    Args:
+        event: A query event from the SDK or dict with event data.
+        elapsed: Elapsed time string from format_timestamp.
+
+    Returns:
+        A Rich Panel with yellow border and syntax-highlighted SQL.
+    """
+    # Extract query from event data
+    data = getattr(event, "data", None) or (event.get("data") if isinstance(event, dict) else {})
+    if isinstance(data, dict):
+        query = data.get("query", "") or data.get("sql", "")
+    else:
+        query = getattr(data, "query", "") or getattr(data, "sql", "")
+
+    query = str(query) if query else "-- No query available"
+
+    # Truncate long SQL (>20 lines)
+    lines = query.split("\n")
+    if len(lines) > 20:
+        query = "\n".join(lines[:20]) + "\n-- ... (truncated)"
+
+    return Panel(
+        Syntax(query, "sql", theme="monokai", line_numbers=False),
+        title=f"{elapsed} Executing Query",
+        border_style="yellow",
+    )
+
+
+def format_evidence_item(event: Any, elapsed: str) -> Panel:
+    """Format an evidence event as a green (supports) or red (refutes) panel.
+
+    Args:
+        event: An evidence event from the SDK or dict with event data.
+        elapsed: Elapsed time string from format_timestamp.
+
+    Returns:
+        A Rich Panel with green or red border based on support verdict.
+    """
+    # Extract evidence data
+    data = getattr(event, "data", None) or (event.get("data") if isinstance(event, dict) else {})
+    if isinstance(data, dict):
+        supports = data.get("supports_hypothesis", data.get("supports"))
+        interpretation = data.get("interpretation", "") or data.get("finding", "")
+        confidence = data.get("confidence", 0)
+        query = data.get("query", "") or data.get("sql", "")
+    else:
+        supports = getattr(data, "supports_hypothesis", None) or getattr(data, "supports", None)
+        interpretation = getattr(data, "interpretation", "") or getattr(data, "finding", "")
+        confidence = getattr(data, "confidence", 0) or 0
+        query = getattr(data, "query", "") or getattr(data, "sql", "")
+
+    # Determine color and title based on support
+    if supports is True:
+        color = "green"
+        verdict = "Supports"
+    elif supports is False:
+        color = "red"
+        verdict = "Refutes"
+    else:
+        color = "yellow"
+        verdict = "Inconclusive"
+
+    # Build content
+    renderables: list[Any] = []
+
+    if interpretation:
+        renderables.append(Text(str(interpretation), style=""))
+
+    if confidence:
+        conf_pct = confidence * 100 if confidence <= 1 else confidence
+        renderables.append(Text(f"\nConfidence: {conf_pct:.0f}%", style="dim"))
+
+    if query:
+        query_str = str(query)
+        # Truncate long SQL
+        lines = query_str.split("\n")
+        if len(lines) > 10:
+            query_str = "\n".join(lines[:10]) + "\n-- ... (truncated)"
+        renderables.append(Text("\nQuery:", style="dim"))
+        renderables.append(Syntax(query_str, "sql", theme="monokai", line_numbers=False))
+
+    if not renderables:
+        renderables.append(Text("Evidence collected", style="dim"))
+
+    return Panel(
+        Group(*renderables),
+        title=f"{elapsed} Evidence: {verdict}",
+        border_style=color,
+    )
+
+
+def format_synthesis(event: Any, elapsed: str) -> Panel:
+    """Format a synthesis/completion event as a cyan-bordered panel.
+
+    Args:
+        event: A completion event from the SDK or dict with result data.
+        elapsed: Elapsed time string from format_timestamp.
+
+    Returns:
+        A Rich Panel with cyan border showing root cause and recommendations.
+    """
+    # Extract synthesis data
+    data = getattr(event, "data", None) or (event.get("data") if isinstance(event, dict) else {})
+    if isinstance(data, dict):
+        root_cause = data.get("root_cause", "")
+        confidence = data.get("confidence", 0)
+        recommendations = data.get("recommendations", [])
+    else:
+        root_cause = getattr(data, "root_cause", "") or ""
+        confidence = getattr(data, "confidence", 0) or 0
+        recommendations = getattr(data, "recommendations", []) or []
+
+    # Also check event-level attributes for completion events
+    if not root_cause:
+        root_cause = getattr(event, "root_cause", None) or (
+            event.get("root_cause") if isinstance(event, dict) else ""
+        )
+    if not confidence:
+        confidence = getattr(event, "confidence", None) or (
+            event.get("confidence") if isinstance(event, dict) else 0
+        )
+
+    root_cause = root_cause or "No root cause identified"
+    conf_pct = confidence * 100 if confidence and confidence <= 1 else (confidence or 0)
+
+    # Build content
+    renderables: list[Any] = [
+        Text("Root Cause:", style="bold"),
+        Text(f"  {escape(str(root_cause))}\n"),
+        Text(f"Confidence: {conf_pct:.0f}%\n", style="dim"),
+    ]
+
+    if recommendations:
+        renderables.append(Text("Recommendations:", style="bold"))
+        rec_table = Table(show_header=False, box=None, padding=(0, 0, 0, 2))
+        rec_table.add_column("bullet", style="cyan", width=2)
+        rec_table.add_column("text")
+        for rec in recommendations[:5]:  # Limit to 5 recommendations
+            rec_text = str(rec.get("text", rec) if isinstance(rec, dict) else rec)
+            rec_table.add_row("*", rec_text)
+        renderables.append(rec_table)
+
+    return Panel(
+        Group(*renderables),
+        title=f"{elapsed} Synthesis",
+        border_style="cyan",
     )
 
 

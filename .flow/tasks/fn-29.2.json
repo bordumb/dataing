@@ -1,0 +1,25 @@
+{
+  "assignee": "bordumbb@gmail.com",
+  "claim_note": "",
+  "claimed_at": "2026-01-27T00:01:34.394986Z",
+  "created_at": "2026-01-26T23:48:18.550427Z",
+  "depends_on": [
+    "fn-29.1"
+  ],
+  "epic": "fn-29",
+  "evidence": {
+    "commits": [
+      "0d9f1cfd8381f1f90bd1c12f2e6033a4b2753874"
+    ],
+    "prs": [],
+    "tests": [
+      "pytest python-packages/dataing-cli/tests/test_commands_run.py"
+    ]
+  },
+  "id": "fn-29.2",
+  "priority": null,
+  "spec_path": ".flow/tasks/fn-29.2.md",
+  "status": "done",
+  "title": "Refactor _watch_run() for timeline streaming",
+  "updated_at": "2026-01-27T00:03:51.038762Z"
+}

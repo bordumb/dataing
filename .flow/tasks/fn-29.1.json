@@ -1,0 +1,23 @@
+{
+  "assignee": "bordumbb@gmail.com",
+  "claim_note": "",
+  "claimed_at": "2026-01-26T23:58:33.987706Z",
+  "created_at": "2026-01-26T23:48:18.364083Z",
+  "depends_on": [],
+  "epic": "fn-29",
+  "evidence": {
+    "commits": [
+      "32608e5eebb4d51e61d351d7a9f5d48cd2567fdf"
+    ],
+    "prs": [],
+    "tests": [
+      "pytest python-packages/dataing-cli/tests/test_display.py"
+    ]
+  },
+  "id": "fn-29.1",
+  "priority": null,
+  "spec_path": ".flow/tasks/fn-29.1.md",
+  "status": "done",
+  "title": "Add timeline display formatters",
+  "updated_at": "2026-01-27T00:00:56.436796Z"
+}

@@ -1,0 +1,23 @@
+{
+  "assignee": "bordumbb@gmail.com",
+  "claim_note": "",
+  "claimed_at": "2026-01-27T00:07:48.092964Z",
+  "created_at": "2026-01-26T23:48:19.140490Z",
+  "depends_on": [],
+  "epic": "fn-29",
+  "evidence": {
+    "commits": [
+      "3811201452442e987fbbb4945ddaac826bb61f73"
+    ],
+    "prs": [],
+    "tests": [
+      "pytest python-packages/dataing-cli/tests/test_commands_run.py"
+    ]
+  },
+  "id": "fn-29.5",
+  "priority": null,
+  "spec_path": ".flow/tasks/fn-29.5.md",
+  "status": "done",
+  "title": "Add non-TTY detection and fallback",
+  "updated_at": "2026-01-27T00:10:05.427167Z"
+}

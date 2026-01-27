@@ -54,7 +54,7 @@ dataing ds attach <datasource-id>
 ### 4. Run an Investigation
 
 ```bash
-dataing run start main.orders --goal "investigate null spike in customer_id"
+dataing run start main.orders --goal "investigate null spike in user_id"
 ```
 
 ---
@@ -199,14 +199,14 @@ created_at timestamp
 Start a new investigation.
 
 ```bash
-dataing run start main.orders --goal "investigate null spike in customer_id"
+dataing run start main.orders --goal "investigate null spike in user_id"
 ```
 
 By default, the CLI streams a **progressive timeline** in real-time with color-coded panels:
 
 ```
 ╭─ [00:02] Hypothesis #1 ─────────────────────────────────╮
-│ The customer_id column may have null values due to a    │
+│ The user_id column may have null values due to a    │
 │ failed upstream ETL job.                                │
 ╰─────────────────────────────────────────────────────────╯
 
@@ -330,7 +330,7 @@ The CLI resolves credentials in this order (highest to lowest):
 export DATAING_API_KEY="${SECRETS_DATAING_API_KEY}"
 export DATAING_BASE_URL="https://api.dataing.io"
 
-dataing run start analytics.orders \
+dataing run start main.orders \
   --goal "post-deploy data validation" \
   --no-watch
 ```
@@ -362,7 +362,7 @@ dataing --json run start main.orders --goal "investigate null spike"
 
 ```json
 {"event":"hypothesis_generated","data":{"hypothesis":"Null values from upstream failure"},"is_terminal":false}
-{"event":"query_executed","data":{"query":"SELECT COUNT(*) FROM orders WHERE customer_id IS NULL"},"is_terminal":false}
+{"event":"query_executed","data":{"query":"SELECT COUNT(*) FROM main.orders WHERE user_id IS NULL"},"is_terminal":false}
 {"event":"evidence_collected","data":{"supports_hypothesis":true,"interpretation":"Found 500 null rows"},"is_terminal":false}
 {"event":"run_completed","data":{"root_cause":"Upstream ETL failed","confidence":0.87},"is_terminal":true}
 ```

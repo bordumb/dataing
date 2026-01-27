@@ -165,7 +165,8 @@ class TestRunWatchCommand:
         result = runner.invoke(app, ["run", "watch", "run-123"])
 
         assert result.exit_code == 0
-        assert "Investigation complete" in result.output or "Result" in result.output
+        # New timeline format shows "Synthesis" and "Root Cause"
+        assert "Root Cause" in result.output or "Synthesis" in result.output
 
     def test_run_watch_with_evidence(
         self,

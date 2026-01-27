@@ -3,15 +3,23 @@
 from __future__ import annotations
 
 import json
+import time
 from typing import TYPE_CHECKING, Annotated, Any
 
 import typer
-from rich.console import Console
+from rich.console import Console, Group
 from rich.live import Live
 from rich.panel import Panel
+from rich.text import Text  # Used for header panel
 
 from dataing_cli.config import get_client, get_frontend_url, load_config
-from dataing_cli.display import format_completion, format_event
+from dataing_cli.display import (
+    format_evidence_item,
+    format_hypothesis,
+    format_query,
+    format_synthesis,
+    format_timestamp,
+)
 from dataing_cli.errors import cli_error_handler
 
 if TYPE_CHECKING:
@@ -91,7 +99,7 @@ def watch_run(
 
 
 def _watch_run(client: DataingClient, run_id: str, state: Any) -> None:
-    """Stream and display run events with Rich Live.
+    """Stream and display run events with Rich Live timeline.
 
     Args:
         client: The DataingClient instance.
@@ -103,7 +111,7 @@ def _watch_run(client: DataingClient, run_id: str, state: Any) -> None:
     json_output = state.json_output if state else False
 
     if json_output:
-        # JSON mode: print events as JSON lines
+        # JSON mode: print events as JSON lines (handled by fn-29.4)
         for event in client.stream_run(run_id):
             console.print(json.dumps(event.model_dump(), indent=2, default=str))
             if event.is_terminal:
@@ -112,44 +120,98 @@ def _watch_run(client: DataingClient, run_id: str, state: Any) -> None:
                 return
         return
 
-    # Rich Live mode for interactive display
+    # Timeline display mode - accumulate panels progressively
+    panels: list[Any] = []
+    start_time = time.time()
+    hypothesis_idx = 0
+
+    # Header panel with goal (will be updated)
+    header = Text(f"Investigation: {run_id}", style="bold")
+    panels.append(Panel(header, border_style="dim"))
+
     with Live(
-        Panel("Initializing...", title="Progress"),
+        Group(*panels),
         refresh_per_second=4,
-        transient=True,
+        transient=False,  # Keep timeline visible after completion
         console=console,
     ) as live:
-        for event in client.stream_run(run_id):
-            event_type = event.event
+        try:
+            for event in client.stream_run(run_id):
+                event_type = event.event
+                elapsed = format_timestamp(start_time)
 
-            if event_type in ("run_progress", "hypothesis_testing", "context_gathered"):
-                # Progress events - transient display
-                message = event.data.get("message", event_type.replace("_", " ").title())
-                live.update(Panel(f"[yellow]...[/yellow] {message}", title="Progress"))
+                if event_type == "run_started":
+                    # Update header with goal
+                    goal = event.data.get("goal", "")
+                    if goal:
+                        panels[0] = Panel(
+                            Text(f"Goal: {goal}", style="bold"),
+                            title=f"{elapsed} Investigation Started",
+                            border_style="dim",
+                        )
+                    live.update(Group(*panels))
 
-            elif event_type in ("run_evidence", "hypothesis_result"):
-                # Evidence events - permanent display
-                live.stop()
-                console.print(format_event(event))
-                live.start()
+                elif event_type == "hypothesis_testing":
+                    hypothesis_idx += 1
+                    panels.append(format_hypothesis(event, hypothesis_idx, elapsed))
+                    live.update(Group(*panels))
 
-            elif event_type == "run_completed":
-                live.stop()
-                panel = format_completion(event.data)
-                console.print(panel)
-                return
+                elif event_type == "run_progress":
+                    # Check if this is a query execution
+                    data = event.data or {}
+                    if data.get("query") or data.get("sql"):
+                        panels.append(format_query(event, elapsed))
+                        live.update(Group(*panels))
+                    # Otherwise just update the live display without adding panel
+                    # (subtle progress indicator)
 
-            elif event_type == "run_failed":
-                live.stop()
-                error = event.data.get("error", "Unknown error")
-                console.print(
-                    Panel(
-                        f"[red]-[/red] {error}",
-                        title="Failed",
-                        border_style="red",
+                elif event_type in ("run_evidence", "hypothesis_result"):
+                    panels.append(format_evidence_item(event, elapsed))
+                    live.update(Group(*panels))
+
+                elif event_type == "run_completed":
+                    panels.append(format_synthesis(event, elapsed))
+                    live.update(Group(*panels))
+                    return
+
+                elif event_type == "run_failed":
+                    error = event.data.get("error", "Unknown error")
+                    panels.append(
+                        Panel(
+                            f"[red]-[/red] {error}",
+                            title=f"{elapsed} Failed",
+                            border_style="red",
+                        )
                     )
-                )
-                raise typer.Exit(1)
+                    live.update(Group(*panels))
+                    raise typer.Exit(1)
 
-            elif event_type == "run_started":
-                live.update(Panel("[yellow]...[/yellow] Investigation started", title="Progress"))
+                elif event_type == "run_heartbeat":
+                    # Heartbeat - just refresh display without adding new panel
+                    # This keeps the connection alive visually
+                    live.refresh()
+
+                elif event_type == "context_gathered":
+                    # Show context gathering progress
+                    message = event.data.get("message", "Context gathered")
+                    panels.append(
+                        Panel(
+                            f"[dim]{message}[/dim]",
+                            title=f"{elapsed} Context",
+                            border_style="dim",
+                        )
+                    )
+                    live.update(Group(*panels))
+
+        except KeyboardInterrupt:
+            # Handle Ctrl+C gracefully
+            elapsed = format_timestamp(start_time)
+            panels.append(
+                Panel(
+                    "[yellow]Investigation interrupted by user[/yellow]",
+                    title=f"{elapsed} Interrupted",
+                    border_style="yellow",
+                )
+            )
+            live.update(Group(*panels))
+            raise typer.Exit(130) from None

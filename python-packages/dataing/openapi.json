@@ -4883,7 +4883,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/LineageGraphResponse"
+                  "$ref": "#/components/schemas/dataing__entrypoints__api__routes__lineage__LineageGraphResponse"
                 }
               }
             }
@@ -9309,7 +9309,7 @@
           "lineage": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/dataing__entrypoints__api__routes__bundles__LineageGraphResponse"
+                "$ref": "#/components/schemas/LineageGraphResponse"
               },
               {
                 "type": "null"
@@ -11728,40 +11728,35 @@
       "LineageGraphResponse": {
         "properties": {
           "root": {
-            "type": "string",
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Root"
           },
           "datasets": {
             "additionalProperties": {
-              "$ref": "#/components/schemas/DatasetResponse"
+              "additionalProperties": true,
+              "type": "object"
             },
             "type": "object",
             "title": "Datasets"
           },
           "edges": {
             "items": {
-              "$ref": "#/components/schemas/LineageEdgeResponse"
+              "$ref": "#/components/schemas/LineageEdge"
             },
             "type": "array",
             "title": "Edges"
-          },
-          "jobs": {
-            "additionalProperties": {
-              "$ref": "#/components/schemas/JobResponse"
-            },
-            "type": "object",
-            "title": "Jobs"
           }
         },
         "type": "object",
-        "required": [
-          "root",
-          "datasets",
-          "edges",
-          "jobs"
-        ],
         "title": "LineageGraphResponse",
-        "description": "Response for a lineage graph."
+        "description": "Lineage graph response."
       },
       "LineageProviderResponse": {
         "properties": {
@@ -14775,39 +14770,6 @@
         "title": "WeeklyUsageResponse",
         "description": "Weekly usage statistics response."
       },
-      "dataing__entrypoints__api__routes__bundles__LineageGraphResponse": {
-        "properties": {
-          "root": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Root"
-          },
-          "datasets": {
-            "additionalProperties": {
-              "additionalProperties": true,
-              "type": "object"
-            },
-            "type": "object",
-            "title": "Datasets"
-          },
-          "edges": {
-            "items": {
-              "$ref": "#/components/schemas/LineageEdge"
-            },
-            "type": "array",
-            "title": "Edges"
-          }
-        },
-        "type": "object",
-        "title": "LineageGraphResponse",
-        "description": "Lineage graph response."
-      },
       "dataing__entrypoints__api__routes__datasources__TestConnectionResponse": {
         "properties": {
           "success": {
@@ -14848,6 +14810,44 @@
         ],
         "title": "TestConnectionResponse",
         "description": "Response for testing a connection."
+      },
+      "dataing__entrypoints__api__routes__lineage__LineageGraphResponse": {
+        "properties": {
+          "root": {
+            "type": "string",
+            "title": "Root"
+          },
+          "datasets": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/DatasetResponse"
+            },
+            "type": "object",
+            "title": "Datasets"
+          },
+          "edges": {
+            "items": {
+              "$ref": "#/components/schemas/LineageEdgeResponse"
+            },
+            "type": "array",
+            "title": "Edges"
+          },
+          "jobs": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/JobResponse"
+            },
+            "type": "object",
+            "title": "Jobs"
+          }
+        },
+        "type": "object",
+        "required": [
+          "root",
+          "datasets",
+          "edges",
+          "jobs"
+        ],
+        "title": "LineageGraphResponse",
+        "description": "Response for a lineage graph."
       }
     },
     "securitySchemes": {

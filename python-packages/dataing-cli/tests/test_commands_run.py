@@ -2,12 +2,15 @@
 
 from __future__ import annotations
 
+import json
+import re
 from pathlib import Path
 from typing import TYPE_CHECKING
 from unittest.mock import MagicMock
 
 import pytest
 from dataing_cli.main import app
+from dataing_sdk import NotFoundError
 from typer.testing import CliRunner
 
 if TYPE_CHECKING:
@@ -360,3 +363,231 @@ class TestRunProgressEvents:
         result = runner.invoke(app, ["run", "watch", "run-123"])
 
         assert result.exit_code == 0
+
+
+class TestRunExportCommand:
+    """Tests for run export command."""
+
+    @pytest.fixture
+    def mock_investigation_state(self) -> MagicMock:
+        """Create a mock InvestigationState with realistic data."""
+        main_branch = MagicMock()
+        main_branch.status = "completed"
+        main_branch.current_step = "synthesis"
+        main_branch.synthesis = {
+            "root_cause": "Null values appeared due to upstream ETL failure",
+            "confidence": 0.85,
+            "recommendations": ["Fix upstream ETL", "Add data validation"],
+        }
+        main_branch.evidence = [
+            {
+                "kind": "query_result",
+                "query": "SELECT COUNT(*) FROM orders WHERE user_id IS NULL",
+                "interpretation": "Found 1500 null values",
+                "supports_hypothesis": True,
+                "confidence": 0.9,
+            },
+            {
+                "kind": "hypothesis",
+                "interpretation": "ETL job failed at 2AM",
+                "supports_hypothesis": True,
+                "confidence": 0.8,
+            },
+        ]
+
+        investigation = MagicMock()
+        investigation.investigation_id = "inv-xyz123"
+        investigation.status = "completed"
+        investigation.main_branch = main_branch
+        return investigation
+
+    def test_export_markdown_to_stdout(
+        self,
+        runner: CliRunner,
+        configured_env: Path,
+        mock_client_patch: MagicMock,
+        mock_investigation_state: MagicMock,
+    ) -> None:
+        """Test export outputs markdown to stdout by default."""
+        mock_client_patch.get_investigation.return_value = mock_investigation_state
+
+        result = runner.invoke(app, ["run", "export", "inv-xyz123"])
+
+        assert result.exit_code == 0
+        assert "# Investigation Report: inv-xyz123" in result.output
+        assert "Null values appeared" in result.output
+        assert "Chain Hash" in result.output
+
+    def test_export_to_file(
+        self,
+        runner: CliRunner,
+        configured_env: Path,
+        mock_client_patch: MagicMock,
+        mock_investigation_state: MagicMock,
+        tmp_path: Path,
+    ) -> None:
+        """Test export writes to file with --output."""
+        mock_client_patch.get_investigation.return_value = mock_investigation_state
+        output_file = tmp_path / "report.md"
+
+        result = runner.invoke(app, ["run", "export", "inv-xyz123", "--output", str(output_file)])
+
+        assert result.exit_code == 0
+        assert "Report written to" in result.output
+        assert output_file.exists()
+        content = output_file.read_text()
+        assert "# Investigation Report: inv-xyz123" in content
+
+    def test_export_json_format(
+        self,
+        runner: CliRunner,
+        configured_env: Path,
+        mock_client_patch: MagicMock,
+        mock_investigation_state: MagicMock,
+    ) -> None:
+        """Test export outputs valid JSON with --format json."""
+        mock_client_patch.get_investigation.return_value = mock_investigation_state
+
+        result = runner.invoke(app, ["run", "export", "inv-xyz123", "--format", "json"])
+
+        assert result.exit_code == 0
+        # Verify it's valid JSON
+        data = json.loads(result.output)
+        assert data["investigation_id"] == "inv-xyz123"
+        assert data["status"] == "completed"
+        assert "chain_hash" in data
+        assert "main_branch" in data
+
+    def test_export_not_found(
+        self,
+        runner: CliRunner,
+        configured_env: Path,
+        mock_client_patch: MagicMock,
+    ) -> None:
+        """Test export handles not found error with exit code 1."""
+        mock_client_patch.get_investigation.side_effect = NotFoundError("Investigation not found")
+
+        result = runner.invoke(app, ["run", "export", "inv-notfound"])
+
+        assert result.exit_code == 1
+        assert "not found" in result.output.lower() or "error" in result.output.lower()
+
+    def test_export_in_progress_investigation(
+        self,
+        runner: CliRunner,
+        configured_env: Path,
+        mock_client_patch: MagicMock,
+    ) -> None:
+        """Test export handles in-progress investigation with partial data."""
+        main_branch = MagicMock()
+        main_branch.status = "running"
+        main_branch.current_step = "hypothesis_testing"
+        main_branch.synthesis = None
+        main_branch.evidence = []
+
+        investigation = MagicMock()
+        investigation.investigation_id = "inv-running"
+        investigation.status = "running"
+        investigation.main_branch = main_branch
+
+        mock_client_patch.get_investigation.return_value = investigation
+
+        result = runner.invoke(app, ["run", "export", "inv-running"])
+
+        assert result.exit_code == 0
+        assert "RUNNING" in result.output
+        assert "No root cause identified yet" in result.output
+
+    def test_export_no_evidence(
+        self,
+        runner: CliRunner,
+        configured_env: Path,
+        mock_client_patch: MagicMock,
+    ) -> None:
+        """Test export handles investigation with no evidence."""
+        main_branch = MagicMock()
+        main_branch.status = "completed"
+        main_branch.current_step = "synthesis"
+        main_branch.synthesis = {"root_cause": "Unknown", "confidence": 0.5}
+        main_branch.evidence = []
+
+        investigation = MagicMock()
+        investigation.investigation_id = "inv-noevidence"
+        investigation.status = "completed"
+        investigation.main_branch = main_branch
+
+        mock_client_patch.get_investigation.return_value = investigation
+
+        result = runner.invoke(app, ["run", "export", "inv-noevidence"])
+
+        assert result.exit_code == 0
+        assert "No evidence collected" in result.output
+
+    def test_export_markdown_contains_sql_blocks(
+        self,
+        runner: CliRunner,
+        configured_env: Path,
+        mock_client_patch: MagicMock,
+        mock_investigation_state: MagicMock,
+    ) -> None:
+        """Test markdown export contains fenced SQL code blocks."""
+        mock_client_patch.get_investigation.return_value = mock_investigation_state
+
+        result = runner.invoke(app, ["run", "export", "inv-xyz123"])
+
+        assert result.exit_code == 0
+        assert "```sql" in result.output
+        assert "SELECT COUNT(*)" in result.output
+        assert "```" in result.output
+
+    def test_export_chain_hash_format(
+        self,
+        runner: CliRunner,
+        configured_env: Path,
+        mock_client_patch: MagicMock,
+        mock_investigation_state: MagicMock,
+    ) -> None:
+        """Test chain hash is a valid 64-char hex string."""
+        mock_client_patch.get_investigation.return_value = mock_investigation_state
+
+        # Test markdown format
+        result = runner.invoke(app, ["run", "export", "inv-xyz123"])
+        assert result.exit_code == 0
+        # Find the chain hash in the output
+        hash_match = re.search(r"Chain Hash.*`([a-f0-9]{64})`", result.output)
+        assert hash_match is not None, "Chain hash not found in markdown output"
+
+        # Test JSON format
+        result = runner.invoke(app, ["run", "export", "inv-xyz123", "--format", "json"])
+        assert result.exit_code == 0
+        data = json.loads(result.output)
+        assert "chain_hash" in data
+        assert re.match(r"^[a-f0-9]{64}$", data["chain_hash"])
+
+    def test_export_json_structure_matches_api(
+        self,
+        runner: CliRunner,
+        configured_env: Path,
+        mock_client_patch: MagicMock,
+        mock_investigation_state: MagicMock,
+    ) -> None:
+        """Test JSON structure matches InvestigationStateResponse schema."""
+        mock_client_patch.get_investigation.return_value = mock_investigation_state
+
+        result = runner.invoke(app, ["run", "export", "inv-xyz123", "--format", "json"])
+
+        assert result.exit_code == 0
+        data = json.loads(result.output)
+
+        # Verify required fields from API schema
+        assert "investigation_id" in data
+        assert "status" in data
+        assert "main_branch" in data
+        assert "generated_at" in data
+        assert "chain_hash" in data
+
+        # Verify main_branch structure
+        main_branch = data["main_branch"]
+        assert "status" in main_branch
+        assert "synthesis" in main_branch
+        assert "evidence" in main_branch

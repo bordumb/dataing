@@ -17,6 +17,7 @@ from .exceptions import (
 from .types import (
     TERMINAL_STATUSES,
     AssetRef,
+    BranchState,
     ColumnSchema,
     ConnectionTestResult,
     ContextBundle,
@@ -25,6 +26,8 @@ from .types import (
     DiffResult,
     EvidenceKind,
     ExplainResult,
+    Investigation,
+    InvestigationState,
     QueryResult,
     ResolvedAsset,
     Run,
@@ -44,6 +47,7 @@ __all__ = [
     "from_sql",
     # Types
     "AssetRef",
+    "BranchState",
     "ColumnSchema",
     "ContextBundle",
     "Datasource",
@@ -51,6 +55,8 @@ __all__ = [
     "DiffResult",
     "EvidenceKind",
     "ExplainResult",
+    "Investigation",
+    "InvestigationState",
     "QueryResult",
     "ResolvedAsset",
     "Run",

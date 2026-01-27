@@ -1,0 +1,25 @@
+{
+  "assignee": "bordumbb@gmail.com",
+  "claim_note": "",
+  "claimed_at": "2026-01-27T03:23:35.831877Z",
+  "created_at": "2026-01-27T03:12:04.533935Z",
+  "depends_on": [
+    "fn-30.2"
+  ],
+  "epic": "fn-30",
+  "evidence": {
+    "commits": [
+      "ed1f31c3fcdb21673e6547a42ebea2f21dd993f4"
+    ],
+    "prs": [],
+    "tests": [
+      "dataing run export --help"
+    ]
+  },
+  "id": "fn-30.3",
+  "priority": null,
+  "spec_path": ".flow/tasks/fn-30.3.md",
+  "status": "done",
+  "title": "Add JSON format and evidence chain hash",
+  "updated_at": "2026-01-27T03:25:57.499739Z"
+}

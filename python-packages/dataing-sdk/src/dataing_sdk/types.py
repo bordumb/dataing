@@ -987,6 +987,63 @@ class DatasourceSchema(BaseModel):
 # --- Investigation Types ---
 
 
+class BranchState(BaseModel):
+    """State of an investigation branch.
+
+    Represents the current state of a branch including evidence collected
+    and synthesis results.
+
+    Attributes:
+        branch_id: Unique identifier for the branch.
+        status: Current status (queued, running, completed, failed).
+        current_step: Name of the current investigation step.
+        synthesis: Root cause analysis and recommendations (if completed).
+        evidence: List of evidence collected during investigation.
+    """
+
+    branch_id: str = Field(..., description="Branch identifier")
+    status: str = Field(..., description="Branch status")
+    current_step: str = Field(default="unknown", description="Current step name")
+    synthesis: dict[str, Any] | None = Field(
+        default=None, description="Synthesis with root_cause, recommendations"
+    )
+    evidence: list[dict[str, Any]] = Field(default_factory=list, description="Evidence collected")
+
+
+class InvestigationState(BaseModel):
+    """Full investigation state returned by get_investigation.
+
+    Contains the complete state of an investigation including all branches,
+    evidence collected, and synthesis results.
+
+    Attributes:
+        investigation_id: Unique identifier for the investigation.
+        status: Current status (queued, running, completed, failed).
+        main_branch: State of the main investigation branch.
+        user_branch: State of user branch if exists.
+    """
+
+    investigation_id: str = Field(..., description="Investigation identifier")
+    status: str = Field(..., description="Investigation status")
+    main_branch: BranchState = Field(..., description="Main branch state")
+    user_branch: BranchState | None = Field(default=None, description="User branch state")
+
+    @property
+    def run_id(self) -> str:
+        """Alias for investigation_id (compatibility with Run type)."""
+        return self.investigation_id
+
+    @property
+    def synthesis(self) -> dict[str, Any] | None:
+        """Get synthesis from main branch."""
+        return self.main_branch.synthesis
+
+    @property
+    def evidence(self) -> list[dict[str, Any]]:
+        """Get evidence from main branch."""
+        return self.main_branch.evidence
+
+
 class Investigation(BaseModel):
     """An investigation started via the investigations API.
 

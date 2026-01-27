@@ -1,0 +1,25 @@
+{
+  "assignee": "bordumbb@gmail.com",
+  "claim_note": "",
+  "claimed_at": "2026-01-27T03:26:27.338228Z",
+  "created_at": "2026-01-27T03:12:05.788450Z",
+  "depends_on": [
+    "fn-30.3"
+  ],
+  "epic": "fn-30",
+  "evidence": {
+    "commits": [
+      "7dbd6d92f507be37b7052e49e2ae32a4135d9356"
+    ],
+    "prs": [],
+    "tests": [
+      "uv run pytest python-packages/dataing-cli/tests/test_commands_run.py -v -k export"
+    ]
+  },
+  "id": "fn-30.4",
+  "priority": null,
+  "spec_path": ".flow/tasks/fn-30.4.md",
+  "status": "done",
+  "title": "Add unit tests for export command",
+  "updated_at": "2026-01-27T03:28:32.994331Z"
+}

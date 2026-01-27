@@ -5,6 +5,8 @@ from __future__ import annotations
 import json
 import sys
 import time
+from enum import Enum
+from pathlib import Path
 from typing import TYPE_CHECKING, Annotated, Any
 
 import typer
@@ -23,6 +25,15 @@ from dataing_cli.display import (
     format_timestamp,
 )
 from dataing_cli.errors import cli_error_handler
+from dataing_cli.export import render_json, render_markdown
+
+
+class OutputFormat(str, Enum):
+    """Output format for export command."""
+
+    markdown = "markdown"
+    json = "json"
+
 
 if TYPE_CHECKING:
     from dataing_sdk import DataingClient
@@ -158,6 +169,85 @@ def watch_run(
         base_url=state.base_url if state else None,
     )
     _watch_run(client, run_id, state)
+
+
+@app.command("export")
+@cli_error_handler
+def export_run(
+    ctx: typer.Context,
+    run_id: Annotated[str, typer.Argument(help="Investigation ID to export")],
+    output: Annotated[
+        Path | None,
+        typer.Option(
+            "--output",
+            "-o",
+            help="Output file path (stdout if not specified)",
+            file_okay=True,
+            dir_okay=False,
+            writable=True,
+            resolve_path=True,
+        ),
+    ] = None,
+    format_: Annotated[
+        OutputFormat,
+        typer.Option(
+            "--format",
+            "-f",
+            help="Output format (markdown or json)",
+            case_sensitive=False,
+        ),
+    ] = OutputFormat.markdown,
+) -> None:
+    """Export an investigation as a markdown or JSON report.
+
+    Generates a self-contained report with all evidence, queries,
+    and findings. Suitable for sharing in PRs, Slack, or incident post-mortems.
+
+    Examples:
+        # Export to stdout (markdown)
+        dataing run export abc123
+
+        # Export as JSON
+        dataing run export abc123 --format json
+
+        # Export to file
+        dataing run export abc123 --output report.md
+    """
+    state = ctx.obj
+    client = get_client(
+        api_key=state.api_key if state else None,
+        base_url=state.base_url if state else None,
+    )
+
+    # Fetch investigation state
+    with console.status("[bold blue]Fetching investigation..."):
+        investigation_state = client.get_investigation(run_id)
+
+    # Convert to dict for rendering
+    investigation_dict = {
+        "investigation_id": investigation_state.investigation_id,
+        "status": investigation_state.status,
+        "main_branch": {
+            "status": investigation_state.main_branch.status,
+            "current_step": investigation_state.main_branch.current_step,
+            "synthesis": investigation_state.main_branch.synthesis,
+            "evidence": investigation_state.main_branch.evidence,
+        },
+    }
+
+    # Render based on format
+    if format_ == OutputFormat.json:
+        content = render_json(investigation_dict)
+    else:
+        content = render_markdown(investigation_dict)
+
+    # Output to file or stdout
+    if output:
+        output.write_text(content)
+        console.print(f"[green]+[/green] Report written to: [cyan]{output}[/cyan]")
+    else:
+        # Print to stdout (without Rich formatting for clean output)
+        print(content)
 
 
 def _wait_for_completion(client: DataingClient, run_id: str, state: Any) -> None:

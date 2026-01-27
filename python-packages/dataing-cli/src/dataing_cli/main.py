@@ -7,7 +7,7 @@ from typing import Annotated
 import typer
 from rich.console import Console
 
-from dataing_cli.commands import ds, run
+from dataing_cli.commands import ask, ds, run
 
 app = typer.Typer(
     name="dataing",
@@ -165,6 +165,7 @@ def status(ctx: typer.Context) -> None:
 # Register subcommand groups
 app.add_typer(run.app, name="run", help="Manage investigation runs")
 app.add_typer(ds.app, name="ds", help="Manage datasources")
+app.add_typer(ask.app, name="ask", help="Interactive investigation mode")
 
 
 if __name__ == "__main__":

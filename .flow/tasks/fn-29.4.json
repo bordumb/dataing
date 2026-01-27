@@ -1,14 +1,23 @@
 {
-  "assignee": null,
+  "assignee": "bordumbb@gmail.com",
   "claim_note": "",
-  "claimed_at": null,
+  "claimed_at": "2026-01-27T00:06:03.603768Z",
   "created_at": "2026-01-26T23:48:18.948923Z",
   "depends_on": [],
   "epic": "fn-29",
+  "evidence": {
+    "commits": [
+      "ac79ea371cc94d0b405fffbc4eaca1909f09ea26"
+    ],
+    "prs": [],
+    "tests": [
+      "pytest python-packages/dataing-cli/tests/test_commands_run.py"
+    ]
+  },
   "id": "fn-29.4",
   "priority": null,
   "spec_path": ".flow/tasks/fn-29.4.md",
-  "status": "todo",
+  "status": "done",
   "title": "Fix NDJSON output format",
-  "updated_at": "2026-01-26T23:49:53.881953Z"
+  "updated_at": "2026-01-27T00:07:26.755416Z"
 }

@@ -171,9 +171,10 @@ def _watch_run(client: DataingClient, run_id: str, state: Any) -> None:
     json_output = state.json_output if state else False
 
     if json_output:
-        # JSON mode: print events as JSON lines (handled by fn-29.4)
+        # NDJSON mode: one compact JSON object per line
         for event in client.stream_run(run_id):
-            console.print(json.dumps(event.model_dump(), indent=2, default=str))
+            # Use print() to avoid Rich formatting, separators for compact output
+            print(json.dumps(event.model_dump(), separators=(",", ":"), default=str))
             if event.is_terminal:
                 if event.event == "run_failed":
                     raise typer.Exit(1)

@@ -202,42 +202,65 @@ Start a new investigation.
 dataing run start main.orders --goal "investigate null spike in customer_id"
 ```
 
-By default, the CLI streams progress in real-time:
+By default, the CLI streams a **progressive timeline** in real-time with color-coded panels:
 
 ```
-+ Started run: run_xyz789
-
-Streaming events for run run_xyz789...
-
-╭─ Progress ──────────────────────────────────────────────╮
-│ ... Gathering schema context...                         │
+╭─ [00:02] Hypothesis #1 ─────────────────────────────────╮
+│ The customer_id column may have null values due to a    │
+│ failed upstream ETL job.                                │
 ╰─────────────────────────────────────────────────────────╯
 
-╭─ + Evidence ────────────────────────────────────────────╮
-│ Upstream dependency check                               │
-│                                                         │
-│ Query:                                                  │
+╭─ [00:05] Executing Query ───────────────────────────────╮
 │ SELECT COUNT(*) FROM raw.customers                      │
 │ WHERE loaded_at > '2024-01-14'                          │
-│                                                         │
-│ Finding: Upstream customers table has 0 rows loaded     │
-│ since 2024-01-14, indicating a failed pipeline run.     │
 ╰─────────────────────────────────────────────────────────╯
 
-╭─ Result ────────────────────────────────────────────────╮
-│ + Investigation complete                                │
-│                                                         │
+╭─ [00:08] Evidence: Supports ────────────────────────────╮
+│ Finding: Upstream customers table has 0 rows loaded     │
+│ since 2024-01-14, indicating a failed pipeline run.     │
+│ Confidence: 85%                                         │
+╰─────────────────────────────────────────────────────────╯
+
+╭─ [00:15] Synthesis ─────────────────────────────────────╮
 │ Root Cause: Upstream ETL job for raw.customers failed   │
 │ at 03:00 UTC due to source API timeout.                 │
 │ Confidence: 87%                                         │
+│                                                         │
+│ Recommendations:                                        │
+│   • Check the ETL job logs for errors                   │
+│   • Verify source API connectivity                      │
 ╰─────────────────────────────────────────────────────────╯
 ```
+
+**Timeline color coding:**
+
+| Event Type | Border Color | Description |
+|------------|--------------|-------------|
+| Hypothesis | Blue | Generated hypotheses with numbering |
+| Query | Yellow | SQL queries with syntax highlighting |
+| Evidence (supports) | Green | Evidence supporting the hypothesis |
+| Evidence (refutes) | Red | Evidence refuting the hypothesis |
+| Evidence (inconclusive) | Yellow | Inconclusive evidence |
+| Synthesis | Cyan | Final root cause and recommendations |
+
+Each panel shows elapsed time `[MM:SS]` since the investigation started.
 
 | Option | Description |
 |--------|-------------|
 | `--goal`, `-g` | Investigation goal (required) |
 | `--datasource`, `-d` | Datasource ID (uses default if not set) |
+| `--no-stream` | Wait for completion, output final result only |
 | `--no-watch` | Don't stream progress, just start the run |
+
+#### `--no-stream` Mode
+
+Use `--no-stream` to wait for the investigation to complete and output only the final result:
+
+```bash
+dataing run start main.orders --goal "investigate null spike" --no-stream
+```
+
+This is useful for scripting or when you only care about the final outcome.
 
 #### `dataing run watch <run-id>`
 
@@ -325,14 +348,45 @@ dataing --json ds list
 # Get status as JSON
 dataing --json status
 
-# Stream events as JSON lines
-dataing --json run watch run_xyz789
+# Stream events as NDJSON (newline-delimited JSON)
+dataing --json run start main.orders --goal "investigate null spike"
 ```
 
-JSON mode outputs one JSON object per line for streaming commands, making it easy to pipe to `jq` or other tools:
+### NDJSON Streaming Format
+
+When streaming investigations, `--json` outputs **NDJSON** (one compact JSON object per line):
 
 ```bash
-dataing --json run watch run_xyz789 | jq 'select(.event == "run_completed")'
+dataing --json run start main.orders --goal "investigate null spike"
+```
+
+```json
+{"event":"hypothesis_generated","data":{"hypothesis":"Null values from upstream failure"},"is_terminal":false}
+{"event":"query_executed","data":{"query":"SELECT COUNT(*) FROM orders WHERE customer_id IS NULL"},"is_terminal":false}
+{"event":"evidence_collected","data":{"supports_hypothesis":true,"interpretation":"Found 500 null rows"},"is_terminal":false}
+{"event":"run_completed","data":{"root_cause":"Upstream ETL failed","confidence":0.87},"is_terminal":true}
+```
+
+This makes it easy to pipe to `jq` or other tools:
+
+```bash
+# Get only the final result
+dataing --json run start main.orders --goal "..." | jq 'select(.event == "run_completed")'
+
+# Extract all evidence
+dataing --json run start main.orders --goal "..." | jq 'select(.event == "evidence_collected")'
+```
+
+### Non-TTY Output
+
+When output is piped or redirected (non-TTY), the CLI automatically falls back to **plain text** without ANSI color codes:
+
+```bash
+# Piped output uses plain text
+dataing run start main.orders --goal "..." | tee investigation.log
+
+# Use --json for structured output in pipes
+dataing --json run start main.orders --goal "..." > events.jsonl
 ```
 
 ---

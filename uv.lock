@@ -1093,6 +1093,7 @@ dependencies = [
     { name = "dataing-sdk" },
     { name = "jinja2" },
     { name = "keyring" },
+    { name = "prompt-toolkit" },
     { name = "rich" },
     { name = "typer" },
 ]
@@ -1102,6 +1103,7 @@ requires-dist = [
     { name = "dataing-sdk", specifier = ">=0.1.0" },
     { name = "jinja2", specifier = ">=3.1.0" },
     { name = "keyring", specifier = ">=25.0.0" },
+    { name = "prompt-toolkit", specifier = ">=3.0.0" },
     { name = "pytest", marker = "extra == 'dev'", specifier = ">=8.0.0" },
     { name = "pytest-asyncio", marker = "extra == 'dev'", specifier = ">=0.23.0" },
     { name = "pytest-cov", marker = "extra == 'dev'", specifier = ">=4.1.0" },

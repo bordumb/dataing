@@ -267,22 +267,156 @@ class DataingREPL:
         except Exception as e:
             self.console.print(f"[yellow]Could not refresh state: {e}[/yellow]")
 
-    # Slash command implementations (placeholders - implemented in fn-31.5)
+    # Slash command implementations
     async def _cmd_lineage(self, args: list[str]) -> None:
-        """Show lineage graph (placeholder)."""
-        self.console.print("[dim]Lineage command coming soon...[/dim]")
+        """Show lineage graph for investigation datasource."""
+        await self._refresh_investigation()
+
+        # Lineage requires investigation context which may not be available
+        self.console.print("[dim]Lineage display is not yet available.[/dim]")
+        self.console.print("[dim]Use the Dataing web UI to view lineage graphs.[/dim]")
 
     async def _cmd_hypotheses(self, args: list[str]) -> None:
-        """Show hypotheses (placeholder)."""
-        self.console.print("[dim]Hypotheses command coming soon...[/dim]")
+        """Show hypotheses and their status."""
+        await self._refresh_investigation()
+
+        if not self.investigation:
+            self.console.print("[red]Could not load investigation state.[/red]")
+            return
+
+        evidence = self.investigation.evidence or []
+
+        # Filter for hypothesis evidence items
+        hypotheses = [e for e in evidence if e.get("kind") == "hypothesis"]
+
+        if not hypotheses:
+            self.console.print("[dim]No hypotheses yet.[/dim]")
+            return
+
+        self.console.print(f"\n[bold]Hypotheses ({len(hypotheses)})[/bold]\n")
+
+        for i, hyp in enumerate(hypotheses, 1):
+            # Format hypothesis display
+            text = hyp.get("hypothesis_text", hyp.get("hypothesis", "Unknown"))
+            verdict = hyp.get("verdict", "pending")
+            confidence = hyp.get("confidence", 0)
+
+            # Color based on verdict
+            if verdict == "confirmed" or verdict == "supported":
+                color = "green"
+                icon = "+"
+            elif verdict == "rejected" or verdict == "refuted":
+                color = "red"
+                icon = "-"
+            else:
+                color = "yellow"
+                icon = "?"
+
+            conf_pct = confidence * 100 if confidence <= 1 else confidence
+
+            self.console.print(
+                Panel(
+                    f"[{color}]{icon}[/{color}] {text}\n"
+                    f"[dim]Verdict: {verdict} | Confidence: {conf_pct:.0f}%[/dim]",
+                    title=f"Hypothesis {i}",
+                    border_style=color,
+                )
+            )
 
     async def _cmd_evidence(self, args: list[str]) -> None:
-        """Show evidence (placeholder)."""
-        self.console.print("[dim]Evidence command coming soon...[/dim]")
+        """Show collected evidence items."""
+        await self._refresh_investigation()
+
+        if not self.investigation:
+            self.console.print("[red]Could not load investigation state.[/red]")
+            return
+
+        evidence = self.investigation.evidence or []
+
+        if not evidence:
+            self.console.print("[dim]No evidence collected yet.[/dim]")
+            return
+
+        self.console.print(f"\n[bold]Evidence ({len(evidence)})[/bold]\n")
+
+        for i, ev in enumerate(evidence, 1):
+            kind = ev.get("kind", "unknown")
+            supports = ev.get("supports_hypothesis", ev.get("supports"))
+            interpretation = ev.get("interpretation", ev.get("finding", ""))
+            confidence = ev.get("confidence", 0)
+
+            # Color based on support verdict
+            if supports is True:
+                color = "green"
+                verdict = "Supports"
+            elif supports is False:
+                color = "red"
+                verdict = "Refutes"
+            else:
+                color = "yellow"
+                verdict = "Inconclusive"
+
+            # Build content
+            content_parts = []
+            if interpretation:
+                content_parts.append(str(interpretation))
+
+            if confidence:
+                conf_pct = confidence * 100 if confidence <= 1 else confidence
+                content_parts.append(f"[dim]Confidence: {conf_pct:.0f}%[/dim]")
+
+            # Add SQL if present (truncated)
+            sql = ev.get("query", ev.get("sql", ""))
+            if sql:
+                sql_preview = str(sql)[:200]
+                if len(str(sql)) > 200:
+                    sql_preview += "..."
+                content_parts.append(f"[dim]SQL: {sql_preview}[/dim]")
+
+            content = "\n".join(content_parts) if content_parts else "[dim]Evidence collected[/dim]"
+
+            self.console.print(
+                Panel(
+                    content,
+                    title=f"#{i} {kind.replace('_', ' ').title()} ({verdict})",
+                    border_style=color,
+                )
+            )
 
     async def _cmd_export(self, args: list[str]) -> None:
-        """Export investigation (placeholder)."""
-        self.console.print("[dim]Export command coming soon...[/dim]")
+        """Export investigation without leaving REPL."""
+        format_type = args[0].lower() if args else "markdown"
+
+        if format_type not in ("json", "markdown"):
+            self.console.print("[red]Usage: /export [json|markdown][/red]")
+            return
+
+        await self._refresh_investigation()
+
+        if not self.investigation:
+            self.console.print("[red]Could not load investigation state.[/red]")
+            return
+
+        from dataing_cli.export import render_json, render_markdown
+
+        # Convert InvestigationState to dict for rendering
+        inv_dict = {
+            "investigation_id": self.investigation.investigation_id,
+            "status": self.investigation.status,
+            "main_branch": {
+                "status": self.investigation.main_branch.status,
+                "current_step": self.investigation.main_branch.current_step,
+                "synthesis": self.investigation.main_branch.synthesis,
+                "evidence": self.investigation.main_branch.evidence,
+            },
+        }
+
+        if format_type == "json":
+            output = render_json(inv_dict)
+            self.console.print(output)
+        else:
+            output = render_markdown(inv_dict)
+            self.console.print(output)
 
     async def _cmd_help(self, args: list[str]) -> None:
         """Show help."""

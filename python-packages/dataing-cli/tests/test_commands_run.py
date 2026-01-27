@@ -416,7 +416,6 @@ class TestRunExportCommand:
         assert result.exit_code == 0
         assert "# Investigation Report: inv-xyz123" in result.output
         assert "Null values appeared" in result.output
-        assert "Chain Hash" in result.output
 
     def test_export_to_file(
         self,
@@ -455,7 +454,7 @@ class TestRunExportCommand:
         data = json.loads(result.output)
         assert data["investigation_id"] == "inv-xyz123"
         assert data["status"] == "completed"
-        assert "chain_hash" in data
+        assert "root_hash" in data
         assert "main_branch" in data
 
     def test_export_not_found(
@@ -540,29 +539,28 @@ class TestRunExportCommand:
         assert "SELECT COUNT(*)" in result.output
         assert "```" in result.output
 
-    def test_export_chain_hash_format(
+    def test_export_root_hash_format(
         self,
         runner: CliRunner,
         configured_env: Path,
         mock_client_patch: MagicMock,
         mock_investigation_state: MagicMock,
     ) -> None:
-        """Test chain hash is a valid 64-char hex string."""
+        """Test root hash appears in export when set on investigation."""
+        mock_investigation_state.root_hash = "a" * 64
         mock_client_patch.get_investigation.return_value = mock_investigation_state
 
         # Test markdown format
         result = runner.invoke(app, ["run", "export", "inv-xyz123"])
         assert result.exit_code == 0
-        # Find the chain hash in the output
-        hash_match = re.search(r"Chain Hash.*`([a-f0-9]{64})`", result.output)
-        assert hash_match is not None, "Chain hash not found in markdown output"
+        hash_match = re.search(r"Root Hash.*`([a-f0-9]{64})`", result.output)
+        assert hash_match is not None, "Root hash not found in markdown output"
 
         # Test JSON format
         result = runner.invoke(app, ["run", "export", "inv-xyz123", "--format", "json"])
         assert result.exit_code == 0
         data = json.loads(result.output)
-        assert "chain_hash" in data
-        assert re.match(r"^[a-f0-9]{64}$", data["chain_hash"])
+        assert data["root_hash"] == "a" * 64
 
     def test_export_json_structure_matches_api(
         self,
@@ -584,10 +582,250 @@ class TestRunExportCommand:
         assert "status" in data
         assert "main_branch" in data
         assert "generated_at" in data
-        assert "chain_hash" in data
+        assert "root_hash" in data
 
         # Verify main_branch structure
         main_branch = data["main_branch"]
         assert "status" in main_branch
         assert "synthesis" in main_branch
         assert "evidence" in main_branch
+
+
+class TestRunVerifyCommand:
+    """Tests for run verify command."""
+
+    def test_verify_valid_chain(
+        self,
+        runner: CliRunner,
+        configured_env: Path,
+        mock_client_patch: MagicMock,
+    ) -> None:
+        """Test verify outputs success for valid chain."""
+        mock_result = MagicMock()
+        mock_result.chain_available = True
+        mock_result.is_valid = True
+        mock_result.evidence_count = 5
+        mock_result.root_hash = "a" * 64
+        mock_result.root_hash_matches = True
+        mock_result.first_broken_seq = None
+        mock_result.error = None
+        mock_client_patch.verify_investigation.return_value = mock_result
+
+        result = runner.invoke(app, ["run", "verify", "inv-xyz123"])
+
+        assert result.exit_code == 0
+        assert "Chain valid" in result.output
+        assert "5 evidence items" in result.output
+        assert "a" * 64 in result.output
+
+    def test_verify_broken_chain(
+        self,
+        runner: CliRunner,
+        configured_env: Path,
+        mock_client_patch: MagicMock,
+    ) -> None:
+        """Test verify exits 1 for broken chain."""
+        mock_result = MagicMock()
+        mock_result.chain_available = True
+        mock_result.is_valid = False
+        mock_result.evidence_count = 3
+        mock_result.root_hash = "b" * 64
+        mock_result.root_hash_matches = False
+        mock_result.first_broken_seq = 2
+        mock_result.error = "Item seq=2 content_hash mismatch"
+        mock_client_patch.verify_investigation.return_value = mock_result
+
+        result = runner.invoke(app, ["run", "verify", "inv-xyz123"])
+
+        assert result.exit_code == 1
+        assert "Chain broken" in result.output
+        assert "seq 2" in result.output
+        assert "content_hash mismatch" in result.output
+
+    def test_verify_chain_not_available(
+        self,
+        runner: CliRunner,
+        configured_env: Path,
+        mock_client_patch: MagicMock,
+    ) -> None:
+        """Test verify exits 2 when chain not available."""
+        mock_result = MagicMock()
+        mock_result.chain_available = False
+        mock_result.is_valid = True
+        mock_result.evidence_count = 10
+        mock_result.root_hash = None
+        mock_result.root_hash_matches = None
+        mock_result.first_broken_seq = None
+        mock_result.error = None
+        mock_client_patch.verify_investigation.return_value = mock_result
+
+        result = runner.invoke(app, ["run", "verify", "inv-xyz123"])
+
+        assert result.exit_code == 2
+        assert "not available" in result.output.lower()
+
+    def test_verify_not_found(
+        self,
+        runner: CliRunner,
+        configured_env: Path,
+        mock_client_patch: MagicMock,
+    ) -> None:
+        """Test verify handles not found error."""
+        mock_client_patch.verify_investigation.side_effect = NotFoundError(
+            "Investigation not found"
+        )
+
+        result = runner.invoke(app, ["run", "verify", "inv-notfound"])
+
+        assert result.exit_code == 1
+        assert "not found" in result.output.lower() or "error" in result.output.lower()
+
+    def test_verify_root_hash_mismatch(
+        self,
+        runner: CliRunner,
+        configured_env: Path,
+        mock_client_patch: MagicMock,
+    ) -> None:
+        """Test verify shows warning when root hash doesn't match stored value."""
+        mock_result = MagicMock()
+        mock_result.chain_available = True
+        mock_result.is_valid = True
+        mock_result.evidence_count = 5
+        mock_result.root_hash = "c" * 64
+        mock_result.root_hash_matches = False
+        mock_result.first_broken_seq = None
+        mock_result.error = None
+        mock_client_patch.verify_investigation.return_value = mock_result
+
+        result = runner.invoke(app, ["run", "verify", "inv-xyz123"])
+
+        assert result.exit_code == 0
+        assert "does not match" in result.output
+
+
+class TestExportChainMetadata:
+    """Tests for chain metadata in export output."""
+
+    @pytest.fixture
+    def mock_investigation_with_chain(self) -> MagicMock:
+        """Create a mock investigation with chain data on evidence."""
+        main_branch = MagicMock()
+        main_branch.status = "completed"
+        main_branch.current_step = "synthesis"
+        main_branch.synthesis = {
+            "root_cause": "ETL failure",
+            "confidence": 0.9,
+        }
+        main_branch.evidence = [
+            {
+                "kind": "query_result",
+                "query": "SELECT COUNT(*) FROM orders",
+                "interpretation": "Found anomaly",
+                "seq": 1,
+                "content_hash": "a" * 64,
+                "prev_hash": None,
+            },
+            {
+                "kind": "hypothesis",
+                "interpretation": "ETL job failed",
+                "seq": 2,
+                "content_hash": "b" * 64,
+                "prev_hash": "a" * 64,
+            },
+        ]
+
+        investigation = MagicMock()
+        investigation.investigation_id = "inv-chain"
+        investigation.status = "completed"
+        investigation.root_hash = "b" * 64
+        investigation.main_branch = main_branch
+        return investigation
+
+    def test_export_json_includes_chain_metadata(
+        self,
+        runner: CliRunner,
+        configured_env: Path,
+        mock_client_patch: MagicMock,
+        mock_investigation_with_chain: MagicMock,
+    ) -> None:
+        """Test JSON export includes chain_metadata when evidence has chain data."""
+        mock_client_patch.get_investigation.return_value = mock_investigation_with_chain
+
+        result = runner.invoke(app, ["run", "export", "inv-chain", "--format", "json"])
+
+        assert result.exit_code == 0
+        data = json.loads(result.output)
+        assert data["root_hash"] == "b" * 64
+        assert "chain_metadata" in data
+        assert data["chain_metadata"]["hash_algorithm"] == "sha256"
+        assert data["chain_metadata"]["canonicalization"] == "rfc8785"
+        assert data["chain_metadata"]["chain_version"] == "evidence_v1"
+
+    def test_export_json_per_item_chain_fields(
+        self,
+        runner: CliRunner,
+        configured_env: Path,
+        mock_client_patch: MagicMock,
+        mock_investigation_with_chain: MagicMock,
+    ) -> None:
+        """Test JSON export includes per-item content_hash, prev_hash, seq."""
+        mock_client_patch.get_investigation.return_value = mock_investigation_with_chain
+
+        result = runner.invoke(app, ["run", "export", "inv-chain", "--format", "json"])
+
+        assert result.exit_code == 0
+        data = json.loads(result.output)
+        evidence = data["main_branch"]["evidence"]
+        assert evidence[0]["seq"] == 1
+        assert evidence[0]["content_hash"] == "a" * 64
+        assert evidence[0]["prev_hash"] is None
+        assert evidence[1]["seq"] == 2
+        assert evidence[1]["prev_hash"] == "a" * 64
+
+    def test_export_markdown_shows_chain_info(
+        self,
+        runner: CliRunner,
+        configured_env: Path,
+        mock_client_patch: MagicMock,
+        mock_investigation_with_chain: MagicMock,
+    ) -> None:
+        """Test markdown export shows chain metadata and per-item chain info."""
+        mock_client_patch.get_investigation.return_value = mock_investigation_with_chain
+
+        result = runner.invoke(app, ["run", "export", "inv-chain"])
+
+        assert result.exit_code == 0
+        assert "Root Hash" in result.output
+        assert "sha256" in result.output
+        assert "rfc8785" in result.output
+        assert "seq=" in result.output
+
+    def test_export_json_no_chain_metadata_without_chain_data(
+        self,
+        runner: CliRunner,
+        configured_env: Path,
+        mock_client_patch: MagicMock,
+    ) -> None:
+        """Test JSON export omits chain_metadata when evidence lacks chain data."""
+        main_branch = MagicMock()
+        main_branch.status = "completed"
+        main_branch.current_step = "synthesis"
+        main_branch.synthesis = {"root_cause": "Test", "confidence": 0.5}
+        main_branch.evidence = [
+            {"kind": "query_result", "interpretation": "Found issue"},
+        ]
+
+        investigation = MagicMock()
+        investigation.investigation_id = "inv-old"
+        investigation.status = "completed"
+        investigation.root_hash = None
+        investigation.main_branch = main_branch
+
+        mock_client_patch.get_investigation.return_value = investigation
+
+        result = runner.invoke(app, ["run", "export", "inv-old", "--format", "json"])
+
+        assert result.exit_code == 0
+        data = json.loads(result.output)
+        assert data["root_hash"] is None
+        assert "chain_metadata" not in data

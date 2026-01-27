@@ -1,0 +1,28 @@
+{
+  "assignee": "bordumbb@gmail.com",
+  "claim_note": "",
+  "claimed_at": "2026-01-27T21:47:16.464224Z",
+  "created_at": "2026-01-27T21:24:43.244273Z",
+  "depends_on": [
+    "fn-33.3"
+  ],
+  "epic": "fn-33",
+  "evidence": {
+    "files_changed": [
+      "python-packages/dataing-sdk/src/dataing_sdk/types.py",
+      "python-packages/dataing-sdk/src/dataing_sdk/client.py",
+      "python-packages/dataing-cli/src/dataing_cli/commands/run.py",
+      "python-packages/dataing-cli/src/dataing_cli/export.py",
+      "python-packages/dataing-cli/tests/test_commands_run.py"
+    ],
+    "lint": "pass",
+    "tests_passed": 30,
+    "typecheck": "pass"
+  },
+  "id": "fn-33.4",
+  "priority": null,
+  "spec_path": ".flow/tasks/fn-33.4.md",
+  "status": "done",
+  "title": "Add CLI verify command and export enhancement",
+  "updated_at": "2026-01-27T22:04:37.576354Z"
+}

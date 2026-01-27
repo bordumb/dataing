@@ -619,6 +619,58 @@
         }
       }
     },
+    "/api/v1/investigations/{investigation_id}/verify": {
+      "get": {
+        "tags": [
+          "investigations"
+        ],
+        "summary": "Verify Investigation",
+        "description": "Verify the integrity of an investigation's evidence hash chain.\n\nValidates that evidence items have not been tampered with by checking\ncontent hashes and chain linkage.\n\nArgs:\n    investigation_id: UUID of the investigation.\n    auth: Authentication context from API key/JWT.\n    db: Application database.\n\nReturns:\n    ChainVerificationResponse with verification result.\n\nRaises:\n    HTTPException: If investigation not found.",
+        "operationId": "verify_investigation_api_v1_investigations__investigation_id__verify_get",
+        "security": [
+          {
+            "APIKeyHeader": []
+          },
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "investigation_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Investigation Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChainVerificationResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/investigations/{investigation_id}/messages": {
       "post": {
         "tags": [
@@ -4883,7 +4935,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/dataing__entrypoints__api__routes__lineage__LineageGraphResponse"
+                  "$ref": "#/components/schemas/LineageGraphResponse"
                 }
               }
             }
@@ -9977,6 +10029,80 @@
         "title": "CancelInvestigationResponse",
         "description": "Response for cancelling an investigation."
       },
+      "ChainVerificationResponse": {
+        "properties": {
+          "investigation_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Investigation Id"
+          },
+          "is_valid": {
+            "type": "boolean",
+            "title": "Is Valid"
+          },
+          "evidence_count": {
+            "type": "integer",
+            "title": "Evidence Count"
+          },
+          "root_hash": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Root Hash"
+          },
+          "root_hash_matches": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Root Hash Matches"
+          },
+          "first_broken_seq": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "First Broken Seq"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          },
+          "chain_available": {
+            "type": "boolean",
+            "title": "Chain Available",
+            "default": true
+          }
+        },
+        "type": "object",
+        "required": [
+          "investigation_id",
+          "is_valid",
+          "evidence_count"
+        ],
+        "title": "ChainVerificationResponse",
+        "description": "Response from evidence chain verification."
+      },
       "ColumnLineageListResponse": {
         "properties": {
           "lineage": {
@@ -10066,7 +10192,7 @@
           "lineage": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/LineageGraphResponse"
+                "$ref": "#/components/schemas/dataing__entrypoints__api__routes__bundles__LineageGraphResponse"
               },
               {
                 "type": "null"
@@ -11592,6 +11718,17 @@
                 "type": "null"
               }
             ]
+          },
+          "root_hash": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Root Hash"
           }
         },
         "type": "object",
@@ -12631,35 +12768,40 @@
       "LineageGraphResponse": {
         "properties": {
           "root": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
+            "type": "string",
             "title": "Root"
           },
           "datasets": {
             "additionalProperties": {
-              "additionalProperties": true,
-              "type": "object"
+              "$ref": "#/components/schemas/DatasetResponse"
             },
             "type": "object",
             "title": "Datasets"
           },
           "edges": {
             "items": {
-              "$ref": "#/components/schemas/LineageEdge"
+              "$ref": "#/components/schemas/LineageEdgeResponse"
             },
             "type": "array",
             "title": "Edges"
+          },
+          "jobs": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/JobResponse"
+            },
+            "type": "object",
+            "title": "Jobs"
           }
         },
         "type": "object",
+        "required": [
+          "root",
+          "datasets",
+          "edges",
+          "jobs"
+        ],
         "title": "LineageGraphResponse",
-        "description": "Lineage graph response."
+        "description": "Response for a lineage graph."
       },
       "LineageProviderResponse": {
         "properties": {
@@ -15994,6 +16136,39 @@
         "title": "WeeklyUsageResponse",
         "description": "Weekly usage statistics response."
       },
+      "dataing__entrypoints__api__routes__bundles__LineageGraphResponse": {
+        "properties": {
+          "root": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Root"
+          },
+          "datasets": {
+            "additionalProperties": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "object",
+            "title": "Datasets"
+          },
+          "edges": {
+            "items": {
+              "$ref": "#/components/schemas/LineageEdge"
+            },
+            "type": "array",
+            "title": "Edges"
+          }
+        },
+        "type": "object",
+        "title": "LineageGraphResponse",
+        "description": "Lineage graph response."
+      },
       "dataing__entrypoints__api__routes__credentials__TestConnectionResponse": {
         "properties": {
           "success": {
@@ -16029,44 +16204,6 @@
         ],
         "title": "TestConnectionResponse",
         "description": "Response for testing credentials."
-      },
-      "dataing__entrypoints__api__routes__lineage__LineageGraphResponse": {
-        "properties": {
-          "root": {
-            "type": "string",
-            "title": "Root"
-          },
-          "datasets": {
-            "additionalProperties": {
-              "$ref": "#/components/schemas/DatasetResponse"
-            },
-            "type": "object",
-            "title": "Datasets"
-          },
-          "edges": {
-            "items": {
-              "$ref": "#/components/schemas/LineageEdgeResponse"
-            },
-            "type": "array",
-            "title": "Edges"
-          },
-          "jobs": {
-            "additionalProperties": {
-              "$ref": "#/components/schemas/JobResponse"
-            },
-            "type": "object",
-            "title": "Jobs"
-          }
-        },
-        "type": "object",
-        "required": [
-          "root",
-          "datasets",
-          "edges",
-          "jobs"
-        ],
-        "title": "LineageGraphResponse",
-        "description": "Response for a lineage graph."
       }
     },
     "securitySchemes": {

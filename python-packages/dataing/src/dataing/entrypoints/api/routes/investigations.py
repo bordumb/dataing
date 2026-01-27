@@ -94,6 +94,20 @@ class InvestigationStateResponse(BaseModel):
     status: str
     main_branch: BranchStateResponse
     user_branch: BranchStateResponse | None = None
+    root_hash: str | None = None
+
+
+class ChainVerificationResponse(BaseModel):
+    """Response from evidence chain verification."""
+
+    investigation_id: UUID
+    is_valid: bool
+    evidence_count: int
+    root_hash: str | None = None
+    root_hash_matches: bool | None = None
+    first_broken_seq: int | None = None
+    error: str | None = None
+    chain_available: bool = True
 
 
 class InvestigationListItem(BaseModel):
@@ -433,11 +447,14 @@ async def get_investigation(
             parent_branch_id=None,
         )
 
+        root_hash = getattr(status.result, "root_hash", None) if status.result else None
+
         return InvestigationStateResponse(
             investigation_id=investigation_id,
             status=status.workflow_status,
             main_branch=main_branch,
             user_branch=None,
+            root_hash=root_hash,
         )
     except Exception as e:
         logger.error(f"Failed to get Temporal investigation: {e}")
@@ -445,6 +462,94 @@ async def get_investigation(
             status_code=404,
             detail=f"Investigation not found: {e}",
         ) from e
+
+
+@router.get("/{investigation_id}/verify", response_model=ChainVerificationResponse)
+async def verify_investigation(
+    investigation_id: UUID,
+    auth: AuthDep,
+    db: AppDbDep,
+) -> ChainVerificationResponse:
+    """Verify the integrity of an investigation's evidence hash chain.
+
+    Validates that evidence items have not been tampered with by checking
+    content hashes and chain linkage.
+
+    Args:
+        investigation_id: UUID of the investigation.
+        auth: Authentication context from API key/JWT.
+        db: Application database.
+
+    Returns:
+        ChainVerificationResponse with verification result.
+
+    Raises:
+        HTTPException: If investigation not found.
+    """
+    from dataing.adapters.db.sdk_repository import EvidenceRepository
+    from dataing.core.evidence import verify_chain
+
+    # Check investigation exists and belongs to tenant
+    inv = await db.fetch_one(
+        "SELECT id, root_hash FROM investigations WHERE id = $1 AND tenant_id = $2",
+        investigation_id,
+        auth.tenant_id,
+    )
+    if not inv:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Investigation not found: {investigation_id}",
+        )
+
+    stored_root_hash: str | None = inv.get("root_hash")
+
+    # Load evidence
+    repo = EvidenceRepository(db)
+    evidence_items = await repo.get_evidence_by_run(investigation_id)
+
+    if not evidence_items:
+        return ChainVerificationResponse(
+            investigation_id=investigation_id,
+            is_valid=True,
+            evidence_count=0,
+            root_hash=stored_root_hash,
+            root_hash_matches=None,
+            chain_available=False,
+        )
+
+    # Check if evidence has chain fields populated
+    first_item = evidence_items[0]
+    if not first_item.get("content_hash"):
+        return ChainVerificationResponse(
+            investigation_id=investigation_id,
+            is_valid=True,
+            evidence_count=len(evidence_items),
+            root_hash=stored_root_hash,
+            root_hash_matches=None,
+            chain_available=False,
+        )
+
+    # Verify the chain
+    is_valid, broken_seq, error_msg = verify_chain(evidence_items)
+
+    # Compute root_hash from chain (content_hash of last item)
+    computed_root_hash = evidence_items[-1].get("content_hash") if evidence_items else None
+
+    # Compare stored vs computed root_hash
+    root_hash_matches = None
+    if stored_root_hash and computed_root_hash:
+        root_hash_matches = stored_root_hash == computed_root_hash
+
+    return ChainVerificationResponse(
+        investigation_id=investigation_id,
+        is_valid=is_valid,
+        evidence_count=len(evidence_items),
+        root_hash=computed_root_hash,
+        root_hash_matches=root_hash_matches,
+        first_broken_seq=broken_seq,
+        error=error_msg,
+        chain_available=True,
+    )
 
 
 @router.post("/{investigation_id}/messages", response_model=SendMessageResponse)

@@ -30,6 +30,11 @@ from dataing.temporal.activities.execute_query import (
     ExecuteQueryResult,
     make_execute_query_activity,
 )
+from dataing.temporal.activities.finalize_evidence import (
+    FinalizeEvidenceChainInput,
+    FinalizeEvidenceChainResult,
+    make_finalize_evidence_chain_activity,
+)
 from dataing.temporal.activities.gather_context import (
     GatherContextInput,
     GatherContextResult,
@@ -66,6 +71,7 @@ __all__ = [
     "make_interpret_evidence_activity",
     "make_synthesize_activity",
     "make_counter_analyze_activity",
+    "make_finalize_evidence_chain_activity",
     # Input/Result types
     "GatherContextInput",
     "GatherContextResult",
@@ -83,4 +89,6 @@ __all__ = [
     "SynthesizeResult",
     "CounterAnalyzeInput",
     "CounterAnalyzeResult",
+    "FinalizeEvidenceChainInput",
+    "FinalizeEvidenceChainResult",
 ]

@@ -1,0 +1,13 @@
+{
+  "branch_name": "fn-33",
+  "created_at": "2026-01-27T21:23:26.102870Z",
+  "depends_on_epics": [],
+  "id": "fn-33",
+  "next_task": 1,
+  "plan_review_status": "unknown",
+  "plan_reviewed_at": null,
+  "spec_path": ".flow/specs/fn-33.md",
+  "status": "open",
+  "title": "Evidence Integrity and Reproducibility",
+  "updated_at": "2026-01-27T21:24:21.812518Z"
+}

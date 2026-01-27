@@ -11,19 +11,29 @@ Evidence is normalized to enable queries like:
 
 Hash chain is opt-in for enterprise customers who need tamper-evidence.
 Enable via EVIDENCE_HASH_CHAIN=true environment variable.
+
+Hash computation uses RFC 8785 (JSON Canonicalization Scheme) for deterministic
+serialization, with a domain-separated SHA-256 hash covering chain metadata
+(seq, kind, prev_hash) in addition to content.
 """
 
 from __future__ import annotations
 
 import hashlib
-import json
+import hmac
 import os
 from datetime import UTC, datetime
 from enum import Enum
 from typing import Annotated, Any, Literal
 from uuid import UUID, uuid4
 
+import rfc8785
 from pydantic import BaseModel, ConfigDict, Field
+
+# Domain separation prefix for evidence hash computation.
+# Prevents second preimage attacks by distinguishing evidence hashes
+# from other SHA-256 hashes in the system.
+_HASH_DOMAIN_PREFIX = b"evidence_v1:"
 
 
 def is_hash_chain_enabled() -> bool:
@@ -33,6 +43,108 @@ def is_hash_chain_enabled() -> bool:
         True if EVIDENCE_HASH_CHAIN=true, False otherwise.
     """
     return os.environ.get("EVIDENCE_HASH_CHAIN", "").lower() in ("true", "1", "yes")
+
+
+def compute_content_hash(
+    seq: int,
+    kind: str,
+    prev_hash: str | None,
+    content: dict[str, Any],
+) -> str:
+    """Compute SHA-256 hash of evidence with chain metadata.
+
+    Uses RFC 8785 canonical JSON serialization for deterministic output
+    across Python versions and platforms. Includes chain metadata (seq, kind,
+    prev_hash) in the hash to authenticate ordering and linkage.
+
+    Args:
+        seq: Evidence sequence number.
+        kind: Evidence kind discriminator.
+        prev_hash: Hash of previous evidence in chain (None for first item).
+        content: Evidence content dict (must be JSON-safe).
+
+    Returns:
+        64-character hex-encoded SHA-256 hash.
+    """
+    hashable: dict[str, Any] = {
+        "seq": seq,
+        "kind": kind,
+        "prev_hash": prev_hash,
+        "content": content,
+    }
+    canonical_bytes = rfc8785.dumps(hashable)
+    return hashlib.sha256(_HASH_DOMAIN_PREFIX + canonical_bytes).hexdigest()
+
+
+def verify_chain(
+    evidence_items: list[dict[str, Any]],
+) -> tuple[bool, int | None, str | None]:
+    """Verify integrity of an evidence hash chain.
+
+    Pure function that validates:
+    1. Each item's content_hash matches recomputed hash
+    2. Each item's prev_hash matches the previous item's content_hash
+    3. First item has prev_hash = None
+
+    Uses timing-safe comparison via hmac.compare_digest().
+
+    Args:
+        evidence_items: Evidence dicts ordered by seq. Each must contain
+            keys: seq, kind, prev_hash, content_hash, content.
+
+    Returns:
+        Tuple of (is_valid, first_broken_seq, error_message).
+        If valid, returns (True, None, None).
+        If broken, returns (False, broken_seq, description).
+    """
+    if not evidence_items:
+        return True, None, None
+
+    for i, item in enumerate(evidence_items):
+        seq = item.get("seq", i + 1)
+        kind = item.get("kind", "")
+        prev_hash = item.get("prev_hash")
+        content_hash = item.get("content_hash", "")
+        content = item.get("content", {})
+
+        # Verify genesis block
+        if i == 0 and prev_hash is not None:
+            return (
+                False,
+                seq,
+                f"Genesis item (seq={seq}) must have prev_hash=None, " f"got '{prev_hash}'",
+            )
+
+        # Verify prev_hash linkage
+        if i > 0:
+            expected_prev = evidence_items[i - 1].get("content_hash", "")
+            if not hmac.compare_digest(
+                str(prev_hash or ""),
+                str(expected_prev),
+            ):
+                return (
+                    False,
+                    seq,
+                    f"Item seq={seq} prev_hash mismatch: "
+                    f"expected '{expected_prev}', got '{prev_hash}'",
+                )
+
+        # Verify content_hash
+        expected_hash = compute_content_hash(
+            seq=seq,
+            kind=kind,
+            prev_hash=prev_hash,
+            content=content,
+        )
+        if not hmac.compare_digest(content_hash, expected_hash):
+            return (
+                False,
+                seq,
+                f"Item seq={seq} content_hash mismatch: "
+                f"expected '{expected_hash}', got '{content_hash}'",
+            )
+
+    return True, None, None
 
 
 class EvidenceKind(str, Enum):
@@ -67,18 +179,6 @@ class EvidenceBase(BaseModel):
         default="",
         description="SHA256 hash of content for tamper-evidence",
     )
-
-    def compute_content_hash(self, content: dict[str, Any]) -> str:
-        """Compute SHA256 hash of content.
-
-        Args:
-            content: Dictionary content to hash.
-
-        Returns:
-            Hex-encoded SHA256 hash.
-        """
-        json_str = json.dumps(content, sort_keys=True, default=str)
-        return hashlib.sha256(json_str.encode()).hexdigest()
 
 
 class QueryResultEvidence(EvidenceBase):
@@ -188,6 +288,7 @@ def create_evidence_chain(
     content: dict[str, Any],
     prev_hash: str | None = None,
     seq: int = 1,
+    timestamp: datetime | None = None,
 ) -> EvidenceBase:
     """Create an evidence item with optional hash chain.
 
@@ -197,6 +298,7 @@ def create_evidence_chain(
         content: Evidence content dict.
         prev_hash: Hash of previous evidence in chain (only used if hash chain enabled).
         seq: Sequence number.
+        timestamp: Explicit timestamp (defaults to now UTC).
 
     Returns:
         Evidence instance with computed content_hash.
@@ -208,17 +310,19 @@ def create_evidence_chain(
     # Only include prev_hash if hash chain is enabled
     effective_prev_hash = prev_hash if is_hash_chain_enabled() else None
 
-    # Create base evidence to compute hash
-    base = EvidenceBase(
-        run_id=run_id,
+    # Compute hash using module-level function (no throwaway instance)
+    content_hash = compute_content_hash(
         seq=seq,
-        kind=kind,
+        kind=kind.value,
         prev_hash=effective_prev_hash,
+        content=content,
     )
-    content_hash = base.compute_content_hash(content)
+
+    # Use explicit timestamp to avoid mismatch between hash and stored value
+    ts = timestamp or datetime.now(UTC)
 
     # Map kind to concrete type
-    evidence_classes = {
+    evidence_classes: dict[EvidenceKind, type[EvidenceBase]] = {
         EvidenceKind.QUERY_RESULT: QueryResultEvidence,
         EvidenceKind.HYPOTHESIS: HypothesisEvidence,
         EvidenceKind.LINEAGE_TRACE: LineageTraceEvidence,
@@ -232,6 +336,7 @@ def create_evidence_chain(
         run_id=run_id,
         seq=seq,
         kind=kind,
+        timestamp=ts,
         prev_hash=effective_prev_hash,
         content_hash=content_hash,
         **content,

@@ -37,6 +37,7 @@ from dataing.temporal.activities import (
     make_check_patterns_activity,
     make_counter_analyze_activity,
     make_execute_query_activity,
+    make_finalize_evidence_chain_activity,
     make_gather_context_activity,
     make_generate_hypotheses_activity,
     make_generate_query_activity,
@@ -220,6 +221,8 @@ def create_activities(deps: dict[str, Any]) -> list[Any]:
         # Synthesis and analysis
         make_synthesize_activity(adapter=agent_adapter),
         make_counter_analyze_activity(adapter=agent_adapter),
+        # Evidence chain finalization
+        make_finalize_evidence_chain_activity(app_db=app_db),
     ]
 
     logger.info(f"Created {len(activities)} activities with dependencies")

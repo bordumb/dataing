@@ -250,6 +250,86 @@ class TestBranchStateResponse:
         assert response.evidence == []
 
 
+class TestChainVerificationResponse:
+    """Tests for ChainVerificationResponse model."""
+
+    def test_valid_chain_response(self) -> None:
+        """Test response for a valid chain."""
+        from dataing.entrypoints.api.routes.investigations import (
+            ChainVerificationResponse,
+        )
+
+        investigation_id = uuid.uuid4()
+        response = ChainVerificationResponse(
+            investigation_id=investigation_id,
+            is_valid=True,
+            evidence_count=5,
+            root_hash="a" * 64,
+            root_hash_matches=True,
+            chain_available=True,
+        )
+        assert response.is_valid is True
+        assert response.evidence_count == 5
+        assert response.root_hash_matches is True
+        assert response.chain_available is True
+        assert response.first_broken_seq is None
+        assert response.error is None
+
+    def test_broken_chain_response(self) -> None:
+        """Test response for a broken chain."""
+        from dataing.entrypoints.api.routes.investigations import (
+            ChainVerificationResponse,
+        )
+
+        investigation_id = uuid.uuid4()
+        response = ChainVerificationResponse(
+            investigation_id=investigation_id,
+            is_valid=False,
+            evidence_count=3,
+            root_hash="b" * 64,
+            root_hash_matches=False,
+            first_broken_seq=2,
+            error="Item seq=2 content_hash mismatch",
+            chain_available=True,
+        )
+        assert response.is_valid is False
+        assert response.first_broken_seq == 2
+        assert "content_hash mismatch" in response.error
+
+    def test_no_evidence_response(self) -> None:
+        """Test response when no evidence exists."""
+        from dataing.entrypoints.api.routes.investigations import (
+            ChainVerificationResponse,
+        )
+
+        investigation_id = uuid.uuid4()
+        response = ChainVerificationResponse(
+            investigation_id=investigation_id,
+            is_valid=True,
+            evidence_count=0,
+            chain_available=False,
+        )
+        assert response.is_valid is True
+        assert response.evidence_count == 0
+        assert response.chain_available is False
+
+    def test_pre_feature_investigation(self) -> None:
+        """Test response for investigation without hash chain data."""
+        from dataing.entrypoints.api.routes.investigations import (
+            ChainVerificationResponse,
+        )
+
+        investigation_id = uuid.uuid4()
+        response = ChainVerificationResponse(
+            investigation_id=investigation_id,
+            is_valid=True,
+            evidence_count=10,
+            chain_available=False,
+        )
+        assert response.chain_available is False
+        assert response.root_hash_matches is None
+
+
 class TestRouterConfiguration:
     """Tests for router configuration."""
 

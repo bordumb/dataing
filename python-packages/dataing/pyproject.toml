@@ -33,6 +33,7 @@ dependencies = [
     "pyjwt>=2.10.1",
     "redis>=5.0.0",
     "jsonschema>=4.20.0",
+    "rfc8785>=0.1.4",
 ]
 
 [project.optional-dependencies]

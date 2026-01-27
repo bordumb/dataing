@@ -6,6 +6,7 @@
  * OpenAPI spec version: 2.0.0
  */
 import type { BranchStateResponse } from "./branchStateResponse";
+import type { InvestigationStateResponseRootHash } from "./investigationStateResponseRootHash";
 import type { InvestigationStateResponseUserBranch } from "./investigationStateResponseUserBranch";
 
 /**
@@ -14,6 +15,7 @@ import type { InvestigationStateResponseUserBranch } from "./investigationStateR
 export interface InvestigationStateResponse {
   investigation_id: string;
   main_branch: BranchStateResponse;
+  root_hash?: InvestigationStateResponseRootHash;
   status: string;
   user_branch?: InvestigationStateResponseUserBranch;
 }

@@ -1,3 +1,10 @@
+# [1.8.0](https://github.com/bordumb/dataing/compare/v1.7.1...v1.8.0) (2026-01-27)
+
+
+### Features
+
+* add dataset-to-repository mapping system ([#96](https://github.com/bordumb/dataing/issues/96)) ([84e2cd0](https://github.com/bordumb/dataing/commit/84e2cd0d9b8c31b3a18db48924790e23e5f79145))
+
 ## [1.7.1](https://github.com/bordumb/dataing/compare/v1.7.0...v1.7.1) (2026-01-27)
 
 

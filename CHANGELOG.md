@@ -1,3 +1,10 @@
+# [1.6.0](https://github.com/bordumb/dataing/compare/v1.5.0...v1.6.0) (2026-01-27)
+
+
+### Features
+
+* **cli:** add export command for investigation reports ([#91](https://github.com/bordumb/dataing/issues/91)) ([944213c](https://github.com/bordumb/dataing/commit/944213cab42c57828f19bebc152205bee5731465))
+
 # [1.5.0](https://github.com/bordumb/dataing/compare/v1.4.0...v1.5.0) (2026-01-27)
 
 

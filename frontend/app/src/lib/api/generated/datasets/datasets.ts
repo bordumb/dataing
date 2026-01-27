@@ -15,8 +15,10 @@ import type {
 import type {
   DatasetDetailResponse,
   DatasetInvestigationsResponse,
+  DatasetRepoResponse,
   GetDatasetInvestigationsApiV1DatasetsDatasetIdInvestigationsGetParams,
   HTTPValidationError,
+  ResolveDatasetRepoApiV1DatasetsDatasetIdRepoGetParams,
 } from "../../model";
 import { customInstance } from "../../client";
 
@@ -260,3 +262,125 @@ export const useGetDatasetInvestigationsApiV1DatasetsDatasetIdInvestigationsGet 
 
     return query;
   };
+
+/**
+ * Resolve the best repository mapping for a dataset.
+
+Returns 200 with primary=null when no mapping found (never 404).
+This enables graceful degradation in investigations.
+ * @summary Resolve Dataset Repo
+ */
+export const resolveDatasetRepoApiV1DatasetsDatasetIdRepoGet = (
+  datasetId: string,
+  params?: ResolveDatasetRepoApiV1DatasetsDatasetIdRepoGetParams,
+  signal?: AbortSignal,
+) => {
+  return customInstance<DatasetRepoResponse>({
+    url: `/api/v1/datasets/${datasetId}/repo`,
+    method: "GET",
+    params,
+    signal,
+  });
+};
+
+export const getResolveDatasetRepoApiV1DatasetsDatasetIdRepoGetQueryKey = (
+  datasetId: string,
+  params?: ResolveDatasetRepoApiV1DatasetsDatasetIdRepoGetParams,
+) => {
+  return [
+    `/api/v1/datasets/${datasetId}/repo`,
+    ...(params ? [params] : []),
+  ] as const;
+};
+
+export const getResolveDatasetRepoApiV1DatasetsDatasetIdRepoGetQueryOptions = <
+  TData = Awaited<
+    ReturnType<typeof resolveDatasetRepoApiV1DatasetsDatasetIdRepoGet>
+  >,
+  TError = HTTPValidationError,
+>(
+  datasetId: string,
+  params?: ResolveDatasetRepoApiV1DatasetsDatasetIdRepoGetParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<
+          ReturnType<typeof resolveDatasetRepoApiV1DatasetsDatasetIdRepoGet>
+        >,
+        TError,
+        TData
+      >
+    >;
+  },
+) => {
+  const { query: queryOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ??
+    getResolveDatasetRepoApiV1DatasetsDatasetIdRepoGetQueryKey(
+      datasetId,
+      params,
+    );
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof resolveDatasetRepoApiV1DatasetsDatasetIdRepoGet>>
+  > = ({ signal }) =>
+    resolveDatasetRepoApiV1DatasetsDatasetIdRepoGet(datasetId, params, signal);
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!datasetId,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof resolveDatasetRepoApiV1DatasetsDatasetIdRepoGet>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type ResolveDatasetRepoApiV1DatasetsDatasetIdRepoGetQueryResult =
+  NonNullable<
+    Awaited<ReturnType<typeof resolveDatasetRepoApiV1DatasetsDatasetIdRepoGet>>
+  >;
+export type ResolveDatasetRepoApiV1DatasetsDatasetIdRepoGetQueryError =
+  HTTPValidationError;
+
+/**
+ * @summary Resolve Dataset Repo
+ */
+export const useResolveDatasetRepoApiV1DatasetsDatasetIdRepoGet = <
+  TData = Awaited<
+    ReturnType<typeof resolveDatasetRepoApiV1DatasetsDatasetIdRepoGet>
+  >,
+  TError = HTTPValidationError,
+>(
+  datasetId: string,
+  params?: ResolveDatasetRepoApiV1DatasetsDatasetIdRepoGetParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<
+          ReturnType<typeof resolveDatasetRepoApiV1DatasetsDatasetIdRepoGet>
+        >,
+        TError,
+        TData
+      >
+    >;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } => {
+  const queryOptions =
+    getResolveDatasetRepoApiV1DatasetsDatasetIdRepoGetQueryOptions(
+      datasetId,
+      params,
+      options,
+    );
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  query.queryKey = queryOptions.queryKey;
+
+  return query;
+};

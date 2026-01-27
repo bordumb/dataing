@@ -89,6 +89,8 @@ class RepoMappingListResponse(BaseModel):
 
 def _to_response(row: dict[str, Any]) -> RepoMappingResponse:
     """Convert a database row to a response model."""
+    raw_meta = row.get("metadata", {})
+    metadata = json.loads(raw_meta) if isinstance(raw_meta, str) else (raw_meta or {})
     return RepoMappingResponse(
         id=str(row["id"]),
         dataset_pattern=row["dataset_pattern"],
@@ -102,7 +104,7 @@ def _to_response(row: dict[str, Any]) -> RepoMappingResponse:
         source=row["source"],
         confidence=row["confidence"],
         confirmed=row["confirmed"],
-        metadata=row.get("metadata", {}),
+        metadata=metadata,
         last_verified_at=row.get("last_verified_at"),
         created_at=row["created_at"],
         updated_at=row.get("updated_at"),
@@ -133,7 +135,16 @@ async def create_repo_mapping(
         "priority": 0,
         "metadata": req.metadata or {},
     }
-    row = await db.create_repo_mapping(auth.tenant_id, mapping_data)
+    try:
+        row = await db.create_repo_mapping(auth.tenant_id, mapping_data)
+    except Exception as exc:
+        if "unique" in str(exc).lower() or "duplicate" in str(exc).lower():
+            raise HTTPException(
+                status_code=409,
+                detail="A confirmed mapping for this dataset+repo already exists. "
+                "Use PUT to update or DELETE first.",
+            ) from exc
+        raise
     return _to_response(row)
 
 

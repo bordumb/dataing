@@ -7,10 +7,19 @@
     "fn-31.4"
   ],
   "epic": "fn-31",
+  "evidence": {
+    "commits": [
+      "02f26349"
+    ],
+    "prs": [],
+    "tests": [
+      "Pre-commit hooks"
+    ]
+  },
   "id": "fn-31.5",
   "priority": null,
   "spec_path": ".flow/tasks/fn-31.5.md",
-  "status": "in_progress",
+  "status": "done",
   "title": "CLI: Implement slash commands",
-  "updated_at": "2026-01-27T04:14:46.582248Z"
+  "updated_at": "2026-01-27T04:17:16.648838Z"
 }

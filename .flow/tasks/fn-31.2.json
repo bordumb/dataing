@@ -1,14 +1,23 @@
 {
-  "assignee": null,
+  "assignee": "bordumbb@gmail.com",
   "claim_note": "",
-  "claimed_at": null,
+  "claimed_at": "2026-01-27T04:06:16.341330Z",
   "created_at": "2026-01-27T03:53:49.564405Z",
   "depends_on": [],
   "epic": "fn-31",
+  "evidence": {
+    "commits": [
+      "336ee88e27c72d82c8317ea3be0204a8f2211912"
+    ],
+    "prs": [],
+    "tests": [
+      "PYTHONPATH verification of config functions"
+    ]
+  },
   "id": "fn-31.2",
   "priority": null,
   "spec_path": ".flow/tasks/fn-31.2.md",
-  "status": "todo",
+  "status": "done",
   "title": "CLI: Add dependencies and config",
-  "updated_at": "2026-01-27T03:55:55.922773Z"
+  "updated_at": "2026-01-27T04:08:55.013447Z"
 }

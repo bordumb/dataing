@@ -297,3 +297,38 @@ def set_default_datasource(datasource_id: str, datasource_name: str | None = Non
     if datasource_name:
         config["default_datasource_name"] = datasource_name
     save_config(config)
+
+
+def get_current_investigation_id() -> str | None:
+    """Get the current investigation ID from config.
+
+    Returns:
+        The current investigation ID or None if not set.
+    """
+    config = load_config()
+    return config.get("current_investigation_id")
+
+
+def set_current_investigation_id(investigation_id: str | None) -> None:
+    """Set the current investigation ID in config.
+
+    Args:
+        investigation_id: The investigation ID to set, or None to clear.
+    """
+    config = load_config()
+    if investigation_id is None:
+        config.pop("current_investigation_id", None)
+    else:
+        config["current_investigation_id"] = investigation_id
+    save_config(config)
+
+
+def get_history_path() -> Path:
+    """Get path to REPL history file, creating directory if needed.
+
+    Returns:
+        Path to ~/.dataing/history file.
+    """
+    history_dir = Path.home() / ".dataing"
+    history_dir.mkdir(parents=True, exist_ok=True)
+    return history_dir / "history"

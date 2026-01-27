@@ -976,6 +976,118 @@ class DataingClient:
             status=data.get("status", "queued"),
         )
 
+    def get_investigation(self, investigation_id: str) -> Any:
+        """Get the current state of an investigation.
+
+        Fetches the full investigation state including evidence collected,
+        synthesis results, and branch status.
+
+        Args:
+            investigation_id: The unique identifier of the investigation.
+
+        Returns:
+            An `InvestigationState` object containing the full investigation
+            state including main_branch with evidence and synthesis.
+
+        Raises:
+            NotFoundError: If the investigation ID does not exist.
+            AuthError: If not authorized to access this investigation.
+
+        Example:
+            ```python
+            inv = client.start_investigation(
+                dataset="main.orders",
+                anomaly_type="null_rate",
+                goal="Investigate nulls",
+            )
+
+            # Wait for completion, then get full state
+            # ...
+
+            state = client.get_investigation(inv.investigation_id)
+            if state.synthesis:
+                print(f"Root cause: {state.synthesis.get('root_cause')}")
+            for ev in state.evidence:
+                print(f"Evidence: {ev.get('kind')}")
+            ```
+
+        See Also:
+            - `start_investigation`: Start a new investigation
+            - `stream_run`: Stream real-time events
+        """
+        from .types import BranchState, InvestigationState
+
+        response = self._request("GET", f"/api/v1/investigations/{investigation_id}")
+        data = response.json()
+
+        # Parse main branch
+        main_branch_data = data.get("main_branch", {})
+        main_branch = BranchState(
+            branch_id=str(main_branch_data.get("branch_id", investigation_id)),
+            status=main_branch_data.get("status", data.get("status", "unknown")),
+            current_step=main_branch_data.get("current_step", "unknown"),
+            synthesis=main_branch_data.get("synthesis"),
+            evidence=main_branch_data.get("evidence", []),
+        )
+
+        # Parse user branch if present
+        user_branch = None
+        user_branch_data = data.get("user_branch")
+        if user_branch_data:
+            user_branch = BranchState(
+                branch_id=str(user_branch_data.get("branch_id", "")),
+                status=user_branch_data.get("status", "unknown"),
+                current_step=user_branch_data.get("current_step", "unknown"),
+                synthesis=user_branch_data.get("synthesis"),
+                evidence=user_branch_data.get("evidence", []),
+            )
+
+        return InvestigationState(
+            investigation_id=str(data["investigation_id"]),
+            status=data.get("status", "unknown"),
+            main_branch=main_branch,
+            user_branch=user_branch,
+        )
+
+    async def async_get_investigation(self, investigation_id: str) -> Any:
+        """Async version of `get_investigation`.
+
+        See `get_investigation` for full documentation.
+        """
+        from .types import BranchState, InvestigationState
+
+        response = await self._async_request("GET", f"/api/v1/investigations/{investigation_id}")
+        data = response.json()
+
+        # Parse main branch
+        main_branch_data = data.get("main_branch", {})
+        main_branch = BranchState(
+            branch_id=str(main_branch_data.get("branch_id", investigation_id)),
+            status=main_branch_data.get("status", data.get("status", "unknown")),
+            current_step=main_branch_data.get("current_step", "unknown"),
+            synthesis=main_branch_data.get("synthesis"),
+            evidence=main_branch_data.get("evidence", []),
+        )
+
+        # Parse user branch if present
+        user_branch = None
+        user_branch_data = data.get("user_branch")
+        if user_branch_data:
+            user_branch = BranchState(
+                branch_id=str(user_branch_data.get("branch_id", "")),
+                status=user_branch_data.get("status", "unknown"),
+                current_step=user_branch_data.get("current_step", "unknown"),
+                synthesis=user_branch_data.get("synthesis"),
+                evidence=user_branch_data.get("evidence", []),
+            )
+
+        return InvestigationState(
+            investigation_id=str(data["investigation_id"]),
+            status=data.get("status", "unknown"),
+            main_branch=main_branch,
+            user_branch=user_branch,
+        )
+
     # --- Run status methods ---
 
     def get_run(self, run_id: str) -> Run:

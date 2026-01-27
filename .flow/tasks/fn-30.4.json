@@ -1,0 +1,16 @@
+{
+  "assignee": null,
+  "claim_note": "",
+  "claimed_at": null,
+  "created_at": "2026-01-27T03:12:05.788450Z",
+  "depends_on": [
+    "fn-30.3"
+  ],
+  "epic": "fn-30",
+  "id": "fn-30.4",
+  "priority": null,
+  "spec_path": ".flow/tasks/fn-30.4.md",
+  "status": "todo",
+  "title": "Add unit tests for export command",
+  "updated_at": "2026-01-27T03:13:33.105405Z"
+}

@@ -1,0 +1,16 @@
+{
+  "assignee": null,
+  "claim_note": "",
+  "claimed_at": null,
+  "created_at": "2026-01-27T03:12:03.009679Z",
+  "depends_on": [
+    "fn-30.1"
+  ],
+  "epic": "fn-30",
+  "id": "fn-30.2",
+  "priority": null,
+  "spec_path": ".flow/tasks/fn-30.2.md",
+  "status": "todo",
+  "title": "Add CLI export command with markdown output",
+  "updated_at": "2026-01-27T03:13:29.420997Z"
+}

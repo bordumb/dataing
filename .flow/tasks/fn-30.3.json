@@ -1,0 +1,16 @@
+{
+  "assignee": null,
+  "claim_note": "",
+  "claimed_at": null,
+  "created_at": "2026-01-27T03:12:04.533935Z",
+  "depends_on": [
+    "fn-30.2"
+  ],
+  "epic": "fn-30",
+  "id": "fn-30.3",
+  "priority": null,
+  "spec_path": ".flow/tasks/fn-30.3.md",
+  "status": "todo",
+  "title": "Add JSON format and evidence chain hash",
+  "updated_at": "2026-01-27T03:13:31.100403Z"
+}

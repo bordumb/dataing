@@ -1,3 +1,10 @@
+## [1.7.1](https://github.com/bordumb/dataing/compare/v1.7.0...v1.7.1) (2026-01-27)
+
+
+### Bug Fixes
+
+* followup to 94 ([#95](https://github.com/bordumb/dataing/issues/95)) ([f6a2107](https://github.com/bordumb/dataing/commit/f6a2107a75a9ce28e3ed77dac18432d0f0f409bf))
+
 # [1.7.0](https://github.com/bordumb/dataing/compare/v1.6.0...v1.7.0) (2026-01-27)
 
 

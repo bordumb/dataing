@@ -1,3 +1,10 @@
+# [1.7.0](https://github.com/bordumb/dataing/compare/v1.6.0...v1.7.0) (2026-01-27)
+
+
+### Features
+
+* **cli:** add interactive ask command with REPL mode ([#94](https://github.com/bordumb/dataing/issues/94)) ([c0c330b](https://github.com/bordumb/dataing/commit/c0c330b3e0fd3d8c2f555e2eed655cca34dbc5a4))
+
 # [1.6.0](https://github.com/bordumb/dataing/compare/v1.5.0...v1.6.0) (2026-01-27)
 
 

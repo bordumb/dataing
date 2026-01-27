@@ -54,7 +54,11 @@ dataing ds attach <datasource-id>
 ### 4. Run an Investigation
 
 ```bash
-dataing run start main.orders --goal "investigate null spike in user_id"
+dataing run start main.orders \
+  --anomaly-type null_rate \
+  --column user_id \
+  --date 2026-01-10 \
+  --goal "investigate null spike in user_id"
 ```
 
 ---
@@ -194,12 +198,29 @@ created_at timestamp
 
 ### Investigation Commands (`dataing run`)
 
-#### `dataing run start <dataset> --goal <goal>`
+#### `dataing run start <dataset> --anomaly-type <type> --goal <goal>`
 
-Start a new investigation.
+Start a new investigation. Uses the same endpoint as the GUI for consistent results.
+
+**Basic usage:**
 
 ```bash
-dataing run start main.orders --goal "investigate null spike in user_id"
+dataing run start main.orders \
+  --anomaly-type null_rate \
+  --goal "investigate null spike"
+```
+
+**Full structured input (matches GUI):**
+
+```bash
+dataing run start main.orders \
+  --anomaly-type null_rate \
+  --column user_id \
+  --expected 0.01 \
+  --actual 0.15 \
+  --severity high \
+  --date 2026-01-10 \
+  --goal "investigate why user_id has null values"
 ```
 
 By default, the CLI streams a **progressive timeline** in real-time with color-coded panels:
@@ -248,6 +269,12 @@ Each panel shows elapsed time `[MM:SS]` since the investigation started.
 | Option | Description |
 |--------|-------------|
 | `--goal`, `-g` | Investigation goal (required) |
+| `--anomaly-type`, `-a` | Type of anomaly (required): `null_rate`, `row_count`, `freshness`, `duplicate_rate`, `schema_drift` |
+| `--column`, `-c` | Affected column name (optional) |
+| `--expected`, `-e` | Expected baseline value (default: 0.0) |
+| `--actual` | Observed actual value (default: 0.0) |
+| `--severity`, `-s` | Severity level: `low`, `medium`, `high`, `critical` (default: `medium`) |
+| `--date` | Anomaly date in YYYY-MM-DD format (default: today) |
 | `--datasource`, `-d` | Datasource ID (uses default if not set) |
 | `--no-stream` | Wait for completion, output final result only |
 | `--no-watch` | Don't stream progress, just start the run |
@@ -257,7 +284,10 @@ Each panel shows elapsed time `[MM:SS]` since the investigation started.
 Use `--no-stream` to wait for the investigation to complete and output only the final result:
 
 ```bash
-dataing run start main.orders --goal "investigate null spike" --no-stream
+dataing run start main.orders \
+  --anomaly-type null_rate \
+  --goal "investigate null spike" \
+  --no-stream
 ```
 
 This is useful for scripting or when you only care about the final outcome.
@@ -331,6 +361,7 @@ export DATAING_API_KEY="${SECRETS_DATAING_API_KEY}"
 export DATAING_BASE_URL="https://api.dataing.io"
 
 dataing run start main.orders \
+  --anomaly-type row_count \
   --goal "post-deploy data validation" \
   --no-watch
 ```
@@ -349,7 +380,9 @@ dataing --json ds list
 dataing --json status
 
 # Stream events as NDJSON (newline-delimited JSON)
-dataing --json run start main.orders --goal "investigate null spike"
+dataing --json run start main.orders \
+  --anomaly-type null_rate \
+  --goal "investigate null spike"
 ```
 
 ### NDJSON Streaming Format
@@ -357,7 +390,9 @@ dataing --json run start main.orders --goal "investigate null spike"
 When streaming investigations, `--json` outputs **NDJSON** (one compact JSON object per line):
 
 ```bash
-dataing --json run start main.orders --goal "investigate null spike"
+dataing --json run start main.orders \
+  --anomaly-type null_rate \
+  --goal "investigate null spike"
 ```
 
 ```json
@@ -371,10 +406,14 @@ This makes it easy to pipe to `jq` or other tools:
 
 ```bash
 # Get only the final result
-dataing --json run start main.orders --goal "..." | jq 'select(.event == "run_completed")'
+dataing --json run start main.orders \
+  --anomaly-type null_rate \
+  --goal "investigate null spike" | jq 'select(.event == "run_completed")'
 
 # Extract all evidence
-dataing --json run start main.orders --goal "..." | jq 'select(.event == "evidence_collected")'
+dataing --json run start main.orders \
+  --anomaly-type null_rate \
+  --goal "investigate null spike" | jq 'select(.event == "evidence_collected")'
 ```
 
 ### Non-TTY Output
@@ -383,10 +422,14 @@ When output is piped or redirected (non-TTY), the CLI automatically falls back t
 
 ```bash
 # Piped output uses plain text
-dataing run start main.orders --goal "..." | tee investigation.log
+dataing run start main.orders \
+  --anomaly-type null_rate \
+  --goal "investigate null spike" | tee investigation.log
 
 # Use --json for structured output in pipes
-dataing --json run start main.orders --goal "..." > events.jsonl
+dataing --json run start main.orders \
+  --anomaly-type null_rate \
+  --goal "investigate null spike" > events.jsonl
 ```
 
 ---
@@ -437,7 +480,7 @@ Run `dataing init` to configure your API key, or set `DATAING_API_KEY` environme
 
 Either:
 
-- Provide `--datasource` flag: `dataing run start table --goal "..." --datasource ds-123`
+- Provide `--datasource` flag: `dataing run start table --anomaly-type null_rate --goal "..." --datasource ds-123`
 - Set a default: `dataing ds attach ds-123`
 
 ### Keychain Issues

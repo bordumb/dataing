@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import json
 from pathlib import Path
 from typing import TYPE_CHECKING
 from unittest.mock import MagicMock
@@ -25,10 +24,11 @@ class TestRunStartCommand:
         mock_client_patch: MagicMock,
     ) -> None:
         """Test run start creates an investigation."""
-        mock_run = MagicMock()
-        mock_run.run_id = "run-xyz123"
-        mock_run.model_dump.return_value = {"run_id": "run-xyz123"}
-        mock_client_patch.run.return_value = mock_run
+        mock_investigation = MagicMock()
+        mock_investigation.investigation_id = "inv-xyz123"
+        mock_investigation.run_id = "inv-xyz123"
+        mock_investigation.model_dump.return_value = {"investigation_id": "inv-xyz123"}
+        mock_client_patch.start_investigation.return_value = mock_investigation
         mock_client_patch.stream_run.return_value = iter([])
 
         result = runner.invoke(
@@ -37,6 +37,8 @@ class TestRunStartCommand:
                 "run",
                 "start",
                 "schema.table",
+                "--anomaly-type",
+                "null_rate",
                 "--goal",
                 "investigate null spike",
                 "--no-watch",
@@ -44,8 +46,8 @@ class TestRunStartCommand:
         )
 
         assert result.exit_code == 0
-        assert "Started run" in result.output
-        assert "run-xyz123" in result.output
+        assert "Started investigation" in result.output
+        assert "inv-xyz123" in result.output
 
     def test_run_start_with_datasource(
         self,
@@ -54,9 +56,10 @@ class TestRunStartCommand:
         mock_client_patch: MagicMock,
     ) -> None:
         """Test run start with explicit datasource."""
-        mock_run = MagicMock()
-        mock_run.run_id = "run-xyz123"
-        mock_client_patch.run.return_value = mock_run
+        mock_investigation = MagicMock()
+        mock_investigation.investigation_id = "inv-xyz123"
+        mock_investigation.run_id = "inv-xyz123"
+        mock_client_patch.start_investigation.return_value = mock_investigation
         mock_client_patch.stream_run.return_value = iter([])
 
         result = runner.invoke(
@@ -65,6 +68,8 @@ class TestRunStartCommand:
                 "run",
                 "start",
                 "schema.table",
+                "--anomaly-type",
+                "null_rate",
                 "--goal",
                 "test",
                 "--datasource",
@@ -74,9 +79,43 @@ class TestRunStartCommand:
         )
 
         assert result.exit_code == 0
-        # Verify the asset was created with correct datasource_id
-        call_kwargs = mock_client_patch.run.call_args[1]
-        assert call_kwargs["assets"][0].datasource_id == "ds-custom"
+        # Verify start_investigation was called with correct datasource_id
+        call_kwargs = mock_client_patch.start_investigation.call_args[1]
+        assert call_kwargs["datasource_id"] == "ds-custom"
+
+    def test_run_start_with_date(
+        self,
+        runner: CliRunner,
+        configured_env: Path,
+        mock_client_patch: MagicMock,
+    ) -> None:
+        """Test run start with --date flag passes anomaly_date to SDK."""
+        mock_investigation = MagicMock()
+        mock_investigation.investigation_id = "inv-xyz123"
+        mock_investigation.run_id = "inv-xyz123"
+        mock_client_patch.start_investigation.return_value = mock_investigation
+        mock_client_patch.stream_run.return_value = iter([])
+
+        result = runner.invoke(
+            app,
+            [
+                "run",
+                "start",
+                "schema.table",
+                "--anomaly-type",
+                "null_rate",
+                "--goal",
+                "test",
+                "--date",
+                "2026-01-10",
+                "--no-watch",
+            ],
+        )
+
+        assert result.exit_code == 0
+        # Verify start_investigation was called with correct anomaly_date
+        call_kwargs = mock_client_patch.start_investigation.call_args[1]
+        assert call_kwargs["anomaly_date"] == "2026-01-10"
 
     def test_run_start_no_datasource(
         self,
@@ -93,7 +132,15 @@ class TestRunStartCommand:
 
         result = runner.invoke(
             app,
-            ["run", "start", "schema.table", "--goal", "test"],
+            [
+                "run",
+                "start",
+                "schema.table",
+                "--anomaly-type",
+                "null_rate",
+                "--goal",
+                "test",
+            ],
         )
 
         assert result.exit_code == 1
@@ -106,13 +153,14 @@ class TestRunStartCommand:
         mock_client_patch: MagicMock,
     ) -> None:
         """Test run start with --json flag."""
-        mock_run = MagicMock()
-        mock_run.run_id = "run-xyz123"
-        mock_run.model_dump.return_value = {
-            "run_id": "run-xyz123",
-            "status": "running",
+        mock_investigation = MagicMock()
+        mock_investigation.investigation_id = "inv-xyz123"
+        mock_investigation.run_id = "inv-xyz123"
+        mock_investigation.model_dump.return_value = {
+            "investigation_id": "inv-xyz123",
+            "status": "queued",
         }
-        mock_client_patch.run.return_value = mock_run
+        mock_client_patch.start_investigation.return_value = mock_investigation
 
         result = runner.invoke(
             app,
@@ -121,27 +169,16 @@ class TestRunStartCommand:
                 "run",
                 "start",
                 "schema.table",
+                "--anomaly-type",
+                "null_rate",
                 "--goal",
                 "test",
             ],
         )
 
         assert result.exit_code == 0
-        # Should contain JSON output and run ID
-        assert "run-xyz123" in result.output
-        # Find and parse the JSON portion (after the "Started run" line)
-        lines = result.output.strip().split("\n")
-        # The JSON output starts with a line containing just "{"
-        json_lines = []
-        in_json = False
-        for line in lines:
-            if line.strip() == "{":
-                in_json = True
-            if in_json:
-                json_lines.append(line)
-        if json_lines:
-            data = json.loads("\n".join(json_lines))
-            assert data["run_id"] == "run-xyz123"
+        # Should contain investigation ID in output
+        assert "inv-xyz123" in result.output
 
 
 class TestRunWatchCommand:

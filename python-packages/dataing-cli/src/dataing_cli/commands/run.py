@@ -37,6 +37,34 @@ def start_run(
     ctx: typer.Context,
     dataset: Annotated[str, typer.Argument(help="Dataset to investigate (e.g., 'schema.table')")],
     goal: Annotated[str, typer.Option("--goal", "-g", help="Investigation goal")],
+    anomaly_type: Annotated[
+        str,
+        typer.Option(
+            "--anomaly-type",
+            "-a",
+            help="Type of anomaly (null_rate, row_count, freshness, duplicate_rate, schema_drift)",
+        ),
+    ],
+    column: Annotated[
+        str | None,
+        typer.Option("--column", "-c", help="Affected column name (optional)"),
+    ] = None,
+    expected: Annotated[
+        float,
+        typer.Option("--expected", "-e", help="Expected baseline value"),
+    ] = 0.0,
+    actual: Annotated[
+        float,
+        typer.Option("--actual", help="Observed actual value"),
+    ] = 0.0,
+    severity: Annotated[
+        str,
+        typer.Option("--severity", "-s", help="Severity level (low, medium, high, critical)"),
+    ] = "medium",
+    date: Annotated[
+        str | None,
+        typer.Option("--date", help="Anomaly date (YYYY-MM-DD format, defaults to today)"),
+    ] = None,
     datasource: Annotated[
         str | None,
         typer.Option("--datasource", "-d", help="Datasource ID"),
@@ -50,17 +78,32 @@ def start_run(
         typer.Option("--no-stream", help="Wait for completion and output final result only"),
     ] = False,
 ) -> None:
-    """Start a new investigation run."""
-    from dataing_sdk import AssetRef
+    r"""Start a new investigation run.
 
+    Uses the same endpoint as the GUI for consistent results.
+
+    Examples:
+        # Full structured input (matches GUI)
+        dataing run start main.orders \
+            --anomaly-type null_rate \
+            --column user_id \
+            --expected 0.01 \
+            --actual 0.15 \
+            --date 2026-01-10 \
+            --goal "investigate null spike in user_id"
+
+        # Minimal input
+        dataing run start main.orders \
+            --anomaly-type null_rate \
+            --goal "investigate null spike"
+    """
     state = ctx.obj
     config = load_config()
 
     ds_id = datasource or config.get("default_datasource_id")
     if not ds_id:
         console.print(
-            "[red]Error:[/red] No datasource specified. "
-            "Use --datasource or run 'dataing ds attach'"
+            "[red]Error:[/red] No datasource specified. Use --datasource or run 'dataing ds attach'"
         )
         raise typer.Exit(1)
 
@@ -69,16 +112,24 @@ def start_run(
         base_url=state.base_url if state else None,
     )
 
-    # Parse dataset into AssetRef
-    # Try to infer platform from datasource, default to "unknown"
-    asset = AssetRef(platform="unknown", name=dataset, datasource_id=ds_id)
-
+    # Use the unified investigations endpoint (same as GUI)
     with console.status("[bold blue]Starting investigation..."):
-        run = client.run(assets=[asset], goal=goal)
+        investigation = client.start_investigation(
+            dataset=dataset,
+            anomaly_type=anomaly_type,
+            goal=goal,
+            column=column,
+            expected_value=expected,
+            actual_value=actual,
+            severity=severity,
+            datasource_id=ds_id,
+            anomaly_date=date,
+        )
 
     frontend_url = get_frontend_url()
-    inv_url = f"{frontend_url}/investigations/{run.run_id}"
-    console.print(f"[green]+[/green] Started run: [cyan]{run.run_id}[/cyan]")
+    inv_url = f"{frontend_url}/investigations/{investigation.investigation_id}"
+    inv_id = investigation.investigation_id
+    console.print(f"[green]+[/green] Started investigation: [cyan]{inv_id}[/cyan]")
     console.print(f"[green]+[/green] View at: [link={inv_url}]{inv_url}[/link]")
 
     # Handle --no-watch (deprecated): exit immediately after showing URL
@@ -87,15 +138,11 @@ def start_run(
 
     # Handle --no-stream: wait silently, then output final result
     if no_stream:
-        _wait_for_completion(client, run.run_id, state)
+        _wait_for_completion(client, investigation.run_id, state)
         return
 
     # Default: stream events with timeline display
-    if not (state and state.json_output):
-        _watch_run(client, run.run_id, state)
-    else:
-        # JSON output mode - handled by _watch_run
-        _watch_run(client, run.run_id, state)
+    _watch_run(client, investigation.run_id, state)
 
 
 @app.command("watch")

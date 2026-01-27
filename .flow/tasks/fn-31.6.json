@@ -7,10 +7,20 @@
     "fn-31.5"
   ],
   "epic": "fn-31",
+  "evidence": {
+    "commits": [
+      "a1f88717"
+    ],
+    "prs": [],
+    "tests": [
+      "36 new tests",
+      "154 total CLI tests pass"
+    ]
+  },
   "id": "fn-31.6",
   "priority": null,
   "spec_path": ".flow/tasks/fn-31.6.md",
-  "status": "in_progress",
+  "status": "done",
   "title": "Tests: Unit and integration tests for ask command",
-  "updated_at": "2026-01-27T04:17:34.785956Z"
+  "updated_at": "2026-01-27T04:23:15.014178Z"
 }

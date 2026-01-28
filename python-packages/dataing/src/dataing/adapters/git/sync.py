@@ -9,7 +9,8 @@ from uuid import UUID
 import structlog
 
 from dataing.adapters.db.app_db import AppDatabase
-from dataing.adapters.git.provider import GitProvider
+from dataing.adapters.git.provider import GitCommit, GitProvider
+from dataing.core.git_asset_parser import parse_affected_assets
 
 logger = structlog.get_logger()
 
@@ -102,22 +103,25 @@ class GitSyncService:
                 )
                 return 0
 
-            # 5. Bulk insert code_changes
-            # Note: affected_assets will be populated by asset matching in fn-36.5
-            changes_to_insert: list[dict[str, Any]] = [
-                {
-                    "repo_id": repo_id,
-                    "commit_hash": commit.hash,
-                    "author_name": commit.author_name,
-                    "author_email": commit.author_email,
-                    "message": commit.message,
-                    "committed_at": commit.committed_at,
-                    "affected_assets": [],  # Populated by asset matching later
-                    "raw_diff": commit.raw_diff,
-                    "files_changed": commit.files_changed,
-                }
-                for commit in commits
-            ]
+            # 5. Bulk insert code_changes with asset matching
+            changes_to_insert: list[dict[str, Any]] = []
+            for commit in commits:
+                # Extract affected assets from each changed file
+                assets = _extract_commit_assets(commit)
+
+                changes_to_insert.append(
+                    {
+                        "repo_id": repo_id,
+                        "commit_hash": commit.hash,
+                        "author_name": commit.author_name,
+                        "author_email": commit.author_email,
+                        "message": commit.message,
+                        "committed_at": commit.committed_at,
+                        "affected_assets": assets,
+                        "raw_diff": commit.raw_diff,
+                        "files_changed": commit.files_changed,
+                    }
+                )
 
             inserted = await self.db.bulk_create_code_changes(changes_to_insert)
 
@@ -172,3 +176,28 @@ class GitSyncService:
                 results[repo_id] = -1  # Indicates failure
 
         return results
+
+
+def _extract_commit_assets(commit: GitCommit) -> list[dict[str, str]]:
+    """Extract affected assets from all changed files in a commit.
+
+    Args:
+        commit: The parsed git commit.
+
+    Returns:
+        Deduplicated list of affected assets.
+    """
+    all_assets: list[dict[str, str]] = []
+    seen_names: set[str] = set()
+
+    for file_path in commit.files_changed:
+        # Use raw_diff if available, otherwise pass None
+        # Note: Currently raw_diff is per-commit, not per-file
+        # For full accuracy, we'd need per-file diffs from the provider
+        assets = parse_affected_assets(file_path, commit.raw_diff)
+        for asset in assets:
+            if asset["name"] not in seen_names:
+                seen_names.add(asset["name"])
+                all_assets.append(asset)
+
+    return all_assets

@@ -1,3 +1,10 @@
+# [1.12.0](https://github.com/bordumb/dataing/compare/v1.11.0...v1.12.0) (2026-01-28)
+
+
+### Features
+
+* **agents:** add code context injection for investigation agents ([#102](https://github.com/bordumb/dataing/issues/102)) ([0fca0bf](https://github.com/bordumb/dataing/commit/0fca0bfd269aa771d9ee509ec11cee76dfc5f937))
+
 # [1.11.0](https://github.com/bordumb/dataing/compare/v1.10.0...v1.11.0) (2026-01-28)
 
 

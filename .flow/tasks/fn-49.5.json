@@ -1,17 +1,45 @@
 {
-  "assignee": null,
+  "assignee": "bordumbb@gmail.com",
   "claim_note": "",
-  "claimed_at": null,
+  "claimed_at": "2026-01-28T23:43:37.092102Z",
   "created_at": "2026-01-28T22:13:29.605694Z",
   "depends_on": [
     "fn-49.3",
     "fn-49.4"
   ],
   "epic": "fn-49",
+  "evidence": {
+    "features": [
+      "IPython magic command: %dataing hydrate <investigation_id>",
+      "IPython magic command: %dataing list",
+      "IPython magic command: %dataing help",
+      "JupyterLab widget: Recent investigations list",
+      "JupyterLab widget: Hydrate button per investigation",
+      "JupyterLab widget: Refresh investigations button",
+      "JupyterLab widget: Hydration progress indicator",
+      "Kernel variable injection: dataing_alert, dataing_hypotheses, etc.",
+      "Support for --checkpoint and --namespace options",
+      "Warning for existing variables with --overwrite option"
+    ],
+    "files_created": [
+      "python-packages/dataing/src/dataing/sdk/magic.py",
+      "python-packages/dataing/tests/unit/sdk/test_magic.py"
+    ],
+    "files_modified": [
+      "python-packages/dataing/src/dataing/sdk/__init__.py",
+      "frontend/jupyterlab-dataing/src/types.ts",
+      "frontend/jupyterlab-dataing/src/widget.ts",
+      "frontend/jupyterlab-dataing/src/index.ts"
+    ],
+    "mypy_status": "pass",
+    "ruff_status": "pass",
+    "tests_passed": 42,
+    "tests_skipped": 10
+  },
   "id": "fn-49.5",
   "priority": null,
   "spec_path": ".flow/tasks/fn-49.5.md",
-  "status": "todo",
+  "status": "done",
   "title": "Build JupyterLab Hydrate Command and Widget",
-  "updated_at": "2026-01-28T22:23:12.020935Z"
+  "updated_at": "2026-01-28T23:53:04.703774Z"
 }

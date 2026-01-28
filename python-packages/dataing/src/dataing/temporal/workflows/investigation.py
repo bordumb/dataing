@@ -10,6 +10,7 @@ from temporalio.exceptions import CancelledError
 
 with workflow.unsafe.imports_passed_through():
     from dataing.temporal.activities import (
+        CaptureSnapshotInput,
         CheckPatternsInput,
         CounterAnalyzeInput,
         FinalizeEvidenceChainInput,
@@ -34,6 +35,7 @@ class InvestigationInput:
     alert_summary: str = ""
     max_hypotheses: int = 5
     confidence_threshold: float = 0.85
+    enable_snapshots: bool = True  # Enable snapshot capture for hydration
 
 
 @dataclass
@@ -49,6 +51,7 @@ class InvestigationResult:
     counter_analysis: dict[str, Any] | None = None
     user_feedback: dict[str, Any] | None = None
     root_hash: str | None = None
+    snapshot_paths: list[str] = field(default_factory=list)  # Paths to captured snapshots
 
 
 @dataclass
@@ -91,12 +94,16 @@ class InvestigationWorkflow:
         self._child_handles: list[Any] = []
         # Progress tracking
         self._investigation_id = ""
+        self._tenant_id = ""
         self._current_step = "initializing"
         self._progress = 0.0
         self._is_complete = False
         self._hypotheses_count = 0
         self._hypotheses_evaluated = 0
         self._evidence_count = 0
+        # Snapshot tracking
+        self._enable_snapshots = True
+        self._snapshot_paths: list[str] = []
 
     @workflow.signal
     def cancel_investigation(self) -> None:
@@ -148,6 +155,7 @@ class InvestigationWorkflow:
             return InvestigationResult(
                 investigation_id=investigation_id,
                 status="cancelled",
+                snapshot_paths=self._snapshot_paths,
             )
         return None
 
@@ -184,6 +192,62 @@ class InvestigationWorkflow:
         self._awaiting_user = False
         return self._user_input
 
+    async def _capture_snapshot(
+        self,
+        checkpoint: str,
+        alert: dict[str, Any] | None = None,
+        hypotheses: list[dict[str, Any]] | None = None,
+        evidence: list[dict[str, Any]] | None = None,
+        synthesis: dict[str, Any] | None = None,
+        schema_snapshot: dict[str, Any] | None = None,
+        lineage_snapshot: dict[str, Any] | None = None,
+        metadata: dict[str, Any] | None = None,
+    ) -> None:
+        """Capture investigation snapshot asynchronously (fire-and-forget).
+
+        Snapshot capture is non-blocking: failures are logged but don't
+        interrupt the investigation workflow.
+
+        Args:
+            checkpoint: The checkpoint name (start, hypothesis_generated, etc).
+            alert: Alert data that triggered the investigation.
+            hypotheses: Generated hypotheses.
+            evidence: Collected evidence.
+            synthesis: Synthesis results.
+            schema_snapshot: Schema context.
+            lineage_snapshot: Lineage context.
+            metadata: Additional metadata.
+        """
+        if not self._enable_snapshots:
+            return
+
+        try:
+            snapshot_input = CaptureSnapshotInput(
+                investigation_id=self._investigation_id,
+                tenant_id=self._tenant_id,
+                checkpoint=checkpoint,
+                alert=alert,
+                hypotheses=hypotheses,
+                evidence=evidence,
+                synthesis=synthesis,
+                schema_snapshot=schema_snapshot,
+                lineage_snapshot=lineage_snapshot,
+                metadata=metadata,
+            )
+            # Execute with short timeout - snapshot capture shouldn't block
+            result = await workflow.execute_activity(
+                "capture_snapshot",
+                snapshot_input,
+                start_to_close_timeout=timedelta(minutes=2),
+            )
+            if result.get("success") and result.get("storage_path"):
+                self._snapshot_paths.append(result["storage_path"])
+            elif result.get("error"):
+                workflow.logger.warning(f"Snapshot capture warning: {result['error']}")
+        except Exception as e:
+            # Non-fatal: snapshot capture should never block investigation
+            workflow.logger.warning(f"Snapshot capture failed (non-fatal): {e}")
+
     @workflow.run
     async def run(self, input: InvestigationInput) -> InvestigationResult:
         """Execute the investigation workflow.
@@ -196,8 +260,11 @@ class InvestigationWorkflow:
         """
         # Initialize progress tracking
         self._investigation_id = input.investigation_id
+        self._tenant_id = input.tenant_id
         self._current_step = "starting"
         self._progress = 0.0
+        self._enable_snapshots = input.enable_snapshots
+        self._snapshot_paths = []
 
         alert_summary = input.alert_summary or str(input.alert_data)
 
@@ -230,8 +297,17 @@ class InvestigationWorkflow:
             return InvestigationResult(
                 investigation_id=input.investigation_id,
                 status="cancelled",
+                snapshot_paths=self._snapshot_paths,
             )
         self._progress = 0.2
+
+        # Capture START snapshot after context gathered
+        await self._capture_snapshot(
+            checkpoint="start",
+            alert=input.alert_data,
+            schema_snapshot=context.get("schema"),
+            lineage_snapshot=context.get("lineage"),
+        )
 
         if result := self._check_cancelled(input.investigation_id):
             return result
@@ -253,6 +329,7 @@ class InvestigationWorkflow:
                 investigation_id=input.investigation_id,
                 status="cancelled",
                 context=context,
+                snapshot_paths=self._snapshot_paths,
             )
         self._progress = 0.3
 
@@ -261,6 +338,7 @@ class InvestigationWorkflow:
                 investigation_id=input.investigation_id,
                 status="cancelled",
                 context=context,
+                snapshot_paths=self._snapshot_paths,
             )
 
         # Step 3: Generate hypotheses based on context and patterns
@@ -294,9 +372,19 @@ class InvestigationWorkflow:
                 investigation_id=input.investigation_id,
                 status="cancelled",
                 context=context,
+                snapshot_paths=self._snapshot_paths,
             )
         self._hypotheses_count = len(hypotheses) if hypotheses else 0
         self._progress = 0.4
+
+        # Capture HYPOTHESIS_GENERATED snapshot
+        await self._capture_snapshot(
+            checkpoint="hypothesis_generated",
+            alert=input.alert_data,
+            hypotheses=hypotheses,
+            schema_snapshot=context.get("schema"),
+            lineage_snapshot=context.get("lineage"),
+        )
 
         if result := self._check_cancelled(input.investigation_id):
             await self._cancel_children()
@@ -305,6 +393,7 @@ class InvestigationWorkflow:
                 status="cancelled",
                 context=context,
                 hypotheses=hypotheses,
+                snapshot_paths=self._snapshot_paths,
             )
 
         # Step 4: Evaluate hypotheses in parallel via child workflows
@@ -327,6 +416,7 @@ class InvestigationWorkflow:
                 context=context,
                 hypotheses=hypotheses,
                 evidence=evidence,
+                snapshot_paths=self._snapshot_paths,
             )
 
         # Step 5: Synthesize findings
@@ -360,6 +450,7 @@ class InvestigationWorkflow:
                 context=context,
                 hypotheses=hypotheses,
                 evidence=evidence,
+                snapshot_paths=self._snapshot_paths,
             )
         self._progress = 0.85
 
@@ -371,6 +462,7 @@ class InvestigationWorkflow:
                 hypotheses=hypotheses,
                 evidence=evidence,
                 synthesis=synthesis,
+                snapshot_paths=self._snapshot_paths,
             )
 
         # Step 5b: Finalize evidence chain (build hash chain and persist)
@@ -400,6 +492,7 @@ class InvestigationWorkflow:
                 hypotheses=hypotheses,
                 evidence=evidence,
                 synthesis=synthesis,
+                snapshot_paths=self._snapshot_paths,
             )
         except Exception as e:
             # Non-fatal: investigation can complete without evidence chain
@@ -440,7 +533,20 @@ class InvestigationWorkflow:
                     hypotheses=hypotheses,
                     evidence=evidence,
                     synthesis=synthesis,
+                    snapshot_paths=self._snapshot_paths,
                 )
+
+        # Capture COMPLETE snapshot
+        await self._capture_snapshot(
+            checkpoint="complete",
+            alert=input.alert_data,
+            hypotheses=hypotheses,
+            evidence=evidence,
+            synthesis=synthesis,
+            schema_snapshot=context.get("schema"),
+            lineage_snapshot=context.get("lineage"),
+            metadata={"counter_analysis": counter_analysis, "root_hash": root_hash},
+        )
 
         # Mark complete
         self._current_step = "completed"
@@ -456,6 +562,7 @@ class InvestigationWorkflow:
             synthesis=synthesis,
             counter_analysis=counter_analysis,
             root_hash=root_hash,
+            snapshot_paths=self._snapshot_paths,
         )
 
     async def _evaluate_hypotheses_parallel(

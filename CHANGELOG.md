@@ -1,3 +1,10 @@
+# [1.10.0](https://github.com/bordumb/dataing/compare/v1.9.0...v1.10.0) (2026-01-28)
+
+
+### Features
+
+* **notebook:** add investigation history, replay, and compare commands ([#100](https://github.com/bordumb/dataing/issues/100)) ([483ee8d](https://github.com/bordumb/dataing/commit/483ee8d47964bd1786d393db53e31725f6d281c6))
+
 # [1.9.0](https://github.com/bordumb/dataing/compare/v1.8.0...v1.9.0) (2026-01-28)
 
 

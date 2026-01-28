@@ -9,10 +9,22 @@
     "fn-36.7"
   ],
   "epic": "fn-36",
+  "evidence": {
+    "commits": [
+      "a6eecb5416c04e046ddbb69aac97b58633fd3ab3"
+    ],
+    "prs": [],
+    "tests": [
+      "test_git_asset_parser.py",
+      "test_github.py",
+      "test_sync.py",
+      "test_git_repos.py"
+    ]
+  },
   "id": "fn-36.8",
   "priority": 8,
   "spec_path": ".flow/tasks/fn-36.8.md",
-  "status": "in_progress",
+  "status": "done",
   "title": "Add unit tests for git integration",
-  "updated_at": "2026-01-28T19:13:29.624075Z"
+  "updated_at": "2026-01-28T19:20:44.575513Z"
 }

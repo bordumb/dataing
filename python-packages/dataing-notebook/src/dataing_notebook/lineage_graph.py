@@ -7,6 +7,7 @@ DAG in Jupyter notebooks, with fallback to ASCII for non-widget environments.
 from __future__ import annotations
 
 from collections import deque
+from html import escape
 from typing import Any
 
 # Node type -> visual style mapping
@@ -285,6 +286,185 @@ def _build_widget(elements: list[dict[str, Any]]) -> Any:
     return widget
 
 
+def _get_ipywidgets() -> Any:
+    """Lazy-import ipywidgets.
+
+    Returns:
+        The ipywidgets module.
+
+    Raises:
+        ImportError: If ipywidgets is not installed.
+    """
+    try:
+        import ipywidgets  # type: ignore[import-untyped]
+
+        return ipywidgets
+    except ImportError as e:
+        raise ImportError(
+            "ipywidgets is required for interactive lineage graphs. "
+            "Install it with: pip install ipywidgets"
+        ) from e
+
+
+def _render_dataset_details(dataset_id: str, dataset: dict[str, Any]) -> str:
+    """Render dataset metadata as HTML for the details panel.
+
+    Args:
+        dataset_id: Dataset identifier.
+        dataset: Dataset metadata dict from the API response.
+
+    Returns:
+        HTML string with escaped content.
+    """
+    name = escape(str(dataset_id))
+    platform = escape(str(dataset.get("platform", "Unknown")))
+    dtype = escape(str(dataset.get("type", "table")))
+    description = escape(str(dataset.get("description", "")))
+
+    html = f"""
+    <div style="font-family: sans-serif; font-size: 13px;">
+      <h4 style="margin: 0 0 8px 0; color: #1e293b;">{name}</h4>
+      <table style="border-collapse: collapse; width: 100%;">
+        <tr><td style="color: #6b7280; padding: 2px 8px 2px 0;">Platform</td>
+            <td>{platform}</td></tr>
+        <tr><td style="color: #6b7280; padding: 2px 8px 2px 0;">Type</td>
+            <td>{dtype}</td></tr>
+    """
+
+    if description:
+        html += f"""
+        <tr><td style="color: #6b7280; padding: 2px 8px 2px 0;">Description</td>
+            <td>{description}</td></tr>
+        """
+
+    owners = dataset.get("owners", [])
+    if owners:
+        owners_str = escape(", ".join(str(o) for o in owners))
+        html += f"""
+        <tr><td style="color: #6b7280; padding: 2px 8px 2px 0;">Owners</td>
+            <td>{owners_str}</td></tr>
+        """
+
+    tags = dataset.get("tags", [])
+    if tags:
+        tags_html = " ".join(
+            f'<span style="background: #e2e8f0; padding: 1px 6px; border-radius: 4px;'
+            f' font-size: 11px;">{escape(str(t))}</span>'
+            for t in tags
+        )
+        html += f"""
+        <tr><td style="color: #6b7280; padding: 2px 8px 2px 0;">Tags</td>
+            <td>{tags_html}</td></tr>
+        """
+
+    schema = dataset.get("schema", [])
+    if schema:
+        cols_html = ", ".join(
+            f"<code>{escape(str(col.get('name', '?')))}</code>" for col in schema[:10]
+        )
+        if len(schema) > 10:
+            cols_html += f" ... +{len(schema) - 10} more"
+        html += f"""
+        <tr><td style="color: #6b7280; padding: 2px 8px 2px 0;">Schema</td>
+            <td>{cols_html}</td></tr>
+        """
+
+    html += "</table></div>"
+    return html
+
+
+def _render_job_details(job_id: str, job: dict[str, Any]) -> str:
+    """Render job metadata as HTML for the details panel.
+
+    Args:
+        job_id: Job identifier.
+        job: Job metadata dict from the API response.
+
+    Returns:
+        HTML string with escaped content.
+    """
+    name = escape(str(job_id))
+    jtype = escape(str(job.get("type", "Unknown")))
+
+    html = f"""
+    <div style="font-family: sans-serif; font-size: 13px;">
+      <h4 style="margin: 0 0 8px 0; color: #1e293b;">{name}</h4>
+      <table style="border-collapse: collapse; width: 100%;">
+        <tr><td style="color: #6b7280; padding: 2px 8px 2px 0;">Type</td>
+            <td>{jtype}</td></tr>
+    """
+
+    inputs = job.get("inputs", [])
+    if inputs:
+        inputs_str = escape(", ".join(str(i) for i in inputs))
+        html += f"""
+        <tr><td style="color: #6b7280; padding: 2px 8px 2px 0;">Inputs</td>
+            <td>{inputs_str}</td></tr>
+        """
+
+    outputs = job.get("outputs", [])
+    if outputs:
+        outputs_str = escape(", ".join(str(o) for o in outputs))
+        html += f"""
+        <tr><td style="color: #6b7280; padding: 2px 8px 2px 0;">Outputs</td>
+            <td>{outputs_str}</td></tr>
+        """
+
+    source_url = job.get("source_url", "")
+    if source_url:
+        safe_url = escape(str(source_url))
+        html += f"""
+        <tr><td style="color: #6b7280; padding: 2px 8px 2px 0;">Source</td>
+            <td><a href="{safe_url}" target="_blank">{safe_url}</a></td></tr>
+        """
+
+    html += "</table></div>"
+    return html
+
+
+def _create_details_panel() -> Any:
+    """Create an HTML widget to display node details.
+
+    Returns:
+        ipywidgets.HTML widget for rendering details.
+    """
+    widgets = _get_ipywidgets()
+    panel = widgets.HTML(
+        value="<p style='color: #6b7280; font-family: sans-serif;'>Click a node to see details</p>"
+    )
+    panel.layout = widgets.Layout(
+        border="1px solid #e5e7eb",
+        padding="12px",
+        margin="8px 0",
+        min_height="80px",
+    )
+    return panel
+
+
+def _on_node_click(
+    node: dict[str, Any],
+    details_panel: Any,
+    lineage_data: dict[str, Any],
+) -> None:
+    """Handle node click event and update details panel.
+
+    Args:
+        node: Cytoscape node event dict with 'data' key.
+        details_panel: ipywidgets.HTML widget to update.
+        lineage_data: Full lineage data for lookups.
+    """
+    data = node.get("data", {})
+    node_id = data.get("id", "")
+    node_type = data.get("node_type", "table")
+
+    if node_type == "job":
+        job = lineage_data.get("jobs", {}).get(node_id, {})
+        details_panel.value = _render_job_details(node_id, job)
+    else:
+        dataset = lineage_data.get("datasets", {}).get(node_id, {})
+        details_panel.value = _render_dataset_details(node_id, dataset)
+
+
 def _render_ascii_fallback(
     lineage_data: dict[str, Any],
     *,
@@ -348,4 +528,14 @@ def render_lineage_graph(
         print("No lineage elements to display.")
         return None
 
-    return _build_widget(elements)
+    widgets = _get_ipywidgets()
+    graph_widget = _build_widget(elements)
+    details_panel = _create_details_panel()
+
+    def on_click(node: dict[str, Any]) -> None:
+        """Handle node click."""
+        _on_node_click(node, details_panel, lineage_data)
+
+    graph_widget.on("node", "click", on_click)
+
+    return widgets.VBox([graph_widget, details_panel])

@@ -435,3 +435,82 @@ class TestInvestigationServiceIntegration:
             user_id=mock_auth_context.user_id,
             message=message,
         )
+
+
+class TestSnapshotModels:
+    """Tests for snapshot-related models."""
+
+    def test_snapshot_checkpoint_param_values(self) -> None:
+        """Test that all checkpoint values are valid."""
+        from dataing.entrypoints.api.routes.investigations import (
+            SnapshotCheckpointParam,
+        )
+
+        assert SnapshotCheckpointParam.START.value == "start"
+        assert SnapshotCheckpointParam.HYPOTHESIS_GENERATED.value == "hypothesis_generated"
+        assert SnapshotCheckpointParam.EVIDENCE_COLLECTED.value == "evidence_collected"
+        assert SnapshotCheckpointParam.COMPLETE.value == "complete"
+        assert SnapshotCheckpointParam.FAILED.value == "failed"
+
+    def test_snapshot_list_item_model(self) -> None:
+        """Test SnapshotListItem model."""
+        from dataing.entrypoints.api.routes.investigations import SnapshotListItem
+
+        item = SnapshotListItem(
+            checkpoint="complete",
+            captured_at="2026-01-28T10:00:00Z",
+            storage_path="/snapshots/tenant/investigation/complete.snapshot",
+            size_bytes=1024,
+        )
+        assert item.checkpoint == "complete"
+        assert item.size_bytes == 1024
+
+    def test_snapshot_list_item_optional_size(self) -> None:
+        """Test SnapshotListItem with optional size_bytes."""
+        from dataing.entrypoints.api.routes.investigations import SnapshotListItem
+
+        item = SnapshotListItem(
+            checkpoint="start",
+            captured_at="",
+            storage_path="/path/to/snapshot",
+        )
+        assert item.size_bytes is None
+
+    def test_snapshot_list_response_model(self) -> None:
+        """Test SnapshotListResponse model."""
+        from dataing.entrypoints.api.routes.investigations import (
+            SnapshotListItem,
+            SnapshotListResponse,
+        )
+
+        investigation_id = uuid.uuid4()
+        response = SnapshotListResponse(
+            investigation_id=investigation_id,
+            snapshots=[
+                SnapshotListItem(
+                    checkpoint="start",
+                    captured_at="",
+                    storage_path="/path/start.snapshot",
+                ),
+                SnapshotListItem(
+                    checkpoint="complete",
+                    captured_at="",
+                    storage_path="/path/complete.snapshot",
+                ),
+            ],
+        )
+        assert response.investigation_id == investigation_id
+        assert len(response.snapshots) == 2
+
+    def test_snapshot_list_response_empty(self) -> None:
+        """Test SnapshotListResponse with no snapshots."""
+        from dataing.entrypoints.api.routes.investigations import (
+            SnapshotListResponse,
+        )
+
+        investigation_id = uuid.uuid4()
+        response = SnapshotListResponse(
+            investigation_id=investigation_id,
+            snapshots=[],
+        )
+        assert len(response.snapshots) == 0

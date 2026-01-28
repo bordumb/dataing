@@ -7,6 +7,7 @@ with real-time updates via SSE streaming.
 from __future__ import annotations
 
 import asyncio
+import gzip
 import json
 import logging
 from collections.abc import AsyncIterator
@@ -15,7 +16,8 @@ from enum import Enum
 from typing import Annotated, Any
 from uuid import UUID, uuid4
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request
+from fastapi.responses import Response
 from pydantic import BaseModel, Field
 from sse_starlette.sse import EventSourceResponse
 
@@ -975,3 +977,229 @@ async def stream_events(
             await asyncio.sleep(0.5)
 
     return EventSourceResponse(event_generator())
+
+
+# --- Snapshot Download Endpoint ---
+
+
+class SnapshotCheckpointParam(str, Enum):
+    """Valid checkpoint values for snapshot download."""
+
+    START = "start"
+    HYPOTHESIS_GENERATED = "hypothesis_generated"
+    EVIDENCE_COLLECTED = "evidence_collected"
+    COMPLETE = "complete"
+    FAILED = "failed"
+
+
+class SnapshotListItem(BaseModel):
+    """Snapshot metadata for listing."""
+
+    checkpoint: str
+    captured_at: str
+    storage_path: str
+    size_bytes: int | None = None
+
+
+class SnapshotListResponse(BaseModel):
+    """Response for listing available snapshots."""
+
+    investigation_id: UUID
+    snapshots: list[SnapshotListItem]
+
+
+def get_snapshot_store(request: Request) -> Any:
+    """Get the snapshot store from app state.
+
+    Args:
+        request: The current request.
+
+    Returns:
+        SnapshotStore instance.
+
+    Raises:
+        HTTPException: If snapshot store is not configured.
+    """
+    store = getattr(request.app.state, "snapshot_store", None)
+    if store is None:
+        raise HTTPException(
+            status_code=503,
+            detail="Snapshot storage not configured",
+        )
+    return store
+
+
+SnapshotStoreDep = Annotated[Any, Depends(get_snapshot_store)]
+
+
+@router.get("/{investigation_id}/snapshots")
+async def list_snapshots(
+    investigation_id: UUID,
+    auth: AuthDep,
+    db: AppDbDep,
+) -> SnapshotListResponse:
+    """List available snapshots for an investigation.
+
+    Args:
+        investigation_id: UUID of the investigation.
+        auth: Authentication context from API key/JWT.
+        db: Application database.
+
+    Returns:
+        SnapshotListResponse with list of available snapshots.
+
+    Raises:
+        HTTPException: If investigation not found or access denied.
+    """
+    # Verify investigation exists and belongs to tenant
+    result = await db.fetch_one(
+        """
+        SELECT id, outcome
+        FROM investigations
+        WHERE id = $1 AND tenant_id = $2
+        """,
+        investigation_id,
+        auth.tenant_id,
+    )
+    if not result:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Investigation not found: {investigation_id}",
+        )
+
+    # Get snapshot paths from outcome if available
+    outcome = result.get("outcome")
+    snapshot_paths: list[str] = []
+    if outcome:
+        if isinstance(outcome, str):
+            outcome = json.loads(outcome)
+        snapshot_paths = outcome.get("snapshot_paths", [])
+
+    snapshots = []
+    for path in snapshot_paths:
+        # Extract checkpoint from path (format: .../checkpoint.snapshot)
+        checkpoint = path.rsplit("/", 1)[-1].replace(".snapshot", "")
+        snapshots.append(
+            SnapshotListItem(
+                checkpoint=checkpoint,
+                captured_at="",  # Would need to read from file
+                storage_path=path,
+            )
+        )
+
+    return SnapshotListResponse(
+        investigation_id=investigation_id,
+        snapshots=snapshots,
+    )
+
+
+@router.get("/{investigation_id}/snapshots/{checkpoint}")
+async def download_snapshot(
+    investigation_id: UUID,
+    checkpoint: SnapshotCheckpointParam,
+    auth: AuthDep,
+    db: AppDbDep,
+    snapshot_store: SnapshotStoreDep,
+    accept_encoding: str | None = Header(default=None, alias="Accept-Encoding"),
+) -> Response:
+    """Download a snapshot for local hydration.
+
+    Supports streaming response for large snapshots and optional gzip compression.
+
+    Args:
+        investigation_id: UUID of the investigation.
+        checkpoint: The checkpoint to download (start, hypothesis_generated, etc).
+        auth: Authentication context from API key/JWT.
+        db: Application database.
+        snapshot_store: Snapshot storage backend.
+        accept_encoding: Accept-Encoding header for compression.
+
+    Returns:
+        StreamingResponse with snapshot data.
+
+    Raises:
+        HTTPException: If investigation not found, access denied, or snapshot missing.
+    """
+    # Verify investigation exists and belongs to tenant
+    result = await db.fetch_one(
+        """
+        SELECT id, outcome
+        FROM investigations
+        WHERE id = $1 AND tenant_id = $2
+        """,
+        investigation_id,
+        auth.tenant_id,
+    )
+    if not result:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Investigation not found: {investigation_id}",
+        )
+
+    # Build expected storage path
+    storage_path = f"{auth.tenant_id}/snapshots/{investigation_id}/{checkpoint.value}.snapshot"
+
+    # Check if snapshot exists
+    try:
+        exists = await snapshot_store.exists(storage_path)
+        if not exists:
+            raise HTTPException(
+                status_code=404,
+                detail=f"Snapshot not found: {checkpoint.value}",
+            )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to check snapshot existence: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail="Failed to access snapshot storage",
+        ) from e
+
+    # Retrieve snapshot
+    try:
+        snapshot = await snapshot_store.retrieve(storage_path)
+    except Exception as e:
+        logger.error(f"Failed to retrieve snapshot: {e}")
+        raise HTTPException(
+            status_code=404,
+            detail=f"Snapshot not found: {checkpoint.value}",
+        ) from e
+
+    # Serialize snapshot to JSON
+    try:
+        data = snapshot.model_dump(mode="json")
+        content = json.dumps(data, default=str).encode("utf-8")
+    except Exception as e:
+        logger.error(f"Failed to serialize snapshot: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail="Failed to serialize snapshot",
+        ) from e
+
+    # Check if client accepts gzip
+    use_gzip = accept_encoding and "gzip" in accept_encoding.lower()
+
+    headers = {
+        "X-Snapshot-Version": snapshot.version,
+        "X-Snapshot-Checkpoint": checkpoint.value,
+        "X-Snapshot-Investigation-Id": str(investigation_id),
+    }
+
+    if use_gzip:
+        # Compress content
+        compressed = gzip.compress(content, compresslevel=6)
+        headers["Content-Encoding"] = "gzip"
+        headers["Content-Length"] = str(len(compressed))
+        return Response(
+            content=compressed,
+            media_type="application/octet-stream",
+            headers=headers,
+        )
+    else:
+        headers["Content-Length"] = str(len(content))
+        return Response(
+            content=content,
+            media_type="application/octet-stream",
+            headers=headers,
+        )

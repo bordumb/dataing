@@ -1,16 +1,25 @@
 {
-  "assignee": null,
+  "assignee": "bordumbb@gmail.com",
   "claim_note": "",
-  "claimed_at": null,
+  "claimed_at": "2026-01-28T18:55:07.047055Z",
   "created_at": "2026-01-28T03:51:39.060698Z",
   "depends_on": [
     "fn-36.2"
   ],
   "epic": "fn-36",
+  "evidence": {
+    "commits": [
+      "8ff6fcd1235b7e27ad64905c54a10e6f324d2243"
+    ],
+    "prs": [],
+    "tests": [
+      "uv run pytest python-packages/dataing/tests/unit/ -v -k app_db"
+    ]
+  },
   "id": "fn-36.3",
   "priority": 3,
   "spec_path": ".flow/tasks/fn-36.3.md",
-  "status": "todo",
+  "status": "done",
   "title": "Implement repository adapter methods in AppDatabase",
-  "updated_at": "2026-01-28T03:51:39.061163Z"
+  "updated_at": "2026-01-28T18:57:14.398119Z"
 }

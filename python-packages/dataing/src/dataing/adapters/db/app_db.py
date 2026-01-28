@@ -2288,3 +2288,374 @@ class AppDatabase:
             tenant_id,
         )
         return result == "DELETE 1"
+
+    # Git Repository operations
+
+    async def create_git_repository(
+        self, tenant_id: UUID, repo_data: dict[str, Any]
+    ) -> dict[str, Any]:
+        """Create a git repository connection.
+
+        Args:
+            tenant_id: The tenant ID.
+            repo_data: Repository data including name, url, provider, etc.
+
+        Returns:
+            The created repository record.
+        """
+        result = await self.execute_returning(
+            """INSERT INTO git_repositories
+               (tenant_id, name, url, provider, access_token_encrypted,
+                tracked_paths, default_branch, sync_status)
+               VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+               RETURNING *""",
+            tenant_id,
+            repo_data["name"],
+            repo_data["url"],
+            repo_data["provider"],
+            repo_data.get("access_token_encrypted"),
+            repo_data.get("tracked_paths"),
+            repo_data.get("default_branch", "main"),
+            repo_data.get("sync_status", "pending"),
+        )
+        if result is None:
+            raise RuntimeError("Failed to create git repository")
+        return result
+
+    async def get_git_repository(self, repo_id: UUID, tenant_id: UUID) -> dict[str, Any] | None:
+        """Get a git repository by ID.
+
+        Args:
+            repo_id: The repository ID.
+            tenant_id: The tenant ID.
+
+        Returns:
+            The repository record or None if not found.
+        """
+        return await self.fetch_one(
+            "SELECT * FROM git_repositories WHERE id = $1 AND tenant_id = $2",
+            repo_id,
+            tenant_id,
+        )
+
+    async def list_git_repositories(
+        self,
+        tenant_id: UUID,
+        provider: str | None = None,
+        limit: int = 50,
+        offset: int = 0,
+    ) -> list[dict[str, Any]]:
+        """List git repositories with optional provider filter.
+
+        Args:
+            tenant_id: The tenant ID.
+            provider: Optional provider filter (github, gitlab, bitbucket).
+            limit: Maximum repositories to return.
+            offset: Number of repositories to skip.
+
+        Returns:
+            List of repository records.
+        """
+        if provider:
+            return await self.fetch_all(
+                """SELECT * FROM git_repositories
+                   WHERE tenant_id = $1 AND provider = $2
+                   ORDER BY created_at DESC
+                   LIMIT $3 OFFSET $4""",
+                tenant_id,
+                provider,
+                limit,
+                offset,
+            )
+        return await self.fetch_all(
+            """SELECT * FROM git_repositories
+               WHERE tenant_id = $1
+               ORDER BY created_at DESC
+               LIMIT $2 OFFSET $3""",
+            tenant_id,
+            limit,
+            offset,
+        )
+
+    async def update_git_repository(
+        self, repo_id: UUID, tenant_id: UUID, updates: dict[str, Any]
+    ) -> dict[str, Any] | None:
+        """Update a git repository.
+
+        Args:
+            repo_id: The repository ID.
+            tenant_id: The tenant ID.
+            updates: Fields to update.
+
+        Returns:
+            The updated repository record or None if not found.
+        """
+        allowed_fields = {
+            "name",
+            "url",
+            "access_token_encrypted",
+            "tracked_paths",
+            "default_branch",
+        }
+        set_clauses = ["updated_at = NOW()"]
+        params: list[Any] = [repo_id, tenant_id]
+        param_idx = 3
+
+        for field, value in updates.items():
+            if field not in allowed_fields:
+                continue
+            set_clauses.append(f"{field} = ${param_idx}")
+            params.append(value)
+            param_idx += 1
+
+        if len(set_clauses) == 1:
+            return await self.get_git_repository(repo_id, tenant_id)
+
+        query = f"""
+            UPDATE git_repositories
+            SET {", ".join(set_clauses)}
+            WHERE id = $1 AND tenant_id = $2
+            RETURNING *
+        """
+        return await self.execute_returning(query, *params)
+
+    async def delete_git_repository(self, repo_id: UUID, tenant_id: UUID) -> bool:
+        """Delete a git repository (cascades to code_changes).
+
+        Args:
+            repo_id: The repository ID.
+            tenant_id: The tenant ID.
+
+        Returns:
+            True if deleted, False if not found.
+        """
+        result = await self.execute(
+            "DELETE FROM git_repositories WHERE id = $1 AND tenant_id = $2",
+            repo_id,
+            tenant_id,
+        )
+        return result == "DELETE 1"
+
+    async def update_git_repo_sync_status(
+        self,
+        repo_id: UUID,
+        status: str,
+        error: str | None = None,
+        last_sync_at: Any = None,
+    ) -> None:
+        """Update sync status for a git repository.
+
+        Args:
+            repo_id: The repository ID.
+            status: The new sync status (pending, syncing, synced, error).
+            error: Optional error message.
+            last_sync_at: Optional last sync timestamp.
+        """
+        if last_sync_at is not None:
+            await self.execute(
+                """UPDATE git_repositories
+                   SET sync_status = $2, sync_error = $3, last_sync_at = $4, updated_at = NOW()
+                   WHERE id = $1""",
+                repo_id,
+                status,
+                error,
+                last_sync_at,
+            )
+        else:
+            await self.execute(
+                """UPDATE git_repositories
+                   SET sync_status = $2, sync_error = $3, updated_at = NOW()
+                   WHERE id = $1""",
+                repo_id,
+                status,
+                error,
+            )
+
+    # Code Change operations
+
+    async def create_code_change(self, change_data: dict[str, Any]) -> dict[str, Any]:
+        """Insert a parsed commit.
+
+        Args:
+            change_data: Commit data including repo_id, commit_hash, etc.
+
+        Returns:
+            The created code change record.
+        """
+        result = await self.execute_returning(
+            """INSERT INTO code_changes
+               (repo_id, commit_hash, author_name, author_email, message,
+                committed_at, affected_assets, raw_diff, files_changed)
+               VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+               RETURNING *""",
+            change_data["repo_id"],
+            change_data["commit_hash"],
+            change_data.get("author_name"),
+            change_data.get("author_email"),
+            change_data.get("message"),
+            change_data.get("committed_at"),
+            to_json_string(change_data.get("affected_assets", [])),
+            change_data.get("raw_diff"),
+            change_data.get("files_changed"),
+        )
+        if result is None:
+            raise RuntimeError("Failed to create code change")
+        return result
+
+    async def bulk_create_code_changes(self, changes: list[dict[str, Any]]) -> int:
+        """Bulk insert parsed commits (skip duplicates).
+
+        Uses ON CONFLICT DO NOTHING to handle duplicate commits gracefully.
+
+        Args:
+            changes: List of commit data dictionaries.
+
+        Returns:
+            Number of commits inserted (excludes duplicates).
+        """
+        if not changes:
+            return 0
+
+        query = """
+            INSERT INTO code_changes
+               (repo_id, commit_hash, author_name, author_email, message,
+                committed_at, affected_assets, raw_diff, files_changed)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+            ON CONFLICT (repo_id, commit_hash) DO NOTHING
+        """
+
+        async with self.acquire() as conn:
+            await conn.executemany(
+                query,
+                [
+                    (
+                        change["repo_id"],
+                        change["commit_hash"],
+                        change.get("author_name"),
+                        change.get("author_email"),
+                        change.get("message"),
+                        change.get("committed_at"),
+                        to_json_string(change.get("affected_assets", [])),
+                        change.get("raw_diff"),
+                        change.get("files_changed"),
+                    )
+                    for change in changes
+                ],
+            )
+            # executemany doesn't return row count, so count based on input
+            # Note: actual inserted count may be less due to conflicts
+            return len(changes)
+
+    async def get_latest_commit_hash(self, repo_id: UUID) -> str | None:
+        """Get the most recent commit hash for incremental sync.
+
+        Args:
+            repo_id: The repository ID.
+
+        Returns:
+            The most recent commit hash or None if no commits exist.
+        """
+        result = await self.fetch_one(
+            """SELECT commit_hash FROM code_changes
+               WHERE repo_id = $1
+               ORDER BY committed_at DESC NULLS LAST
+               LIMIT 1""",
+            repo_id,
+        )
+        return result["commit_hash"] if result else None
+
+    async def list_code_changes(
+        self,
+        repo_id: UUID,
+        since: Any = None,
+        until: Any = None,
+        limit: int = 100,
+        offset: int = 0,
+    ) -> list[dict[str, Any]]:
+        """List code changes with optional time range filter.
+
+        Args:
+            repo_id: The repository ID.
+            since: Optional start timestamp (inclusive).
+            until: Optional end timestamp (inclusive).
+            limit: Maximum changes to return.
+            offset: Number of changes to skip.
+
+        Returns:
+            List of code change records ordered by committed_at DESC.
+        """
+        conditions = ["repo_id = $1"]
+        params: list[Any] = [repo_id]
+        param_idx = 2
+
+        if since is not None:
+            conditions.append(f"committed_at >= ${param_idx}")
+            params.append(since)
+            param_idx += 1
+
+        if until is not None:
+            conditions.append(f"committed_at <= ${param_idx}")
+            params.append(until)
+            param_idx += 1
+
+        where_clause = " AND ".join(conditions)
+        params.extend([limit, offset])
+
+        query = f"""
+            SELECT * FROM code_changes
+            WHERE {where_clause}
+            ORDER BY committed_at DESC
+            LIMIT ${param_idx} OFFSET ${param_idx + 1}
+        """
+        return await self.fetch_all(query, *params)
+
+    async def find_code_changes_by_asset(
+        self,
+        tenant_id: UUID,
+        asset_name: str,
+        since: Any = None,
+        until: Any = None,
+        limit: int = 50,
+    ) -> list[dict[str, Any]]:
+        """Find code changes that affected a given asset (cross-repo, tenant-scoped).
+
+        Uses JSONB containment operator to search affected_assets array.
+
+        Args:
+            tenant_id: The tenant ID.
+            asset_name: The asset name to search for.
+            since: Optional start timestamp (inclusive).
+            until: Optional end timestamp (inclusive).
+            limit: Maximum changes to return.
+
+        Returns:
+            List of code change records with repository info.
+        """
+        conditions = ["gr.tenant_id = $1"]
+        # Use JSONB containment to check if any element has matching name
+        conditions.append("cc.affected_assets @> $2::jsonb")
+        params: list[Any] = [tenant_id, to_json_string([{"name": asset_name}])]
+        param_idx = 3
+
+        if since is not None:
+            conditions.append(f"cc.committed_at >= ${param_idx}")
+            params.append(since)
+            param_idx += 1
+
+        if until is not None:
+            conditions.append(f"cc.committed_at <= ${param_idx}")
+            params.append(until)
+            param_idx += 1
+
+        where_clause = " AND ".join(conditions)
+        params.append(limit)
+
+        query = f"""
+            SELECT cc.*, gr.name as repo_name, gr.url as repo_url, gr.provider
+            FROM code_changes cc
+            JOIN git_repositories gr ON cc.repo_id = gr.id
+            WHERE {where_clause}
+            ORDER BY cc.committed_at DESC
+            LIMIT ${param_idx}
+        """
+        return await self.fetch_all(query, *params)

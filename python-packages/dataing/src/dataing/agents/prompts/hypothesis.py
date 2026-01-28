@@ -8,7 +8,11 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from dataing.core.domain_types import AnomalyAlert, InvestigationContext
+    from dataing.core.domain_types import (
+        AnomalyAlert,
+        InvestigationContext,
+        RelevantCodeChange,
+    )
 
 SYSTEM_PROMPT = """You are a data quality investigator. Given an anomaly alert and database context,
 generate {num_hypotheses} hypotheses about what could have caused the anomaly.
@@ -25,6 +29,7 @@ HYPOTHESIS CATEGORIES:
 - data_quality: Nulls, duplicates, invalid values, schema drift
 - infrastructure: Job failure, timeout, resource exhaustion
 - expected_variance: Seasonality, holiday, known business event
+- code_change: Recent code deploy introduced bug, changed logic, or broke pipeline
 
 REQUIRED FIELDS FOR EACH HYPOTHESIS:
 
@@ -102,12 +107,55 @@ from the schema and investigate accordingly.
 Focus on: matching the description to actual schema elements."""
 
 
-def build_user(alert: AnomalyAlert, context: InvestigationContext) -> str:
+def _build_code_changes_section(changes: list[RelevantCodeChange]) -> str:
+    """Build a formatted section showing recent code changes.
+
+    Args:
+        changes: List of relevant code changes.
+
+    Returns:
+        Formatted string for inclusion in the prompt.
+    """
+    if not changes:
+        return ""
+
+    lines = ["## Recent Code Changes (last 14 days)"]
+    lines.append("These commits may have affected the data pipeline:")
+    lines.append("")
+
+    for change in changes:
+        date_str = (
+            change.committed_at.strftime("%Y-%m-%d %H:%M") if change.committed_at else "unknown"
+        )
+        author = change.author_name or "unknown"
+        message = (change.message or "No message")[:100]  # Truncate long messages
+        commit_short = change.commit_hash[:8]
+
+        lines.append(f"- **[{commit_short}]** {date_str} by {author}")
+        lines.append(f"  {message}")
+        if change.affected_assets:
+            assets = ", ".join(change.affected_assets[:5])  # Max 5 assets shown
+            if len(change.affected_assets) > 5:
+                assets += f" (+{len(change.affected_assets) - 5} more)"
+            lines.append(f"  Affected: {assets}")
+        lines.append(f"  Relevance: {change.relevance_reason} (score: {change.relevance_score})")
+        lines.append("")
+
+    lines.append("Consider if any of these changes could have caused the anomaly.")
+    return "\n".join(lines)
+
+
+def build_user(
+    alert: AnomalyAlert,
+    context: InvestigationContext,
+    code_changes: list[RelevantCodeChange] | None = None,
+) -> str:
     """Build hypothesis user prompt.
 
     Args:
         alert: The anomaly alert to investigate.
         context: Available schema and lineage context.
+        code_changes: Optional list of recent code changes affecting the asset.
 
     Returns:
         Formatted user prompt.
@@ -117,6 +165,12 @@ def build_user(alert: AnomalyAlert, context: InvestigationContext) -> str:
         lineage_section = f"""
 ## Data Lineage
 {context.lineage.to_prompt_string()}
+"""
+
+    code_changes_section = ""
+    if code_changes:
+        code_changes_section = f"""
+{_build_code_changes_section(code_changes)}
 """
 
     metric_context = _build_metric_context(alert)
@@ -136,6 +190,6 @@ def build_user(alert: AnomalyAlert, context: InvestigationContext) -> str:
 
 ## Available Schema
 {context.schema.to_prompt_string()}
-{lineage_section}
+{lineage_section}{code_changes_section}
 Generate hypotheses to investigate why {alert.metric_spec.display_name} deviated
 from {alert.expected_value} to {alert.actual_value} ({alert.deviation_pct}% change)."""

@@ -194,8 +194,11 @@ Dataing Magic Commands
         %dataing attach "SELECT * FROM orders" --datasource ds-123
         %dataing attach "SELECT * FROM orders" --platform postgres
 
-%dataing lineage
+%dataing lineage [--depth N] [--direction upstream|downstream|both]
     Display the lineage graph for the attached context.
+    Options:
+        --depth, -d N        Max traversal depth, 1-10 (default: 2)
+        --direction DIR      upstream, downstream, or both (default: both)
 
 %dataing ask "<question>"
     Start an investigation with the given question.
@@ -404,13 +407,43 @@ Dataing Magic Commands
             print(f"Error attaching context: {e}", file=sys.stderr)
 
     def _handle_lineage(self, args: list[str]) -> None:
-        """Handle lineage subcommand.
+        """Handle lineage subcommand with interactive graph visualization.
 
         Args:
             args: Command arguments.
         """
+        parser = argparse.ArgumentParser(prog="%dataing lineage", add_help=False)
+        parser.add_argument(
+            "--depth",
+            "-d",
+            type=int,
+            default=2,
+            choices=range(1, 11),
+            metavar="N",
+            help="Max traversal depth from root, 1-10 (default: 2)",
+        )
+        parser.add_argument(
+            "--direction",
+            choices=["upstream", "downstream", "both"],
+            default="both",
+            help="Traversal direction (default: both)",
+        )
+        parser.add_argument("--help", "-h", action="store_true")
+
+        try:
+            parsed = parser.parse_args(args)
+        except SystemExit:
+            return
+
+        if parsed.help:
+            parser.print_help()
+            return
+
         if not self._state.is_attached:
-            print("Error: No context attached. Use '%dataing attach' first.", file=sys.stderr)
+            print(
+                "Error: No context attached. Use '%dataing attach' first.",
+                file=sys.stderr,
+            )
             return
 
         ctx = self._state.context
@@ -423,39 +456,18 @@ Dataing Magic Commands
             print("(Lineage requires a configured lineage provider like dbt or Airflow)")
             return
 
-        # Try to use rich for nice output
-        try:
-            from rich.console import Console
-            from rich.tree import Tree
+        from .lineage_graph import render_lineage_graph
 
-            console = Console()
-            root_name = lineage.get("root", "Unknown")
-            tree = Tree(f"[bold blue]{root_name}[/bold blue]")
+        widget = render_lineage_graph(
+            lineage,
+            depth=parsed.depth,
+            direction=parsed.direction,
+        )
 
-            datasets = lineage.get("datasets", {})
-            edges = lineage.get("edges", [])
+        if widget is not None:
+            from IPython.display import display  # type: ignore[import-untyped]
 
-            # Build tree from edges
-            for edge in edges:
-                source = edge.get("source", "?")
-                target = edge.get("target", "?")
-                edge_type = edge.get("edge_type", "transforms")
-                tree.add(f"[green]{source}[/green] --[{edge_type}]--> [yellow]{target}[/yellow]")
-
-            console.print(tree)
-
-        except ImportError:
-            # Fallback to plain text
-            print("Lineage Graph:")
-            print(f"  Root: {lineage.get('root', 'Unknown')}")
-            datasets = lineage.get("datasets", {})
-            if datasets:
-                print(f"  Datasets: {len(datasets)}")
-            edges = lineage.get("edges", [])
-            for edge in edges:
-                source = edge.get("source", "?")
-                target = edge.get("target", "?")
-                print(f"    {source} -> {target}")
+            display(widget)
 
     def _handle_ask(self, args: list[str]) -> None:
         """Handle ask subcommand with streaming timeline.

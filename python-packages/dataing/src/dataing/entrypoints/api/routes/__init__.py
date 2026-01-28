@@ -16,6 +16,7 @@ from dataing.entrypoints.api.routes.dashboard import router as dashboard_router
 from dataing.entrypoints.api.routes.datasets import router as datasets_router
 from dataing.entrypoints.api.routes.datasources import router as datasources_router
 from dataing.entrypoints.api.routes.datasources import router as datasources_v2_router
+from dataing.entrypoints.api.routes.git_repos import router as git_repos_router
 from dataing.entrypoints.api.routes.integrations import router as integrations_router
 from dataing.entrypoints.api.routes.investigation_feedback import (
     router as investigation_feedback_router,
@@ -79,6 +80,9 @@ api_router.include_router(integrations_router)  # Webhook integrations
 # Dataset-to-repository mappings
 api_router.include_router(repo_mappings_router)
 api_router.include_router(datasets_repo_router)  # GET /datasets/{id}/repo
+
+# Git repository connections
+api_router.include_router(git_repos_router)
 
 # RBAC routes
 api_router.include_router(teams_router)  # Teams + policies

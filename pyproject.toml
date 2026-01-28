@@ -64,7 +64,7 @@ demo = [
     # SDK, CLI, and notebook packages for demo/testing
     "dataing-sdk",
     "dataing-cli",
-    "dataing-notebook[server,keyring]",
+    "dataing-notebook[server,keyring,graph]",
     "jupyterlab-dataing",
 ]
 

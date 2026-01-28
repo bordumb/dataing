@@ -1,3 +1,10 @@
+# [1.11.0](https://github.com/bordumb/dataing/compare/v1.10.0...v1.11.0) (2026-01-28)
+
+
+### Features
+
+* Git Integration for Pipeline Change Detection ([#101](https://github.com/bordumb/dataing/issues/101)) ([58482a3](https://github.com/bordumb/dataing/commit/58482a3d13b2786770d2e82d870f014f077c659b))
+
 # [1.10.0](https://github.com/bordumb/dataing/compare/v1.9.0...v1.10.0) (2026-01-28)
 
 

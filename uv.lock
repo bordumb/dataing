@@ -1135,6 +1135,7 @@ server = [
 [package.metadata]
 requires-dist = [
     { name = "dataing-sdk", specifier = ">=0.1.0" },
+    { name = "ipycytoscape", marker = "extra == 'graph'", specifier = ">=1.3.0" },
     { name = "ipython", specifier = ">=8.0.0" },
     { name = "jupyter-server", marker = "extra == 'server'", specifier = ">=2.0.0" },
     { name = "keyring", marker = "extra == 'keyring'", specifier = ">=24.0.0" },
@@ -1143,7 +1144,7 @@ requires-dist = [
     { name = "rich", marker = "extra == 'rich'", specifier = ">=13.0.0" },
     { name = "tornado", specifier = ">=6.0.0" },
 ]
-provides-extras = ["dev", "rich", "server", "keyring"]
+provides-extras = ["dev", "rich", "server", "keyring", "graph"]
 
 [[package]]
 name = "dataing-sdk"

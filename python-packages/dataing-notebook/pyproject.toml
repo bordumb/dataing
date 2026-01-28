@@ -40,6 +40,9 @@ server = [
 keyring = [
     "keyring>=24.0.0",
 ]
+graph = [
+    "ipycytoscape>=1.3.0",
+]
 
 [project.entry-points."jupyter_server.extensions"]
 dataing_notebook = "dataing_notebook.serverextension"

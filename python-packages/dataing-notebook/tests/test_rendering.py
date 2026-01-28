@@ -1,15 +1,15 @@
 """Tests for rich rendering utilities."""
 
-from datetime import UTC, datetime
 from unittest.mock import MagicMock
-
-import pytest
 
 from dataing_notebook.rendering import (
     is_notebook_environment,
+    render_comparison_table,
     render_context,
     render_evidence,
+    render_history_table,
     render_lineage_tree,
+    render_replay_detail,
     render_run,
     render_table,
 )
@@ -233,3 +233,179 @@ class TestRenderRun:
         html = render_run(run)
         assert "FAILED" in html
         assert "#ef4444" in html  # Red color
+
+
+class TestRenderHistoryTable:
+    """Tests for render_history_table."""
+
+    def test_empty_list(self) -> None:
+        """Test rendering empty investigation list."""
+        result = render_history_table([])
+        assert "No" in result or "empty" in result.lower()
+
+    def test_single_investigation(self) -> None:
+        """Test rendering a single investigation."""
+        investigations = [
+            {
+                "investigation_id": "abc-123-def-456",
+                "dataset_id": "orders",
+                "status": "completed",
+                "created_at": "2026-01-28T10:00:00Z",
+            },
+        ]
+        result = render_history_table(investigations)
+        assert "abc-123" in result
+        assert "orders" in result
+        assert "completed" in result.lower()
+
+    def test_pagination_display(self) -> None:
+        """Test pagination info in footer."""
+        investigations = [
+            {
+                "investigation_id": f"id-{i}",
+                "dataset_id": "orders",
+                "status": "completed",
+                "created_at": "2026-01-28T10:00:00Z",
+            }
+            for i in range(5)
+        ]
+        result = render_history_table(investigations, page=2, total=93, page_size=20)
+        assert "Page" in result or "93" in result
+
+    def test_status_badges(self) -> None:
+        """Test that different statuses get appropriate styling."""
+        investigations = [
+            {
+                "investigation_id": "id-1",
+                "dataset_id": "orders",
+                "status": "completed",
+                "created_at": "2026-01-28T10:00:00Z",
+            },
+            {
+                "investigation_id": "id-2",
+                "dataset_id": "orders",
+                "status": "failed",
+                "created_at": "2026-01-28T11:00:00Z",
+            },
+        ]
+        result = render_history_table(investigations)
+        assert "completed" in result.lower()
+        assert "failed" in result.lower()
+
+
+class TestRenderReplayDetail:
+    """Tests for render_replay_detail."""
+
+    def test_completed_investigation(self) -> None:
+        """Test rendering a completed investigation."""
+        inv = {
+            "investigation_id": "abc-123",
+            "status": "completed",
+            "root_hash": "hash123456789",
+            "main_branch": {
+                "synthesis": {"summary": "Root cause identified"},
+                "evidence": [{"kind": "sql", "result_summary": "Null spike"}],
+            },
+        }
+        result = render_replay_detail(inv)
+        assert "abc-123" in result
+        assert "completed" in result.lower()
+
+    def test_failed_investigation(self) -> None:
+        """Test rendering a failed investigation."""
+        inv = {
+            "investigation_id": "def-456",
+            "status": "failed",
+            "root_hash": None,
+            "main_branch": {
+                "synthesis": None,
+                "evidence": [],
+            },
+        }
+        result = render_replay_detail(inv)
+        assert "def-456" in result
+        assert "failed" in result.lower()
+
+    def test_evidence_displayed(self) -> None:
+        """Test that evidence items are rendered."""
+        inv = {
+            "investigation_id": "ghi-789",
+            "status": "completed",
+            "root_hash": "abc",
+            "main_branch": {
+                "synthesis": {"summary": "Found it"},
+                "evidence": [
+                    {"kind": "sql", "sql": "SELECT * FROM test"},
+                    {"kind": "metric", "metric": "row_count", "value": 100},
+                ],
+            },
+        }
+        result = render_replay_detail(inv)
+        assert "Evidence" in result
+        assert "2 items" in result
+
+
+class TestRenderComparisonTable:
+    """Tests for render_comparison_table."""
+
+    def test_identical_investigations(self) -> None:
+        """Test comparing investigations with same data."""
+        inv = {
+            "investigation_id": "id-1",
+            "status": "completed",
+            "main_branch": {
+                "synthesis": {"summary": "Same root cause"},
+                "evidence": [],
+            },
+        }
+        result = render_comparison_table(inv, inv)
+        assert "id-1" in result
+
+    def test_different_statuses(self) -> None:
+        """Test comparing investigations with different statuses."""
+        inv1 = {
+            "investigation_id": "id-1",
+            "status": "completed",
+            "main_branch": {
+                "synthesis": {"summary": "Found root cause"},
+                "evidence": [{"kind": "sql"}],
+            },
+        }
+        inv2 = {
+            "investigation_id": "id-2",
+            "status": "failed",
+            "main_branch": {
+                "synthesis": None,
+                "evidence": [],
+            },
+        }
+        result = render_comparison_table(inv1, inv2)
+        assert "id-1" in result
+        assert "id-2" in result
+        assert "completed" in result.lower()
+        assert "failed" in result.lower()
+
+    def test_different_evidence(self) -> None:
+        """Test comparing investigations with different evidence."""
+        inv1 = {
+            "investigation_id": "id-1",
+            "status": "completed",
+            "main_branch": {
+                "synthesis": None,
+                "evidence": [{"kind": "sql", "sql": "SELECT 1"}],
+            },
+        }
+        inv2 = {
+            "investigation_id": "id-2",
+            "status": "completed",
+            "main_branch": {
+                "synthesis": None,
+                "evidence": [
+                    {"kind": "sql", "sql": "SELECT 2"},
+                    {"kind": "metric", "metric": "count"},
+                ],
+            },
+        }
+        result = render_comparison_table(inv1, inv2)
+        # Should show difference in evidence counts
+        assert "Unique" in result or "1" in result

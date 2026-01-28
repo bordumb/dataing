@@ -165,6 +165,9 @@ class DataingMagics(Magics):
             "export": self._handle_export,
             "status": self._handle_status,
             "clear": self._handle_clear,
+            "history": self._handle_history,
+            "replay": self._handle_replay,
+            "compare": self._handle_compare,
             "help": self._show_help,
         }
 
@@ -215,10 +218,615 @@ Dataing Magic Commands
 %dataing clear
     Clear the current context.
 
+%dataing history [--dataset ID] [--days N] [--limit N] [--offset N]
+    List past investigations from the API.
+    Options:
+        --dataset, -d ID     Filter by dataset ID
+        --days, -n N         Show investigations from last N days (default: 30)
+        --limit, -l N        Max results to return (default: 20)
+        --offset N           Pagination offset (default: 0)
+
+%dataing replay <investigation_id> [--format rich|plain]
+    Load and display a past investigation with all evidence.
+    Options:
+        --format, -f FORMAT  Output format: rich (default) or plain
+
+%dataing compare <id1> <id2> [--format rich|plain]
+    Compare two investigations side-by-side.
+    Shows differences in synthesis, evidence, and hypotheses.
+    Options:
+        --format, -f FORMAT  Output format: rich (default) or plain
+
 %dataing help
     Show this help message.
 """
         print(help_text)
+
+    def _handle_history(self, args: list[str]) -> None:
+        """Handle history subcommand -- list past investigations.
+
+        Args:
+            args: Command arguments.
+        """
+        from datetime import UTC, datetime, timedelta
+
+        parser = argparse.ArgumentParser(prog="%dataing history")
+        parser.add_argument("--dataset", "-d", help="Filter by dataset ID")
+        parser.add_argument(
+            "--days",
+            "-n",
+            type=int,
+            default=30,
+            help="Show investigations from last N days",
+        )
+        parser.add_argument(
+            "--limit",
+            "-l",
+            type=int,
+            default=20,
+            help="Max results to return",
+        )
+        parser.add_argument(
+            "--offset",
+            type=int,
+            default=0,
+            help="Pagination offset",
+        )
+
+        try:
+            parsed = parser.parse_args(args)
+        except SystemExit:
+            return
+
+        if self._state.client is None:
+            print("Error: Not connected. Use '%dataing connect' first.", file=sys.stderr)
+            return
+
+        try:
+            # Call the investigations list endpoint
+            response = self._state.client._request("GET", "/api/v1/investigations")
+            investigations = response.json()
+
+            if not investigations:
+                print("No investigations found.")
+                return
+
+            # Client-side filtering by date (days)
+            cutoff_date = datetime.now(UTC) - timedelta(days=parsed.days)
+            filtered = []
+            for inv in investigations:
+                created_str = inv.get("created_at", "")
+                try:
+                    # Parse ISO format date
+                    created = datetime.fromisoformat(created_str.replace("Z", "+00:00"))
+                    if created >= cutoff_date:
+                        filtered.append(inv)
+                except (ValueError, TypeError):
+                    # Include if we can't parse the date
+                    filtered.append(inv)
+
+            # Client-side filtering by dataset
+            if parsed.dataset:
+                filtered = [
+                    inv
+                    for inv in filtered
+                    if parsed.dataset.lower() in inv.get("dataset_id", "").lower()
+                ]
+
+            # Apply pagination
+            total = len(filtered)
+            filtered = filtered[parsed.offset : parsed.offset + parsed.limit]
+
+            if not filtered:
+                print("No investigations match the filter criteria.")
+                return
+
+            # Try rich HTML rendering first
+            if self._try_render_history_html(filtered, total, parsed.offset, parsed.limit):
+                return
+
+            # Fallback to plain text table
+            self._render_history_table(filtered, total, parsed.offset, parsed.limit)
+
+        except Exception as e:
+            print(f"Error fetching investigations: {e}", file=sys.stderr)
+
+    def _try_render_history_html(
+        self,
+        investigations: list[dict[str, Any]],
+        total: int,
+        offset: int,
+        limit: int,
+    ) -> bool:
+        """Try to render history as rich HTML.
+
+        Args:
+            investigations: List of investigation dicts.
+            total: Total count.
+            offset: Current offset.
+            limit: Page size.
+
+        Returns:
+            True if HTML rendering succeeded, False otherwise.
+        """
+        try:
+            from IPython.display import HTML, display
+
+            from .rendering import render_history_table
+
+            page = (offset // limit) + 1
+            html_content = render_history_table(
+                investigations,
+                page=page,
+                total=total,
+                page_size=limit,
+            )
+            display(HTML(html_content))
+            return True
+        except ImportError:
+            return False
+
+    def _render_history_table(
+        self,
+        investigations: list[dict[str, Any]],
+        total: int,
+        offset: int,
+        limit: int,
+    ) -> None:
+        """Render investigation history as a plain text table.
+
+        Args:
+            investigations: List of investigation dicts.
+            total: Total count before pagination.
+            offset: Current offset.
+            limit: Page size.
+        """
+        # Column headers and widths
+        headers = ["ID", "Dataset", "Status", "Created"]
+        widths = [36, 30, 12, 20]
+
+        # Print header
+        header_line = "  ".join(h.ljust(w) for h, w in zip(headers, widths, strict=True))
+        print(header_line)
+        print("-" * len(header_line))
+
+        # Print rows
+        for inv in investigations:
+            inv_id = str(inv.get("investigation_id", ""))[:36]
+            dataset = inv.get("dataset_id", "")[:30]
+            status = inv.get("status", "unknown")[:12]
+            created = inv.get("created_at", "")[:20]
+
+            row = [
+                inv_id.ljust(widths[0]),
+                dataset.ljust(widths[1]),
+                status.ljust(widths[2]),
+                created.ljust(widths[3]),
+            ]
+            print("  ".join(row))
+
+        # Print pagination info
+        showing_end = min(offset + limit, total)
+        print("")
+        print(f"Showing {offset + 1}-{showing_end} of {total} investigations")
+        if showing_end < total:
+            print(f"Use --offset {showing_end} to see more")
+
+    def _handle_replay(self, args: list[str]) -> None:
+        """Handle replay subcommand -- load a past investigation.
+
+        Args:
+            args: Command arguments.
+        """
+        parser = argparse.ArgumentParser(prog="%dataing replay")
+        parser.add_argument("investigation_id", help="Investigation UUID to replay")
+        parser.add_argument(
+            "--format",
+            "-f",
+            choices=["rich", "plain"],
+            default="rich",
+            help="Output format",
+        )
+
+        try:
+            parsed = parser.parse_args(args)
+        except SystemExit:
+            return
+
+        if self._state.client is None:
+            print("Error: Not connected. Use '%dataing connect' first.", file=sys.stderr)
+            return
+
+        try:
+            # Fetch full investigation state from API
+            investigation = self._state.client.get_investigation(parsed.investigation_id)
+
+            # Store in session history for export
+            self._state._history.append(
+                {
+                    "action": "replay",
+                    "investigation_id": parsed.investigation_id,
+                    "investigation": {
+                        "investigation_id": investigation.investigation_id,
+                        "status": investigation.status,
+                        "main_branch": {
+                            "branch_id": investigation.main_branch.branch_id,
+                            "status": investigation.main_branch.status,
+                            "current_step": investigation.main_branch.current_step,
+                            "synthesis": investigation.main_branch.synthesis,
+                            "evidence": investigation.main_branch.evidence,
+                        },
+                        "root_hash": investigation.root_hash,
+                    },
+                }
+            )
+
+            # Render investigation details
+            if parsed.format == "rich":
+                if self._try_render_replay_html(investigation):
+                    return
+            self._render_replay(investigation, parsed.format)
+
+        except Exception as e:
+            error_msg = str(e)
+            if "404" in error_msg or "not found" in error_msg.lower():
+                print(
+                    f"Error: Investigation not found: {parsed.investigation_id}",
+                    file=sys.stderr,
+                )
+            else:
+                print(f"Error fetching investigation: {e}", file=sys.stderr)
+
+    def _try_render_replay_html(self, investigation: Any) -> bool:
+        """Try to render replay as rich HTML.
+
+        Args:
+            investigation: InvestigationState object from SDK.
+
+        Returns:
+            True if HTML rendering succeeded, False otherwise.
+        """
+        try:
+            from IPython.display import HTML, display
+
+            from .rendering import render_replay_detail
+
+            inv_dict = {
+                "investigation_id": investigation.investigation_id,
+                "status": investigation.status,
+                "root_hash": investigation.root_hash,
+                "main_branch": {
+                    "branch_id": investigation.main_branch.branch_id,
+                    "status": investigation.main_branch.status,
+                    "current_step": investigation.main_branch.current_step,
+                    "synthesis": investigation.main_branch.synthesis,
+                    "evidence": investigation.main_branch.evidence,
+                },
+            }
+            html_content = render_replay_detail(inv_dict)
+            display(HTML(html_content))
+            return True
+        except ImportError:
+            return False
+
+    def _render_replay(self, investigation: Any, fmt: str) -> None:
+        """Render a replayed investigation.
+
+        Args:
+            investigation: InvestigationState object from SDK.
+            fmt: Output format ('rich' or 'plain').
+        """
+        print("=" * 60)
+        print("INVESTIGATION REPLAY")
+        print("=" * 60)
+        print(f"ID:     {investigation.investigation_id}")
+        print(f"Status: {investigation.status}")
+        if investigation.root_hash:
+            print(f"Hash:   {investigation.root_hash[:16]}...")
+        print("")
+
+        main_branch = investigation.main_branch
+
+        # Show synthesis if available (completed investigations)
+        if main_branch.synthesis:
+            print("-" * 40)
+            print("ROOT CAUSE ANALYSIS")
+            print("-" * 40)
+            synthesis = main_branch.synthesis
+            if isinstance(synthesis, dict):
+                if "root_cause" in synthesis:
+                    print(f"\n{synthesis['root_cause']}")
+                if "summary" in synthesis:
+                    print(f"\nSummary: {synthesis['summary']}")
+                if "recommendations" in synthesis:
+                    print("\nRecommendations:")
+                    recs = synthesis["recommendations"]
+                    if isinstance(recs, list):
+                        for rec in recs:
+                            print(f"  • {rec}")
+                    else:
+                        print(f"  {recs}")
+            else:
+                print(str(synthesis))
+            print("")
+
+        # Show evidence
+        evidence_list = main_branch.evidence
+        if evidence_list:
+            print("-" * 40)
+            print(f"EVIDENCE ({len(evidence_list)} items)")
+            print("-" * 40)
+
+            for i, evidence in enumerate(evidence_list, 1):
+                self._render_evidence_item(evidence, i, fmt)
+        else:
+            print("No evidence collected yet.")
+
+        # Show current step for running investigations
+        if investigation.status in ("running", "queued"):
+            print("")
+            print(f"Current Step: {main_branch.current_step}")
+
+        print("")
+        print("=" * 60)
+
+    def _render_evidence_item(self, evidence: dict[str, Any], index: int, fmt: str) -> None:
+        """Render a single evidence item.
+
+        Args:
+            evidence: Evidence dict from API.
+            index: Evidence item number.
+            fmt: Output format.
+        """
+        kind = evidence.get("kind", "unknown")
+        print(f"\n[{index}] {kind.upper()}")
+
+        if kind == "sql_result":
+            # SQL evidence
+            sql = evidence.get("sql", "")
+            if sql:
+                print(f"  SQL: {sql[:100]}{'...' if len(sql) > 100 else ''}")
+            rows = evidence.get("row_count", evidence.get("rows", "?"))
+            print(f"  Rows: {rows}")
+            conclusion = evidence.get("conclusion", "")
+            if conclusion:
+                print(f"  Conclusion: {conclusion}")
+
+        elif kind == "metric":
+            # Metric evidence
+            metric = evidence.get("metric", "")
+            value = evidence.get("value", "")
+            print(f"  Metric: {metric} = {value}")
+
+        elif kind == "hypothesis":
+            # Hypothesis
+            hypothesis = evidence.get("hypothesis", evidence.get("text", ""))
+            status = evidence.get("status", "")
+            print(f"  Hypothesis: {hypothesis}")
+            if status:
+                print(f"  Status: {status}")
+
+        else:
+            # Generic evidence
+            for key, value in evidence.items():
+                if key not in ("kind", "seq", "prev_hash", "hash"):
+                    val_str = str(value)
+                    if len(val_str) > 100:
+                        val_str = val_str[:100] + "..."
+                    print(f"  {key}: {val_str}")
+
+    def _handle_compare(self, args: list[str]) -> None:
+        """Handle compare subcommand -- diff two investigations.
+
+        Args:
+            args: Command arguments.
+        """
+        parser = argparse.ArgumentParser(prog="%dataing compare")
+        parser.add_argument("id1", help="First investigation UUID")
+        parser.add_argument("id2", help="Second investigation UUID")
+        parser.add_argument(
+            "--format",
+            "-f",
+            choices=["rich", "plain"],
+            default="rich",
+            help="Output format",
+        )
+
+        try:
+            parsed = parser.parse_args(args)
+        except SystemExit:
+            return
+
+        if self._state.client is None:
+            print("Error: Not connected. Use '%dataing connect' first.", file=sys.stderr)
+            return
+
+        # Fetch both investigations
+        try:
+            inv1 = self._state.client.get_investigation(parsed.id1)
+        except Exception as e:
+            print(f"Error fetching investigation {parsed.id1}: {e}", file=sys.stderr)
+            return
+
+        try:
+            inv2 = self._state.client.get_investigation(parsed.id2)
+        except Exception as e:
+            print(f"Error fetching investigation {parsed.id2}: {e}", file=sys.stderr)
+            return
+
+        if parsed.format == "rich":
+            if self._try_render_comparison_html(inv1, inv2):
+                return
+        self._render_comparison(inv1, inv2, parsed.format)
+
+    def _try_render_comparison_html(self, inv1: Any, inv2: Any) -> bool:
+        """Try to render comparison as rich HTML.
+
+        Args:
+            inv1: First InvestigationState.
+            inv2: Second InvestigationState.
+
+        Returns:
+            True if HTML rendering succeeded, False otherwise.
+        """
+        try:
+            from IPython.display import HTML, display
+
+            from .rendering import render_comparison_table
+
+            def to_dict(inv: Any) -> dict[str, Any]:
+                return {
+                    "investigation_id": inv.investigation_id,
+                    "status": inv.status,
+                    "main_branch": {
+                        "synthesis": inv.main_branch.synthesis,
+                        "evidence": inv.main_branch.evidence,
+                    },
+                }
+
+            html_content = render_comparison_table(to_dict(inv1), to_dict(inv2))
+            display(HTML(html_content))
+            return True
+        except ImportError:
+            return False
+
+    def _render_comparison(self, inv1: Any, inv2: Any, fmt: str) -> None:
+        """Render side-by-side comparison of two investigations.
+
+        Args:
+            inv1: First InvestigationState.
+            inv2: Second InvestigationState.
+            fmt: Output format ('rich' or 'plain').
+        """
+        # Column width for each side
+        col_width = 40
+
+        def truncate(s: str, width: int) -> str:
+            return s[: width - 3] + "..." if len(s) > width else s.ljust(width)
+
+        print("=" * (col_width * 2 + 5))
+        print("INVESTIGATION COMPARISON")
+        print("=" * (col_width * 2 + 5))
+        print("")
+
+        # Header comparison
+        print(
+            f"{'ID:':<8}{truncate(inv1.investigation_id, col_width)}  |  "
+            f"{truncate(inv2.investigation_id, col_width)}"
+        )
+        print(
+            f"{'Status:':<8}{truncate(inv1.status, col_width)}  |  "
+            f"{truncate(inv2.status, col_width)}"
+        )
+
+        # Show status diff if different
+        if inv1.status != inv2.status:
+            print("         ^ STATUS DIFFERS ^")
+        print("")
+
+        # Synthesis comparison
+        print("-" * (col_width * 2 + 5))
+        print("SYNTHESIS / ROOT CAUSE")
+        print("-" * (col_width * 2 + 5))
+
+        synth1 = inv1.main_branch.synthesis
+        synth2 = inv2.main_branch.synthesis
+
+        root1 = self._extract_root_cause(synth1)
+        root2 = self._extract_root_cause(synth2)
+
+        if root1 or root2:
+            print(f"Left:  {truncate(root1 or '(none)', col_width * 2)}")
+            print(f"Right: {truncate(root2 or '(none)', col_width * 2)}")
+            if root1 != root2:
+                print("  ^ DIFFERS ^")
+        else:
+            print("(No synthesis available for either investigation)")
+        print("")
+
+        # Evidence comparison
+        print("-" * (col_width * 2 + 5))
+        print("EVIDENCE COMPARISON")
+        print("-" * (col_width * 2 + 5))
+
+        evidence1 = inv1.main_branch.evidence
+        evidence2 = inv2.main_branch.evidence
+
+        # Create evidence signatures for comparison
+        sigs1 = {self._evidence_signature(e): e for e in evidence1}
+        sigs2 = {self._evidence_signature(e): e for e in evidence2}
+
+        shared = set(sigs1.keys()) & set(sigs2.keys())
+        only_in_1 = set(sigs1.keys()) - set(sigs2.keys())
+        only_in_2 = set(sigs2.keys()) - set(sigs1.keys())
+
+        print(f"Shared evidence items: {len(shared)}")
+        print(f"Only in left:  {len(only_in_1)}")
+        print(f"Only in right: {len(only_in_2)}")
+        print("")
+
+        if only_in_1:
+            print("Unique to LEFT:")
+            for sig in list(only_in_1)[:5]:
+                ev = sigs1[sig]
+                kind = ev.get("kind", "unknown")
+                print(f"  - [{kind}] {sig[:60]}")
+            if len(only_in_1) > 5:
+                print(f"  ... and {len(only_in_1) - 5} more")
+            print("")
+
+        if only_in_2:
+            print("Unique to RIGHT:")
+            for sig in list(only_in_2)[:5]:
+                ev = sigs2[sig]
+                kind = ev.get("kind", "unknown")
+                print(f"  - [{kind}] {sig[:60]}")
+            if len(only_in_2) > 5:
+                print(f"  ... and {len(only_in_2) - 5} more")
+            print("")
+
+        print("=" * (col_width * 2 + 5))
+
+    def _extract_root_cause(self, synthesis: dict[str, Any] | None) -> str:
+        """Extract root cause string from synthesis dict.
+
+        Args:
+            synthesis: Synthesis dict or None.
+
+        Returns:
+            Root cause string or empty string.
+        """
+        if not synthesis:
+            return ""
+        if isinstance(synthesis, dict):
+            return str(synthesis.get("root_cause", synthesis.get("summary", "")))
+        return str(synthesis)
+
+    def _evidence_signature(self, evidence: dict[str, Any]) -> str:
+        """Create a signature for evidence comparison.
+
+        Args:
+            evidence: Evidence dict.
+
+        Returns:
+            Signature string for comparison.
+        """
+        kind = evidence.get("kind", "")
+        if kind == "sql_result":
+            sql = evidence.get("sql", "")
+            return f"sql:{sql[:100]}"
+        elif kind == "metric":
+            metric = evidence.get("metric", "")
+            return f"metric:{metric}"
+        elif kind == "hypothesis":
+            hyp = evidence.get("hypothesis", evidence.get("text", ""))
+            return f"hypothesis:{hyp[:100]}"
+        else:
+            # Use first significant key-value
+            for k, v in evidence.items():
+                if k not in ("kind", "seq", "prev_hash", "hash"):
+                    return f"{kind}:{k}:{str(v)[:50]}"
+            return f"{kind}:unknown"
 
     def _handle_connect(self, args: list[str]) -> None:
         """Handle connect subcommand.

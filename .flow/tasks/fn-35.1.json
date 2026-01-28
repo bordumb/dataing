@@ -1,14 +1,23 @@
 {
-  "assignee": null,
+  "assignee": "bordumbb@gmail.com",
   "claim_note": "",
-  "claimed_at": null,
+  "claimed_at": "2026-01-28T18:27:02.351837Z",
   "created_at": "2026-01-28T03:51:06.641252Z",
   "depends_on": [],
   "epic": "fn-35",
+  "evidence": {
+    "commits": [
+      "3dd37f8c3ede8cf05d8479e23ae0e1d92e32ae47"
+    ],
+    "prs": [],
+    "tests": [
+      "uv run pytest python-packages/dataing-notebook/tests/test_magic.py -v"
+    ]
+  },
   "id": "fn-35.1",
   "priority": 1,
   "spec_path": ".flow/tasks/fn-35.1.md",
-  "status": "todo",
+  "status": "done",
   "title": "Add history magic handler with API-backed browsing and filtering",
-  "updated_at": "2026-01-28T03:51:06.641445Z"
+  "updated_at": "2026-01-28T18:30:19.765216Z"
 }

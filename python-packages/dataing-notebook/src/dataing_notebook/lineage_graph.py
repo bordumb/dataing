@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from collections import deque
 from html import escape
+from pathlib import Path
 from typing import Any
 
 # Node type -> visual style mapping
@@ -471,7 +472,15 @@ def _render_ascii_fallback(
     depth: int = 2,
     direction: str = "both",
 ) -> None:
-    """Render lineage as plain ASCII text for non-widget environments.
+    """Render lineage as ASCII tree with box-drawing characters.
+
+    Produces output like::
+
+        Lineage Graph (depth=2, direction=both)
+        ==================================================
+        +-- orders [table] (root)
+            +-- raw_orders [source]
+            +-- raw_customers [source]
 
     Args:
         lineage_data: Lineage API response dict.
@@ -479,23 +488,52 @@ def _render_ascii_fallback(
         direction: One of 'upstream', 'downstream', 'both'.
     """
     root = lineage_data.get("root", "Unknown")
+    datasets: dict[str, Any] = lineage_data.get("datasets", {})
     edges: list[dict[str, Any]] = lineage_data.get("edges", [])
 
-    reachable = _filter_by_depth_and_direction(root, edges, depth=depth, direction=direction)
-
-    print(f"Lineage Graph (root: {root}, depth: {depth}, direction: {direction})")
-    print("=" * 60)
+    print(f"Lineage Graph (depth={depth}, direction={direction})")
+    print("=" * 50)
 
     if not edges:
-        print(f"  {root} (no edges)")
+        print(f"+-- {root} (root, no edges)")
         return
 
+    # Build adjacency for tree display
+    children: dict[str, list[str]] = {}
     for edge in edges:
-        src = edge.get("source", "?")
-        tgt = edge.get("target", "?")
-        if src in reachable and tgt in reachable:
-            edge_type = edge.get("edge_type", "transforms")
-            print(f"  {src} --[{edge_type}]--> {tgt}")
+        src = edge.get("source", "")
+        tgt = edge.get("target", "")
+        if direction == "upstream":
+            children.setdefault(tgt, []).append(src)
+        elif direction == "downstream":
+            children.setdefault(src, []).append(tgt)
+        else:
+            children.setdefault(src, []).append(tgt)
+            children.setdefault(tgt, []).append(src)
+
+    visited: set[str] = set()
+
+    def _print_node(node: str, prefix: str, is_last: bool, current_depth: int) -> None:
+        if current_depth > depth or node in visited:
+            return
+        visited.add(node)
+
+        connector = "+-- "
+        ds_info = datasets.get(node, {})
+        ds_type = ds_info.get("type", "") if isinstance(ds_info, dict) else ""
+        type_label = f" [{ds_type}]" if ds_type else ""
+        root_label = " (root)" if node == root else ""
+        label = node.rsplit(".", 1)[-1] if "." in node else node
+
+        print(f"{prefix}{connector}{label}{type_label}{root_label}")
+
+        child_nodes = children.get(node, [])
+        for i, child in enumerate(child_nodes):
+            is_child_last = i == len(child_nodes) - 1
+            child_prefix = prefix + ("    " if is_last else "|   ")
+            _print_node(child, child_prefix, is_child_last, current_depth + 1)
+
+    _print_node(root, "", True, 0)
 
 
 def render_lineage_graph(
@@ -539,3 +577,46 @@ def render_lineage_graph(
     graph_widget.on("node", "click", on_click)
 
     return widgets.VBox([graph_widget, details_panel])
+
+
+def export_lineage_graph(
+    lineage_data: dict[str, Any],
+    output_path: str,
+    *,
+    fmt: str = "png",
+    depth: int = 2,
+    direction: str = "both",
+) -> str:
+    """Export lineage graph to PNG or SVG file.
+
+    Args:
+        lineage_data: Lineage API response dict.
+        output_path: File path to write (e.g., "lineage.png").
+        fmt: Export format, either "png" or "svg".
+        depth: Max traversal depth.
+        direction: 'upstream', 'downstream', or 'both'.
+
+    Returns:
+        Absolute path of the written file.
+
+    Raises:
+        ImportError: If ipycytoscape is not installed.
+        ValueError: If fmt is not 'png' or 'svg'.
+    """
+    if fmt not in ("png", "svg"):
+        raise ValueError(f"Unsupported format: {fmt!r}. Use 'png' or 'svg'.")
+
+    elements = lineage_to_cytoscape_elements(lineage_data, depth=depth, direction=direction)
+    widget = _build_widget(elements)
+
+    if fmt == "png":
+        data: bytes | str = widget.get_png()
+        mode = "wb"
+    else:
+        data = widget.get_svg()
+        mode = "w"
+
+    with open(output_path, mode) as f:
+        f.write(data)  # type: ignore[arg-type]
+
+    return str(Path(output_path).resolve())

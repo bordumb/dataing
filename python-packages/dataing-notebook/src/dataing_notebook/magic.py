@@ -194,11 +194,12 @@ Dataing Magic Commands
         %dataing attach "SELECT * FROM orders" --datasource ds-123
         %dataing attach "SELECT * FROM orders" --platform postgres
 
-%dataing lineage [--depth N] [--direction upstream|downstream|both]
+%dataing lineage [--depth N] [--direction upstream|downstream|both] [--export FILE]
     Display the lineage graph for the attached context.
     Options:
         --depth, -d N        Max traversal depth, 1-10 (default: 2)
         --direction DIR      upstream, downstream, or both (default: both)
+        --export, -e FILE    Export graph to PNG or SVG file
 
 %dataing ask "<question>"
     Start an investigation with the given question.
@@ -428,6 +429,11 @@ Dataing Magic Commands
             default="both",
             help="Traversal direction (default: both)",
         )
+        parser.add_argument(
+            "--export",
+            "-e",
+            help="Export graph to file (e.g., lineage.png or lineage.svg)",
+        )
         parser.add_argument("--help", "-h", action="store_true")
 
         try:
@@ -454,6 +460,24 @@ Dataing Magic Commands
         if lineage is None or not lineage:
             print("No lineage information available for this context.")
             print("(Lineage requires a configured lineage provider like dbt or Airflow)")
+            return
+
+        if parsed.export:
+            from .lineage_graph import export_lineage_graph
+
+            export_path = parsed.export
+            fmt = "svg" if export_path.endswith(".svg") else "png"
+            try:
+                result_path = export_lineage_graph(
+                    lineage,
+                    export_path,
+                    fmt=fmt,
+                    depth=parsed.depth,
+                    direction=parsed.direction,
+                )
+                print(f"Graph exported to: {result_path}")
+            except (ImportError, ValueError) as e:
+                print(f"Export error: {e}", file=sys.stderr)
             return
 
         from .lineage_graph import render_lineage_graph

@@ -102,6 +102,7 @@ class TemporalAgentAdapter:
         evidence: list[dict[str, Any]],
         hypotheses: list[dict[str, Any]],
         alert_summary: str,
+        code_changes: list[dict[str, Any]] | None = None,
     ) -> dict[str, Any]:
         """Synthesize findings from dict inputs.
 
@@ -109,14 +110,18 @@ class TemporalAgentAdapter:
             evidence: List of evidence dicts.
             hypotheses: List of hypothesis dicts (unused but kept for API compat).
             alert_summary: Summary of the alert.
+            code_changes: Optional list of code changes related to the investigation.
 
         Returns:
             Synthesis result as dict.
         """
         evidence_objs = [self._to_evidence(e) for e in evidence]
         alert_obj = self._to_alert(None, alert_summary)
+        code_changes_obj = self._to_code_changes(code_changes)
 
-        result = await self._client.synthesize_findings_raw(alert_obj, evidence_objs)
+        result = await self._client.synthesize_findings_raw(
+            alert_obj, evidence_objs, code_changes=code_changes_obj
+        )
 
         return {
             "root_cause": result.root_cause,

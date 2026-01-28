@@ -20,6 +20,7 @@ class SynthesizeInput:
     hypotheses: list[dict[str, Any]]
     alert_summary: str
     confidence_threshold: float = 0.85
+    code_changes: list[dict[str, Any]] | None = None
 
 
 @dataclass
@@ -56,6 +57,7 @@ def make_synthesize_activity(
                 evidence=input.evidence,
                 hypotheses=input.hypotheses,
                 alert_summary=input.alert_summary,
+                code_changes=input.code_changes,
             )
         except Exception as e:
             return SynthesizeResult(

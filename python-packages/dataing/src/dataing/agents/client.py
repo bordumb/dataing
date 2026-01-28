@@ -282,6 +282,7 @@ class AgentClient:
         alert: AnomalyAlert,
         evidence: list[Evidence],
         handlers: StreamHandlers | None = None,
+        code_changes: list[RelevantCodeChange] | None = None,
     ) -> SynthesisResponse:
         """Synthesize all evidence into a root cause finding (raw response).
 
@@ -289,6 +290,7 @@ class AgentClient:
             alert: The original anomaly alert.
             evidence: All collected evidence.
             handlers: Optional streaming handlers for real-time updates.
+            code_changes: Optional list of code changes related to the investigation.
 
         Returns:
             Raw SynthesisResponse with all fields from LLM.
@@ -296,7 +298,7 @@ class AgentClient:
         Raises:
             LLMError: If synthesis fails.
         """
-        prompt = synthesis.build_user(alert=alert, evidence=evidence)
+        prompt = synthesis.build_user(alert=alert, evidence=evidence, code_changes=code_changes)
         system = synthesis.build_system()
 
         try:

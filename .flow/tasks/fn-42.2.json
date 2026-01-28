@@ -1,0 +1,16 @@
+{
+  "assignee": null,
+  "claim_note": "",
+  "claimed_at": null,
+  "created_at": "2026-01-28T03:52:05.250749Z",
+  "depends_on": [
+    "fn-42.1"
+  ],
+  "epic": "fn-42",
+  "id": "fn-42.2",
+  "priority": 2,
+  "spec_path": ".flow/tasks/fn-42.2.md",
+  "status": "todo",
+  "title": "Write run-first-investigation walkthrough with expected output",
+  "updated_at": "2026-01-28T03:52:05.250936Z"
+}

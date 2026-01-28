@@ -1,0 +1,16 @@
+{
+  "assignee": null,
+  "claim_note": "",
+  "claimed_at": null,
+  "created_at": "2026-01-28T03:52:40.024771Z",
+  "depends_on": [
+    "fn-48.1"
+  ],
+  "epic": "fn-48",
+  "id": "fn-48.2",
+  "priority": 2,
+  "spec_path": ".flow/tasks/fn-48.2.md",
+  "status": "todo",
+  "title": "Create SQLAlchemy model and threshold repository",
+  "updated_at": "2026-01-28T03:52:40.024961Z"
+}

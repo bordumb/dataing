@@ -1,0 +1,17 @@
+{
+  "assignee": null,
+  "claim_note": "",
+  "claimed_at": null,
+  "created_at": "2026-01-28T03:50:57.068279Z",
+  "depends_on": [
+    "fn-39.3",
+    "fn-39.4"
+  ],
+  "epic": "fn-39",
+  "id": "fn-39.5",
+  "priority": 5,
+  "spec_path": ".flow/tasks/fn-39.5.md",
+  "status": "todo",
+  "title": "Add CLI commands: dataing run snapshot and dataing run import",
+  "updated_at": "2026-01-28T03:50:57.068448Z"
+}

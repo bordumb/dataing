@@ -1,0 +1,14 @@
+{
+  "assignee": null,
+  "claim_note": "",
+  "claimed_at": null,
+  "created_at": "2026-01-28T03:51:31.892043Z",
+  "depends_on": [],
+  "epic": "fn-46",
+  "id": "fn-46.1",
+  "priority": 1,
+  "spec_path": ".flow/tasks/fn-46.1.md",
+  "status": "todo",
+  "title": "Create migration for workspaces and workspace_members tables",
+  "updated_at": "2026-01-28T03:51:31.892259Z"
+}

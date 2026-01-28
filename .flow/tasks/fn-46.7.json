@@ -1,0 +1,16 @@
+{
+  "assignee": null,
+  "claim_note": "",
+  "claimed_at": null,
+  "created_at": "2026-01-28T03:51:56.509095Z",
+  "depends_on": [
+    "fn-46.4"
+  ],
+  "epic": "fn-46",
+  "id": "fn-46.7",
+  "priority": 7,
+  "spec_path": ".flow/tasks/fn-46.7.md",
+  "status": "todo",
+  "title": "Create migration path: existing data to Default workspace",
+  "updated_at": "2026-01-28T03:51:56.510040Z"
+}

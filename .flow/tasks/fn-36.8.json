@@ -1,0 +1,18 @@
+{
+  "assignee": null,
+  "claim_note": "",
+  "claimed_at": null,
+  "created_at": "2026-01-28T03:52:03.066979Z",
+  "depends_on": [
+    "fn-36.5",
+    "fn-36.6",
+    "fn-36.7"
+  ],
+  "epic": "fn-36",
+  "id": "fn-36.8",
+  "priority": 8,
+  "spec_path": ".flow/tasks/fn-36.8.md",
+  "status": "todo",
+  "title": "Add unit tests for git integration",
+  "updated_at": "2026-01-28T03:52:03.067193Z"
+}

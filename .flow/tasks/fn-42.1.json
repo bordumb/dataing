@@ -1,0 +1,14 @@
+{
+  "assignee": null,
+  "claim_note": "",
+  "claimed_at": null,
+  "created_at": "2026-01-28T03:52:00.180176Z",
+  "depends_on": [],
+  "epic": "fn-42",
+  "id": "fn-42.1",
+  "priority": 1,
+  "spec_path": ".flow/tasks/fn-42.1.md",
+  "status": "todo",
+  "title": "Write install CLI and connect demo datasource steps",
+  "updated_at": "2026-01-28T03:52:00.180357Z"
+}

@@ -1,0 +1,17 @@
+{
+  "assignee": null,
+  "claim_note": "",
+  "claimed_at": null,
+  "created_at": "2026-01-28T03:51:48.791988Z",
+  "depends_on": [
+    "fn-46.3",
+    "fn-46.4"
+  ],
+  "epic": "fn-46",
+  "id": "fn-46.5",
+  "priority": 5,
+  "spec_path": ".flow/tasks/fn-46.5.md",
+  "status": "todo",
+  "title": "Add workspace-scoped query filtering throughout system",
+  "updated_at": "2026-01-28T03:51:48.792185Z"
+}

@@ -1,0 +1,16 @@
+{
+  "assignee": null,
+  "claim_note": "",
+  "claimed_at": null,
+  "created_at": "2026-01-28T03:51:36.254100Z",
+  "depends_on": [
+    "fn-46.1"
+  ],
+  "epic": "fn-46",
+  "id": "fn-46.2",
+  "priority": 2,
+  "spec_path": ".flow/tasks/fn-46.2.md",
+  "status": "todo",
+  "title": "Create SQLAlchemy models and workspace repository",
+  "updated_at": "2026-01-28T03:51:36.254278Z"
+}

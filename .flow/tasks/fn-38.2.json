@@ -1,0 +1,16 @@
+{
+  "assignee": null,
+  "claim_note": "",
+  "claimed_at": null,
+  "created_at": "2026-01-28T03:52:34.548035Z",
+  "depends_on": [
+    "fn-38.1"
+  ],
+  "epic": "fn-38",
+  "id": "fn-38.2",
+  "priority": 2,
+  "spec_path": ".flow/tasks/fn-38.2.md",
+  "status": "todo",
+  "title": "Implement PR metadata lookup during git sync (GitHub API)",
+  "updated_at": "2026-01-28T03:52:34.548226Z"
+}

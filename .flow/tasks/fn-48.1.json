@@ -1,0 +1,14 @@
+{
+  "assignee": null,
+  "claim_note": "",
+  "claimed_at": null,
+  "created_at": "2026-01-28T03:52:36.353314Z",
+  "depends_on": [],
+  "epic": "fn-48",
+  "id": "fn-48.1",
+  "priority": 1,
+  "spec_path": ".flow/tasks/fn-48.1.md",
+  "status": "todo",
+  "title": "Create migration for thresholds table",
+  "updated_at": "2026-01-28T03:52:36.353533Z"
+}

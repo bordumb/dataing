@@ -1,0 +1,16 @@
+{
+  "assignee": null,
+  "claim_note": "",
+  "claimed_at": null,
+  "created_at": "2026-01-28T03:52:25.018166Z",
+  "depends_on": [
+    "fn-37.3"
+  ],
+  "epic": "fn-37",
+  "id": "fn-37.4",
+  "priority": 4,
+  "spec_path": ".flow/tasks/fn-37.4.md",
+  "status": "todo",
+  "title": "Add Related Code Changes section to synthesis prompt and tests",
+  "updated_at": "2026-01-28T03:52:25.018412Z"
+}

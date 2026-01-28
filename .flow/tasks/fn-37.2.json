@@ -1,0 +1,16 @@
+{
+  "assignee": null,
+  "claim_note": "",
+  "claimed_at": null,
+  "created_at": "2026-01-28T03:52:13.864453Z",
+  "depends_on": [
+    "fn-37.1"
+  ],
+  "epic": "fn-37",
+  "id": "fn-37.2",
+  "priority": 2,
+  "spec_path": ".flow/tasks/fn-37.2.md",
+  "status": "todo",
+  "title": "Add code changes section to hypothesis generation prompt",
+  "updated_at": "2026-01-28T03:52:13.864630Z"
+}

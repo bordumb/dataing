@@ -1,0 +1,13 @@
+{
+  "branch_name": "fn-48",
+  "created_at": "2026-01-28T03:43:37.107955Z",
+  "depends_on_epics": [],
+  "id": "fn-48",
+  "next_task": 1,
+  "plan_review_status": "unknown",
+  "plan_reviewed_at": null,
+  "spec_path": ".flow/specs/fn-48.md",
+  "status": "open",
+  "title": "Threshold-Based Auto-Investigation",
+  "updated_at": "2026-01-28T03:44:21.285173Z"
+}

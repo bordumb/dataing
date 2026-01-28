@@ -1,0 +1,16 @@
+{
+  "assignee": null,
+  "claim_note": "",
+  "claimed_at": null,
+  "created_at": "2026-01-28T03:51:10.826671Z",
+  "depends_on": [
+    "fn-40.1"
+  ],
+  "epic": "fn-40",
+  "id": "fn-40.2",
+  "priority": 2,
+  "spec_path": ".flow/tasks/fn-40.2.md",
+  "status": "todo",
+  "title": "Configure PyPI trusted publishing in GitHub Actions",
+  "updated_at": "2026-01-28T03:51:10.826873Z"
+}

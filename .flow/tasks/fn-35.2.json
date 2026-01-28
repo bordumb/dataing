@@ -1,0 +1,16 @@
+{
+  "assignee": null,
+  "claim_note": "",
+  "claimed_at": null,
+  "created_at": "2026-01-28T03:51:10.274509Z",
+  "depends_on": [
+    "fn-35.1"
+  ],
+  "epic": "fn-35",
+  "id": "fn-35.2",
+  "priority": 2,
+  "spec_path": ".flow/tasks/fn-35.2.md",
+  "status": "todo",
+  "title": "Add replay magic handler to load investigation with evidence",
+  "updated_at": "2026-01-28T03:51:10.274739Z"
+}

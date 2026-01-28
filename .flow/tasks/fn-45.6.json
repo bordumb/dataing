@@ -1,0 +1,17 @@
+{
+  "assignee": null,
+  "claim_note": "",
+  "claimed_at": null,
+  "created_at": "2026-01-28T03:51:27.524432Z",
+  "depends_on": [
+    "fn-45.4",
+    "fn-45.5"
+  ],
+  "epic": "fn-45",
+  "id": "fn-45.6",
+  "priority": 6,
+  "spec_path": ".flow/tasks/fn-45.6.md",
+  "status": "todo",
+  "title": "Add integration tests for SAML flow (Okta, Azure AD)",
+  "updated_at": "2026-01-28T03:51:27.524671Z"
+}

@@ -1,0 +1,14 @@
+{
+  "assignee": null,
+  "claim_note": "",
+  "claimed_at": null,
+  "created_at": "2026-01-28T03:52:23.000051Z",
+  "depends_on": [],
+  "epic": "fn-43",
+  "id": "fn-43.1",
+  "priority": 1,
+  "spec_path": ".flow/tasks/fn-43.1.md",
+  "status": "todo",
+  "title": "Create CONTRIBUTING.md with dev setup and PR process",
+  "updated_at": "2026-01-28T03:52:23.000304Z"
+}

@@ -1,0 +1,16 @@
+{
+  "assignee": null,
+  "claim_note": "",
+  "claimed_at": null,
+  "created_at": "2026-01-28T03:51:54.248921Z",
+  "depends_on": [
+    "fn-36.3"
+  ],
+  "epic": "fn-36",
+  "id": "fn-36.6",
+  "priority": 6,
+  "spec_path": ".flow/tasks/fn-36.6.md",
+  "status": "todo",
+  "title": "Create API routes for git repo CRUD and sync trigger",
+  "updated_at": "2026-01-28T03:51:54.249090Z"
+}

@@ -1,0 +1,13 @@
+{
+  "branch_name": "fn-39",
+  "created_at": "2026-01-28T03:43:29.958924Z",
+  "depends_on_epics": [],
+  "id": "fn-39",
+  "next_task": 1,
+  "plan_review_status": "unknown",
+  "plan_reviewed_at": null,
+  "spec_path": ".flow/specs/fn-39.md",
+  "status": "open",
+  "title": "Investigation Snapshot Export and Import",
+  "updated_at": "2026-01-28T03:44:19.538797Z"
+}

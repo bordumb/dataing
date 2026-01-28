@@ -1,0 +1,16 @@
+{
+  "assignee": null,
+  "claim_note": "",
+  "claimed_at": null,
+  "created_at": "2026-01-28T03:50:44.457026Z",
+  "depends_on": [
+    "fn-44.1"
+  ],
+  "epic": "fn-44",
+  "id": "fn-44.2",
+  "priority": 2,
+  "spec_path": ".flow/tasks/fn-44.2.md",
+  "status": "todo",
+  "title": "Create welcome message and FAQ bot",
+  "updated_at": "2026-01-28T03:50:44.457201Z"
+}

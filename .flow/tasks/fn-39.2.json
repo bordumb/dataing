@@ -1,0 +1,16 @@
+{
+  "assignee": null,
+  "claim_note": "",
+  "claimed_at": null,
+  "created_at": "2026-01-28T03:50:42.881565Z",
+  "depends_on": [
+    "fn-39.1"
+  ],
+  "epic": "fn-39",
+  "id": "fn-39.2",
+  "priority": 2,
+  "spec_path": ".flow/tasks/fn-39.2.md",
+  "status": "todo",
+  "title": "Build tar.gz archive builder with evidence and Parquet results",
+  "updated_at": "2026-01-28T03:50:42.881787Z"
+}

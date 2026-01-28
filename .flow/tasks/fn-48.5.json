@@ -1,0 +1,16 @@
+{
+  "assignee": null,
+  "claim_note": "",
+  "claimed_at": null,
+  "created_at": "2026-01-28T03:52:52.480045Z",
+  "depends_on": [
+    "fn-48.4"
+  ],
+  "epic": "fn-48",
+  "id": "fn-48.5",
+  "priority": 5,
+  "spec_path": ".flow/tasks/fn-48.5.md",
+  "status": "todo",
+  "title": "Implement auto-trigger investigation on breach with cooldown",
+  "updated_at": "2026-01-28T03:52:52.480278Z"
+}

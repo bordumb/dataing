@@ -1,0 +1,13 @@
+{
+  "branch_name": "fn-40",
+  "created_at": "2026-01-28T03:43:35.560255Z",
+  "depends_on_epics": [],
+  "id": "fn-40",
+  "next_task": 1,
+  "plan_review_status": "unknown",
+  "plan_reviewed_at": null,
+  "spec_path": ".flow/specs/fn-40.md",
+  "status": "open",
+  "title": "PyPI Package Publishing",
+  "updated_at": "2026-01-28T03:44:19.734726Z"
+}

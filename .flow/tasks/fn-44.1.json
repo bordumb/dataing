@@ -1,0 +1,14 @@
+{
+  "assignee": null,
+  "claim_note": "",
+  "claimed_at": null,
+  "created_at": "2026-01-28T03:50:40.649607Z",
+  "depends_on": [],
+  "epic": "fn-44",
+  "id": "fn-44.1",
+  "priority": 1,
+  "spec_path": ".flow/tasks/fn-44.1.md",
+  "status": "todo",
+  "title": "Set up Discord server with structured channels",
+  "updated_at": "2026-01-28T03:50:40.649882Z"
+}

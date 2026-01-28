@@ -1,0 +1,13 @@
+{
+  "branch_name": "fn-45",
+  "created_at": "2026-01-28T03:43:36.509536Z",
+  "depends_on_epics": [],
+  "id": "fn-45",
+  "next_task": 1,
+  "plan_review_status": "unknown",
+  "plan_reviewed_at": null,
+  "spec_path": ".flow/specs/fn-45.md",
+  "status": "open",
+  "title": "SAML SSO Implementation",
+  "updated_at": "2026-01-28T03:44:20.680526Z"
+}

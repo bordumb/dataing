@@ -1,0 +1,19 @@
+{
+  "assignee": null,
+  "claim_note": "",
+  "claimed_at": null,
+  "created_at": "2026-01-28T03:52:43.841806Z",
+  "depends_on": [
+    "fn-43.1",
+    "fn-43.2",
+    "fn-43.3",
+    "fn-43.4"
+  ],
+  "epic": "fn-43",
+  "id": "fn-43.5",
+  "priority": 5,
+  "spec_path": ".flow/tasks/fn-43.5.md",
+  "status": "todo",
+  "title": "Configure branch protection, Dependabot, and conventional commits",
+  "updated_at": "2026-01-28T03:52:43.841983Z"
+}

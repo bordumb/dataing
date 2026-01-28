@@ -456,6 +456,7 @@ class TemporalAgentAdapter:
                 supports_hypothesis=evidence.get("supports_hypothesis"),
                 confidence=float(evidence.get("confidence", 0.0)),
                 interpretation=evidence.get("interpretation", ""),
+                commit_refs=evidence.get("commit_refs"),
             )
 
     def _to_query_result(self, query_result: dict[str, Any]) -> Any:

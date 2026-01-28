@@ -113,6 +113,7 @@ class HypothesisCategory(str, Enum):
     DATA_QUALITY = "data_quality"
     INFRASTRUCTURE = "infrastructure"
     EXPECTED_VARIANCE = "expected_variance"
+    CODE_CHANGE = "code_change"
 
 
 class Hypothesis(BaseModel):
@@ -146,6 +147,7 @@ class Evidence(BaseModel):
         supports_hypothesis: Whether evidence supports the hypothesis.
         confidence: Confidence score from 0.0 to 1.0.
         interpretation: Human-readable interpretation of results.
+        commit_refs: Optional list of commit hashes linked to this evidence.
     """
 
     model_config = ConfigDict(frozen=True)
@@ -157,6 +159,7 @@ class Evidence(BaseModel):
     supports_hypothesis: bool | None
     confidence: float
     interpretation: str
+    commit_refs: list[str] | None = None
 
 
 class Finding(BaseModel):

@@ -1,0 +1,16 @@
+{
+  "assignee": null,
+  "claim_note": "",
+  "claimed_at": null,
+  "created_at": "2026-01-28T22:13:29.042524Z",
+  "depends_on": [
+    "fn-49.1"
+  ],
+  "epic": "fn-49",
+  "id": "fn-49.2",
+  "priority": null,
+  "spec_path": ".flow/tasks/fn-49.2.md",
+  "status": "todo",
+  "title": "Implement Snapshot Capture in Temporal Workflow",
+  "updated_at": "2026-01-28T22:23:10.881563Z"
+}

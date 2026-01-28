@@ -1,0 +1,16 @@
+{
+  "assignee": null,
+  "claim_note": "",
+  "claimed_at": null,
+  "created_at": "2026-01-28T22:14:19.074036Z",
+  "depends_on": [
+    "fn-54.4"
+  ],
+  "epic": "fn-54",
+  "id": "fn-54.5",
+  "priority": null,
+  "spec_path": ".flow/tasks/fn-54.5.md",
+  "status": "todo",
+  "title": "Implement Output Writers (DuckDB, SQLite, Parquet, PostgreSQL)",
+  "updated_at": "2026-01-28T22:23:40.668700Z"
+}

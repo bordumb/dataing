@@ -1,0 +1,13 @@
+{
+  "branch_name": "feat/fn-49-ghost-state-hydrator",
+  "created_at": "2026-01-28T22:11:05.146952Z",
+  "depends_on_epics": [],
+  "id": "fn-49",
+  "next_task": 1,
+  "plan_review_status": "unknown",
+  "plan_reviewed_at": null,
+  "spec_path": ".flow/specs/fn-49.md",
+  "status": "open",
+  "title": "Ghost State Hydrator - Remote Investigation State Hydration",
+  "updated_at": "2026-01-28T22:13:14.583012Z"
+}

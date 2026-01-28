@@ -165,6 +165,7 @@ class DataingMagics(Magics):
             "export": self._handle_export,
             "status": self._handle_status,
             "clear": self._handle_clear,
+            "history": self._handle_history,
             "help": self._show_help,
         }
 
@@ -215,10 +216,149 @@ Dataing Magic Commands
 %dataing clear
     Clear the current context.
 
+%dataing history [--dataset ID] [--days N] [--limit N] [--offset N]
+    List past investigations from the API.
+    Options:
+        --dataset, -d ID     Filter by dataset ID
+        --days, -n N         Show investigations from last N days (default: 30)
+        --limit, -l N        Max results to return (default: 20)
+        --offset N           Pagination offset (default: 0)
+
 %dataing help
     Show this help message.
 """
         print(help_text)
+
+    def _handle_history(self, args: list[str]) -> None:
+        """Handle history subcommand -- list past investigations.
+
+        Args:
+            args: Command arguments.
+        """
+        from datetime import UTC, datetime, timedelta
+
+        parser = argparse.ArgumentParser(prog="%dataing history")
+        parser.add_argument("--dataset", "-d", help="Filter by dataset ID")
+        parser.add_argument(
+            "--days",
+            "-n",
+            type=int,
+            default=30,
+            help="Show investigations from last N days",
+        )
+        parser.add_argument(
+            "--limit",
+            "-l",
+            type=int,
+            default=20,
+            help="Max results to return",
+        )
+        parser.add_argument(
+            "--offset",
+            type=int,
+            default=0,
+            help="Pagination offset",
+        )
+
+        try:
+            parsed = parser.parse_args(args)
+        except SystemExit:
+            return
+
+        if self._state.client is None:
+            print("Error: Not connected. Use '%dataing connect' first.", file=sys.stderr)
+            return
+
+        try:
+            # Call the investigations list endpoint
+            response = self._state.client._request("GET", "/api/v1/investigations")
+            investigations = response.json()
+
+            if not investigations:
+                print("No investigations found.")
+                return
+
+            # Client-side filtering by date (days)
+            cutoff_date = datetime.now(UTC) - timedelta(days=parsed.days)
+            filtered = []
+            for inv in investigations:
+                created_str = inv.get("created_at", "")
+                try:
+                    # Parse ISO format date
+                    created = datetime.fromisoformat(created_str.replace("Z", "+00:00"))
+                    if created >= cutoff_date:
+                        filtered.append(inv)
+                except (ValueError, TypeError):
+                    # Include if we can't parse the date
+                    filtered.append(inv)
+
+            # Client-side filtering by dataset
+            if parsed.dataset:
+                filtered = [
+                    inv
+                    for inv in filtered
+                    if parsed.dataset.lower() in inv.get("dataset_id", "").lower()
+                ]
+
+            # Apply pagination
+            total = len(filtered)
+            filtered = filtered[parsed.offset : parsed.offset + parsed.limit]
+
+            if not filtered:
+                print("No investigations match the filter criteria.")
+                return
+
+            # Render as plain text table
+            self._render_history_table(filtered, total, parsed.offset, parsed.limit)
+
+        except Exception as e:
+            print(f"Error fetching investigations: {e}", file=sys.stderr)
+
+    def _render_history_table(
+        self,
+        investigations: list[dict[str, Any]],
+        total: int,
+        offset: int,
+        limit: int,
+    ) -> None:
+        """Render investigation history as a plain text table.
+
+        Args:
+            investigations: List of investigation dicts.
+            total: Total count before pagination.
+            offset: Current offset.
+            limit: Page size.
+        """
+        # Column headers and widths
+        headers = ["ID", "Dataset", "Status", "Created"]
+        widths = [36, 30, 12, 20]
+
+        # Print header
+        header_line = "  ".join(h.ljust(w) for h, w in zip(headers, widths, strict=True))
+        print(header_line)
+        print("-" * len(header_line))
+
+        # Print rows
+        for inv in investigations:
+            inv_id = str(inv.get("investigation_id", ""))[:36]
+            dataset = inv.get("dataset_id", "")[:30]
+            status = inv.get("status", "unknown")[:12]
+            created = inv.get("created_at", "")[:20]
+
+            row = [
+                inv_id.ljust(widths[0]),
+                dataset.ljust(widths[1]),
+                status.ljust(widths[2]),
+                created.ljust(widths[3]),
+            ]
+            print("  ".join(row))
+
+        # Print pagination info
+        showing_end = min(offset + limit, total)
+        print("")
+        print(f"Showing {offset + 1}-{showing_end} of {total} investigations")
+        if showing_end < total:
+            print(f"Use --offset {showing_end} to see more")
 
     def _handle_connect(self, args: list[str]) -> None:
         """Handle connect subcommand.

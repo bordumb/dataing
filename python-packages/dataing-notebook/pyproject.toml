@@ -42,6 +42,7 @@ keyring = [
 ]
 graph = [
     "ipycytoscape>=1.3.0",
+    "ipywidgets>=8.0.0",
 ]
 
 [project.entry-points."jupyter_server.extensions"]

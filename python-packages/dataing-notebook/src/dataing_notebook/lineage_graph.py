@@ -229,7 +229,10 @@ def _build_widget(elements: list[dict[str, Any]]) -> Any:
     """
     cyto = _get_cytoscape_widget()
     widget = cyto.CytoscapeWidget()
-    widget.graph.add_graph_from_json({"elements": elements})
+    # ipycytoscape expects {"nodes": [...], "edges": [...]} format
+    nodes = [e for e in elements if "source" not in e.get("data", {})]
+    edges = [e for e in elements if "source" in e.get("data", {})]
+    widget.graph.add_graph_from_json({"nodes": nodes, "edges": edges})
 
     widget.set_layout(name="dagre", rankDir="TB", nodeSep=60, rankSep=80)
 

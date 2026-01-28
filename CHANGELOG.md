@@ -1,3 +1,10 @@
+# [1.9.0](https://github.com/bordumb/dataing/compare/v1.8.0...v1.9.0) (2026-01-28)
+
+
+### Features
+
+* **notebook:** add interactive lineage graph visualization ([#99](https://github.com/bordumb/dataing/issues/99)) ([068b5b7](https://github.com/bordumb/dataing/commit/068b5b771347d2e26a1b69ec884aa748d18b556c))
+
 # [1.8.0](https://github.com/bordumb/dataing/compare/v1.7.1...v1.8.0) (2026-01-27)
 
 

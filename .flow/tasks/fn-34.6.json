@@ -1,7 +1,7 @@
 {
-  "assignee": null,
+  "assignee": "bordumbb@gmail.com",
   "claim_note": "",
-  "claimed_at": null,
+  "claimed_at": "2026-01-28T04:46:36.255484Z",
   "created_at": "2026-01-28T03:51:01.928662Z",
   "depends_on": [
     "fn-34.3",
@@ -9,10 +9,19 @@
     "fn-34.5"
   ],
   "epic": "fn-34",
+  "evidence": {
+    "commits": [
+      "a18abb2577cb13a5205dfd34aff6db97917b497b"
+    ],
+    "prs": [],
+    "tests": [
+      "uv run pytest python-packages/dataing-notebook/tests/ -v"
+    ]
+  },
   "id": "fn-34.6",
   "priority": 6,
   "spec_path": ".flow/tasks/fn-34.6.md",
-  "status": "todo",
+  "status": "done",
   "title": "Add unit tests for lineage visualization",
-  "updated_at": "2026-01-28T03:51:01.928829Z"
+  "updated_at": "2026-01-28T17:34:06.841859Z"
 }

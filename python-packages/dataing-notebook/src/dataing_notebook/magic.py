@@ -321,11 +321,50 @@ Dataing Magic Commands
                 print("No investigations match the filter criteria.")
                 return
 
-            # Render as plain text table
+            # Try rich HTML rendering first
+            if self._try_render_history_html(filtered, total, parsed.offset, parsed.limit):
+                return
+
+            # Fallback to plain text table
             self._render_history_table(filtered, total, parsed.offset, parsed.limit)
 
         except Exception as e:
             print(f"Error fetching investigations: {e}", file=sys.stderr)
+
+    def _try_render_history_html(
+        self,
+        investigations: list[dict[str, Any]],
+        total: int,
+        offset: int,
+        limit: int,
+    ) -> bool:
+        """Try to render history as rich HTML.
+
+        Args:
+            investigations: List of investigation dicts.
+            total: Total count.
+            offset: Current offset.
+            limit: Page size.
+
+        Returns:
+            True if HTML rendering succeeded, False otherwise.
+        """
+        try:
+            from IPython.display import HTML, display
+
+            from .rendering import render_history_table
+
+            page = (offset // limit) + 1
+            html_content = render_history_table(
+                investigations,
+                page=page,
+                total=total,
+                page_size=limit,
+            )
+            display(HTML(html_content))
+            return True
+        except ImportError:
+            return False
 
     def _render_history_table(
         self,
@@ -423,6 +462,9 @@ Dataing Magic Commands
             )
 
             # Render investigation details
+            if parsed.format == "rich":
+                if self._try_render_replay_html(investigation):
+                    return
             self._render_replay(investigation, parsed.format)
 
         except Exception as e:
@@ -434,6 +476,38 @@ Dataing Magic Commands
                 )
             else:
                 print(f"Error fetching investigation: {e}", file=sys.stderr)
+
+    def _try_render_replay_html(self, investigation: Any) -> bool:
+        """Try to render replay as rich HTML.
+
+        Args:
+            investigation: InvestigationState object from SDK.
+
+        Returns:
+            True if HTML rendering succeeded, False otherwise.
+        """
+        try:
+            from IPython.display import HTML, display
+
+            from .rendering import render_replay_detail
+
+            inv_dict = {
+                "investigation_id": investigation.investigation_id,
+                "status": investigation.status,
+                "root_hash": investigation.root_hash,
+                "main_branch": {
+                    "branch_id": investigation.main_branch.branch_id,
+                    "status": investigation.main_branch.status,
+                    "current_step": investigation.main_branch.current_step,
+                    "synthesis": investigation.main_branch.synthesis,
+                    "evidence": investigation.main_branch.evidence,
+                },
+            }
+            html_content = render_replay_detail(inv_dict)
+            display(HTML(html_content))
+            return True
+        except ImportError:
+            return False
 
     def _render_replay(self, investigation: Any, fmt: str) -> None:
         """Render a replayed investigation.
@@ -580,7 +654,41 @@ Dataing Magic Commands
             print(f"Error fetching investigation {parsed.id2}: {e}", file=sys.stderr)
             return
 
+        if parsed.format == "rich":
+            if self._try_render_comparison_html(inv1, inv2):
+                return
         self._render_comparison(inv1, inv2, parsed.format)
+
+    def _try_render_comparison_html(self, inv1: Any, inv2: Any) -> bool:
+        """Try to render comparison as rich HTML.
+
+        Args:
+            inv1: First InvestigationState.
+            inv2: Second InvestigationState.
+
+        Returns:
+            True if HTML rendering succeeded, False otherwise.
+        """
+        try:
+            from IPython.display import HTML, display
+
+            from .rendering import render_comparison_table
+
+            def to_dict(inv: Any) -> dict[str, Any]:
+                return {
+                    "investigation_id": inv.investigation_id,
+                    "status": inv.status,
+                    "main_branch": {
+                        "synthesis": inv.main_branch.synthesis,
+                        "evidence": inv.main_branch.evidence,
+                    },
+                }
+
+            html_content = render_comparison_table(to_dict(inv1), to_dict(inv2))
+            display(HTML(html_content))
+            return True
+        except ImportError:
+            return False
 
     def _render_comparison(self, inv1: Any, inv2: Any, fmt: str) -> None:
         """Render side-by-side comparison of two investigations.

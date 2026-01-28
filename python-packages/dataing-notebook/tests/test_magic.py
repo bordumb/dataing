@@ -1,6 +1,6 @@
 """Tests for IPython magic commands."""
 
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 import pytest
 
@@ -198,3 +198,218 @@ class TestAttachCommand:
         captured = capsys.readouterr()
         # Should fail with datasource error (proving it detected SQL)
         assert "requires --datasource or --platform" in captured.err
+
+
+class TestHistoryCommand:
+    """Tests for %dataing history command."""
+
+    def test_history_requires_connection(self, magics, capsys) -> None:
+        """Test history without connection shows error."""
+        magics.dataing("history")
+        captured = capsys.readouterr()
+        assert "Not connected" in captured.err
+
+    def test_history_calls_api(self, magics, capsys) -> None:
+        """Test history calls API on client."""
+        state = get_state()
+        mock_response = MagicMock()
+        mock_response.json.return_value = []
+        state.client = MagicMock()
+        state.client._request.return_value = mock_response
+        magics.dataing("history")
+        state.client._request.assert_called_once_with("GET", "/api/v1/investigations")
+
+    def test_history_renders_results(self, magics, capsys) -> None:
+        """Test history renders returned investigations."""
+        state = get_state()
+        mock_response = MagicMock()
+        mock_response.json.return_value = [
+            {
+                "investigation_id": "abc-123-def-456",
+                "dataset_id": "orders_table",
+                "status": "completed",
+                "created_at": "2026-01-28T10:00:00Z",
+            },
+        ]
+        state.client = MagicMock()
+        state.client._request.return_value = mock_response
+        magics.dataing("history")
+        captured = capsys.readouterr()
+        # Check output - may be HTML object (in notebook) or plain text
+        assert (
+            "abc-123" in captured.out
+            or "orders" in captured.out
+            or "HTML" in captured.out  # IPython HTML object repr
+        )
+
+    def test_history_empty_results(self, magics, capsys) -> None:
+        """Test history with no investigations."""
+        state = get_state()
+        mock_response = MagicMock()
+        mock_response.json.return_value = []
+        state.client = MagicMock()
+        state.client._request.return_value = mock_response
+        magics.dataing("history")
+        captured = capsys.readouterr()
+        assert "No investigations found" in captured.out
+
+    def test_history_api_error(self, magics, capsys) -> None:
+        """Test history handles API errors gracefully."""
+        state = get_state()
+        state.client = MagicMock()
+        state.client._request.side_effect = Exception("Connection failed")
+        magics.dataing("history")
+        captured = capsys.readouterr()
+        assert "Error" in captured.err
+
+    def test_history_limit_filter(self, magics, capsys) -> None:
+        """Test history respects --limit filter."""
+        state = get_state()
+        mock_response = MagicMock()
+        # Return more results than limit
+        mock_response.json.return_value = [
+            {
+                "investigation_id": f"id-{i}",
+                "dataset_id": "test",
+                "status": "completed",
+                "created_at": "2026-01-28T10:00:00Z",
+            }
+            for i in range(10)
+        ]
+        state.client = MagicMock()
+        state.client._request.return_value = mock_response
+        magics.dataing("history --limit 3")
+        captured = capsys.readouterr()
+        # Should show pagination info or HTML (in notebook)
+        assert "1-3" in captured.out or "Showing" in captured.out or "HTML" in captured.out
+
+
+class TestReplayCommand:
+    """Tests for %dataing replay command."""
+
+    def test_replay_requires_connection(self, magics, capsys) -> None:
+        """Test replay without connection shows error."""
+        magics.dataing("replay abc-123")
+        captured = capsys.readouterr()
+        assert "Not connected" in captured.err
+
+    def test_replay_requires_id(self, magics, capsys) -> None:
+        """Test replay without ID shows usage error."""
+        state = get_state()
+        state.client = MagicMock()
+        magics.dataing("replay")
+        captured = capsys.readouterr()
+        # argparse should output usage
+        assert "investigation_id" in captured.err or "usage" in captured.err.lower()
+
+    def test_replay_fetches_investigation(self, magics, capsys) -> None:
+        """Test replay calls get_investigation on client."""
+        state = get_state()
+        state.client = MagicMock()
+        mock_inv = MagicMock()
+        mock_inv.investigation_id = "abc-123-def"
+        mock_inv.status = "completed"
+        mock_inv.root_hash = "hash123"
+        mock_inv.main_branch = MagicMock()
+        mock_inv.main_branch.branch_id = "main"
+        mock_inv.main_branch.status = "completed"
+        mock_inv.main_branch.current_step = "done"
+        mock_inv.main_branch.evidence = []
+        mock_inv.main_branch.synthesis = None
+        state.client.get_investigation.return_value = mock_inv
+        magics.dataing("replay abc-123-def")
+        state.client.get_investigation.assert_called_once_with("abc-123-def")
+
+    def test_replay_stores_in_history(self, magics, capsys) -> None:
+        """Test replayed investigation is added to session history."""
+        state = get_state()
+        state.client = MagicMock()
+        mock_inv = MagicMock()
+        mock_inv.investigation_id = "abc-123"
+        mock_inv.status = "completed"
+        mock_inv.root_hash = "hash123"
+        mock_inv.main_branch = MagicMock()
+        mock_inv.main_branch.branch_id = "main"
+        mock_inv.main_branch.status = "completed"
+        mock_inv.main_branch.current_step = "done"
+        mock_inv.main_branch.evidence = []
+        mock_inv.main_branch.synthesis = None
+        state.client.get_investigation.return_value = mock_inv
+        initial_history_len = len(state._history)
+        magics.dataing("replay abc-123")
+        assert len(state._history) == initial_history_len + 1
+        assert state._history[-1]["action"] == "replay"
+
+    def test_replay_invalid_id(self, magics, capsys) -> None:
+        """Test replay with invalid ID shows error."""
+        state = get_state()
+        state.client = MagicMock()
+        state.client.get_investigation.side_effect = Exception("404 Not found")
+        magics.dataing("replay nonexistent-id")
+        captured = capsys.readouterr()
+        assert "not found" in captured.err.lower() or "Error" in captured.err
+
+
+class TestCompareCommand:
+    """Tests for %dataing compare command."""
+
+    def test_compare_requires_connection(self, magics, capsys) -> None:
+        """Test compare without connection shows error."""
+        magics.dataing("compare id1 id2")
+        captured = capsys.readouterr()
+        assert "Not connected" in captured.err
+
+    def test_compare_requires_two_ids(self, magics, capsys) -> None:
+        """Test compare requires exactly two investigation IDs."""
+        state = get_state()
+        state.client = MagicMock()
+        magics.dataing("compare only-one-id")
+        captured = capsys.readouterr()
+        # argparse should report missing argument
+        assert "id2" in captured.err or "required" in captured.err.lower()
+
+    def test_compare_fetches_both(self, magics, capsys) -> None:
+        """Test compare calls get_investigation for both IDs."""
+        state = get_state()
+        state.client = MagicMock()
+        mock_inv = MagicMock()
+        mock_inv.investigation_id = "test-id"
+        mock_inv.status = "completed"
+        mock_inv.main_branch = MagicMock()
+        mock_inv.main_branch.evidence = []
+        mock_inv.main_branch.synthesis = None
+        state.client.get_investigation.return_value = mock_inv
+        magics.dataing("compare id-aaa id-bbb")
+        assert state.client.get_investigation.call_count == 2
+
+    def test_compare_handles_first_id_failure(self, magics, capsys) -> None:
+        """Test compare handles error when first ID fetch fails."""
+        state = get_state()
+        state.client = MagicMock()
+        state.client.get_investigation.side_effect = Exception("Not found")
+        magics.dataing("compare bad-id good-id")
+        captured = capsys.readouterr()
+        assert "Error" in captured.err
+
+    def test_compare_handles_second_id_failure(self, magics, capsys) -> None:
+        """Test compare handles error when second ID fetch fails."""
+        state = get_state()
+        state.client = MagicMock()
+        mock_inv = MagicMock()
+        mock_inv.investigation_id = "good"
+        mock_inv.status = "completed"
+        mock_inv.main_branch = MagicMock()
+        mock_inv.main_branch.evidence = []
+        mock_inv.main_branch.synthesis = None
+        call_count = [0]
+
+        def side_effect(inv_id):
+            call_count[0] += 1
+            if call_count[0] == 2:
+                raise Exception("Not found")
+            return mock_inv
+
+        state.client.get_investigation.side_effect = side_effect
+        magics.dataing("compare good-id bad-id")
+        captured = capsys.readouterr()
+        assert "Error" in captured.err

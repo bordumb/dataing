@@ -137,6 +137,19 @@ class TestHypothesis:
         assert HypothesisCategory.DATA_QUALITY.value == "data_quality"
         assert HypothesisCategory.INFRASTRUCTURE.value == "infrastructure"
         assert HypothesisCategory.EXPECTED_VARIANCE.value == "expected_variance"
+        assert HypothesisCategory.CODE_CHANGE.value == "code_change"
+
+    def test_code_change_category_for_pipeline_changes(self) -> None:
+        """Test creating a hypothesis with CODE_CHANGE category."""
+        hypothesis = Hypothesis(
+            id="h002",
+            title="Recent code deploy altered query logic",
+            category=HypothesisCategory.CODE_CHANGE,
+            reasoning="The anomaly correlates with a recent code deployment.",
+            suggested_query="SELECT * FROM orders WHERE created_at > '2026-01-15' LIMIT 100",
+        )
+
+        assert hypothesis.category == HypothesisCategory.CODE_CHANGE
 
 
 class TestEvidence:
@@ -157,6 +170,73 @@ class TestEvidence:
         assert evidence.hypothesis_id == "h001"
         assert evidence.supports_hypothesis is True
         assert evidence.confidence == 0.85
+
+    def test_evidence_without_commit_refs(self) -> None:
+        """Test evidence defaults to None for commit_refs."""
+        evidence = Evidence(
+            hypothesis_id="h001",
+            query="SELECT 1",
+            result_summary="result",
+            row_count=1,
+            supports_hypothesis=True,
+            confidence=0.9,
+            interpretation="Test interpretation.",
+        )
+
+        assert evidence.commit_refs is None
+
+    def test_evidence_with_commit_refs(self) -> None:
+        """Test evidence with commit references."""
+        evidence = Evidence(
+            hypothesis_id="h001",
+            query="SELECT 1",
+            result_summary="result",
+            row_count=1,
+            supports_hypothesis=True,
+            confidence=0.9,
+            interpretation="Test interpretation.",
+            commit_refs=["abc123", "def456"],
+        )
+
+        assert evidence.commit_refs is not None
+        assert len(evidence.commit_refs) == 2
+        assert "abc123" in evidence.commit_refs
+        assert "def456" in evidence.commit_refs
+
+    def test_evidence_serializes_with_commit_refs(self) -> None:
+        """Test evidence serializes correctly with commit_refs."""
+        evidence = Evidence(
+            hypothesis_id="h001",
+            query="SELECT 1",
+            result_summary="result",
+            row_count=1,
+            supports_hypothesis=True,
+            confidence=0.9,
+            interpretation="Test interpretation.",
+            commit_refs=["abc123"],
+        )
+
+        data = evidence.model_dump()
+
+        assert "commit_refs" in data
+        assert data["commit_refs"] == ["abc123"]
+
+    def test_evidence_deserializes_with_commit_refs(self) -> None:
+        """Test evidence deserializes correctly with commit_refs."""
+        data = {
+            "hypothesis_id": "h001",
+            "query": "SELECT 1",
+            "result_summary": "result",
+            "row_count": 1,
+            "supports_hypothesis": True,
+            "confidence": 0.9,
+            "interpretation": "Test interpretation.",
+            "commit_refs": ["abc123", "def456"],
+        }
+
+        evidence = Evidence.model_validate(data)
+
+        assert evidence.commit_refs == ["abc123", "def456"]
 
 
 class TestFinding:

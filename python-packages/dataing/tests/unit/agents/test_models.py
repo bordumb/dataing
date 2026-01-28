@@ -369,6 +369,23 @@ class TestHypothesisResponse:
         assert response.expected_if_true is not None
         assert response.expected_if_false is not None
 
+    def test_code_change_category_accepted(self) -> None:
+        """Test that code_change category is accepted as valid."""
+        response = HypothesisResponse(
+            id="h1",
+            title="Recent code deploy broke the order calculation logic",
+            category=HypothesisCategory.CODE_CHANGE,
+            reasoning=(
+                "The anomaly appeared shortly after a code deployment "
+                "that modified the order processing pipeline"
+            ),
+            suggested_query="SELECT * FROM orders WHERE created_at > '2026-01-15' LIMIT 100",
+            expected_if_true="Anomalous values appearing after deploy timestamp",
+            expected_if_false="Values consistent before and after deploy",
+        )
+        assert response.category == HypothesisCategory.CODE_CHANGE
+        assert response.category.value == "code_change"
+
     def test_expected_if_true_required(self) -> None:
         """Test that expected_if_true is required."""
         with pytest.raises(ValidationError) as exc_info:

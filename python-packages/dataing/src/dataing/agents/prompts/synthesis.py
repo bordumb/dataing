@@ -8,7 +8,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from dataing.core.domain_types import AnomalyAlert, Evidence
+    from dataing.core.domain_types import AnomalyAlert, Evidence, RelevantCodeChange
 
 # Import for metric context helper
 from .hypothesis import _build_metric_context
@@ -51,7 +51,15 @@ REQUIRED FIELDS:
    - BAD: "Investigate the issue" or "Fix the data" (too vague)
    - GOOD: "Re-run stg_users job: airflow trigger_dag stg_users --backfill 2024-01-15"
    - GOOD: "Add NULL check constraint to orders.user_id column"
-   - GOOD: "Contact data-platform team to increase API rate limits for users sync"""
+   - GOOD: "Contact data-platform team to increase API rate limits for users sync"
+
+WHEN CODE CHANGES ARE RELEVANT:
+If the investigation includes recent code changes (commits), and a code deploy is the root cause:
+- Reference the commit hash (first 8 chars) in root_cause
+- Include "revert commit" or "fix commit" recommendations with the specific hash
+- Example root_cause: "Deploy of commit abc12345 introduced a bug in order validation logic"
+- Example recommendation: "Revert commit abc12345 or deploy hotfix to correct order validation"
+"""
 
 
 def build_system() -> str:
@@ -63,12 +71,51 @@ def build_system() -> str:
     return SYSTEM_PROMPT
 
 
-def build_user(alert: AnomalyAlert, evidence: list[Evidence]) -> str:
+def _build_code_changes_section(changes: list[RelevantCodeChange]) -> str:
+    """Build a formatted section showing related code changes.
+
+    Args:
+        changes: List of relevant code changes.
+
+    Returns:
+        Formatted string for inclusion in the prompt.
+    """
+    if not changes:
+        return ""
+
+    lines = ["## Related Code Changes"]
+    lines.append("These commits occurred near the anomaly timeframe:")
+    lines.append("")
+
+    for change in changes:
+        date_str = (
+            change.committed_at.strftime("%Y-%m-%d %H:%M") if change.committed_at else "unknown"
+        )
+        author = change.author_name or "unknown"
+        message = (change.message or "No message")[:80]  # Truncate for synthesis
+        commit_short = change.commit_hash[:8]
+
+        lines.append(f"- **{commit_short}** ({date_str}) by {author}: {message}")
+
+    lines.append("")
+    lines.append(
+        "If a code change caused the anomaly, reference the commit hash in root_cause "
+        "and recommendations."
+    )
+    return "\n".join(lines)
+
+
+def build_user(
+    alert: AnomalyAlert,
+    evidence: list[Evidence],
+    code_changes: list[RelevantCodeChange] | None = None,
+) -> str:
     """Build synthesis user prompt.
 
     Args:
         alert: The original anomaly alert.
         evidence: All collected evidence.
+        code_changes: Optional list of recent code changes related to the investigation.
 
     Returns:
         Formatted user prompt.
@@ -86,6 +133,10 @@ def build_user(alert: AnomalyAlert, evidence: list[Evidence]) -> str:
 
     metric_context = _build_metric_context(alert)
 
+    code_changes_section = ""
+    if code_changes:
+        code_changes_section = f"\n{_build_code_changes_section(code_changes)}\n"
+
     return f"""## Original Anomaly
 - Dataset: {alert.dataset_id}
 - Metric: {alert.metric_spec.display_name} deviated by {alert.deviation_pct}%
@@ -99,5 +150,5 @@ def build_user(alert: AnomalyAlert, evidence: list[Evidence]) -> str:
 
 ## Investigation Findings
 {evidence_text}
-
+{code_changes_section}
 Synthesize these findings into a root cause determination."""

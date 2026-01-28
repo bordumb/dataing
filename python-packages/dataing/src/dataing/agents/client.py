@@ -20,6 +20,7 @@ from dataing.core.domain_types import (
     InvestigationContext,
     LineageContext,
     MetricSpec,
+    RelevantCodeChange,
 )
 from dataing.core.exceptions import LLMError
 
@@ -106,6 +107,7 @@ class AgentClient:
         context: InvestigationContext,
         num_hypotheses: int = 5,
         handlers: StreamHandlers | None = None,
+        code_changes: list[RelevantCodeChange] | None = None,
     ) -> list[Hypothesis]:
         """Generate hypotheses for an anomaly.
 
@@ -114,6 +116,7 @@ class AgentClient:
             context: Available schema and lineage context.
             num_hypotheses: Target number of hypotheses.
             handlers: Optional streaming handlers for real-time updates.
+            code_changes: Optional list of recent code changes affecting the asset.
 
         Returns:
             List of validated Hypothesis objects.
@@ -122,7 +125,7 @@ class AgentClient:
             LLMError: If LLM call fails after retries.
         """
         system_prompt = hypothesis.build_system(num_hypotheses=num_hypotheses)
-        user_prompt = hypothesis.build_user(alert=alert, context=context)
+        user_prompt = hypothesis.build_user(alert=alert, context=context, code_changes=code_changes)
 
         try:
             result = await self._hypothesis_agent.ask(
@@ -279,6 +282,7 @@ class AgentClient:
         alert: AnomalyAlert,
         evidence: list[Evidence],
         handlers: StreamHandlers | None = None,
+        code_changes: list[RelevantCodeChange] | None = None,
     ) -> SynthesisResponse:
         """Synthesize all evidence into a root cause finding (raw response).
 
@@ -286,6 +290,7 @@ class AgentClient:
             alert: The original anomaly alert.
             evidence: All collected evidence.
             handlers: Optional streaming handlers for real-time updates.
+            code_changes: Optional list of code changes related to the investigation.
 
         Returns:
             Raw SynthesisResponse with all fields from LLM.
@@ -293,7 +298,7 @@ class AgentClient:
         Raises:
             LLMError: If synthesis fails.
         """
-        prompt = synthesis.build_user(alert=alert, evidence=evidence)
+        prompt = synthesis.build_user(alert=alert, evidence=evidence, code_changes=code_changes)
         system = synthesis.build_system()
 
         try:

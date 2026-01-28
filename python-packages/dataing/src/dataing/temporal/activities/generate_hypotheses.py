@@ -22,6 +22,7 @@ class GenerateHypothesesInput:
     lineage_info: dict[str, Any] | None
     matched_patterns: list[dict[str, Any]]
     max_hypotheses: int = 5
+    code_changes: list[dict[str, Any]] | None = None
 
 
 @dataclass
@@ -59,6 +60,7 @@ def make_generate_hypotheses_activity(
                 lineage_info=input.lineage_info,
                 num_hypotheses=input.max_hypotheses or max_hypotheses,
                 pattern_hints=pattern_hints if pattern_hints else None,
+                code_changes=input.code_changes,
             )
         except Exception as e:
             return GenerateHypothesesResult(

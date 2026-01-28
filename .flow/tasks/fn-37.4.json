@@ -1,16 +1,27 @@
 {
-  "assignee": null,
+  "assignee": "bordumbb@gmail.com",
   "claim_note": "",
-  "claimed_at": null,
+  "claimed_at": "2026-01-28T20:08:55.134405Z",
   "created_at": "2026-01-28T03:52:25.018166Z",
   "depends_on": [
     "fn-37.3"
   ],
   "epic": "fn-37",
+  "evidence": {
+    "commits": [
+      "14276d590b8417ae8887432c9e2395f608319455"
+    ],
+    "prs": [],
+    "tests": [
+      "uv run pytest python-packages/dataing/tests/unit/agents/test_synthesis_prompt.py -v",
+      "uv run pytest python-packages/dataing/tests/unit/agents/ -v",
+      "uv run mypy python-packages/dataing/src/dataing/agents/prompts/synthesis.py"
+    ]
+  },
   "id": "fn-37.4",
   "priority": 4,
   "spec_path": ".flow/tasks/fn-37.4.md",
-  "status": "todo",
+  "status": "done",
   "title": "Add Related Code Changes section to synthesis prompt and tests",
-  "updated_at": "2026-01-28T03:52:25.018412Z"
+  "updated_at": "2026-01-28T20:33:44.448428Z"
 }

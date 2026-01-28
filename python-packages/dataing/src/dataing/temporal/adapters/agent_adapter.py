@@ -35,6 +35,7 @@ from dataing.core.domain_types import (
     InvestigationContext,
     LineageContext,
     MetricSpec,
+    RelevantCodeChange,
 )
 
 
@@ -66,6 +67,7 @@ class TemporalAgentAdapter:
         lineage_info: dict[str, Any] | None,
         num_hypotheses: int = 5,
         pattern_hints: list[str] | None = None,
+        code_changes: list[dict[str, Any]] | None = None,
     ) -> list[dict[str, Any]]:
         """Generate hypotheses from dict inputs.
 
@@ -76,6 +78,7 @@ class TemporalAgentAdapter:
             lineage_info: Lineage info as dict.
             num_hypotheses: Target number of hypotheses.
             pattern_hints: Optional hints from pattern matching.
+            code_changes: Optional list of recent code changes affecting the asset.
 
         Returns:
             List of hypothesis dicts.
@@ -83,9 +86,12 @@ class TemporalAgentAdapter:
         alert_obj = self._to_alert(alert, alert_summary)
         schema_obj = self._to_schema(schema_info)
         lineage_obj = self._to_lineage(lineage_info)
+        code_changes_obj = self._to_code_changes(code_changes)
 
         context = InvestigationContext(schema=schema_obj, lineage=lineage_obj)
-        hypotheses = await self._client.generate_hypotheses(alert_obj, context, num_hypotheses)
+        hypotheses = await self._client.generate_hypotheses(
+            alert_obj, context, num_hypotheses, code_changes=code_changes_obj
+        )
 
         # Use mode="json" to ensure dates, UUIDs, etc. are JSON-serializable
         return [h.model_dump(mode="json") for h in hypotheses]
@@ -96,6 +102,7 @@ class TemporalAgentAdapter:
         evidence: list[dict[str, Any]],
         hypotheses: list[dict[str, Any]],
         alert_summary: str,
+        code_changes: list[dict[str, Any]] | None = None,
     ) -> dict[str, Any]:
         """Synthesize findings from dict inputs.
 
@@ -103,14 +110,18 @@ class TemporalAgentAdapter:
             evidence: List of evidence dicts.
             hypotheses: List of hypothesis dicts (unused but kept for API compat).
             alert_summary: Summary of the alert.
+            code_changes: Optional list of code changes related to the investigation.
 
         Returns:
             Synthesis result as dict.
         """
         evidence_objs = [self._to_evidence(e) for e in evidence]
         alert_obj = self._to_alert(None, alert_summary)
+        code_changes_obj = self._to_code_changes(code_changes)
 
-        result = await self._client.synthesize_findings_raw(alert_obj, evidence_objs)
+        result = await self._client.synthesize_findings_raw(
+            alert_obj, evidence_objs, code_changes=code_changes_obj
+        )
 
         return {
             "root_cause": result.root_cause,
@@ -368,6 +379,39 @@ class TemporalAgentAdapter:
             downstream=tuple(lineage_info.get("downstream", [])),
         )
 
+    def _to_code_changes(
+        self, code_changes: list[dict[str, Any]] | None
+    ) -> list[RelevantCodeChange] | None:
+        """Convert code changes dicts to RelevantCodeChange objects.
+
+        Args:
+            code_changes: List of code change dicts, or None.
+
+        Returns:
+            List of RelevantCodeChange objects or None.
+        """
+        if not code_changes:
+            return None
+
+        result = []
+        for change in code_changes:
+            try:
+                result.append(RelevantCodeChange.model_validate(change))
+            except Exception:
+                # Manual fallback for malformed data
+                result.append(
+                    RelevantCodeChange(
+                        commit_hash=change.get("commit_hash", "unknown"),
+                        author_name=change.get("author_name"),
+                        message=change.get("message"),
+                        committed_at=change.get("committed_at"),
+                        affected_assets=change.get("affected_assets", []),
+                        relevance_score=float(change.get("relevance_score", 0.0)),
+                        relevance_reason=change.get("relevance_reason", "unknown"),
+                    )
+                )
+        return result if result else None
+
     def _to_hypothesis(self, hypothesis: dict[str, Any]) -> Hypothesis:
         """Convert hypothesis dict to Hypothesis.
 
@@ -417,6 +461,7 @@ class TemporalAgentAdapter:
                 supports_hypothesis=evidence.get("supports_hypothesis"),
                 confidence=float(evidence.get("confidence", 0.0)),
                 interpretation=evidence.get("interpretation", ""),
+                commit_refs=evidence.get("commit_refs"),
             )
 
     def _to_query_result(self, query_result: dict[str, Any]) -> Any:

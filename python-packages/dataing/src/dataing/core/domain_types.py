@@ -113,6 +113,7 @@ class HypothesisCategory(str, Enum):
     DATA_QUALITY = "data_quality"
     INFRASTRUCTURE = "infrastructure"
     EXPECTED_VARIANCE = "expected_variance"
+    CODE_CHANGE = "code_change"
 
 
 class Hypothesis(BaseModel):
@@ -146,6 +147,7 @@ class Evidence(BaseModel):
         supports_hypothesis: Whether evidence supports the hypothesis.
         confidence: Confidence score from 0.0 to 1.0.
         interpretation: Human-readable interpretation of results.
+        commit_refs: Optional list of commit hashes linked to this evidence.
     """
 
     model_config = ConfigDict(frozen=True)
@@ -157,6 +159,7 @@ class Evidence(BaseModel):
     supports_hypothesis: bool | None
     confidence: float
     interpretation: str
+    commit_refs: list[str] | None = None
 
 
 class Finding(BaseModel):
@@ -287,3 +290,29 @@ class ApprovalDecision(BaseModel):
     decided_at: datetime
     comment: str | None = None
     modifications: dict[str, Any] | None = None
+
+
+class RelevantCodeChange(BaseModel):
+    """A code change relevant to an investigated asset.
+
+    Used by hypothesis generation to provide context about recent pipeline changes.
+
+    Attributes:
+        commit_hash: The git commit SHA.
+        author_name: Name of the commit author.
+        message: The commit message.
+        committed_at: When the commit was made.
+        affected_assets: List of asset identifiers affected by this commit.
+        relevance_score: How relevant this change is (1.0=exact, 0.7=upstream, 0.4=path).
+        relevance_reason: Human-readable explanation of why this change is relevant.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    commit_hash: str
+    author_name: str | None = None
+    message: str | None = None
+    committed_at: datetime | None = None
+    affected_assets: list[str] = []
+    relevance_score: float
+    relevance_reason: str

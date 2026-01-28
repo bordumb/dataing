@@ -35,7 +35,8 @@ CREATE TABLE code_changes (
     affected_assets JSONB DEFAULT '[]',
     raw_diff TEXT,
     files_changed TEXT[],
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
 -- Indexes for code_changes

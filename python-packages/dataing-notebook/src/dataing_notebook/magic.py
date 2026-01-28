@@ -167,6 +167,7 @@ class DataingMagics(Magics):
             "clear": self._handle_clear,
             "history": self._handle_history,
             "replay": self._handle_replay,
+            "compare": self._handle_compare,
             "help": self._show_help,
         }
 
@@ -227,6 +228,12 @@ Dataing Magic Commands
 
 %dataing replay <investigation_id> [--format rich|plain]
     Load and display a past investigation with all evidence.
+    Options:
+        --format, -f FORMAT  Output format: rich (default) or plain
+
+%dataing compare <id1> <id2> [--format rich|plain]
+    Compare two investigations side-by-side.
+    Shows differences in synthesis, evidence, and hypotheses.
     Options:
         --format, -f FORMAT  Output format: rich (default) or plain
 
@@ -533,6 +540,185 @@ Dataing Magic Commands
                     if len(val_str) > 100:
                         val_str = val_str[:100] + "..."
                     print(f"  {key}: {val_str}")
+
+    def _handle_compare(self, args: list[str]) -> None:
+        """Handle compare subcommand -- diff two investigations.
+
+        Args:
+            args: Command arguments.
+        """
+        parser = argparse.ArgumentParser(prog="%dataing compare")
+        parser.add_argument("id1", help="First investigation UUID")
+        parser.add_argument("id2", help="Second investigation UUID")
+        parser.add_argument(
+            "--format",
+            "-f",
+            choices=["rich", "plain"],
+            default="rich",
+            help="Output format",
+        )
+
+        try:
+            parsed = parser.parse_args(args)
+        except SystemExit:
+            return
+
+        if self._state.client is None:
+            print("Error: Not connected. Use '%dataing connect' first.", file=sys.stderr)
+            return
+
+        # Fetch both investigations
+        try:
+            inv1 = self._state.client.get_investigation(parsed.id1)
+        except Exception as e:
+            print(f"Error fetching investigation {parsed.id1}: {e}", file=sys.stderr)
+            return
+
+        try:
+            inv2 = self._state.client.get_investigation(parsed.id2)
+        except Exception as e:
+            print(f"Error fetching investigation {parsed.id2}: {e}", file=sys.stderr)
+            return
+
+        self._render_comparison(inv1, inv2, parsed.format)
+
+    def _render_comparison(self, inv1: Any, inv2: Any, fmt: str) -> None:
+        """Render side-by-side comparison of two investigations.
+
+        Args:
+            inv1: First InvestigationState.
+            inv2: Second InvestigationState.
+            fmt: Output format ('rich' or 'plain').
+        """
+        # Column width for each side
+        col_width = 40
+
+        def truncate(s: str, width: int) -> str:
+            return s[: width - 3] + "..." if len(s) > width else s.ljust(width)
+
+        print("=" * (col_width * 2 + 5))
+        print("INVESTIGATION COMPARISON")
+        print("=" * (col_width * 2 + 5))
+        print("")
+
+        # Header comparison
+        print(
+            f"{'ID:':<8}{truncate(inv1.investigation_id, col_width)}  |  "
+            f"{truncate(inv2.investigation_id, col_width)}"
+        )
+        print(
+            f"{'Status:':<8}{truncate(inv1.status, col_width)}  |  "
+            f"{truncate(inv2.status, col_width)}"
+        )
+
+        # Show status diff if different
+        if inv1.status != inv2.status:
+            print("         ^ STATUS DIFFERS ^")
+        print("")
+
+        # Synthesis comparison
+        print("-" * (col_width * 2 + 5))
+        print("SYNTHESIS / ROOT CAUSE")
+        print("-" * (col_width * 2 + 5))
+
+        synth1 = inv1.main_branch.synthesis
+        synth2 = inv2.main_branch.synthesis
+
+        root1 = self._extract_root_cause(synth1)
+        root2 = self._extract_root_cause(synth2)
+
+        if root1 or root2:
+            print(f"Left:  {truncate(root1 or '(none)', col_width * 2)}")
+            print(f"Right: {truncate(root2 or '(none)', col_width * 2)}")
+            if root1 != root2:
+                print("  ^ DIFFERS ^")
+        else:
+            print("(No synthesis available for either investigation)")
+        print("")
+
+        # Evidence comparison
+        print("-" * (col_width * 2 + 5))
+        print("EVIDENCE COMPARISON")
+        print("-" * (col_width * 2 + 5))
+
+        evidence1 = inv1.main_branch.evidence
+        evidence2 = inv2.main_branch.evidence
+
+        # Create evidence signatures for comparison
+        sigs1 = {self._evidence_signature(e): e for e in evidence1}
+        sigs2 = {self._evidence_signature(e): e for e in evidence2}
+
+        shared = set(sigs1.keys()) & set(sigs2.keys())
+        only_in_1 = set(sigs1.keys()) - set(sigs2.keys())
+        only_in_2 = set(sigs2.keys()) - set(sigs1.keys())
+
+        print(f"Shared evidence items: {len(shared)}")
+        print(f"Only in left:  {len(only_in_1)}")
+        print(f"Only in right: {len(only_in_2)}")
+        print("")
+
+        if only_in_1:
+            print("Unique to LEFT:")
+            for sig in list(only_in_1)[:5]:
+                ev = sigs1[sig]
+                kind = ev.get("kind", "unknown")
+                print(f"  - [{kind}] {sig[:60]}")
+            if len(only_in_1) > 5:
+                print(f"  ... and {len(only_in_1) - 5} more")
+            print("")
+
+        if only_in_2:
+            print("Unique to RIGHT:")
+            for sig in list(only_in_2)[:5]:
+                ev = sigs2[sig]
+                kind = ev.get("kind", "unknown")
+                print(f"  - [{kind}] {sig[:60]}")
+            if len(only_in_2) > 5:
+                print(f"  ... and {len(only_in_2) - 5} more")
+            print("")
+
+        print("=" * (col_width * 2 + 5))
+
+    def _extract_root_cause(self, synthesis: dict[str, Any] | None) -> str:
+        """Extract root cause string from synthesis dict.
+
+        Args:
+            synthesis: Synthesis dict or None.
+
+        Returns:
+            Root cause string or empty string.
+        """
+        if not synthesis:
+            return ""
+        if isinstance(synthesis, dict):
+            return str(synthesis.get("root_cause", synthesis.get("summary", "")))
+        return str(synthesis)
+
+    def _evidence_signature(self, evidence: dict[str, Any]) -> str:
+        """Create a signature for evidence comparison.
+
+        Args:
+            evidence: Evidence dict.
+
+        Returns:
+            Signature string for comparison.
+        """
+        kind = evidence.get("kind", "")
+        if kind == "sql_result":
+            sql = evidence.get("sql", "")
+            return f"sql:{sql[:100]}"
+        elif kind == "metric":
+            metric = evidence.get("metric", "")
+            return f"metric:{metric}"
+        elif kind == "hypothesis":
+            hyp = evidence.get("hypothesis", evidence.get("text", ""))
+            return f"hypothesis:{hyp[:100]}"
+        else:
+            # Use first significant key-value
+            for k, v in evidence.items():
+                if k not in ("kind", "seq", "prev_hash", "hash"):
+                    return f"{kind}:{k}:{str(v)[:50]}"
+            return f"{kind}:unknown"
 
     def _handle_connect(self, args: list[str]) -> None:
         """Handle connect subcommand.

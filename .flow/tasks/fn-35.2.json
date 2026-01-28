@@ -1,16 +1,25 @@
 {
-  "assignee": null,
+  "assignee": "bordumbb@gmail.com",
   "claim_note": "",
-  "claimed_at": null,
+  "claimed_at": "2026-01-28T18:31:20.107599Z",
   "created_at": "2026-01-28T03:51:10.274509Z",
   "depends_on": [
     "fn-35.1"
   ],
   "epic": "fn-35",
+  "evidence": {
+    "commits": [
+      "0c4cca014356ec1d206cbdfbbe7664430bbc4e3a"
+    ],
+    "prs": [],
+    "tests": [
+      "uv run pytest python-packages/dataing-notebook/tests/test_magic.py -v"
+    ]
+  },
   "id": "fn-35.2",
   "priority": 2,
   "spec_path": ".flow/tasks/fn-35.2.md",
-  "status": "todo",
+  "status": "done",
   "title": "Add replay magic handler to load investigation with evidence",
-  "updated_at": "2026-01-28T03:51:10.274739Z"
+  "updated_at": "2026-01-28T18:33:05.273682Z"
 }

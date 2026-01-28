@@ -166,6 +166,7 @@ class DataingMagics(Magics):
             "status": self._handle_status,
             "clear": self._handle_clear,
             "history": self._handle_history,
+            "replay": self._handle_replay,
             "help": self._show_help,
         }
 
@@ -223,6 +224,11 @@ Dataing Magic Commands
         --days, -n N         Show investigations from last N days (default: 30)
         --limit, -l N        Max results to return (default: 20)
         --offset N           Pagination offset (default: 0)
+
+%dataing replay <investigation_id> [--format rich|plain]
+    Load and display a past investigation with all evidence.
+    Options:
+        --format, -f FORMAT  Output format: rich (default) or plain
 
 %dataing help
     Show this help message.
@@ -359,6 +365,174 @@ Dataing Magic Commands
         print(f"Showing {offset + 1}-{showing_end} of {total} investigations")
         if showing_end < total:
             print(f"Use --offset {showing_end} to see more")
+
+    def _handle_replay(self, args: list[str]) -> None:
+        """Handle replay subcommand -- load a past investigation.
+
+        Args:
+            args: Command arguments.
+        """
+        parser = argparse.ArgumentParser(prog="%dataing replay")
+        parser.add_argument("investigation_id", help="Investigation UUID to replay")
+        parser.add_argument(
+            "--format",
+            "-f",
+            choices=["rich", "plain"],
+            default="rich",
+            help="Output format",
+        )
+
+        try:
+            parsed = parser.parse_args(args)
+        except SystemExit:
+            return
+
+        if self._state.client is None:
+            print("Error: Not connected. Use '%dataing connect' first.", file=sys.stderr)
+            return
+
+        try:
+            # Fetch full investigation state from API
+            investigation = self._state.client.get_investigation(parsed.investigation_id)
+
+            # Store in session history for export
+            self._state._history.append(
+                {
+                    "action": "replay",
+                    "investigation_id": parsed.investigation_id,
+                    "investigation": {
+                        "investigation_id": investigation.investigation_id,
+                        "status": investigation.status,
+                        "main_branch": {
+                            "branch_id": investigation.main_branch.branch_id,
+                            "status": investigation.main_branch.status,
+                            "current_step": investigation.main_branch.current_step,
+                            "synthesis": investigation.main_branch.synthesis,
+                            "evidence": investigation.main_branch.evidence,
+                        },
+                        "root_hash": investigation.root_hash,
+                    },
+                }
+            )
+
+            # Render investigation details
+            self._render_replay(investigation, parsed.format)
+
+        except Exception as e:
+            error_msg = str(e)
+            if "404" in error_msg or "not found" in error_msg.lower():
+                print(
+                    f"Error: Investigation not found: {parsed.investigation_id}",
+                    file=sys.stderr,
+                )
+            else:
+                print(f"Error fetching investigation: {e}", file=sys.stderr)
+
+    def _render_replay(self, investigation: Any, fmt: str) -> None:
+        """Render a replayed investigation.
+
+        Args:
+            investigation: InvestigationState object from SDK.
+            fmt: Output format ('rich' or 'plain').
+        """
+        print("=" * 60)
+        print("INVESTIGATION REPLAY")
+        print("=" * 60)
+        print(f"ID:     {investigation.investigation_id}")
+        print(f"Status: {investigation.status}")
+        if investigation.root_hash:
+            print(f"Hash:   {investigation.root_hash[:16]}...")
+        print("")
+
+        main_branch = investigation.main_branch
+
+        # Show synthesis if available (completed investigations)
+        if main_branch.synthesis:
+            print("-" * 40)
+            print("ROOT CAUSE ANALYSIS")
+            print("-" * 40)
+            synthesis = main_branch.synthesis
+            if isinstance(synthesis, dict):
+                if "root_cause" in synthesis:
+                    print(f"\n{synthesis['root_cause']}")
+                if "summary" in synthesis:
+                    print(f"\nSummary: {synthesis['summary']}")
+                if "recommendations" in synthesis:
+                    print("\nRecommendations:")
+                    recs = synthesis["recommendations"]
+                    if isinstance(recs, list):
+                        for rec in recs:
+                            print(f"  • {rec}")
+                    else:
+                        print(f"  {recs}")
+            else:
+                print(str(synthesis))
+            print("")
+
+        # Show evidence
+        evidence_list = main_branch.evidence
+        if evidence_list:
+            print("-" * 40)
+            print(f"EVIDENCE ({len(evidence_list)} items)")
+            print("-" * 40)
+
+            for i, evidence in enumerate(evidence_list, 1):
+                self._render_evidence_item(evidence, i, fmt)
+        else:
+            print("No evidence collected yet.")
+
+        # Show current step for running investigations
+        if investigation.status in ("running", "queued"):
+            print("")
+            print(f"Current Step: {main_branch.current_step}")
+
+        print("")
+        print("=" * 60)
+
+    def _render_evidence_item(self, evidence: dict[str, Any], index: int, fmt: str) -> None:
+        """Render a single evidence item.
+
+        Args:
+            evidence: Evidence dict from API.
+            index: Evidence item number.
+            fmt: Output format.
+        """
+        kind = evidence.get("kind", "unknown")
+        print(f"\n[{index}] {kind.upper()}")
+
+        if kind == "sql_result":
+            # SQL evidence
+            sql = evidence.get("sql", "")
+            if sql:
+                print(f"  SQL: {sql[:100]}{'...' if len(sql) > 100 else ''}")
+            rows = evidence.get("row_count", evidence.get("rows", "?"))
+            print(f"  Rows: {rows}")
+            conclusion = evidence.get("conclusion", "")
+            if conclusion:
+                print(f"  Conclusion: {conclusion}")
+
+        elif kind == "metric":
+            # Metric evidence
+            metric = evidence.get("metric", "")
+            value = evidence.get("value", "")
+            print(f"  Metric: {metric} = {value}")
+
+        elif kind == "hypothesis":
+            # Hypothesis
+            hypothesis = evidence.get("hypothesis", evidence.get("text", ""))
+            status = evidence.get("status", "")
+            print(f"  Hypothesis: {hypothesis}")
+            if status:
+                print(f"  Status: {status}")
+
+        else:
+            # Generic evidence
+            for key, value in evidence.items():
+                if key not in ("kind", "seq", "prev_hash", "hash"):
+                    val_str = str(value)
+                    if len(val_str) > 100:
+                        val_str = val_str[:100] + "..."
+                    print(f"  {key}: {val_str}")
 
     def _handle_connect(self, args: list[str]) -> None:
         """Handle connect subcommand.

@@ -1,16 +1,23 @@
 {
-  "assignee": null,
+  "assignee": "bordumbb@gmail.com",
   "claim_note": "",
-  "claimed_at": null,
+  "claimed_at": "2026-01-28T18:57:50.139437Z",
   "created_at": "2026-01-28T03:51:43.495221Z",
   "depends_on": [
     "fn-36.3"
   ],
   "epic": "fn-36",
+  "evidence": {
+    "commits": [
+      "1488f0ff2caa109d48ea57b062a768f446774ba7"
+    ],
+    "prs": [],
+    "tests": []
+  },
   "id": "fn-36.4",
   "priority": 4,
   "spec_path": ".flow/tasks/fn-36.4.md",
-  "status": "todo",
+  "status": "done",
   "title": "Implement GitHub OAuth provider and git commit parser",
-  "updated_at": "2026-01-28T03:51:43.495477Z"
+  "updated_at": "2026-01-28T19:01:26.942078Z"
 }

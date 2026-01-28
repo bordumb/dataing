@@ -7,7 +7,7 @@ from typing import Annotated
 import typer
 from rich.console import Console
 
-from dataing_cli.commands import ask, ds, repo, run
+from dataing_cli.commands import ask, ds, git, repo, run
 
 app = typer.Typer(
     name="dataing",
@@ -167,6 +167,7 @@ app.add_typer(run.app, name="run", help="Manage investigation runs")
 app.add_typer(ds.app, name="ds", help="Manage datasources")
 app.add_typer(ask.app, name="ask", help="Interactive investigation mode")
 app.add_typer(repo.app, name="repo", help="Manage dataset-to-repository mappings")
+app.add_typer(git.app, name="git", help="Manage git repository connections")
 
 
 if __name__ == "__main__":

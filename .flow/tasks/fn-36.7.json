@@ -1,16 +1,23 @@
 {
-  "assignee": null,
+  "assignee": "bordumbb@gmail.com",
   "claim_note": "",
-  "claimed_at": null,
+  "claimed_at": "2026-01-28T19:08:49.542365Z",
   "created_at": "2026-01-28T03:51:58.659280Z",
   "depends_on": [
     "fn-36.6"
   ],
   "epic": "fn-36",
+  "evidence": {
+    "commits": [
+      "b0f93f23568f522564ceda505a87bb049787c3d9"
+    ],
+    "prs": [],
+    "tests": []
+  },
   "id": "fn-36.7",
   "priority": 7,
   "spec_path": ".flow/tasks/fn-36.7.md",
-  "status": "todo",
+  "status": "done",
   "title": "Add CLI commands: dataing git connect, sync, list",
-  "updated_at": "2026-01-28T03:51:58.659446Z"
+  "updated_at": "2026-01-28T19:13:16.983353Z"
 }

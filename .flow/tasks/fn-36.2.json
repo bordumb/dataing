@@ -1,16 +1,23 @@
 {
-  "assignee": null,
+  "assignee": "bordumbb@gmail.com",
   "claim_note": "",
-  "claimed_at": null,
+  "claimed_at": "2026-01-28T18:52:50.322672Z",
   "created_at": "2026-01-28T03:51:32.788406Z",
   "depends_on": [
     "fn-36.1"
   ],
   "epic": "fn-36",
+  "evidence": {
+    "commits": [
+      "2a8c69978e28ae05416080b29b0bb72494ff2d12"
+    ],
+    "prs": [],
+    "tests": []
+  },
   "id": "fn-36.2",
   "priority": 2,
   "spec_path": ".flow/tasks/fn-36.2.md",
-  "status": "todo",
+  "status": "done",
   "title": "Create SQLAlchemy models for git_repositories and code_changes",
-  "updated_at": "2026-01-28T03:51:32.788585Z"
+  "updated_at": "2026-01-28T18:54:32.245176Z"
 }

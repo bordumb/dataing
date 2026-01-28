@@ -91,6 +91,10 @@ class Settings:
         # Investigation engine: "temporal" (durable workflow execution)
         self.INVESTIGATION_ENGINE = os.getenv("INVESTIGATION_ENGINE", "temporal")
 
+        # GitHub OAuth settings for git integration
+        self.github_client_id = os.getenv("GITHUB_CLIENT_ID", "")
+        self.github_client_secret = os.getenv("GITHUB_CLIENT_SECRET", "")
+
 
 settings = Settings()
 

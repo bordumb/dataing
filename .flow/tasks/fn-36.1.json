@@ -1,14 +1,21 @@
 {
-  "assignee": null,
+  "assignee": "bordumbb@gmail.com",
   "claim_note": "",
-  "claimed_at": null,
+  "claimed_at": "2026-01-28T18:51:14.936101Z",
   "created_at": "2026-01-28T03:51:28.585985Z",
   "depends_on": [],
   "epic": "fn-36",
+  "evidence": {
+    "commits": [
+      "10371147b5e52815b04f4c03a59055c225cb4d38"
+    ],
+    "prs": [],
+    "tests": []
+  },
   "id": "fn-36.1",
   "priority": 1,
   "spec_path": ".flow/tasks/fn-36.1.md",
-  "status": "todo",
+  "status": "done",
   "title": "Create migration for git_repositories and code_changes tables",
-  "updated_at": "2026-01-28T03:51:28.586155Z"
+  "updated_at": "2026-01-28T18:52:18.795377Z"
 }

@@ -1,16 +1,23 @@
 {
-  "assignee": null,
+  "assignee": "bordumbb@gmail.com",
   "claim_note": "",
-  "claimed_at": null,
+  "claimed_at": "2026-01-28T19:02:06.625429Z",
   "created_at": "2026-01-28T03:51:49.582520Z",
   "depends_on": [
     "fn-36.4"
   ],
   "epic": "fn-36",
+  "evidence": {
+    "commits": [
+      "135f65db8790e57c427932385d0f4d38be8a6edd"
+    ],
+    "prs": [],
+    "tests": []
+  },
   "id": "fn-36.5",
   "priority": 5,
   "spec_path": ".flow/tasks/fn-36.5.md",
-  "status": "todo",
+  "status": "done",
   "title": "Build asset matching: parse SQL/dbt refs from diffs",
-  "updated_at": "2026-01-28T03:51:49.582719Z"
+  "updated_at": "2026-01-28T19:04:56.209700Z"
 }

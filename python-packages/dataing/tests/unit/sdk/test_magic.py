@@ -158,7 +158,7 @@ class TestDataingMagics:
         assert "Invalid investigation ID format" in captured.out
 
     @patch("dataing.sdk.magic._fetch_snapshot")
-    @patch("dataing.sdk.magic.load_snapshot")
+    @patch("dataing.sdk.snapshot.load_snapshot")
     def test_hydrate_success(
         self,
         mock_load: MagicMock,
@@ -251,7 +251,7 @@ class TestDataingMagics:
         assert "Unknown command" in captured.out
 
     @patch("dataing.sdk.magic._fetch_snapshot")
-    @patch("dataing.sdk.magic.load_snapshot")
+    @patch("dataing.sdk.snapshot.load_snapshot")
     def test_hydrate_with_namespace(
         self,
         mock_load: MagicMock,
@@ -279,7 +279,7 @@ class TestDataingMagics:
         assert "myns_hypotheses" in magics.shell.user_ns
 
     @patch("dataing.sdk.magic._fetch_snapshot")
-    @patch("dataing.sdk.magic.load_snapshot")
+    @patch("dataing.sdk.snapshot.load_snapshot")
     def test_hydrate_warns_about_existing_vars(
         self,
         mock_load: MagicMock,
@@ -312,7 +312,7 @@ class TestDataingMagics:
         assert "dataing_alert" in captured.out
 
     @patch("dataing.sdk.magic._fetch_snapshot")
-    @patch("dataing.sdk.magic.load_snapshot")
+    @patch("dataing.sdk.snapshot.load_snapshot")
     def test_hydrate_with_overwrite(
         self,
         mock_load: MagicMock,

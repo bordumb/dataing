@@ -27,9 +27,12 @@ import os
 import re
 import urllib.error
 import urllib.request
-from typing import Any
+from collections.abc import Callable
+from typing import Any, TypeVar
 
 logger = logging.getLogger(__name__)
+
+F = TypeVar("F", bound=Callable[..., Any])
 
 
 # Stub base class for when IPython is not available
@@ -41,53 +44,74 @@ class _StubMagics:
         self.shell = shell
 
 
+def _stub_magics_class(cls: F) -> F:
+    """Stub decorator when IPython not available."""
+    return cls
+
+
+def _stub_line_magic(func: F) -> F:
+    """Stub decorator when IPython not available."""
+    return func
+
+
+def _stub_magic_arguments() -> Callable[[F], F]:
+    """Stub decorator when IPython not available."""
+
+    def decorator(func: F) -> F:
+        return func
+
+    return decorator
+
+
+def _stub_argument(*args: Any, **kwargs: Any) -> Callable[[F], F]:
+    """Stub decorator when IPython not available."""
+
+    def decorator(func: F) -> F:
+        return func
+
+    return decorator
+
+
+def _stub_parse_argstring(func: Any, line: str) -> argparse.Namespace:
+    """Stub function when IPython not available."""
+    # Parse manually for basic compatibility
+    parser = argparse.ArgumentParser()
+    parser.add_argument("command")
+    parser.add_argument("args", nargs="*")
+    parser.add_argument("--checkpoint", "-c", default="complete")
+    parser.add_argument("--namespace", "-n", default="dataing")
+    parser.add_argument("--overwrite", "-o", action="store_true")
+    return parser.parse_args(line.split())
+
+
 # IPython is optional - only available in notebook environments
 IPYTHON_AVAILABLE = False
 BaseMagics: type = _StubMagics
 
+# Initialize with stubs
+magics_class: Callable[[F], F] = _stub_magics_class
+line_magic: Callable[[F], F] = _stub_line_magic
+magic_arguments: Callable[[], Callable[[F], F]] = _stub_magic_arguments
+argument: Callable[..., Callable[[F], F]] = _stub_argument
+parse_argstring: Callable[[Any, str], Any] = _stub_parse_argstring
+
 try:
     from IPython.core.magic import Magics as IPythonMagics
-    from IPython.core.magic import line_magic, magics_class
-    from IPython.core.magic_arguments import argument, magic_arguments, parse_argstring
+    from IPython.core.magic import line_magic as _ipython_line_magic
+    from IPython.core.magic import magics_class as _ipython_magics_class
+    from IPython.core.magic_arguments import argument as _ipython_argument
+    from IPython.core.magic_arguments import magic_arguments as _ipython_magic_arguments
+    from IPython.core.magic_arguments import parse_argstring as _ipython_parse_argstring
 
     IPYTHON_AVAILABLE = True
     BaseMagics = IPythonMagics
+    magics_class = _ipython_magics_class  # type: ignore[assignment]
+    line_magic = _ipython_line_magic  # type: ignore[assignment]
+    magic_arguments = _ipython_magic_arguments  # type: ignore[assignment]
+    argument = _ipython_argument  # type: ignore[assignment]
+    parse_argstring = _ipython_parse_argstring  # type: ignore[assignment]
 except ImportError:
-    # Provide stub decorators when IPython is not available
-    def magics_class(cls: type) -> type:
-        """Stub decorator when IPython not available."""
-        return cls
-
-    def line_magic(func: Any) -> Any:
-        """Stub decorator when IPython not available."""
-        return func
-
-    def magic_arguments() -> Any:
-        """Stub decorator when IPython not available."""
-
-        def decorator(func: Any) -> Any:
-            return func
-
-        return decorator
-
-    def argument(*args: Any, **kwargs: Any) -> Any:
-        """Stub decorator when IPython not available."""
-
-        def decorator(func: Any) -> Any:
-            return func
-
-        return decorator
-
-    def parse_argstring(func: Any, line: str) -> Any:
-        """Stub function when IPython not available."""
-        # Parse manually for basic compatibility
-        parser = argparse.ArgumentParser()
-        parser.add_argument("command")
-        parser.add_argument("args", nargs="*")
-        parser.add_argument("--checkpoint", "-c", default="complete")
-        parser.add_argument("--namespace", "-n", default="dataing")
-        parser.add_argument("--overwrite", "-o", action="store_true")
-        return parser.parse_args(line.split())
+    pass
 
 
 def _get_api_client() -> tuple[str, dict[str, str]]:
@@ -179,7 +203,7 @@ def _list_investigations(limit: int = 10) -> list[dict[str, Any]]:
 
 
 @magics_class
-class DataingMagics(BaseMagics):
+class DataingMagics(BaseMagics):  # type: ignore[misc]
     """IPython magic commands for Dataing integration."""
 
     @line_magic

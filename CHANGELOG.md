@@ -1,3 +1,10 @@
+# [1.13.0](https://github.com/bordumb/dataing/compare/v1.12.0...v1.13.0) (2026-01-29)
+
+
+### Features
+
+* Ghost State Hydrator - Remote Investigation State Hydration ([#103](https://github.com/bordumb/dataing/issues/103)) ([494dd5d](https://github.com/bordumb/dataing/commit/494dd5d0a233a81f558a821e7441329c0be02c44))
+
 # [1.12.0](https://github.com/bordumb/dataing/compare/v1.11.0...v1.12.0) (2026-01-28)
 
 

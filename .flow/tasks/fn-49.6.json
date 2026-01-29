@@ -1,7 +1,7 @@
 {
-  "assignee": null,
+  "assignee": "bordumbb@gmail.com",
   "claim_note": "",
-  "claimed_at": null,
+  "claimed_at": "2026-01-28T23:53:32.981940Z",
   "created_at": "2026-01-28T22:13:29.804028Z",
   "depends_on": [
     "fn-49.5"
@@ -10,7 +10,7 @@
   "id": "fn-49.6",
   "priority": null,
   "spec_path": ".flow/tasks/fn-49.6.md",
-  "status": "todo",
+  "status": "in_progress",
   "title": "Add Snapshot Diff Comparison",
-  "updated_at": "2026-01-28T22:23:12.411387Z"
+  "updated_at": "2026-01-28T23:53:32.982148Z"
 }

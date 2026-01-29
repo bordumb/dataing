@@ -209,6 +209,7 @@ class DataingMagics(BaseMagics):
 
         Usage:
             %dataing hydrate <investigation_id> [--checkpoint <checkpoint>]
+            %dataing diff <spec1> <spec2>
             %dataing list
             %dataing help
         """
@@ -217,6 +218,8 @@ class DataingMagics(BaseMagics):
 
         if command == "hydrate":
             self._hydrate(args)
+        elif command == "diff":
+            self._diff(args)
         elif command == "list":
             self._list_investigations(args)
         elif command == "help":
@@ -298,6 +301,81 @@ class DataingMagics(BaseMagics):
         except Exception as e:
             print(f"Error hydrating snapshot: {e}")
             logger.exception("Failed to hydrate snapshot")
+
+    def _diff(self, args: Any) -> None:
+        """Compare two snapshots.
+
+        Args:
+            args: Parsed magic arguments containing snapshot specs.
+
+        Format:
+            %dataing diff inv_id:checkpoint1 inv_id:checkpoint2
+            %dataing diff inv_id:start inv_id:complete
+        """
+        from dataing.sdk.diff import compare_snapshots
+        from dataing.sdk.snapshot import load_snapshot
+
+        if len(args.args) < 2:
+            print("Error: Two snapshot specs required")
+            print("Usage: %dataing diff <inv_id:checkpoint> <inv_id:checkpoint>")
+            print("Example: %dataing diff abc123:start abc123:complete")
+            return
+
+        spec1 = args.args[0]
+        spec2 = args.args[1]
+
+        # Parse specs (format: investigation_id:checkpoint or just investigation_id)
+        def parse_spec(spec: str) -> tuple[str, str]:
+            if ":" in spec:
+                parts = spec.split(":", 1)
+                return parts[0], parts[1]
+            return spec, "complete"
+
+        inv1, checkpoint1 = parse_spec(spec1)
+        inv2, checkpoint2 = parse_spec(spec2)
+
+        # Validate UUIDs
+        uuid_pattern = r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+        for inv_id, name in [(inv1, "first"), (inv2, "second")]:
+            if not re.match(uuid_pattern, inv_id.lower()):
+                print(f"Error: Invalid {name} investigation ID: {inv_id}")
+                return
+
+        print(f"Comparing {inv1}:{checkpoint1} with {inv2}:{checkpoint2}...")
+
+        try:
+            # Fetch both snapshots
+            print("  Downloading first snapshot...")
+            bytes1 = _fetch_snapshot(inv1, checkpoint1)
+            print("  Downloading second snapshot...")
+            bytes2 = _fetch_snapshot(inv2, checkpoint2)
+
+            # Deserialize
+            print("  Deserializing snapshots...")
+            state1 = load_snapshot(bytes1, lazy_dataframes=False)
+            state2 = load_snapshot(bytes2, lazy_dataframes=False)
+
+            # Compare
+            print("  Computing diff...")
+            diff = compare_snapshots(state1, state2)
+
+            # Display result
+            print("\n" + "=" * 60)
+            print(diff.summary())
+            print("=" * 60)
+
+            # Store diff in namespace for further exploration
+            shell = self.shell
+            shell.user_ns["dataing_diff"] = diff
+            print("\nDiff object stored as 'dataing_diff'")
+            print("  View as HTML: display(dataing_diff)")
+            print("  Export as markdown: print(dataing_diff.to_markdown())")
+
+        except RuntimeError as e:
+            print(f"Error: {e}")
+        except Exception as e:
+            print(f"Error comparing snapshots: {e}")
+            logger.exception("Failed to compare snapshots")
 
     def _get_variable_names(self, state: Any, namespace: str) -> list[str]:
         """Get list of variable names that would be injected.
@@ -425,6 +503,25 @@ Hydrate investigation state:
         dataing_lineage     - QueryableLineage for data dependencies
         dataing_state       - Full HydratedState object
         df_<table>          - pandas DataFrames for each sampled table
+
+Compare two snapshots:
+    %dataing diff <spec1> <spec2>
+
+    Spec format: <investigation_id>:<checkpoint>
+    Checkpoints: start, hypothesis_generated, complete, failed
+
+    Examples:
+        %dataing diff abc123:start abc123:complete
+        %dataing diff abc123:hypothesis_generated abc123:complete
+
+    Output includes changes to:
+        - Schema (added/removed tables, columns, type changes)
+        - Hypotheses (added/removed, status changes)
+        - Evidence (added/removed)
+        - Synthesis (root cause, confidence)
+        - DataFrames (row counts, value changes)
+
+    The diff object is stored as 'dataing_diff' for further exploration.
 
 List recent investigations:
     %dataing list

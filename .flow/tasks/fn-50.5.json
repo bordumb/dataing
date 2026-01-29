@@ -1,0 +1,17 @@
+{
+  "assignee": null,
+  "claim_note": "",
+  "claimed_at": null,
+  "created_at": "2026-01-28T22:13:38.508754Z",
+  "depends_on": [
+    "fn-50.3",
+    "fn-50.4"
+  ],
+  "epic": "fn-50",
+  "id": "fn-50.5",
+  "priority": null,
+  "spec_path": ".flow/tasks/fn-50.5.md",
+  "status": "todo",
+  "title": "Implement Fix Execution Engine with transactions",
+  "updated_at": "2026-01-28T22:23:22.025789Z"
+}

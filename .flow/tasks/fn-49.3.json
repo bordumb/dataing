@@ -1,0 +1,30 @@
+{
+  "assignee": "bordumbb@gmail.com",
+  "claim_note": "",
+  "claimed_at": "2026-01-28T23:32:39.971719Z",
+  "created_at": "2026-01-28T22:13:29.225723Z",
+  "depends_on": [
+    "fn-49.2"
+  ],
+  "epic": "fn-49",
+  "evidence": {
+    "files_modified": [
+      "python-packages/dataing/src/dataing/entrypoints/api/routes/investigations.py",
+      "python-packages/dataing/tests/unit/entrypoints/api/routes/test_investigations.py"
+    ],
+    "mypy_status": "pass",
+    "new_endpoints": [
+      "GET /investigations/{id}/snapshots",
+      "GET /investigations/{id}/snapshots/{checkpoint}"
+    ],
+    "ruff_status": "pass",
+    "tests_added": 5,
+    "tests_passed": 23
+  },
+  "id": "fn-49.3",
+  "priority": null,
+  "spec_path": ".flow/tasks/fn-49.3.md",
+  "status": "done",
+  "title": "Build Snapshot Download API with streaming and auth",
+  "updated_at": "2026-01-28T23:36:32.309644Z"
+}

@@ -80,3 +80,34 @@ export interface IWorkspaceState {
   binding: IBindingState;
   run: IRunState;
 }
+
+/**
+ * Investigation list item from API
+ */
+export interface IInvestigationItem {
+  investigation_id: string;
+  status: string;
+  created_at: string;
+  dataset_id: string;
+}
+
+/**
+ * Snapshot information
+ */
+export interface ISnapshotItem {
+  checkpoint: string;
+  captured_at: string;
+  storage_path: string;
+  size_bytes?: number;
+}
+
+/**
+ * Hydration state for tracking progress
+ */
+export type HydrationState =
+  | 'idle'
+  | 'downloading'
+  | 'deserializing'
+  | 'injecting'
+  | 'complete'
+  | 'error';

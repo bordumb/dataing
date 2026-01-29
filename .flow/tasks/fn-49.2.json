@@ -1,0 +1,36 @@
+{
+  "assignee": "bordumbb@gmail.com",
+  "claim_note": "",
+  "claimed_at": "2026-01-28T23:22:21.622227Z",
+  "created_at": "2026-01-28T22:13:29.042524Z",
+  "depends_on": [
+    "fn-49.1"
+  ],
+  "epic": "fn-49",
+  "evidence": {
+    "files_created": [
+      "python-packages/dataing/src/dataing/core/snapshot_store.py",
+      "python-packages/dataing/src/dataing/temporal/activities/capture_snapshot.py",
+      "python-packages/dataing/tests/unit/core/test_snapshot_store.py",
+      "python-packages/dataing/tests/unit/temporal/test_capture_snapshot.py"
+    ],
+    "files_modified": [
+      "python-packages/dataing/src/dataing/temporal/activities/__init__.py",
+      "python-packages/dataing/src/dataing/temporal/workflows/investigation.py"
+    ],
+    "mypy_status": "pass",
+    "ruff_status": "pass",
+    "tests_breakdown": {
+      "test_capture_snapshot.py": 13,
+      "test_snapshot.py": 18,
+      "test_snapshot_store.py": 13
+    },
+    "tests_passed": 44
+  },
+  "id": "fn-49.2",
+  "priority": null,
+  "spec_path": ".flow/tasks/fn-49.2.md",
+  "status": "done",
+  "title": "Implement Snapshot Capture in Temporal Workflow",
+  "updated_at": "2026-01-28T23:31:57.922305Z"
+}

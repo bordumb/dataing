@@ -339,6 +339,10 @@ const plugin: JupyterFrontEndPlugin<void> = {
               console.warn('Failed to save recent Dataing URL:', error);
             }
           }
+          // Fetch investigations when connected
+          if (previousState !== 'connected' && sidebarWidget) {
+            void sidebarWidget.fetchInvestigations();
+          }
         } else if (result.serverExtensionOk) {
           // Server extension ok but backend unreachable = disconnected
           state.connectionState = 'disconnected';
@@ -597,6 +601,19 @@ const plugin: JupyterFrontEndPlugin<void> = {
 
     // Set workspace ID on widget
     sidebarWidget.setWorkspaceId(settings.workspaceId);
+
+    // Wire up kernel execution for hydration
+    if (notebookTracker) {
+      sidebarWidget._executeKernelCode = async (code: string): Promise<void> => {
+        const panel = notebookTracker.currentWidget;
+        const kernel = panel?.sessionContext?.session?.kernel;
+        if (!kernel) {
+          throw new Error('No active kernel');
+        }
+        const future = kernel.requestExecute({ code });
+        await future.done;
+      };
+    }
 
     // Track active kernel for workspace state
     let currentKernelId: string | null = null;

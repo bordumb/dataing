@@ -11,7 +11,12 @@
 
 import { Widget, Panel } from '@lumino/widgets';
 import { Signal, ISignal } from '@lumino/signaling';
-import type { ConnectionState, IDataingState } from './types';
+import type {
+  ConnectionState,
+  IDataingState,
+  IInvestigationItem,
+  HydrationState
+} from './types';
 import {
   ConnectionWizardWidget,
   createConnectionWizardWidget
@@ -43,6 +48,9 @@ export interface IDataingWidgetState {
   errorMessage: string | null;
   workspaceId: string | null;
   kernelId: string | null;
+  investigations: IInvestigationItem[];
+  hydrationState: HydrationState;
+  hydrationMessage: string | null;
 }
 
 /**
@@ -59,6 +67,11 @@ export class DataingWidget extends Panel {
   // Functions exposed by index.ts for settings persistence
   _updateBackendUrl?: (url: string) => Promise<void>;
   _getRecentUrls?: () => string[];
+
+  // Reference to notebook tracker (set by index.ts)
+  _notebookTracker?: {
+    currentWidget: { sessionContext: { session: { kernel: { requestExecute: (content: { code: string }) => { done: Promise<void> } } | null } | null } | null } | null
+  } | null;
 
   /**
    * Construct a new DataingWidget
@@ -80,7 +93,10 @@ export class DataingWidget extends Panel {
       timeline: [],
       errorMessage: null,
       workspaceId: null,
-      kernelId: null
+      kernelId: null,
+      investigations: [],
+      hydrationState: 'idle',
+      hydrationMessage: null
     };
 
     // Create content widget for main UI
@@ -223,6 +239,92 @@ export class DataingWidget extends Panel {
   }
 
   /**
+   * Kernel code execution callback (set by index.ts)
+   */
+  _executeKernelCode?: (code: string) => Promise<void>;
+
+  /**
+   * Fetch recent investigations from API
+   */
+  async fetchInvestigations(): Promise<void> {
+    if (this._state.connectionState !== 'connected') {
+      return;
+    }
+
+    try {
+      const response = await fetch(
+        `${this._serverBaseUrl}dataing/proxy/api/v1/investigations`,
+        { credentials: 'same-origin' }
+      );
+
+      if (response.ok) {
+        const data = (await response.json()) as IInvestigationItem[];
+        this._state.investigations = data.slice(0, 10); // Limit to 10
+        this._render();
+        this._stateChanged.emit(this._state);
+      }
+    } catch (error) {
+      console.error('Failed to fetch investigations:', error);
+    }
+  }
+
+  /**
+   * Hydrate an investigation into the kernel
+   */
+  async hydrate(investigationId: string, checkpoint = 'complete'): Promise<void> {
+    if (!this._executeKernelCode) {
+      this._state.hydrationState = 'error';
+      this._state.hydrationMessage = 'Kernel execution not available. Open a notebook first.';
+      this._render();
+      return;
+    }
+
+    if (!this._state.kernelId) {
+      this._state.hydrationState = 'error';
+      this._state.hydrationMessage = 'No active kernel. Start a kernel in your notebook first.';
+      this._render();
+      return;
+    }
+
+    try {
+      this._state.hydrationState = 'downloading';
+      this._state.hydrationMessage = 'Loading magic extension...';
+      this._render();
+
+      // Execute the hydration code in the kernel
+      const code = `
+# Hydrate investigation state
+try:
+    from IPython import get_ipython
+    ip = get_ipython()
+    if 'dataing.sdk.magic' not in ip.extension_manager.loaded:
+        ip.run_line_magic('load_ext', 'dataing.sdk.magic')
+    ip.run_line_magic('dataing', 'hydrate ${investigationId} --checkpoint ${checkpoint}')
+except Exception as e:
+    print(f"Hydration failed: {e}")
+`;
+
+      await this._executeKernelCode(code);
+
+      this._state.hydrationState = 'complete';
+      this._state.hydrationMessage = `Hydrated investigation ${investigationId.slice(0, 8)}...`;
+    } catch (error) {
+      this._state.hydrationState = 'error';
+      this._state.hydrationMessage = `Hydration failed: ${error}`;
+    }
+
+    this._render();
+    this._stateChanged.emit(this._state);
+
+    // Reset state after delay
+    setTimeout(() => {
+      this._state.hydrationState = 'idle';
+      this._state.hydrationMessage = null;
+      this._render();
+    }, 3000);
+  }
+
+  /**
    * Copy connection snippet to clipboard
    *
    * Fetches the snippet from the server to include attach commands
@@ -354,6 +456,30 @@ export class DataingWidget extends Panel {
   }
 
   /**
+   * Format relative time
+   */
+  private _formatRelativeTime(dateStr: string): string {
+    try {
+      const date = new Date(dateStr);
+      const now = new Date();
+      const diffMs = now.getTime() - date.getTime();
+      const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+
+      if (diffHours < 1) {
+        const diffMins = Math.floor(diffMs / (1000 * 60));
+        return `${diffMins}m ago`;
+      } else if (diffHours < 24) {
+        return `${diffHours}h ago`;
+      } else {
+        const diffDays = Math.floor(diffHours / 24);
+        return `${diffDays}d ago`;
+      }
+    } catch {
+      return dateStr;
+    }
+  }
+
+  /**
    * Render the widget
    */
   private _render(): void {
@@ -363,7 +489,10 @@ export class DataingWidget extends Panel {
       credentialMode,
       attachedDatasource,
       errorMessage,
-      kernelId
+      kernelId,
+      investigations,
+      hydrationState,
+      hydrationMessage
     } = this._state;
 
     // Status badge color
@@ -378,6 +507,44 @@ export class DataingWidget extends Panel {
     const isDisconnected =
       connectionState === 'disconnected' || connectionState === 'error';
     const hasKernel = kernelId !== null;
+
+    // Render investigations list
+    const investigationsHtml = investigations.length > 0
+      ? investigations
+          .map(
+            (inv) => `
+            <div class="jp-DataingWidget-investigation" data-id="${inv.investigation_id}">
+              <div class="jp-DataingWidget-inv-info">
+                <span class="jp-DataingWidget-inv-id">${inv.investigation_id.slice(0, 8)}...</span>
+                <span class="jp-DataingWidget-inv-time">${this._formatRelativeTime(inv.created_at)}</span>
+              </div>
+              <div class="jp-DataingWidget-inv-meta">
+                <span class="jp-DataingWidget-inv-dataset">${inv.dataset_id}</span>
+                <span class="jp-DataingWidget-inv-status jp-DataingWidget-inv-status--${inv.status}">${inv.status}</span>
+              </div>
+              <button
+                class="jp-DataingWidget-hydrate-btn"
+                data-investigation-id="${inv.investigation_id}"
+                ${!hasKernel ? 'disabled title="Start a kernel to enable hydration"' : ''}
+              >
+                Hydrate
+              </button>
+            </div>
+          `
+          )
+          .join('')
+      : '<div class="jp-DataingWidget-no-investigations">No recent investigations</div>';
+
+    // Hydration status indicator
+    const hydrationIndicator =
+      hydrationState !== 'idle'
+        ? `
+          <div class="jp-DataingWidget-hydration-status jp-DataingWidget-hydration-status--${hydrationState}">
+            ${hydrationState === 'downloading' || hydrationState === 'deserializing' || hydrationState === 'injecting' ? '<span class="jp-DataingWidget-spinner"></span>' : ''}
+            <span>${hydrationMessage || hydrationState}</span>
+          </div>
+        `
+        : '';
 
     this._contentWidget.node.innerHTML = `
       <div class="jp-DataingWidget-content">
@@ -432,6 +599,17 @@ export class DataingWidget extends Panel {
             <div class="jp-DataingWidget-value">
               ${attachedDatasource || 'None'}
               ${attachedDatasource ? '<button class="jp-DataingWidget-detach">Detach</button>' : ''}
+            </div>
+          </div>
+
+          <div class="jp-DataingWidget-section jp-DataingWidget-investigations-section">
+            <label>
+              Recent Investigations
+              <button class="jp-DataingWidget-refresh-btn" title="Refresh list">↻</button>
+            </label>
+            ${hydrationIndicator}
+            <div class="jp-DataingWidget-investigations-list">
+              ${investigationsHtml}
             </div>
           </div>
         `
@@ -492,6 +670,30 @@ export class DataingWidget extends Panel {
     );
     if (detachBtn) {
       detachBtn.addEventListener('click', () => this.detach());
+    }
+
+    // Hydrate button listeners
+    const hydrateBtns = this._contentWidget.node.querySelectorAll(
+      '.jp-DataingWidget-hydrate-btn'
+    );
+    hydrateBtns.forEach((btn) => {
+      btn.addEventListener('click', (e) => {
+        const target = e.currentTarget as HTMLElement;
+        const investigationId = target.getAttribute('data-investigation-id');
+        if (investigationId) {
+          void this.hydrate(investigationId);
+        }
+      });
+    });
+
+    // Refresh button listener
+    const refreshBtn = this._contentWidget.node.querySelector(
+      '.jp-DataingWidget-refresh-btn'
+    );
+    if (refreshBtn) {
+      refreshBtn.addEventListener('click', () => {
+        void this.fetchInvestigations();
+      });
     }
   }
 

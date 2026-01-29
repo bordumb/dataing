@@ -1,0 +1,16 @@
+{
+  "assignee": null,
+  "claim_note": "",
+  "claimed_at": null,
+  "created_at": "2026-01-28T22:14:19.486193Z",
+  "depends_on": [
+    "fn-54.6"
+  ],
+  "epic": "fn-54",
+  "id": "fn-54.7",
+  "priority": null,
+  "spec_path": ".flow/tasks/fn-54.7.md",
+  "status": "todo",
+  "title": "Add Config File Support (dataing-mock.yml)",
+  "updated_at": "2026-01-28T22:23:41.413857Z"
+}

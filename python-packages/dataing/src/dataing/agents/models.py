@@ -243,6 +243,13 @@ class SynthesisResponse(BaseModel):
         min_length=1,
         max_length=5,
     )
+    fix_proposal: FixProposal | None = Field(
+        default=None,
+        description=(
+            "Proposed fix to remediate the root cause. Only generated when confidence > 0.7. "
+            "Contains the fix type, code, risks, and rollback instructions."
+        ),
+    )
 
     @field_validator("root_cause")
     @classmethod
@@ -440,3 +447,7 @@ class FixProposal(BaseModel):
             compile(code, "<fix>", "exec")
         except SyntaxError as e:
             raise ValueError(f"Invalid Python syntax: {e}") from None
+
+
+# Rebuild models to resolve forward references
+SynthesisResponse.model_rebuild()

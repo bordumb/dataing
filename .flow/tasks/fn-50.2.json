@@ -1,16 +1,26 @@
 {
-  "assignee": null,
+  "assignee": "bordumbb@gmail.com",
   "claim_note": "",
-  "claimed_at": null,
+  "claimed_at": "2026-01-29T01:01:40.335042Z",
   "created_at": "2026-01-28T22:13:37.941054Z",
   "depends_on": [
     "fn-50.1"
   ],
   "epic": "fn-50",
+  "evidence": {
+    "commits": [
+      "4efcb32fe514cb3769ffda067b946f57e237fb48"
+    ],
+    "prs": [],
+    "tests": [
+      "pytest python-packages/dataing/tests/unit/agents/test_models.py",
+      "pytest python-packages/dataing/tests/unit/agents/test_synthesis_prompt.py"
+    ]
+  },
   "id": "fn-50.2",
   "priority": null,
   "spec_path": ".flow/tasks/fn-50.2.md",
-  "status": "todo",
+  "status": "done",
   "title": "Add Fix Generation to Synthesis Agent",
-  "updated_at": "2026-01-28T22:23:20.909937Z"
+  "updated_at": "2026-01-29T01:04:54.220924Z"
 }

@@ -351,6 +351,90 @@ class TestSynthesisResponse:
         )
         assert response.root_cause is None
 
+    def test_fix_proposal_optional(self) -> None:
+        """Test that fix_proposal is optional and defaults to None."""
+        response = SynthesisResponse(
+            root_cause="Users ETL job timed out at 03:14 UTC due to API rate limiting",
+            confidence=0.85,
+            causal_chain=[
+                "API rate limit hit at 03:14 UTC",
+                "users ETL job timeout",
+                "users table stale after 03:14",
+                "orders JOIN produces NULLs",
+            ],
+            estimated_onset="03:14 UTC",
+            affected_scope="orders table, order_items table, all downstream reports",
+            supporting_evidence=["485 orders with NULL user_id", "Last user update: 03:14 UTC"],
+            recommendations=["Re-run stg_users job: airflow trigger_dag stg_users --backfill"],
+        )
+        assert response.fix_proposal is None
+
+    def test_fix_proposal_with_sql_dml(self) -> None:
+        """Test synthesis response with DML fix proposal."""
+        from dataing.agents.models import FixProposal
+
+        fix = FixProposal(
+            fix_type="sql_dml",
+            description="Update NULL user_ids using email lookup",
+            code=(
+                "UPDATE orders SET user_id = u.id FROM users u "
+                "WHERE orders.user_email = u.email AND orders.user_id IS NULL"
+            ),
+            confidence=0.8,
+            risks=["May update wrong user if email is not unique"],
+            rollback=(
+                "UPDATE orders SET user_id = NULL "
+                "WHERE user_id IN (SELECT id FROM users WHERE email IN "
+                "(SELECT user_email FROM orders))"
+            ),
+            estimated_impact="Updates ~485 rows in orders table",
+            target_asset="orders",
+        )
+
+        response = SynthesisResponse(
+            root_cause="Users ETL job timed out at 03:14 UTC due to API rate limiting",
+            confidence=0.85,
+            causal_chain=["API rate limit hit", "ETL timeout", "stale users table", "NULL JOINs"],
+            estimated_onset="03:14 UTC",
+            affected_scope="orders table, downstream reports",
+            supporting_evidence=["485 NULL user_ids"],
+            recommendations=["Re-run ETL job"],
+            fix_proposal=fix,
+        )
+        assert response.fix_proposal is not None
+        assert response.fix_proposal.fix_type == "sql_dml"
+
+    def test_fix_proposal_with_manual_instruction(self) -> None:
+        """Test synthesis response with manual instruction fix."""
+        from dataing.agents.models import FixProposal
+
+        fix = FixProposal(
+            fix_type="manual_instruction",
+            description="Contact data engineering team to re-run users ETL",
+            code=(
+                "1. Contact data-eng team via Slack #data-alerts\n"
+                "2. Request re-run of users_etl job\n"
+                "3. Verify users table updated after completion"
+            ),
+            confidence=0.9,
+            risks=["Depends on team availability"],
+            estimated_impact="Requires manual intervention",
+            target_asset="users_etl",
+        )
+
+        response = SynthesisResponse(
+            root_cause="Users ETL job timed out at 03:14 UTC due to API rate limiting",
+            confidence=0.85,
+            causal_chain=["API rate limit hit", "ETL timeout", "stale users table", "NULL JOINs"],
+            estimated_onset="03:14 UTC",
+            affected_scope="orders table, downstream reports",
+            supporting_evidence=["485 NULL user_ids"],
+            recommendations=["Contact data-eng team"],
+            fix_proposal=fix,
+        )
+        assert response.fix_proposal is not None
+        assert response.fix_proposal.fix_type == "manual_instruction"
+
 
 class TestHypothesisResponse:
     """Tests for HypothesisResponse model."""

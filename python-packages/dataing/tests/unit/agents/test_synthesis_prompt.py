@@ -240,3 +240,31 @@ class TestBuildSystem:
         assert "CODE CHANGES" in result
         assert "commit hash" in result.lower()
         assert "revert commit" in result.lower()
+
+    def test_includes_fix_proposal_guidance(self) -> None:
+        """Test that system prompt includes guidance for fix proposals."""
+        result = synthesis.build_system()
+
+        # Check fix proposal section exists
+        assert "FIX PROPOSAL" in result
+        assert "confidence > 0.7" in result.lower()
+
+        # Check fix types are documented
+        assert "sql_ddl" in result
+        assert "sql_dml" in result
+        assert "dbt_patch" in result
+        assert "python_patch" in result
+        assert "manual_instruction" in result
+
+        # Check safety rules are included
+        assert "DROP TABLE" in result
+        assert "WHERE clause" in result
+
+    def test_fix_proposal_maps_root_cause_to_fix_type(self) -> None:
+        """Test that prompt includes mapping from root cause category to fix type."""
+        result = synthesis.build_system()
+
+        # Check fix type selection guidance
+        assert "Schema issues" in result
+        assert "Data quality" in result
+        assert "Transformation logic" in result

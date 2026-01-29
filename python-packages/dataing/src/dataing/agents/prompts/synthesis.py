@@ -59,6 +59,47 @@ If the investigation includes recent code changes (commits), and a code deploy i
 - Include "revert commit" or "fix commit" recommendations with the specific hash
 - Example root_cause: "Deploy of commit abc12345 introduced a bug in order validation logic"
 - Example recommendation: "Revert commit abc12345 or deploy hotfix to correct order validation"
+
+FIX PROPOSAL (OPTIONAL - only when confidence > 0.7):
+
+8. fix_proposal: If confidence > 0.7, propose a concrete fix the user can apply.
+   Only include this field when you have a high-confidence root cause.
+
+   fix_proposal has these required fields:
+   - fix_type: One of "sql_ddl", "sql_dml", "dbt_patch", "python_patch", "manual_instruction"
+   - description: Human-readable explanation of what the fix does (10+ chars)
+   - code: The actual fix code (SQL, dbt, Python, or instruction text)
+   - confidence: Your confidence this fix will work (0.0-1.0)
+   - risks: List of potential negative effects (can be empty)
+   - rollback: SQL/code to undo the fix (null if not applicable)
+   - requires_confirmation: Always true for DDL, true by default for others
+   - estimated_impact: What rows/tables are affected (e.g., "Updates ~485 rows in orders")
+   - target_asset: The table/model being fixed
+
+   CHOOSING fix_type based on root cause category:
+   - Schema issues (missing columns, wrong types) → sql_ddl (ALTER TABLE)
+   - Data quality issues (NULLs, duplicates) → sql_dml (UPDATE/DELETE)
+   - Transformation logic bugs → dbt_patch (model SQL changes)
+   - Code bugs → python_patch (code changes)
+   - External/manual intervention needed → manual_instruction
+
+   GOOD FIX EXAMPLES:
+   - sql_dml: "UPDATE orders SET user_id = (SELECT id FROM users WHERE email = orders.user_email)
+              WHERE user_id IS NULL AND user_email IS NOT NULL"
+   - sql_ddl: "ALTER TABLE orders ALTER COLUMN user_id SET NOT NULL"
+   - dbt_patch: "SELECT COALESCE(user_id, -1) as user_id FROM {{ ref('stg_orders') }}"
+   - manual_instruction: "1. Contact data-eng team\\n2. Re-run users_etl job\\n3. Verify data"
+
+   BAD FIX EXAMPLES (DO NOT DO):
+   - "DELETE FROM orders" (too broad, no WHERE clause)
+   - "DROP TABLE orders" (destructive without clear justification)
+   - "Fix the data" (vague instruction, not actionable)
+
+   SAFETY RULES:
+   - NEVER propose DROP TABLE without explicit user request
+   - ALWAYS include WHERE clause for UPDATE/DELETE
+   - PREFER manual_instruction when unsure
+   - Include rollback statement when possible
 """
 
 

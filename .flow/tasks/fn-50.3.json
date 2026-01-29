@@ -1,16 +1,25 @@
 {
-  "assignee": null,
+  "assignee": "bordumbb@gmail.com",
   "claim_note": "",
-  "claimed_at": null,
+  "claimed_at": "2026-01-29T01:05:41.440380Z",
   "created_at": "2026-01-28T22:13:38.128224Z",
   "depends_on": [
     "fn-50.1"
   ],
   "epic": "fn-50",
+  "evidence": {
+    "commits": [
+      "e1a8e50c237da5eefe6cde881720a73e0a166bdb"
+    ],
+    "prs": [],
+    "tests": [
+      "pytest python-packages/dataing/tests/unit/safety/test_fix_validator.py"
+    ]
+  },
   "id": "fn-50.3",
   "priority": null,
   "spec_path": ".flow/tasks/fn-50.3.md",
-  "status": "todo",
+  "status": "done",
   "title": "Implement SQL Fix Validator (sqlglot-based)",
-  "updated_at": "2026-01-28T22:23:21.290462Z"
+  "updated_at": "2026-01-29T01:09:31.582532Z"
 }

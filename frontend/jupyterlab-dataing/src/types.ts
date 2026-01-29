@@ -111,3 +111,49 @@ export type HydrationState =
   | 'injecting'
   | 'complete'
   | 'error';
+
+/**
+ * Fix proposal types - matches backend FixType literal
+ */
+export type FixType =
+  | 'sql_ddl'
+  | 'sql_dml'
+  | 'dbt_patch'
+  | 'python_patch'
+  | 'manual_instruction';
+
+/**
+ * Fix proposal from synthesis agent
+ */
+export interface IFixProposal {
+  fix_type: FixType;
+  description: string;
+  code: string;
+  confidence: number;
+  risks: string[];
+  rollback: string | null;
+  requires_confirmation: boolean;
+  estimated_impact: string;
+  target_asset: string;
+}
+
+/**
+ * Fix validation result from backend
+ */
+export interface IFixValidationResult {
+  is_valid: boolean;
+  errors: string[];
+  warnings: string[];
+  estimated_affected_rows: number | null;
+  tables_touched: string[];
+}
+
+/**
+ * Fix execution result from backend
+ */
+export interface IFixExecutionResult {
+  success: boolean;
+  error?: string;
+  rows_affected?: number;
+  execution_time_ms?: number;
+}

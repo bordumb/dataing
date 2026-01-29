@@ -9,11 +9,21 @@ Pydantic AI uses these for:
 
 from __future__ import annotations
 
-from pydantic import BaseModel, Field, field_validator
+from typing import Literal
+
+import sqlglot
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 from dataing.core.domain_types import HypothesisCategory
 from dataing.core.exceptions import QueryValidationError
 from dataing.safety.validator import validate_query as _validate_query_safety
+
+# Fix type literals
+FixType = Literal["sql_ddl", "sql_dml", "dbt_patch", "python_patch", "manual_instruction"]
+
+# SQL statement types for validation
+DDL_STATEMENTS = {"ALTER", "CREATE", "DROP"}
+DML_STATEMENTS = {"INSERT", "UPDATE", "DELETE", "MERGE"}
 
 
 def _strip_markdown(query: str) -> str:
@@ -233,6 +243,13 @@ class SynthesisResponse(BaseModel):
         min_length=1,
         max_length=5,
     )
+    fix_proposal: FixProposal | None = Field(
+        default=None,
+        description=(
+            "Proposed fix to remediate the root cause. Only generated when confidence > 0.7. "
+            "Contains the fix type, code, risks, and rollback instructions."
+        ),
+    )
 
     @field_validator("root_cause")
     @classmethod
@@ -273,3 +290,164 @@ class CounterAnalysisResponse(BaseModel):
         if v not in valid:
             raise ValueError(f"recommendation must be one of {valid}")
         return v
+
+
+class FixProposal(BaseModel):
+    """Proposed fix that the agent can generate after investigation.
+
+    Fix proposals are typed and validated to ensure safety. Each type has
+    specific validation rules to prevent dangerous operations.
+    """
+
+    fix_type: FixType = Field(
+        description=(
+            "Type of fix: sql_ddl (ALTER/CREATE/DROP), sql_dml (INSERT/UPDATE/DELETE), "
+            "dbt_patch (dbt model change), python_patch (Python code change), "
+            "manual_instruction (human action required)"
+        )
+    )
+    description: str = Field(
+        description="Human-readable explanation of what the fix does and why",
+        min_length=10,
+    )
+    code: str = Field(
+        description="The actual fix code (SQL, dbt YAML/SQL, Python, or instruction text)",
+        min_length=1,
+    )
+    confidence: float = Field(
+        ge=0.0,
+        le=1.0,
+        description="Confidence this fix will resolve the issue (0.0-1.0)",
+    )
+    risks: list[str] = Field(
+        description="Potential negative effects of applying this fix",
+        min_length=0,
+        max_length=10,
+    )
+    rollback: str | None = Field(
+        default=None,
+        description="SQL/code to undo this fix if it causes problems",
+    )
+    requires_confirmation: bool = Field(
+        default=True,
+        description="Whether user must confirm before applying (always True for DDL)",
+    )
+    estimated_impact: str = Field(
+        description="Description of affected rows/tables (e.g., 'Affects ~1000 rows in orders')",
+        min_length=5,
+    )
+    target_asset: str = Field(
+        description="The table, model, or asset being fixed",
+        min_length=1,
+    )
+
+    @field_validator("code")
+    @classmethod
+    def validate_code_not_empty(cls, v: str) -> str:
+        """Ensure code is not just whitespace."""
+        stripped = v.strip()
+        if not stripped:
+            raise ValueError("Fix code cannot be empty or whitespace only")
+        return v
+
+    @model_validator(mode="after")
+    def validate_fix_type_rules(self) -> FixProposal:
+        """Validate fix based on its type."""
+        code = self.code.strip()
+
+        if self.fix_type == "sql_ddl":
+            self._validate_sql_ddl(code)
+            # DDL always requires confirmation
+            object.__setattr__(self, "requires_confirmation", True)
+
+        elif self.fix_type == "sql_dml":
+            self._validate_sql_dml(code)
+
+        elif self.fix_type == "dbt_patch":
+            self._validate_dbt_patch(code)
+
+        elif self.fix_type == "python_patch":
+            self._validate_python_patch(code)
+
+        # manual_instruction has no code validation - it's just text
+
+        return self
+
+    def _validate_sql_ddl(self, code: str) -> None:
+        """Validate SQL DDL statement (ALTER/CREATE/DROP)."""
+        try:
+            parsed = sqlglot.parse_one(code, dialect="postgres")
+        except Exception as e:
+            raise ValueError(f"Invalid SQL DDL syntax: {e}") from None
+
+        statement_type = type(parsed).__name__.upper()
+        # Map sqlglot types to our DDL statements
+        ddl_type_map = {
+            "ALTER": {"ALTER"},
+            "CREATE": {"CREATE"},
+            "DROP": {"DROP"},
+        }
+        is_ddl = False
+        for ddl_keyword, type_names in ddl_type_map.items():
+            if any(t in statement_type for t in type_names) or ddl_keyword in statement_type:
+                is_ddl = True
+                break
+
+        if not is_ddl:
+            raise ValueError(
+                f"sql_ddl fix must be ALTER, CREATE, or DROP statement, got: {statement_type}"
+            )
+
+    def _validate_sql_dml(self, code: str) -> None:
+        """Validate SQL DML statement (INSERT/UPDATE/DELETE/MERGE)."""
+        try:
+            parsed = sqlglot.parse_one(code, dialect="postgres")
+        except Exception as e:
+            raise ValueError(f"Invalid SQL DML syntax: {e}") from None
+
+        statement_type = type(parsed).__name__.upper()
+        is_dml = any(dml in statement_type for dml in DML_STATEMENTS)
+
+        if not is_dml:
+            raise ValueError(
+                f"sql_dml fix must be INSERT, UPDATE, DELETE, or MERGE statement, "
+                f"got: {statement_type}"
+            )
+
+    def _validate_dbt_patch(self, code: str) -> None:
+        """Validate dbt patch (YAML or SQL)."""
+        # dbt patches can be YAML config or SQL model changes
+        # Basic validation: must have some structure
+        if not code.strip():
+            raise ValueError("dbt patch cannot be empty")
+
+        # If it looks like YAML, check for common dbt patterns
+        if code.strip().startswith(("-", "version:", "models:", "sources:", "name:")):
+            # Looks like YAML - that's fine
+            return
+
+        # If contains Jinja templates, skip SQL validation (can't parse {{ }})
+        if "{{" in code or "{%" in code:
+            return
+
+        # If it looks like SQL without Jinja, validate syntax
+        if any(kw in code.upper() for kw in ["SELECT", "WITH", "FROM"]):
+            try:
+                sqlglot.parse_one(code, dialect="postgres")
+            except Exception as e:
+                raise ValueError(f"Invalid SQL in dbt patch: {e}") from None
+
+    def _validate_python_patch(self, code: str) -> None:
+        """Validate Python code patch."""
+        if not code.strip():
+            raise ValueError("Python patch cannot be empty")
+
+        # Basic syntax check via compile
+        try:
+            compile(code, "<fix>", "exec")
+        except SyntaxError as e:
+            raise ValueError(f"Invalid Python syntax: {e}") from None
+
+
+# Rebuild models to resolve forward references
+SynthesisResponse.model_rebuild()

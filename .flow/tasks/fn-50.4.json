@@ -1,16 +1,23 @@
 {
-  "assignee": null,
+  "assignee": "bordumbb@gmail.com",
   "claim_note": "",
-  "claimed_at": null,
+  "claimed_at": "2026-01-29T01:10:15.090421Z",
   "created_at": "2026-01-28T22:13:38.313964Z",
   "depends_on": [
     "fn-50.2"
   ],
   "epic": "fn-50",
+  "evidence": {
+    "commits": [
+      "2877fb3c0ba414a5dfcfee7cd3a06e3ffc2bccac"
+    ],
+    "prs": [],
+    "tests": []
+  },
   "id": "fn-50.4",
   "priority": null,
   "spec_path": ".flow/tasks/fn-50.4.md",
-  "status": "todo",
+  "status": "done",
   "title": "Build Fix Preview Widget with syntax highlighting",
-  "updated_at": "2026-01-28T22:23:21.651299Z"
+  "updated_at": "2026-01-29T01:13:43.712260Z"
 }

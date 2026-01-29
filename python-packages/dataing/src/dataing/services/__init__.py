@@ -1,6 +1,14 @@
 """Application services."""
 
 from dataing.services.auth import AuthService
+from dataing.services.feedback import (
+    FeedbackExportRecord,
+    FixFeedback,
+    FixFeedbackRating,
+    FixFeedbackService,
+    FixSuccessAlert,
+    FixSuccessStats,
+)
 from dataing.services.fix_execution import (
     FixExecutionResult,
     FixExecutionService,
@@ -20,8 +28,14 @@ from dataing.services.usage import UsageTracker
 
 __all__ = [
     "AuthService",
+    "FeedbackExportRecord",
     "FixExecutionResult",
     "FixExecutionService",
+    "FixFeedback",
+    "FixFeedbackRating",
+    "FixFeedbackService",
+    "FixSuccessAlert",
+    "FixSuccessStats",
     "IssueContext",
     "NotificationService",
     "PolicyResult",

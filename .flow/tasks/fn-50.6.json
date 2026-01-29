@@ -1,16 +1,25 @@
 {
-  "assignee": null,
+  "assignee": "bordumbb@gmail.com",
   "claim_note": "",
-  "claimed_at": null,
+  "claimed_at": "2026-01-29T01:19:14.197530Z",
   "created_at": "2026-01-28T22:13:38.695733Z",
   "depends_on": [
     "fn-50.5"
   ],
   "epic": "fn-50",
+  "evidence": {
+    "commits": [
+      "1415f15045039fc9a821f55dc82e2228b5280608"
+    ],
+    "prs": [],
+    "tests": [
+      "python-packages/dataing/tests/unit/services/test_feedback.py"
+    ]
+  },
   "id": "fn-50.6",
   "priority": null,
   "spec_path": ".flow/tasks/fn-50.6.md",
-  "status": "todo",
+  "status": "done",
   "title": "Add Fix Proposal Feedback Loop",
-  "updated_at": "2026-01-28T22:23:22.396867Z"
+  "updated_at": "2026-01-29T01:22:18.549796Z"
 }

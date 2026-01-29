@@ -135,7 +135,10 @@ class TestDataingMagics:
         """Create DataingMagics instance with mock shell."""
         mock_shell = MagicMock()
         mock_shell.user_ns = {}
-        m = DataingMagics(shell=mock_shell)
+        # Create instance without shell to avoid traitlets validation error,
+        # then manually set shell attribute
+        m = DataingMagics(shell=None)
+        m.shell = mock_shell
         return m
 
     def test_hydrate_requires_investigation_id(

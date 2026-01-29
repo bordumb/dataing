@@ -7,10 +7,19 @@
     "fn-49.5"
   ],
   "epic": "fn-49",
+  "evidence": {
+    "commits": [
+      "9d6828fe"
+    ],
+    "tests": {
+      "passed": 70,
+      "skipped": 10
+    }
+  },
   "id": "fn-49.6",
   "priority": null,
   "spec_path": ".flow/tasks/fn-49.6.md",
-  "status": "in_progress",
+  "status": "done",
   "title": "Add Snapshot Diff Comparison",
-  "updated_at": "2026-01-28T23:53:32.982148Z"
+  "updated_at": "2026-01-29T00:02:43.320994Z"
 }

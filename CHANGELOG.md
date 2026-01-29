@@ -1,3 +1,10 @@
+# [1.14.0](https://github.com/bordumb/dataing/compare/v1.13.0...v1.14.0) (2026-01-29)
+
+
+### Features
+
+* Fix-It Button - Agent-Proposed Code/SQL Fixes ([#104](https://github.com/bordumb/dataing/issues/104)) ([072aaa5](https://github.com/bordumb/dataing/commit/072aaa56982b38691b7587c8edad07515bc303a4))
+
 # [1.13.0](https://github.com/bordumb/dataing/compare/v1.12.0...v1.13.0) (2026-01-29)
 
 

@@ -1,0 +1,220 @@
+# Dataing Self-Hosted Docker Compose
+# Production-ready deployment for autonomous data quality investigation
+#
+# Usage:
+#   docker compose up -d                    # Start all services
+#   docker compose --profile observability  # Include Jaeger/OTEL
+#   docker compose down -v                  # Stop and remove volumes
+#
+# Required environment variables:
+#   ANTHROPIC_API_KEY       - Anthropic API key for LLM features
+#   DATADR_ENCRYPTION_KEY   - Fernet key for encrypting datasource credentials
+#
+# Access points:
+#   Frontend:     http://localhost:3000
+#   API:          http://localhost:8000
+#   Temporal UI:  http://localhost:8233
+
+services:
+  # ===========================================================================
+  # Core Infrastructure
+  # ===========================================================================
+  postgres:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_DB: dataing
+      POSTGRES_USER: dataing
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-dataing}
+    volumes:
+      - dataing-pgdata:/var/lib/postgresql/data
+      - ./infra/init-temporal-db.sh:/docker-entrypoint-initdb.d/init-temporal-db.sh:ro
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U dataing -d dataing"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--appendonly", "yes"]
+    ports:
+      - "6379:6379"
+    volumes:
+      - dataing-redis:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    restart: unless-stopped
+
+  # ===========================================================================
+  # Temporal Server
+  # ===========================================================================
+  temporal:
+    image: temporalio/auto-setup:latest
+    environment:
+      DB: postgres12
+      DB_PORT: 5432
+      POSTGRES_SEEDS: postgres
+      POSTGRES_USER: temporal
+      POSTGRES_PWD: temporal  # pragma: allowlist secret
+      SKIP_DB_CREATE: "true"
+    ports:
+      - "7233:7233"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "tctl --address $(hostname -i):7233 namespace list | grep -q temporal-system"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 60s
+    restart: unless-stopped
+
+  temporal-ui:
+    image: temporalio/ui:latest
+    environment:
+      TEMPORAL_ADDRESS: temporal:7233
+      TEMPORAL_CORS_ORIGINS: http://localhost:3000
+    ports:
+      - "8233:8080"
+    depends_on:
+      temporal:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:8080/"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    restart: unless-stopped
+
+  # ===========================================================================
+  # Dataing Application
+  # ===========================================================================
+  api:
+    build:
+      context: .
+      dockerfile: infra/Dockerfile.backend
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      DATABASE_URL: postgresql://dataing:${POSTGRES_PASSWORD:-dataing}@postgres:5432/dataing
+      APP_DATABASE_URL: postgresql://dataing:${POSTGRES_PASSWORD:-dataing}@postgres:5432/dataing
+      TEMPORAL_HOST: temporal:7233
+      TEMPORAL_NAMESPACE: ${TEMPORAL_NAMESPACE:-default}
+      TEMPORAL_TASK_QUEUE: ${TEMPORAL_TASK_QUEUE:-investigations}
+      INVESTIGATION_ENGINE: temporal
+      DATADR_ENCRYPTION_KEY: ${DATADR_ENCRYPTION_KEY:-}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      LLM_MODEL: ${LLM_MODEL:-claude-sonnet-4-20250514}
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      temporal:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    restart: unless-stopped
+
+  worker:
+    build:
+      context: .
+      dockerfile: infra/Dockerfile.backend
+    command: ["python", "-m", "dataing.entrypoints.temporal_worker"]
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      DATABASE_URL: postgresql://dataing:${POSTGRES_PASSWORD:-dataing}@postgres:5432/dataing
+      APP_DATABASE_URL: postgresql://dataing:${POSTGRES_PASSWORD:-dataing}@postgres:5432/dataing
+      TEMPORAL_HOST: temporal:7233
+      TEMPORAL_NAMESPACE: ${TEMPORAL_NAMESPACE:-default}
+      TEMPORAL_TASK_QUEUE: ${TEMPORAL_TASK_QUEUE:-investigations}
+      DATADR_ENCRYPTION_KEY: ${DATADR_ENCRYPTION_KEY:-}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      LLM_MODEL: ${LLM_MODEL:-claude-sonnet-4-20250514}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      temporal:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import asyncio; from temporalio.client import Client; asyncio.run(Client.connect('temporal:7233'))\" 2>/dev/null"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: .
+      dockerfile: infra/Dockerfile.frontend
+    environment:
+      API_URL: http://api:8000
+    ports:
+      - "3000:3000"
+    depends_on:
+      api:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:3000/nginx-health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    restart: unless-stopped
+
+  # ===========================================================================
+  # Observability (optional, enable with --profile observability)
+  # ===========================================================================
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.96.0
+    profiles: ["observability"]
+    command: ["--config=/etc/otelcol-contrib/config.yaml"]
+    volumes:
+      - ./demo/otel-collector-config.yaml:/etc/otelcol-contrib/config.yaml:ro
+    ports:
+      - "4317:4317"
+      - "4318:4318"
+    depends_on:
+      - jaeger
+    restart: unless-stopped
+
+  jaeger:
+    image: jaegertracing/all-in-one:1.76.0
+    profiles: ["observability"]
+    environment:
+      COLLECTOR_OTLP_ENABLED: "true"
+    ports:
+      - "16686:16686"
+      - "14268:14268"
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:16686"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    restart: unless-stopped
+
+volumes:
+  dataing-pgdata:
+  dataing-redis:

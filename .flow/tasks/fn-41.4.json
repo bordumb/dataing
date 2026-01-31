@@ -1,7 +1,7 @@
 {
-  "assignee": null,
+  "assignee": "bordumbb@gmail.com",
   "claim_note": "",
-  "claimed_at": null,
+  "claimed_at": "2026-01-31T22:26:18.042870Z",
   "created_at": "2026-01-28T03:51:43.745215Z",
   "depends_on": [
     "fn-41.3"
@@ -10,7 +10,7 @@
   "id": "fn-41.4",
   "priority": 4,
   "spec_path": ".flow/tasks/fn-41.4.md",
-  "status": "todo",
+  "status": "in_progress",
   "title": "Add health checks and persistent volumes for PostgreSQL and Redis",
-  "updated_at": "2026-01-28T03:51:43.745389Z"
+  "updated_at": "2026-01-31T22:26:18.043084Z"
 }

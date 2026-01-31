@@ -157,6 +157,40 @@ class UserInputRequest(BaseModel):
     data: dict[str, Any] | None = None
 
 
+class CodifyFormat(str, Enum):
+    """Output format for test generation."""
+
+    GX = "gx"
+    DBT = "dbt"
+    SODA = "soda"
+    SQL = "sql"
+
+
+class CodifyRequest(BaseModel):
+    """Request body for codifying an investigation."""
+
+    format: CodifyFormat = CodifyFormat.SQL
+
+
+class CodifyTestResponse(BaseModel):
+    """A single test extracted from the investigation."""
+
+    test_type: str
+    column: str | None = None
+    table: str
+    description: str
+
+
+class CodifyResponse(BaseModel):
+    """Response for codifying an investigation."""
+
+    investigation_id: UUID
+    format: str
+    content: str
+    tests: list[CodifyTestResponse]
+    confidence: float
+
+
 def get_app_db(request: Request) -> AppDatabase:
     """Get the app database from app state."""
     app_db: AppDatabase = request.app.state.app_db
@@ -551,6 +585,127 @@ async def verify_investigation(
         first_broken_seq=broken_seq,
         error=error_msg,
         chain_available=True,
+    )
+
+
+@router.post("/{investigation_id}/codify", response_model=CodifyResponse)
+async def codify_investigation(
+    investigation_id: UUID,
+    request: CodifyRequest,
+    auth: AuthDep,
+    temporal_client: TemporalClientDep,
+) -> CodifyResponse:
+    """Generate regression tests from an investigation's synthesis.
+
+    Extracts testable assertions from the investigation synthesis and renders
+    them to the specified format (Great Expectations, dbt, Soda, or SQL).
+
+    Args:
+        investigation_id: UUID of the investigation.
+        request: Codify request with output format.
+        auth: Authentication context from API key/JWT.
+        temporal_client: Temporal client for durable execution.
+
+    Returns:
+        CodifyResponse with rendered test content.
+
+    Raises:
+        HTTPException: If investigation not found or no synthesis available.
+    """
+    from dataing.agents.models import SynthesisResponse
+    from dataing.core.codify import extract_tests_from_synthesis
+    from dataing.renderers import get_renderer
+
+    try:
+        status = await temporal_client.get_status(str(investigation_id))
+    except Exception as e:
+        logger.error(f"Failed to get investigation for codify: {e}")
+        raise HTTPException(
+            status_code=404,
+            detail=f"Investigation not found: {e}",
+        ) from e
+
+    if not status.result or not status.result.synthesis:
+        raise HTTPException(
+            status_code=400,
+            detail="Investigation has no synthesis. Codify requires a completed investigation.",
+        )
+
+    synthesis_dict = status.result.synthesis
+    confidence = synthesis_dict.get("confidence", 0.0)
+
+    if confidence < 0.6:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Synthesis confidence too low ({confidence:.0%}). "
+            "Codify requires at least 60% confidence.",
+        )
+
+    # Build SynthesisResponse from dict
+    try:
+        causal_chain = synthesis_dict.get("causal_chain", [])
+        if len(causal_chain) < 2:
+            causal_chain = ["Issue detected", "Symptom observed"] + causal_chain
+
+        synthesis_response = SynthesisResponse(
+            root_cause=synthesis_dict.get("root_cause"),
+            confidence=confidence,
+            causal_chain=causal_chain,
+            estimated_onset=synthesis_dict.get("estimated_onset", "Unknown"),
+            affected_scope=synthesis_dict.get("affected_scope", "Unknown scope"),
+            supporting_evidence=synthesis_dict.get("supporting_evidence", []),
+            contradicting_evidence=synthesis_dict.get("contradicting_evidence", []),
+            recommendations=synthesis_dict.get("recommendations", []),
+            summary=synthesis_dict.get("summary", ""),
+            metadata=synthesis_dict.get("metadata", {}),
+        )
+    except Exception as e:
+        logger.error(f"Failed to parse synthesis for codify: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to parse synthesis: {e}",
+        ) from e
+
+    # Extract table from metadata
+    table = synthesis_dict.get("metadata", {}).get("dataset", "unknown_table")
+    if "." in table:
+        table = table.split(".")[-1]
+
+    # Extract tests
+    tests = extract_tests_from_synthesis(
+        synthesis=synthesis_response,
+        investigation_id=investigation_id,
+        table=table,
+    )
+
+    if not tests:
+        raise HTTPException(
+            status_code=400,
+            detail="No testable assertions found. "
+            "The investigation may not have identified a clear root cause.",
+        )
+
+    # Render tests
+    renderer = get_renderer(request.format.value)
+    rendered = renderer.render_many(tests)
+
+    # Build response
+    test_responses = [
+        CodifyTestResponse(
+            test_type=t.assertion_type.value,
+            column=t.column,
+            table=t.table,
+            description=t.description,
+        )
+        for t in tests
+    ]
+
+    return CodifyResponse(
+        investigation_id=investigation_id,
+        format=request.format.value,
+        content=rendered,
+        tests=test_responses,
+        confidence=confidence,
     )
 
 

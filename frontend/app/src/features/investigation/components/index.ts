@@ -8,3 +8,4 @@ export { PatternBadge, PatternList } from "./pattern-badge";
 export { BranchTree } from "./branch-tree";
 export { MergeIndicator, MergeStatus } from "./merge-indicator";
 export { EvidenceCard, EvidenceList } from "./evidence-card";
+export { CodifyWidget } from "./codify-widget";

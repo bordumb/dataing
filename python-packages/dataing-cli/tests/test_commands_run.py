@@ -829,3 +829,149 @@ class TestExportChainMetadata:
         data = json.loads(result.output)
         assert data["root_hash"] is None
         assert "chain_metadata" not in data
+
+
+class TestRunSnapshotCommand:
+    """Tests for run snapshot command."""
+
+    def test_snapshot_success(
+        self,
+        runner: CliRunner,
+        configured_env: Path,
+        mock_client_patch: MagicMock,
+        tmp_path: Path,
+    ) -> None:
+        """Test snapshot downloads and saves archive."""
+        # Return mock data
+        mock_data = b"mock tar.gz content" * 1000  # ~19KB
+        mock_client_patch.download_snapshot.return_value = mock_data
+
+        output_file = tmp_path / "test-snapshot.tar.gz"
+        result = runner.invoke(
+            app,
+            ["run", "snapshot", "inv-abc123", "--output", str(output_file)],
+        )
+
+        assert result.exit_code == 0
+        assert "Snapshot saved" in result.output
+        assert output_file.exists()
+        assert output_file.read_bytes() == mock_data
+
+    def test_snapshot_default_filename(
+        self,
+        runner: CliRunner,
+        configured_env: Path,
+        mock_client_patch: MagicMock,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """Test snapshot uses default filename based on investigation ID."""
+        mock_data = b"mock tar.gz content"
+        mock_client_patch.download_snapshot.return_value = mock_data
+
+        # Change to temp dir so default file is created there
+        monkeypatch.chdir(tmp_path)
+
+        result = runner.invoke(app, ["run", "snapshot", "inv-xyz789"])
+
+        assert result.exit_code == 0
+        default_file = tmp_path / "snapshot-inv-xyz789.tar.gz"
+        assert default_file.exists()
+
+    def test_snapshot_max_size_exceeded(
+        self,
+        runner: CliRunner,
+        configured_env: Path,
+        mock_client_patch: MagicMock,
+        tmp_path: Path,
+    ) -> None:
+        """Test snapshot fails when size exceeds --max-size."""
+        # Return 2MB of data
+        mock_data = b"x" * (2 * 1024 * 1024)
+        mock_client_patch.download_snapshot.return_value = mock_data
+
+        output_file = tmp_path / "test-snapshot.tar.gz"
+        result = runner.invoke(
+            app,
+            ["run", "snapshot", "inv-abc123", "--output", str(output_file), "--max-size", "1"],
+        )
+
+        assert result.exit_code == 1
+        assert "exceeds" in result.output
+
+    def test_snapshot_not_found(
+        self,
+        runner: CliRunner,
+        configured_env: Path,
+        mock_client_patch: MagicMock,
+    ) -> None:
+        """Test snapshot handles not found error."""
+        mock_client_patch.download_snapshot.side_effect = NotFoundError("Investigation not found")
+
+        result = runner.invoke(app, ["run", "snapshot", "inv-notfound"])
+
+        assert result.exit_code == 1
+        assert "Failed" in result.output or "not found" in result.output.lower()
+
+
+class TestRunImportCommand:
+    """Tests for run import command."""
+
+    def test_import_success(
+        self,
+        runner: CliRunner,
+        configured_env: Path,
+        mock_client_patch: MagicMock,
+        tmp_path: Path,
+    ) -> None:
+        """Test import uploads and imports archive."""
+        # Create a test file
+        test_file = tmp_path / "test.tar.gz"
+        test_file.write_bytes(b"mock archive content")
+
+        mock_client_patch.import_snapshot.return_value = {
+            "investigation_id": "new-inv-123",
+            "original_investigation_id": "orig-inv-456",
+            "evidence_count": 5,
+            "status": "imported",
+            "is_replay": True,
+        }
+
+        result = runner.invoke(app, ["run", "import", str(test_file)])
+
+        assert result.exit_code == 0
+        assert "Imported as" in result.output
+        assert "new-inv-123" in result.output
+        assert "orig-inv-456" in result.output
+        assert "Evidence items: 5" in result.output
+
+    def test_import_file_not_found(
+        self,
+        runner: CliRunner,
+        configured_env: Path,
+        mock_client_patch: MagicMock,
+        tmp_path: Path,
+    ) -> None:
+        """Test import fails when file not found."""
+        result = runner.invoke(app, ["run", "import", str(tmp_path / "nonexistent.tar.gz")])
+
+        assert result.exit_code == 1
+        assert "not found" in result.output.lower()
+
+    def test_import_api_error(
+        self,
+        runner: CliRunner,
+        configured_env: Path,
+        mock_client_patch: MagicMock,
+        tmp_path: Path,
+    ) -> None:
+        """Test import handles API errors."""
+        test_file = tmp_path / "test.tar.gz"
+        test_file.write_bytes(b"mock archive content")
+
+        mock_client_patch.import_snapshot.side_effect = Exception("Invalid archive")
+
+        result = runner.invoke(app, ["run", "import", str(test_file)])
+
+        assert result.exit_code == 1
+        assert "Failed" in result.output

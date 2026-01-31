@@ -1,7 +1,7 @@
 {
-  "assignee": null,
+  "assignee": "bordumbb@gmail.com",
   "claim_note": "",
-  "claimed_at": null,
+  "claimed_at": "2026-01-31T21:16:51.904396Z",
   "created_at": "2026-01-28T03:51:25.501002Z",
   "depends_on": [
     "fn-40.2",
@@ -9,10 +9,19 @@
     "fn-40.4"
   ],
   "epic": "fn-40",
+  "evidence": {
+    "commits": [
+      "2ccefb0cf3030024a0f3217eecaf021aa36f3881"
+    ],
+    "prs": [],
+    "tests": [
+      "python -c 'import yaml; yaml.safe_load(open(\".github/workflows/release.yml\"))'"
+    ]
+  },
   "id": "fn-40.5",
   "priority": 5,
   "spec_path": ".flow/tasks/fn-40.5.md",
-  "status": "todo",
+  "status": "done",
   "title": "Add publish step to release.yml CI workflow",
-  "updated_at": "2026-01-28T03:51:25.501200Z"
+  "updated_at": "2026-01-31T21:17:36.697134Z"
 }

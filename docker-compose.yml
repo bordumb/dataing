@@ -100,6 +100,9 @@ services:
     build:
       context: .
       dockerfile: infra/Dockerfile.backend
+    env_file:
+      - path: .env
+        required: false
     environment:
       DATABASE_URL: postgresql://dataing:${POSTGRES_PASSWORD:-dataing}@postgres:5432/dataing
       APP_DATABASE_URL: postgresql://dataing:${POSTGRES_PASSWORD:-dataing}@postgres:5432/dataing
@@ -134,6 +137,9 @@ services:
       context: .
       dockerfile: infra/Dockerfile.backend
     command: ["python", "-m", "dataing.entrypoints.temporal_worker"]
+    env_file:
+      - path: .env
+        required: false
     environment:
       DATABASE_URL: postgresql://dataing:${POSTGRES_PASSWORD:-dataing}@postgres:5432/dataing
       APP_DATABASE_URL: postgresql://dataing:${POSTGRES_PASSWORD:-dataing}@postgres:5432/dataing

@@ -334,48 +334,172 @@ When complete, you'll get the full analysis:
 
 ## Troubleshooting
 
-### Docker: "port already in use"
+### "ANTHROPIC_API_KEY not set"
 
-Another service is using port 8000, 3000, or 5432. Stop it or change ports in `docker-compose.yml`.
+**Symptom**: Investigation is created but immediately fails.
+
+**Fix**: Set the key in `.env` and restart:
+
+```bash
+# Edit .env
+ANTHROPIC_API_KEY=sk-ant-api03-...
+
+# Restart services
+docker compose restart api worker
+```
+
+!!! tip "Get an API key"
+    Sign up at [console.anthropic.com](https://console.anthropic.com) to get your API key.
+
+---
+
+### "Cannot connect to Docker daemon"
+
+**Symptom**: `docker compose up` fails immediately.
+
+**Fix**: Ensure Docker is running:
+
+=== "macOS"
+    Open Docker Desktop from Applications.
+
+=== "Linux"
+    ```bash
+    sudo systemctl start docker
+    ```
+
+=== "Windows"
+    Open Docker Desktop from the Start menu. Ensure WSL2 backend is enabled.
+
+---
+
+### "Port already in use"
+
+**Symptom**: Service fails to start with "address already in use" for ports 8000, 3000, 5432, or 7233.
+
+**Fix**: Find and stop the conflicting process:
 
 ```bash
 # Find what's using the port
 lsof -i :8000
+
+# Kill the process
+kill -9 <PID>
 ```
 
-### Docker: "unhealthy" containers
-
-Check the logs for the failing service:
-
-```bash
-docker compose logs api
-docker compose logs worker
-```
-
-Common causes:
-- Missing `ANTHROPIC_API_KEY` in `.env`
-- Missing `DATADR_ENCRYPTION_KEY` in `.env`
-
-### pip: "No module named dataing"
-
-Make sure you installed the package:
-
-```bash
-pip install dataing
-```
-
-### "ANTHROPIC_API_KEY not set"
-
-Add your API key to the environment:
-
-```bash
-export ANTHROPIC_API_KEY=sk-ant-api03-...
-```
-
-Or add it to your `.env` file.
+Or change ports in `docker-compose.yml`.
 
 ---
 
-!!! question "Need help?"
-    - [GitHub Issues](https://github.com/bordumb/dataing/issues)
-    - [Architecture Overview](architecture.md)
+### "Temporal server not ready"
+
+**Symptom**: Worker logs show "failed to connect to temporal" or "connection refused".
+
+**Cause**: Temporal takes 30-60 seconds to initialize its database schemas on first run.
+
+**Fix**: Wait and check Temporal logs:
+
+```bash
+# Wait for Temporal to be healthy
+docker compose ps temporal
+
+# View Temporal logs
+docker compose logs temporal
+```
+
+!!! info "First-run initialization"
+    On first startup, Temporal creates database schemas in PostgreSQL. This is normal and only happens once.
+
+---
+
+### "Out of memory" / Docker crashing
+
+**Symptom**: Containers are killed, Docker Desktop becomes unresponsive.
+
+**Cause**: The full stack (Temporal + PostgreSQL + API + Worker) needs ~2GB RAM at minimum.
+
+**Fix**: Increase Docker Desktop memory to at least **4GB** (6GB recommended):
+
+=== "macOS / Windows"
+    Docker Desktop → Settings → Resources → Memory → 6GB
+
+=== "Linux"
+    Edit `/etc/docker/daemon.json`:
+    ```json
+    {
+      "default-ulimits": {
+        "memlock": { "soft": -1, "hard": -1 }
+      }
+    }
+    ```
+    Then restart Docker: `sudo systemctl restart docker`
+
+---
+
+### "Database migration failed"
+
+**Symptom**: API fails to start, logs show SQL errors.
+
+**Fix**: Check logs and try a clean start:
+
+```bash
+# Check API logs
+docker compose logs api
+
+# Clean start (removes all data)
+docker compose down -v
+docker compose up -d
+```
+
+!!! warning "This removes all data"
+    The `-v` flag removes volumes including database data. Only use for fresh starts.
+
+---
+
+### "Investigation stuck in 'running'"
+
+**Symptom**: Investigation never completes, stays in "running" state.
+
+**Fix**: Check worker logs and Temporal UI:
+
+```bash
+# Check worker logs
+docker compose logs worker
+
+# View workflows in Temporal UI
+open http://localhost:8233
+```
+
+Common causes:
+- Worker not running (check `docker compose ps`)
+- LLM API errors (check worker logs for Anthropic errors)
+- Database connectivity issues
+
+---
+
+### Platform-Specific Notes
+
+=== "macOS"
+    - Docker Desktop defaults to 2GB memory — increase to 6GB
+    - Apple Silicon (M1/M2/M3): all images are arm64-native
+    - Intel Macs: works without changes
+
+=== "Linux"
+    - Use Docker Compose v2: `docker compose` (not `docker-compose`)
+    - Ensure your user is in the `docker` group:
+      ```bash
+      sudo usermod -aG docker $USER
+      ```
+
+=== "Windows"
+    - WSL2 backend required for Docker Desktop
+    - Run commands in PowerShell or WSL2 terminal
+    - File paths in WSL2: `/mnt/c/Users/...`
+
+---
+
+## Getting Help
+
+!!! question "Need more help?"
+    - **GitHub Issues**: [github.com/bordumb/dataing/issues](https://github.com/bordumb/dataing/issues)
+    - **Architecture**: [Architecture Overview](architecture.md) for deeper understanding
+    - **Security**: [Security FAQ](security/data-privacy.md) for data handling questions

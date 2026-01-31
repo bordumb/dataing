@@ -1770,3 +1770,115 @@ class DataingClient:
         )
         result: dict[str, Any] = response.json()
         return result
+
+    # --- Snapshot Export/Import methods (fn-39) ---
+
+    def download_snapshot(self, investigation_id: str) -> bytes:
+        """Download an investigation as a snapshot tar.gz archive.
+
+        Downloads a compressed archive containing all evidence, queries,
+        results, lineage, and agent prompts for the investigation.
+
+        Args:
+            investigation_id: The unique identifier of the investigation.
+
+        Returns:
+            The raw bytes of the tar.gz archive.
+
+        Raises:
+            NotFoundError: If the investigation ID does not exist.
+            AuthError: If not authorized to access this investigation.
+            ServerError: If the server encounters an error building the snapshot.
+
+        Example:
+            ```python
+            data = client.download_snapshot("inv-abc123")
+            with open("snapshot.tar.gz", "wb") as f:
+                f.write(data)
+            ```
+
+        See Also:
+            - `import_snapshot`: Import a snapshot archive
+        """
+        # Use longer timeout for snapshot generation
+        client = self._get_sync_client()
+        response = client.request(
+            "GET",
+            f"/api/v1/investigations/{investigation_id}/snapshot",
+            timeout=120.0,
+        )
+        if not response.is_success:
+            self._handle_response_error(response)
+        return response.content
+
+    async def async_download_snapshot(self, investigation_id: str) -> bytes:
+        """Async version of `download_snapshot`.
+
+        See `download_snapshot` for full documentation.
+        """
+        client = self._get_async_client()
+        response = await client.request(
+            "GET",
+            f"/api/v1/investigations/{investigation_id}/snapshot",
+            timeout=120.0,
+        )
+        if not response.is_success:
+            self._handle_response_error(response)
+        return response.content
+
+    def import_snapshot(self, file_data: bytes) -> dict[str, Any]:
+        """Import a snapshot archive as a replayed investigation.
+
+        Uploads a previously exported snapshot and creates a new investigation
+        marked as a replay with the original timestamps preserved.
+
+        Args:
+            file_data: The raw bytes of the tar.gz archive to import.
+
+        Returns:
+            A dict containing:
+                - ``investigation_id``: ID of the new replay investigation
+                - ``status``: Import status ("imported")
+                - ``original_investigation_id``: ID from the original investigation
+                - ``evidence_count``: Number of evidence items imported
+                - ``is_replay``: Always True for imported investigations
+
+        Raises:
+            ValidationError: If the archive is invalid or schema version unsupported.
+            AuthError: If authentication fails.
+            ServerError: If the server encounters an error.
+
+        Example:
+            ```python
+            with open("snapshot.tar.gz", "rb") as f:
+                data = f.read()
+            result = client.import_snapshot(data)
+            print(f"Imported as: {result['investigation_id']}")
+            ```
+
+        See Also:
+            - `download_snapshot`: Export a snapshot archive
+        """
+        # Use files parameter with httpx for multipart upload
+        response = self._request(
+            "POST",
+            "/api/v1/investigations/import",
+            content=file_data,
+            headers={"Content-Type": "application/octet-stream"},
+        )
+        result: dict[str, Any] = response.json()
+        return result
+
+    async def async_import_snapshot(self, file_data: bytes) -> dict[str, Any]:
+        """Async version of `import_snapshot`.
+
+        See `import_snapshot` for full documentation.
+        """
+        response = await self._async_request(
+            "POST",
+            "/api/v1/investigations/import",
+            content=file_data,
+            headers={"Content-Type": "application/octet-stream"},
+        )
+        result: dict[str, Any] = response.json()
+        return result

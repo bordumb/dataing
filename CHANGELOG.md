@@ -1,3 +1,10 @@
+# [1.17.0](https://github.com/bordumb/dataing/compare/v1.16.0...v1.17.0) (2026-01-31)
+
+
+### Features
+
+* PyPI Package Publishing (fn-40) ([#108](https://github.com/bordumb/dataing/issues/108)) ([d972eb7](https://github.com/bordumb/dataing/commit/d972eb77e03f1eaa76c0e3aa1111a46fea344189)), closes [pypa/#action-pypi-publish](https://github.com/bordumb/dataing/issues/action-pypi-publish)
+
 # [1.16.0](https://github.com/bordumb/dataing/compare/v1.15.0...v1.16.0) (2026-01-31)
 
 

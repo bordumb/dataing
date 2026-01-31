@@ -1,16 +1,44 @@
 {
-  "assignee": null,
+  "assignee": "bordumbb@gmail.com",
   "claim_note": "",
-  "claimed_at": null,
+  "claimed_at": "2026-01-31T10:00:17.472054Z",
   "created_at": "2026-01-28T22:13:49.789809Z",
   "depends_on": [
     "fn-51.3"
   ],
   "epic": "fn-51",
+  "evidence": {
+    "features": [
+      "dataing codify <investigation_id> command",
+      "--format option (gx, dbt, soda, sql)",
+      "--output option for file output",
+      "--append option for merging with existing files",
+      "Intelligent merging for dbt schema.yml and GX suites",
+      "Error handling for missing synthesis or low confidence"
+    ],
+    "files_created": [
+      "python-packages/dataing-cli/src/dataing_cli/commands/codify.py",
+      "python-packages/dataing-cli/tests/test_commands_codify.py"
+    ],
+    "files_modified": [
+      "python-packages/dataing-cli/src/dataing_cli/main.py",
+      "python-packages/dataing-cli/pyproject.toml"
+    ],
+    "precommit": {
+      "mypy": "passed",
+      "ruff": "passed"
+    },
+    "tests": {
+      "command": "uv run pytest python-packages/dataing-cli/tests/test_commands_codify.py -v",
+      "failed": 0,
+      "passed": 11,
+      "skipped": 1
+    }
+  },
   "id": "fn-51.5",
   "priority": null,
   "spec_path": ".flow/tasks/fn-51.5.md",
-  "status": "todo",
+  "status": "done",
   "title": "Add CLI Test Generation Command (dataing codify)",
-  "updated_at": "2026-01-28T22:23:24.514588Z"
+  "updated_at": "2026-01-31T15:23:04.372798Z"
 }

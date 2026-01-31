@@ -1,0 +1,40 @@
+name: Publish to PyPI
+
+on:
+  workflow_call:
+    inputs:
+      package-dir:
+        description: "Directory containing the package to publish"
+        required: true
+        type: string
+      package-name:
+        description: "Name of the package being published"
+        required: true
+        type: string
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    environment: pypi
+    permissions:
+      id-token: write  # Required for OIDC trusted publishing
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install build tools
+        run: pip install build
+
+      - name: Build package
+        working-directory: ${{ inputs.package-dir }}
+        run: python -m build
+
+      - name: Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          packages-dir: ${{ inputs.package-dir }}/dist/

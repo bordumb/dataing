@@ -11,8 +11,14 @@ from __future__ import annotations
 
 import logging
 import os
-import tomllib
+import sys
 from pathlib import Path
+
+# tomllib is Python 3.11+, tomli is the backport for 3.10
+if sys.version_info >= (3, 11):
+    import tomllib
+else:
+    import tomli as tomllib
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:

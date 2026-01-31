@@ -1,10 +1,10 @@
 [project]
 name = "dataing"
-version = "0.0.1"
+version = "0.1.0"
 description = "Autonomous Data Quality Investigation - Community Edition"
 readme = "README.md"
 requires-python = ">=3.11"
-license = { text = "MIT" }
+license = { text = "Apache-2.0" }
 authors = [{ name = "dataing team" }]
 dependencies = [
     "bond-agent>=0.1.2",
@@ -145,6 +145,8 @@ ignore = ["D100", "D104"]
 "**/tests/*" = ["D101", "D102", "D103", "D107"]
 "scripts/*" = ["D103"]
 ".flow/bin/*" = ["D103"]
+# Client packages support Python 3.10, need version blocks for tomllib
+"python-packages/dataing-cli/src/dataing_cli/config.py" = ["UP036"]
 
 [tool.ruff.lint.pydocstyle]
 convention = "google"

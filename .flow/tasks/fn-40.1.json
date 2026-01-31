@@ -1,14 +1,23 @@
 {
-  "assignee": null,
+  "assignee": "bordumbb@gmail.com",
   "claim_note": "",
-  "claimed_at": null,
+  "claimed_at": "2026-01-31T17:08:16.496946Z",
   "created_at": "2026-01-28T03:51:06.401089Z",
   "depends_on": [],
   "epic": "fn-40",
+  "evidence": {
+    "commits": [
+      "91fa03d691451609073a08d65dff298829e85d02"
+    ],
+    "prs": [],
+    "tests": [
+      "python scripts/sync_versions.py --check"
+    ]
+  },
   "id": "fn-40.1",
   "priority": 1,
   "spec_path": ".flow/tasks/fn-40.1.md",
-  "status": "todo",
+  "status": "done",
   "title": "Sync package versions and add CHANGELOG.md per package",
-  "updated_at": "2026-01-28T03:51:06.401257Z"
+  "updated_at": "2026-01-31T17:11:06.868889Z"
 }

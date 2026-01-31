@@ -24,7 +24,7 @@ import {
   XCircle,
 } from "lucide-react";
 
-import { StepTimeline, PatternList, EvidenceList } from "./components";
+import { StepTimeline, PatternList, EvidenceList, CodifyWidget } from "./components";
 import { InvestigationFeedbackProvider } from "./context/InvestigationFeedbackContext";
 import { InvestigationFeedbackButtons } from "./components/InvestigationFeedbackButtons";
 
@@ -572,6 +572,19 @@ export function InvestigationDetail() {
             )}
           </div>
           <div className="flex items-center gap-2">
+            {/* Codify Button - only for completed investigations */}
+            {isComplete && data.main_branch.synthesis && (
+              <CodifyWidget
+                investigationId={id}
+                confidence={
+                  typeof (data.main_branch.synthesis as Record<string, unknown>)?.confidence === "number"
+                    ? (data.main_branch.synthesis as Record<string, unknown>).confidence as number
+                    : 0
+                }
+                isComplete={isComplete}
+              />
+            )}
+
             {/* Collaborate Button */}
             <Button
               variant="default"

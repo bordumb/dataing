@@ -77,6 +77,21 @@ export interface SendMessageResponse {
   branch_id: string;
 }
 
+export interface CodifyTest {
+  test_type: string;
+  column: string | null;
+  table: string;
+  description: string;
+}
+
+export interface CodifyResponse {
+  investigation_id: string;
+  format: string;
+  content: string;
+  tests: CodifyTest[];
+  confidence: number;
+}
+
 // API functions
 
 const API_BASE = "/api/v1/investigations";
@@ -115,6 +130,17 @@ async function sendMessage(
     url: `${API_BASE}/${investigationId}/messages`,
     method: "POST",
     data: { message },
+  });
+}
+
+async function codifyInvestigation(
+  investigationId: string,
+  format: "gx" | "dbt" | "soda" | "sql",
+): Promise<CodifyResponse> {
+  return customInstance<CodifyResponse>({
+    url: `${API_BASE}/${investigationId}/codify`,
+    method: "POST",
+    data: { format },
   });
 }
 
@@ -173,6 +199,18 @@ export function useSendMessage() {
         queryKey: queryKeys.investigations.detail(variables.investigationId),
       });
     },
+  });
+}
+
+export function useCodifyInvestigation() {
+  return useMutation({
+    mutationFn: ({
+      investigationId,
+      format,
+    }: {
+      investigationId: string;
+      format: "gx" | "dbt" | "soda" | "sql";
+    }) => codifyInvestigation(investigationId, format),
   });
 }
 

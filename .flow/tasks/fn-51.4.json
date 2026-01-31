@@ -1,17 +1,50 @@
 {
-  "assignee": null,
+  "assignee": "bordumbb@gmail.com",
   "claim_note": "",
-  "claimed_at": null,
+  "claimed_at": "2026-01-31T15:24:04.756573Z",
   "created_at": "2026-01-28T22:13:49.605276Z",
   "depends_on": [
     "fn-51.2",
     "fn-51.3"
   ],
   "epic": "fn-51",
+  "evidence": {
+    "checks": {
+      "eslint": "passed",
+      "mypy": "passed",
+      "ruff": "passed",
+      "tsc": "passed"
+    },
+    "features": {
+      "backend": [
+        "POST /investigations/{id}/codify endpoint",
+        "Confidence validation (>= 60%)",
+        "Test extraction from synthesis",
+        "Multi-format rendering"
+      ],
+      "frontend": [
+        "CodifyWidget with modal dialog",
+        "Format selector (SQL, dbt, GX, Soda)",
+        "Syntax-highlighted code display",
+        "Copy to clipboard button",
+        "Download as file button",
+        "Test summary badges"
+      ]
+    },
+    "files_created": [
+      "frontend/app/src/features/investigation/components/codify-widget.tsx"
+    ],
+    "files_modified": [
+      "python-packages/dataing/src/dataing/entrypoints/api/routes/investigations.py",
+      "frontend/app/src/features/investigation/components/index.ts",
+      "frontend/app/src/lib/api/investigations.ts",
+      "frontend/app/src/features/investigation/InvestigationDetail.tsx"
+    ]
+  },
   "id": "fn-51.4",
   "priority": null,
   "spec_path": ".flow/tasks/fn-51.4.md",
-  "status": "todo",
+  "status": "done",
   "title": "Build Codify Test Widget Button",
-  "updated_at": "2026-01-28T22:23:24.111622Z"
+  "updated_at": "2026-01-31T15:28:48.965639Z"
 }

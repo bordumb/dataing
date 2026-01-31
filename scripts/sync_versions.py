@@ -22,6 +22,7 @@ PACKAGES = [
     REPO_ROOT / "python-packages/dataing-cli/pyproject.toml",
     REPO_ROOT / "python-packages/dataing-sdk/pyproject.toml",
     REPO_ROOT / "python-packages/dataing-notebook/pyproject.toml",
+    REPO_ROOT / "python-packages/dataing-meta/pyproject.toml",
     REPO_ROOT / "pyproject.toml",
 ]
 

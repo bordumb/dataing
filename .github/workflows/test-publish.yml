@@ -6,6 +6,7 @@ on:
       - "python-packages/dataing-cli/**"
       - "python-packages/dataing-sdk/**"
       - "python-packages/dataing-notebook/**"
+      - "python-packages/dataing-meta/**"
 
 jobs:
   build-check:
@@ -16,6 +17,7 @@ jobs:
           - { dir: "python-packages/dataing-cli", name: "dataing-cli" }
           - { dir: "python-packages/dataing-sdk", name: "dataing-sdk" }
           - { dir: "python-packages/dataing-notebook", name: "dataing-notebook" }
+          - { dir: "python-packages/dataing-meta", name: "dataing" }
 
     steps:
       - uses: actions/checkout@v4

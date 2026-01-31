@@ -1,3 +1,10 @@
+# [1.15.0](https://github.com/bordumb/dataing/compare/v1.14.0...v1.15.0) (2026-01-31)
+
+
+### Features
+
+* Trace-to-Test Codify - Generate Regression Tests from Investigations ([#105](https://github.com/bordumb/dataing/issues/105)) ([2400676](https://github.com/bordumb/dataing/commit/2400676416b306d1c4df5c125de971889cc33d1e))
+
 # [1.14.0](https://github.com/bordumb/dataing/compare/v1.13.0...v1.14.0) (2026-01-29)
 
 

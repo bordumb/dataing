@@ -7,10 +7,19 @@
     "fn-42.2"
   ],
   "epic": "fn-42",
+  "evidence": {
+    "commits": [
+      "42cc2c8e"
+    ],
+    "prs": [],
+    "tests": [
+      "cd docs && mkdocs build"
+    ]
+  },
   "id": "fn-42.3",
   "priority": 3,
   "spec_path": ".flow/tasks/fn-42.3.md",
-  "status": "in_progress",
+  "status": "done",
   "title": "Add troubleshooting section for common issues",
-  "updated_at": "2026-01-31T23:02:37.805864Z"
+  "updated_at": "2026-01-31T23:04:51.711750Z"
 }

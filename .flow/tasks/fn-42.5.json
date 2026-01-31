@@ -8,10 +8,20 @@
     "fn-42.4"
   ],
   "epic": "fn-42",
+  "evidence": {
+    "commits": [
+      "cda0a605"
+    ],
+    "prs": [],
+    "tests": [
+      "mkdocs build",
+      "bash -n docs/test-quickstart.sh"
+    ]
+  },
   "id": "fn-42.5",
   "priority": 5,
   "spec_path": ".flow/tasks/fn-42.5.md",
-  "status": "in_progress",
+  "status": "done",
   "title": "Test quickstart flow end-to-end on clean environment",
-  "updated_at": "2026-01-31T23:08:43.113352Z"
+  "updated_at": "2026-01-31T23:10:57.577053Z"
 }

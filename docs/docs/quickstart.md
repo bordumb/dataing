@@ -77,7 +77,7 @@
 
     !!! note "Additional setup required"
         The pip path requires you to run PostgreSQL, Redis, and Temporal separately.
-        See the [Self-Host Guide](guides/self-host.md) for details.
+        See the [Deployment Guide](development/deployment.md) for details.
 
 ---
 

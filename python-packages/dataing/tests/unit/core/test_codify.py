@@ -1,5 +1,7 @@
 """Tests for the codify module - DataQualityTest model."""
 
+from typing import TYPE_CHECKING
+from unittest.mock import MagicMock
 from uuid import uuid4
 
 import pytest
@@ -11,6 +13,9 @@ from dataing.core.codify import (
     TestThreshold,
     ThresholdType,
 )
+
+if TYPE_CHECKING:
+    pass  # MagicMock already imported above
 
 
 class TestAssertionType:
@@ -451,3 +456,348 @@ class TestDataQualityTestFactoryMethods:
 
         assert test.threshold is not None
         assert test.threshold.value == 1.0
+
+
+class TestExtractTestsFromSynthesis:
+    """Tests for extract_tests_from_synthesis function."""
+
+    @pytest.fixture
+    def investigation_id(self) -> "uuid4":
+        """Create a sample investigation ID."""
+        return uuid4()
+
+    @pytest.fixture
+    def mock_synthesis_null(self) -> MagicMock:
+        """Create a mock synthesis response for NULL values issue."""
+        from unittest.mock import MagicMock
+
+        synthesis = MagicMock()
+        synthesis.root_cause = "NULL values introduced in user_id column due to ETL failure"
+        synthesis.confidence = 0.85
+        synthesis.causal_chain = [
+            "ETL job failed at 03:14 UTC",
+            "users table not updated",
+            "orders.user_id column has NULL values",
+        ]
+        synthesis.supporting_evidence = ["Found 485 NULL values in user_id column"]
+        return synthesis
+
+    @pytest.fixture
+    def mock_synthesis_row_count(self) -> MagicMock:
+        """Create a mock synthesis response for row count issue."""
+        from unittest.mock import MagicMock
+
+        synthesis = MagicMock()
+        synthesis.root_cause = "Row count dropped by 50% due to missing upstream data"
+        synthesis.confidence = 0.9
+        synthesis.causal_chain = [
+            "Upstream source returned empty response",
+            "Missing rows in staging table",
+            "Row count dropped dramatically",
+        ]
+        synthesis.supporting_evidence = ["Row count: 1000 expected, 500 actual"]
+        return synthesis
+
+    @pytest.fixture
+    def mock_synthesis_freshness(self) -> MagicMock:
+        """Create a mock synthesis response for freshness issue."""
+        from unittest.mock import MagicMock
+
+        synthesis = MagicMock()
+        synthesis.root_cause = "Stale data in orders table, not updated for 48 hours"
+        synthesis.confidence = 0.75
+        synthesis.causal_chain = [
+            "Scheduler was paused",
+            "ETL job didn't run",
+            "Data became stale",
+        ]
+        synthesis.supporting_evidence = ["Last update: 48 hours ago"]
+        return synthesis
+
+    @pytest.fixture
+    def mock_synthesis_duplicate(self) -> MagicMock:
+        """Create a mock synthesis response for duplicate issue."""
+        from unittest.mock import MagicMock
+
+        synthesis = MagicMock()
+        synthesis.root_cause = "Duplicate order_id values found due to retry logic bug"
+        synthesis.confidence = 0.8
+        synthesis.causal_chain = [
+            "Retry logic caused double inserts",
+            "order_id column has duplicate values",
+        ]
+        synthesis.supporting_evidence = ["Found 150 duplicate order_id values"]
+        return synthesis
+
+    @pytest.fixture
+    def mock_synthesis_low_confidence(self) -> MagicMock:
+        """Create a mock synthesis response with low confidence."""
+        from unittest.mock import MagicMock
+
+        synthesis = MagicMock()
+        synthesis.root_cause = "Some issue detected"
+        synthesis.confidence = 0.5  # Below threshold
+        synthesis.causal_chain = ["Step 1", "Step 2"]
+        synthesis.supporting_evidence = []
+        return synthesis
+
+    @pytest.fixture
+    def mock_synthesis_unexpected_values(self) -> MagicMock:
+        """Create a mock synthesis response for unexpected values."""
+        from unittest.mock import MagicMock
+
+        synthesis = MagicMock()
+        synthesis.root_cause = "Unexpected value 'INVALID' in status column"
+        synthesis.confidence = 0.85
+        synthesis.causal_chain = [
+            "API returned new status code",
+            "Validation not updated",
+            "Invalid status in database",
+        ]
+        synthesis.supporting_evidence = [
+            "Expected values: active, inactive, pending",
+            "Found: INVALID",
+        ]
+        return synthesis
+
+    def test_extract_null_test(
+        self, investigation_id: "uuid4", mock_synthesis_null: MagicMock
+    ) -> None:
+        """Test extraction of NOT_NULL test from synthesis."""
+        from dataing.core.codify import extract_tests_from_synthesis
+
+        tests = extract_tests_from_synthesis(
+            synthesis=mock_synthesis_null,
+            investigation_id=investigation_id,
+            table="orders",
+            column="user_id",
+        )
+
+        assert len(tests) >= 1
+        null_tests = [t for t in tests if t.assertion_type == AssertionType.NOT_NULL]
+        assert len(null_tests) == 1
+        assert null_tests[0].column == "user_id"
+        assert null_tests[0].table == "orders"
+        assert "auto-generated" in null_tests[0].tags
+
+    def test_extract_row_count_test(
+        self, investigation_id: "uuid4", mock_synthesis_row_count: MagicMock
+    ) -> None:
+        """Test extraction of ROW_COUNT_CHANGE test from synthesis."""
+        from dataing.core.codify import extract_tests_from_synthesis
+
+        tests = extract_tests_from_synthesis(
+            synthesis=mock_synthesis_row_count,
+            investigation_id=investigation_id,
+            table="orders",
+        )
+
+        assert len(tests) >= 1
+        rc_tests = [t for t in tests if t.assertion_type == AssertionType.ROW_COUNT_CHANGE]
+        assert len(rc_tests) == 1
+        assert rc_tests[0].table == "orders"
+        assert rc_tests[0].is_table_level
+
+    def test_extract_freshness_test(
+        self, investigation_id: "uuid4", mock_synthesis_freshness: MagicMock
+    ) -> None:
+        """Test extraction of FRESHNESS test from synthesis."""
+        from dataing.core.codify import extract_tests_from_synthesis
+
+        tests = extract_tests_from_synthesis(
+            synthesis=mock_synthesis_freshness,
+            investigation_id=investigation_id,
+            table="orders",
+        )
+
+        assert len(tests) >= 1
+        fresh_tests = [t for t in tests if t.assertion_type == AssertionType.FRESHNESS]
+        assert len(fresh_tests) == 1
+        assert fresh_tests[0].table == "orders"
+
+    def test_extract_unique_test(
+        self, investigation_id: "uuid4", mock_synthesis_duplicate: MagicMock
+    ) -> None:
+        """Test extraction of UNIQUE test from synthesis."""
+        from dataing.core.codify import extract_tests_from_synthesis
+
+        tests = extract_tests_from_synthesis(
+            synthesis=mock_synthesis_duplicate,
+            investigation_id=investigation_id,
+            table="orders",
+            column="order_id",
+        )
+
+        assert len(tests) >= 1
+        unique_tests = [t for t in tests if t.assertion_type == AssertionType.UNIQUE]
+        assert len(unique_tests) == 1
+        assert unique_tests[0].column == "order_id"
+
+    def test_no_tests_below_confidence_threshold(
+        self, investigation_id: "uuid4", mock_synthesis_low_confidence: MagicMock
+    ) -> None:
+        """Test that no tests are generated below confidence threshold."""
+        from dataing.core.codify import extract_tests_from_synthesis
+
+        tests = extract_tests_from_synthesis(
+            synthesis=mock_synthesis_low_confidence,
+            investigation_id=investigation_id,
+            table="orders",
+        )
+
+        assert len(tests) == 0
+
+    def test_extract_accepted_values_test(
+        self, investigation_id: "uuid4", mock_synthesis_unexpected_values: MagicMock
+    ) -> None:
+        """Test extraction of ACCEPTED_VALUES test from synthesis."""
+        from dataing.core.codify import extract_tests_from_synthesis
+
+        tests = extract_tests_from_synthesis(
+            synthesis=mock_synthesis_unexpected_values,
+            investigation_id=investigation_id,
+            table="users",
+            column="status",
+        )
+
+        assert len(tests) >= 1
+        av_tests = [t for t in tests if t.assertion_type == AssertionType.ACCEPTED_VALUES]
+        assert len(av_tests) == 1
+        assert av_tests[0].column == "status"
+        assert "values" in av_tests[0].parameters
+
+    def test_no_root_cause_returns_empty(self, investigation_id: "uuid4") -> None:
+        """Test that no tests are generated when root_cause is None."""
+        from unittest.mock import MagicMock
+
+        from dataing.core.codify import extract_tests_from_synthesis
+
+        synthesis = MagicMock()
+        synthesis.root_cause = None
+        synthesis.confidence = 0.9
+        synthesis.causal_chain = []
+        synthesis.supporting_evidence = []
+
+        tests = extract_tests_from_synthesis(
+            synthesis=synthesis,
+            investigation_id=investigation_id,
+            table="orders",
+        )
+
+        assert len(tests) == 0
+
+    def test_fallback_to_custom_sql(self, investigation_id: "uuid4") -> None:
+        """Test fallback to CUSTOM_SQL for unmatched patterns."""
+        from unittest.mock import MagicMock
+
+        from dataing.core.codify import extract_tests_from_synthesis
+
+        synthesis = MagicMock()
+        synthesis.root_cause = "Complex issue with no clear pattern"
+        synthesis.confidence = 0.8
+        synthesis.causal_chain = ["Step 1", "Step 2"]
+        synthesis.supporting_evidence = []
+
+        tests = extract_tests_from_synthesis(
+            synthesis=synthesis,
+            investigation_id=investigation_id,
+            table="orders",
+        )
+
+        assert len(tests) == 1
+        assert tests[0].assertion_type == AssertionType.CUSTOM_SQL
+        assert tests[0].sql_expression is not None
+
+
+class TestPatternMatchers:
+    """Tests for pattern matching helper functions."""
+
+    def test_matches_null_pattern(self) -> None:
+        """Test NULL pattern matching."""
+        from dataing.core.codify import _matches_null_pattern
+
+        assert _matches_null_pattern("null values found")
+        assert _matches_null_pattern("missing value in column")
+        assert _matches_null_pattern("column is empty")
+        assert not _matches_null_pattern("everything is fine")
+
+    def test_matches_row_count_pattern(self) -> None:
+        """Test row count pattern matching."""
+        from dataing.core.codify import _matches_row_count_pattern
+
+        assert _matches_row_count_pattern("row count dropped")
+        assert _matches_row_count_pattern("volume drop detected")
+        assert _matches_row_count_pattern("missing records")
+        assert not _matches_row_count_pattern("data looks good")
+
+    def test_matches_freshness_pattern(self) -> None:
+        """Test freshness pattern matching."""
+        from dataing.core.codify import _matches_freshness_pattern
+
+        assert _matches_freshness_pattern("stale data")
+        assert _matches_freshness_pattern("data is outdated")
+        assert _matches_freshness_pattern("late arriving data")
+        assert not _matches_freshness_pattern("fresh data")
+
+    def test_matches_duplicate_pattern(self) -> None:
+        """Test duplicate pattern matching."""
+        from dataing.core.codify import _matches_duplicate_pattern
+
+        assert _matches_duplicate_pattern("duplicate records")
+        assert _matches_duplicate_pattern("not unique values")
+        assert _matches_duplicate_pattern("repeated entries")
+        assert not _matches_duplicate_pattern("unique values")
+
+
+class TestHelperFunctions:
+    """Tests for helper functions."""
+
+    def test_extract_accepted_values(self) -> None:
+        """Test extracting accepted values from evidence."""
+        from dataing.core.codify import _extract_accepted_values
+
+        evidence = [
+            "Found invalid value",
+            "Expected values: active, inactive, pending",
+        ]
+        values = _extract_accepted_values(evidence)
+
+        assert len(values) == 3
+        assert "active" in values
+        assert "inactive" in values
+        assert "pending" in values
+
+    def test_extract_accepted_values_empty(self) -> None:
+        """Test extracting accepted values when not present."""
+        from dataing.core.codify import _extract_accepted_values
+
+        evidence = ["No values mentioned here"]
+        values = _extract_accepted_values(evidence)
+
+        assert len(values) == 0
+
+    def test_extract_column_from_synthesis(self) -> None:
+        """Test extracting column name from synthesis."""
+        from unittest.mock import MagicMock
+
+        from dataing.core.codify import _extract_column_from_synthesis
+
+        synthesis = MagicMock()
+        synthesis.root_cause = "NULL in column user_id"
+        synthesis.causal_chain = []
+
+        column = _extract_column_from_synthesis(synthesis)
+        assert column == "user_id"
+
+    def test_extract_column_from_table_dot_column(self) -> None:
+        """Test extracting column from table.column format."""
+        from unittest.mock import MagicMock
+
+        from dataing.core.codify import _extract_column_from_synthesis
+
+        synthesis = MagicMock()
+        synthesis.root_cause = "Issue in orders.status"
+        synthesis.causal_chain = []
+
+        column = _extract_column_from_synthesis(synthesis)
+        assert column == "status"

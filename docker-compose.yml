@@ -26,7 +26,7 @@ services:
       POSTGRES_USER: dataing
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-dataing}
     volumes:
-      - pgdata:/var/lib/postgresql/data
+      - dataing-pgdata:/var/lib/postgresql/data
       - ./infra/init-temporal-db.sh:/docker-entrypoint-initdb.d/init-temporal-db.sh:ro
     ports:
       - "5432:5432"
@@ -39,10 +39,11 @@ services:
 
   redis:
     image: redis:7-alpine
+    command: ["redis-server", "--appendonly", "yes"]
     ports:
       - "6379:6379"
     volumes:
-      - redis_data:/data
+      - dataing-redis:/data
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 5s
@@ -85,6 +86,11 @@ services:
     depends_on:
       temporal:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8080/"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
     restart: unless-stopped
 
   # ===========================================================================
@@ -146,6 +152,12 @@ services:
         condition: service_healthy
       temporal:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import asyncio; from temporalio.client import Client; asyncio.run(Client.connect('temporal:7233'))\" 2>/dev/null"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
     restart: unless-stopped
 
   frontend:
@@ -159,6 +171,11 @@ services:
     depends_on:
       api:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:3000/nginx-health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
     restart: unless-stopped
 
   # ===========================================================================
@@ -193,5 +210,5 @@ services:
     restart: unless-stopped
 
 volumes:
-  pgdata:
-  redis_data:
+  dataing-pgdata:
+  dataing-redis:

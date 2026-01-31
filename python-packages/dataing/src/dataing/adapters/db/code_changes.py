@@ -65,6 +65,12 @@ class CodeChangesRepository:
                     cc.message,
                     cc.committed_at,
                     cc.affected_assets,
+                    cc.pr_number,
+                    cc.pr_url,
+                    cc.pr_title,
+                    cc.pr_author,
+                    cc.pr_merged_at,
+                    cc.provider,
                     1.0::float AS relevance_score,
                     'directly_affects_asset' AS relevance_reason
                 FROM code_changes cc
@@ -80,6 +86,12 @@ class CodeChangesRepository:
                     cc.message,
                     cc.committed_at,
                     cc.affected_assets,
+                    cc.pr_number,
+                    cc.pr_url,
+                    cc.pr_title,
+                    cc.pr_author,
+                    cc.pr_merged_at,
+                    cc.provider,
                     0.7::float AS relevance_score,
                     'affects_upstream_dependency' AS relevance_reason
                 FROM code_changes cc
@@ -101,6 +113,12 @@ class CodeChangesRepository:
                     cc.message,
                     cc.committed_at,
                     cc.affected_assets,
+                    cc.pr_number,
+                    cc.pr_url,
+                    cc.pr_title,
+                    cc.pr_author,
+                    cc.pr_merged_at,
+                    cc.provider,
                     0.4::float AS relevance_score,
                     'matches_file_path_pattern' AS relevance_reason
                 FROM code_changes cc
@@ -140,6 +158,12 @@ class CodeChangesRepository:
                 message,
                 committed_at,
                 affected_assets,
+                pr_number,
+                pr_url,
+                pr_title,
+                pr_author,
+                pr_merged_at,
+                provider,
                 relevance_score,
                 relevance_reason
             FROM all_changes
@@ -189,4 +213,11 @@ class CodeChangesRepository:
             affected_assets=asset_names,
             relevance_score=float(row["relevance_score"]),
             relevance_reason=row["relevance_reason"],
+            # PR metadata (populated by bond-agent tools during sync)
+            pr_number=row.get("pr_number"),
+            pr_url=row.get("pr_url"),
+            pr_title=row.get("pr_title"),
+            pr_author=row.get("pr_author"),
+            pr_merged_at=row.get("pr_merged_at"),
+            provider=row.get("provider"),
         )

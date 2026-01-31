@@ -641,6 +641,13 @@ def render_replay_detail(investigation: dict[str, Any]) -> str:
             html_parts.append(f"<p>{html.escape(str(synthesis))}</p>")
         html_parts.append("</div>")
 
+    # Related code changes section
+    related_code_changes = investigation.get("related_code_changes", [])
+    if not related_code_changes and synthesis and isinstance(synthesis, dict):
+        related_code_changes = synthesis.get("related_code_changes", [])
+    if related_code_changes:
+        html_parts.append(render_code_changes(related_code_changes))
+
     # Evidence section
     if evidence_list:
         html_parts.append('<div class="evidence-section">')
@@ -694,6 +701,98 @@ def render_replay_detail(investigation: dict[str, Any]) -> str:
     else:
         html_parts.append("<p><em>No evidence collected yet.</em></p>")
 
+    html_parts.append("</div>")
+
+    return "\n".join(html_parts)
+
+
+def render_code_changes(code_changes: list[dict[str, Any]]) -> str:
+    """Render related code changes as HTML with clickable links.
+
+    Args:
+        code_changes: List of code change dicts with commit/PR metadata.
+
+    Returns:
+        HTML string with styled code change links.
+    """
+    if not code_changes:
+        return ""
+
+    html_parts = [
+        '<div class="dataing-code-changes">',
+        "<style>",
+        ".dataing-code-changes { ",
+        "  font-family: system-ui, sans-serif; ",
+        "  border: 1px solid #d8b4fe; border-radius: 8px; ",
+        "  padding: 16px; margin: 16px 0; ",
+        "  background: #faf5ff; ",
+        "}",
+        ".dataing-code-changes h4 { margin: 0 0 12px 0; color: #7c3aed; }",
+        ".dataing-code-changes ul { margin: 0; padding-left: 0; list-style: none; }",
+        ".dataing-code-changes li { ",
+        "  margin: 8px 0; padding: 8px 12px; ",
+        "  background: white; border-radius: 6px; ",
+        "  border: 1px solid #e5e7eb; ",
+        "}",
+        ".dataing-code-changes a { ",
+        "  color: #7c3aed; text-decoration: none; font-weight: 500; ",
+        "}",
+        ".dataing-code-changes a:hover { text-decoration: underline; }",
+        ".dataing-code-changes .pr-badge { ",
+        "  display: inline-block; background: #7c3aed; color: white; ",
+        "  padding: 2px 8px; border-radius: 4px; font-size: 0.75em; ",
+        "  margin-right: 8px; font-weight: 500; ",
+        "}",
+        ".dataing-code-changes .author { color: #6b7280; font-size: 0.9em; }",
+        ".dataing-code-changes .commit-hash { ",
+        "  font-family: monospace; font-size: 0.9em; ",
+        "}",
+        "</style>",
+        "<h4>Related Code Changes</h4>",
+        "<ul>",
+    ]
+
+    for change in code_changes[:10]:  # Limit to 10 changes
+        url = change.get("url", "#")
+        pr_number = change.get("pr_number")
+        pr_title = change.get("pr_title")
+        commit_hash = change.get("commit_hash", "")
+        message = change.get("message", "")
+        author = change.get("author", "")
+
+        html_parts.append("<li>")
+
+        if pr_number:
+            # PR with badge
+            html_parts.append(f'<span class="pr-badge">PR #{pr_number}</span>')
+            if pr_title:
+                display_text = html.escape(pr_title)
+            else:
+                display_text = f"Pull Request #{pr_number}"
+            html_parts.append(f'<a href="{html.escape(url)}">{display_text}</a>')
+        else:
+            # Commit link
+            short_hash = commit_hash[:7] if commit_hash else "unknown"
+            if message:
+                truncated_msg = message[:50] + "..." if len(message) > 50 else message
+                display_text = f"{short_hash}: {html.escape(truncated_msg)}"
+            else:
+                display_text = short_hash
+            html_parts.append(
+                f'<span class="commit-hash">'
+                f'<a href="{html.escape(url)}">{display_text}</a>'
+                f"</span>"
+            )
+
+        if author:
+            html_parts.append(f' <span class="author">by {html.escape(author)}</span>')
+
+        html_parts.append("</li>")
+
+    if len(code_changes) > 10:
+        html_parts.append(f"<li><em>...and {len(code_changes) - 10} more changes</em></li>")
+
+    html_parts.append("</ul>")
     html_parts.append("</div>")
 
     return "\n".join(html_parts)

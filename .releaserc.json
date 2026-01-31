@@ -5,9 +5,20 @@
     "@semantic-release/release-notes-generator",
     "@semantic-release/changelog",
     [
+      "@semantic-release/exec",
+      {
+        "prepareCmd": "python scripts/sync_versions.py ${nextRelease.version}"
+      }
+    ],
+    [
       "@semantic-release/git",
       {
-        "assets": ["CHANGELOG.md"],
+        "assets": [
+          "CHANGELOG.md",
+          "pyproject.toml",
+          "python-packages/*/pyproject.toml",
+          "python-packages/*/CHANGELOG.md"
+        ],
         "message": "chore(release): ${nextRelease.version} [skip ci]\n\n${nextRelease.notes}"
       }
     ],

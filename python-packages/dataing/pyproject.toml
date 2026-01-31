@@ -46,6 +46,9 @@ dev = [
     "testcontainers>=3.7.0",
     "respx>=0.20.2",
 ]
+snapshot = [
+    "pyarrow>=15.0.0",
+]
 
 [build-system]
 requires = ["hatchling"]

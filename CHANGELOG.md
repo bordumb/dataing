@@ -1,3 +1,10 @@
+# [1.16.0](https://github.com/bordumb/dataing/compare/v1.15.0...v1.16.0) (2026-01-31)
+
+
+### Features
+
+* PR/Commit Links in Investigation Output (fn-38) ([#106](https://github.com/bordumb/dataing/issues/106)) ([b790e69](https://github.com/bordumb/dataing/commit/b790e696990376041b7d9763f90d89c075d3a3b8))
+
 # [1.15.0](https://github.com/bordumb/dataing/compare/v1.14.0...v1.15.0) (2026-01-31)
 
 

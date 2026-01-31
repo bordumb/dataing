@@ -1,7 +1,7 @@
 {
-  "assignee": null,
+  "assignee": "bordumbb@gmail.com",
   "claim_note": "",
-  "claimed_at": null,
+  "claimed_at": "2026-01-31T23:00:25.211885Z",
   "created_at": "2026-01-28T03:52:05.250749Z",
   "depends_on": [
     "fn-42.1"
@@ -10,7 +10,7 @@
   "id": "fn-42.2",
   "priority": 2,
   "spec_path": ".flow/tasks/fn-42.2.md",
-  "status": "todo",
+  "status": "in_progress",
   "title": "Write run-first-investigation walkthrough with expected output",
-  "updated_at": "2026-01-28T03:52:05.250936Z"
+  "updated_at": "2026-01-31T23:00:25.212079Z"
 }

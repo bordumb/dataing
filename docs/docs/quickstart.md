@@ -175,17 +175,140 @@ The demo datasource includes pre-seeded anomalies for testing:
 
 ---
 
+## Step 4: Run Your First Investigation
+
+Let's investigate the `null_spike` anomaly — a simulated bug where a mobile app update started sending NULL user IDs.
+
+=== "curl"
+
+    ```bash
+    curl -X POST http://localhost:8000/api/v1/investigations \
+      -H "Content-Type: application/json" \
+      -H "X-API-Key: dd_demo_12345" \
+      -d '{
+        "alert": {
+          "table": "orders",
+          "column": "user_id",
+          "metric": "null_rate",
+          "anomaly_type": "spike",
+          "detected_at": "2024-01-15T10:00:00Z",
+          "description": "NULL rate increased from 1% to 15%"
+        }
+      }'
+    ```
+
+    Expected response (202 Accepted):
+
+    ```json
+    {
+      "investigation_id": "inv_abc123...",
+      "status": "running"
+    }
+    ```
+
+=== "Python"
+
+    ```python
+    import httpx
+
+    response = httpx.post(
+        "http://localhost:8000/api/v1/investigations",
+        headers={"X-API-Key": "dd_demo_12345"},
+        json={
+            "alert": {
+                "table": "orders",
+                "column": "user_id",
+                "metric": "null_rate",
+                "anomaly_type": "spike",
+                "description": "NULL rate increased from 1% to 15%"
+            }
+        }
+    )
+    print(response.json())
+    # {"investigation_id": "inv_abc123...", "status": "running"}
+    ```
+
+---
+
+## Step 5: Watch the Investigation
+
+The investigation runs asynchronously. Poll for status:
+
+```bash
+curl -H "X-API-Key: dd_demo_12345" \
+  http://localhost:8000/api/v1/investigations/{investigation_id}
+```
+
+While running, you'll see:
+
+```json
+{
+  "investigation_id": "inv_abc123...",
+  "status": "investigating",
+  "phase": "evaluating_hypotheses",
+  "progress": {
+    "hypotheses_total": 4,
+    "hypotheses_evaluated": 2
+  }
+}
+```
+
+!!! tip "Temporal UI"
+    Watch the investigation workflow in real-time at [http://localhost:8233](http://localhost:8233).
+    You'll see parallel hypothesis evaluation and the evidence chain being built.
+
+---
+
+## Step 6: View Results
+
+When complete, you'll get the full analysis:
+
+```json
+{
+  "investigation_id": "inv_abc123...",
+  "status": "completed",
+  "duration_seconds": 45,
+  "synthesis": {
+    "root_cause": "Mobile app v2.3.1 introduced a bug where the checkout API fails to pass user context for guest checkouts",
+    "confidence": 0.92,
+    "supporting_evidence": [
+      "NULL user_ids occur exclusively on channel='mobile_app'",
+      "100% of affected orders have app_version='2.3.1'",
+      "Web orders and mobile v2.3.0 orders are unaffected",
+      "Issue started exactly when v2.3.1 was released (2024-01-15 09:00 UTC)"
+    ],
+    "recommended_actions": [
+      "Roll back mobile app to v2.3.0",
+      "Fix user context passing in checkout API",
+      "Backfill user_id from session data where possible"
+    ]
+  },
+  "evidence": [
+    {
+      "hypothesis": "Issue is channel-specific",
+      "query": "SELECT channel, COUNT(*) as total, SUM(CASE WHEN user_id IS NULL THEN 1 ELSE 0 END) as nulls FROM orders WHERE created_at > '2024-01-15' GROUP BY channel",
+      "result": {"mobile_app": "85% NULL", "web": "1% NULL"},
+      "interpretation": "Strong evidence - NULLs are isolated to mobile_app channel"
+    }
+  ]
+}
+```
+
+!!! info "What just happened?"
+    Dataing performed an autonomous investigation:
+
+    1. **Context Gathering** — Analyzed table schema, statistics, and recent changes
+    2. **Hypothesis Generation** — LLM generated 4 potential root causes
+    3. **Parallel Evaluation** — Each hypothesis tested with SQL queries simultaneously
+    4. **Synthesis** — Evidence combined into root cause with confidence score
+
+    The entire process took ~45 seconds and ran 12 SQL queries across 4 hypotheses.
+
+---
+
 ## Next Steps
 
-You're ready to run your first investigation! Continue to:
-
 <div class="grid cards" markdown>
-
--   :material-magnify: **[Run Your First Investigation](guides/first-investigation.md)**
-
-    ---
-
-    Trigger an investigation and understand the results
 
 -   :material-book: **[Architecture](architecture.md)**
 
@@ -198,6 +321,12 @@ You're ready to run your first investigation! Continue to:
     ---
 
     Connect to your production warehouse
+
+-   :material-shield: **[Security](security/data-privacy.md)**
+
+    ---
+
+    Learn about read-only safety guarantees
 
 </div>
 

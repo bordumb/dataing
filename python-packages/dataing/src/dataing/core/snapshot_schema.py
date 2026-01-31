@@ -35,6 +35,48 @@ from pydantic import BaseModel, ConfigDict, Field, ValidationError
 # Increment minor version for additive changes, major version for breaking changes.
 SNAPSHOT_SCHEMA_VERSION = "1.0"
 
+# Supported schema versions for import.
+# Add new versions here as they are released.
+SUPPORTED_SCHEMA_VERSIONS: frozenset[str] = frozenset({"1.0"})
+
+
+class InvalidSnapshotError(Exception):
+    """Snapshot archive is invalid or malformed.
+
+    Raised when a snapshot archive cannot be read or is missing required files.
+    """
+
+    pass
+
+
+class UnsupportedSchemaVersionError(Exception):
+    """Snapshot schema version is not supported.
+
+    Raised when importing a snapshot with a schema version that is not in
+    SUPPORTED_SCHEMA_VERSIONS. This typically means the snapshot was created
+    with a newer version of Dataing.
+
+    Attributes:
+        version: The unsupported schema version.
+        supported: Set of supported versions.
+    """
+
+    def __init__(self, version: str, supported: frozenset[str] | None = None) -> None:
+        """Initialize UnsupportedSchemaVersionError.
+
+        Args:
+            version: The unsupported schema version.
+            supported: Set of supported versions.
+        """
+        supported = supported or SUPPORTED_SCHEMA_VERSIONS
+        super().__init__(
+            f"Schema version '{version}' is not supported. "
+            f"Supported versions: {', '.join(sorted(supported))}. "
+            "Please upgrade Dataing to import this snapshot."
+        )
+        self.version = version
+        self.supported = supported
+
 
 class ArchivePaths:
     """Well-known paths within a snapshot archive.

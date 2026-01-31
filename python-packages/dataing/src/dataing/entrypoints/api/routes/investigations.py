@@ -10,13 +10,13 @@ import asyncio
 import gzip
 import json
 import logging
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Iterator
 from datetime import UTC, datetime
 from enum import Enum
 from typing import Annotated, Any
 from uuid import UUID, uuid4
 
-from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request
+from fastapi import APIRouter, Depends, File, Header, HTTPException, Query, Request
 from fastapi.responses import Response
 from pydantic import BaseModel, Field
 from sse_starlette.sse import EventSourceResponse
@@ -1556,3 +1556,235 @@ async def download_snapshot(
             media_type="application/octet-stream",
             headers=headers,
         )
+
+
+# --- Snapshot Archive Export/Import Endpoints (fn-39) ---
+
+
+class ImportSnapshotResponse(BaseModel):
+    """Response for importing a snapshot archive."""
+
+    investigation_id: UUID
+    status: str = "imported"
+    original_investigation_id: str
+    evidence_count: int
+    is_replay: bool = True
+
+
+@router.get("/{investigation_id}/snapshot")
+async def export_snapshot_archive(
+    investigation_id: UUID,
+    auth: AuthDep,
+    db: AppDbDep,
+    temporal_client: TemporalClientDep,
+) -> Response:
+    """Download investigation as a snapshot tar.gz archive.
+
+    Generates a compressed archive containing all evidence, lineage,
+    and metadata needed to replay the investigation.
+
+    Args:
+        investigation_id: UUID of the investigation.
+        auth: Authentication context from API key/JWT.
+        db: Application database.
+        temporal_client: Temporal client for durable execution.
+
+    Returns:
+        StreamingResponse with tar.gz archive.
+
+    Raises:
+        HTTPException: If investigation not found or not complete.
+    """
+    from fastapi.responses import StreamingResponse
+
+    from dataing.adapters.db.sdk_repository import EvidenceRepository
+    from dataing.core.exceptions import SnapshotSizeExceededError
+    from dataing.core.snapshot_builder import SnapshotBuilder
+
+    # Verify investigation exists and belongs to tenant
+    result = await db.fetch_one(
+        """
+        SELECT id, alert, outcome, COALESCE(outcome->>'status', status) AS status
+        FROM investigations
+        WHERE id = $1 AND tenant_id = $2
+        """,
+        investigation_id,
+        auth.tenant_id,
+    )
+    if not result:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Investigation not found: {investigation_id}",
+        )
+
+    # Get investigation state from Temporal
+    try:
+        status = await temporal_client.get_status(str(investigation_id))
+        investigation_state = {
+            "status": status.workflow_status,
+            "source_instance": None,  # Could be populated from config
+            "tenant_id": str(auth.tenant_id),
+        }
+    except Exception as e:
+        logger.warning(f"Failed to get Temporal status, using DB state: {e}")
+        investigation_state = {
+            "status": result.get("status", "unknown"),
+            "source_instance": None,
+            "tenant_id": str(auth.tenant_id),
+        }
+
+    # Load evidence from database
+    repo = EvidenceRepository(db)
+    evidence_items = await repo.get_evidence_by_run(investigation_id)
+
+    # Build the archive
+    builder = SnapshotBuilder(str(investigation_id))
+    try:
+        archive_path = await builder.build(
+            investigation_state=investigation_state,
+            evidence_items=evidence_items,
+            lineage=None,  # TODO: Load lineage if available
+            code_changes=None,  # TODO: Load code changes if available
+            prompts=None,  # TODO: Load prompts if available
+        )
+    except SnapshotSizeExceededError as e:
+        raise HTTPException(
+            status_code=413,
+            detail=f"Snapshot too large: {e.actual_size:,} bytes exceeds "
+            f"{e.max_size:,} byte limit",
+        ) from e
+    except Exception as e:
+        logger.error(f"Failed to build snapshot archive: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to build snapshot: {e}",
+        ) from e
+
+    # Stream the file
+    def iterfile() -> Iterator[bytes]:
+        with open(archive_path, "rb") as f:
+            while chunk := f.read(65536):
+                yield chunk
+        # Clean up temp file after streaming
+        archive_path.unlink(missing_ok=True)
+
+    filename = f"snapshot-{investigation_id}.tar.gz"
+    return StreamingResponse(
+        iterfile(),
+        media_type="application/gzip",
+        headers={
+            "Content-Disposition": f'attachment; filename="{filename}"',
+            "X-Snapshot-Investigation-Id": str(investigation_id),
+        },
+    )
+
+
+@router.post("/import", response_model=ImportSnapshotResponse)
+async def import_snapshot_archive(
+    auth: AuthDep,
+    db: AppDbDep,
+    file: Annotated[bytes, File()],
+) -> ImportSnapshotResponse:
+    """Import a snapshot archive as a replayed investigation.
+
+    Validates the archive and creates a new investigation marked as a replay.
+
+    Args:
+        auth: Authentication context from API key/JWT.
+        db: Application database.
+        file: The uploaded tar.gz file.
+
+    Returns:
+        ImportSnapshotResponse with new investigation ID.
+
+    Raises:
+        HTTPException: If file is invalid or too large.
+    """
+    import tarfile
+    from io import BytesIO
+
+    from dataing.core.snapshot_schema import ArchivePaths, validate_metadata
+
+    # Check file size (100MB default limit)
+    max_size = 100 * 1024 * 1024
+    if len(file) > max_size:
+        raise HTTPException(
+            status_code=413,
+            detail=f"File too large: {len(file):,} bytes exceeds {max_size:,} byte limit",
+        )
+
+    # Parse the archive
+    try:
+        with tarfile.open(fileobj=BytesIO(file), mode="r:gz") as tar:
+            # Find metadata.json
+            metadata_member = None
+            for member in tar.getmembers():
+                if member.name.endswith(ArchivePaths.METADATA):
+                    metadata_member = member
+                    break
+
+            if not metadata_member:
+                raise HTTPException(
+                    status_code=400,
+                    detail="Invalid archive: missing metadata.json",
+                )
+
+            # Read and validate metadata
+            f = tar.extractfile(metadata_member)
+            if f is None:
+                raise HTTPException(
+                    status_code=400,
+                    detail="Invalid archive: cannot read metadata.json",
+                )
+
+            metadata_data = json.load(f)
+            try:
+                metadata = validate_metadata(metadata_data)
+            except ValueError as e:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Invalid metadata: {e}",
+                ) from e
+
+            # Create new investigation marked as replay
+            new_investigation_id = uuid4()
+            original_id = metadata.investigation_id
+
+            # Store in database with replay flag
+            await db.execute(
+                """
+                INSERT INTO investigations (id, tenant_id, alert, outcome, status)
+                VALUES ($1, $2, $3, $4, $5)
+                """,
+                new_investigation_id,
+                auth.tenant_id,
+                json.dumps({"replay_of": original_id, "is_replay": True}),
+                json.dumps(
+                    {
+                        "status": metadata.status,
+                        "is_replay": True,
+                        "original_investigation_id": original_id,
+                        "original_created_at": metadata.created_at.isoformat()
+                        if metadata.created_at
+                        else None,
+                        "schema_version": metadata.schema_version,
+                    }
+                ),
+                "imported",
+            )
+
+            # TODO: Import evidence items from archive
+
+            return ImportSnapshotResponse(
+                investigation_id=new_investigation_id,
+                status="imported",
+                original_investigation_id=original_id,
+                evidence_count=metadata.evidence_count,
+                is_replay=True,
+            )
+
+    except tarfile.TarError as e:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid tar.gz archive: {e}",
+        ) from e

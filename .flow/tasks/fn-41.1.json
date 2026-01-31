@@ -1,14 +1,24 @@
 {
-  "assignee": null,
+  "assignee": "bordumbb@gmail.com",
   "claim_note": "",
-  "claimed_at": null,
+  "claimed_at": "2026-01-31T22:00:41.844260Z",
   "created_at": "2026-01-28T03:51:30.227650Z",
   "depends_on": [],
   "epic": "fn-41",
+  "evidence": {
+    "commits": [
+      "951cfaf45cd937002dc6b3a7549e9cac03a939b4"
+    ],
+    "prs": [],
+    "tests": [
+      "docker build -f infra/Dockerfile.backend -t dataing-backend:dev .",
+      "docker run --rm dataing-backend:dev python -c 'from dataing.entrypoints.temporal_worker import main'"
+    ]
+  },
   "id": "fn-41.1",
   "priority": 1,
   "spec_path": ".flow/tasks/fn-41.1.md",
-  "status": "todo",
+  "status": "done",
   "title": "Create multi-stage Dockerfile for backend (API + workers)",
-  "updated_at": "2026-01-28T03:51:30.227836Z"
+  "updated_at": "2026-01-31T22:09:04.794127Z"
 }

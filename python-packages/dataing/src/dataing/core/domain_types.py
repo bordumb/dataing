@@ -305,6 +305,12 @@ class RelevantCodeChange(BaseModel):
         affected_assets: List of asset identifiers affected by this commit.
         relevance_score: How relevant this change is (1.0=exact, 0.7=upstream, 0.4=path).
         relevance_reason: Human-readable explanation of why this change is relevant.
+        pr_number: PR/MR number in the provider (if available).
+        pr_url: Full URL to the PR/MR in the provider UI.
+        pr_title: Title of the PR/MR.
+        pr_author: Author login/username of the PR/MR.
+        pr_merged_at: When the PR/MR was merged.
+        provider: Git provider (github, gitlab, bitbucket).
     """
 
     model_config = ConfigDict(frozen=True)
@@ -316,3 +322,37 @@ class RelevantCodeChange(BaseModel):
     affected_assets: list[str] = []
     relevance_score: float
     relevance_reason: str
+    # PR metadata (populated by bond-agent tools during sync)
+    pr_number: int | None = None
+    pr_url: str | None = None
+    pr_title: str | None = None
+    pr_author: str | None = None
+    pr_merged_at: datetime | None = None
+    provider: str | None = None
+
+
+class CodeChangeLink(BaseModel):
+    """A link to a code change (commit or PR) for investigation output.
+
+    Used to render clickable links in CLI, notebook, and markdown outputs
+    when an investigation identifies a code change as relevant.
+
+    Attributes:
+        commit_hash: The git commit SHA.
+        message: The commit message (if available).
+        url: Best link (PR URL if available, else commit URL).
+        pr_number: PR/MR number (if available).
+        pr_title: Title of the PR/MR (if available).
+        pr_url: Direct URL to the PR/MR (if available).
+        author: Author login/username.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    commit_hash: str
+    message: str | None = None
+    url: str  # Best link (PR if available, else commit)
+    pr_number: int | None = None
+    pr_title: str | None = None
+    pr_url: str | None = None
+    author: str | None = None

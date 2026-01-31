@@ -1,14 +1,27 @@
 {
-  "assignee": null,
+  "assignee": "bordumbb@gmail.com",
   "claim_note": "",
-  "claimed_at": null,
+  "claimed_at": "2026-01-31T16:05:39.377826Z",
   "created_at": "2026-01-28T03:52:30.310569Z",
   "depends_on": [],
   "epic": "fn-38",
+  "evidence": {
+    "files_created": [
+      "python-packages/dataing/migrations/034_code_changes_pr_metadata.sql"
+    ],
+    "files_modified": [
+      "python-packages/dataing/src/dataing/models/code_change.py",
+      "python-packages/dataing/src/dataing/core/domain_types.py"
+    ],
+    "verification": {
+      "model_import": "OK",
+      "mypy": "passed"
+    }
+  },
   "id": "fn-38.1",
   "priority": 1,
   "spec_path": ".flow/tasks/fn-38.1.md",
-  "status": "todo",
+  "status": "done",
   "title": "Add migration to extend code_changes with PR metadata columns",
-  "updated_at": "2026-01-28T03:52:30.310795Z"
+  "updated_at": "2026-01-31T16:07:05.572932Z"
 }

@@ -40,6 +40,29 @@ version={{ chain_metadata.chain_version }}
 _No root cause identified yet._
 {%- endif %}
 
+{% if related_code_changes -%}
+## Related Code Changes
+
+{% for change in related_code_changes -%}
+{% if change.pr_number and change.pr_title -%}
+- [PR #{{ change.pr_number }}: {{ change.pr_title }}]({{ change.url }})\
+{% if change.author %} by {{ change.author }}{% endif %}
+
+{% elif change.pr_number -%}
+- [PR #{{ change.pr_number }}]({{ change.url }})\
+{% if change.author %} by {{ change.author }}{% endif %}
+
+{% else -%}
+- [{{ change.commit_hash[:7] }}\
+{% if change.message %}: {{ change.message[:50] }}\
+{% if change.message|length > 50 %}...{% endif %}\
+{% endif %}]({{ change.url }})\
+{% if change.author %} by {{ change.author }}{% endif %}
+
+{% endif -%}
+{% endfor -%}
+{% endif -%}
+
 {% if evidence -%}
 ## Evidence Collected
 
@@ -148,6 +171,12 @@ def render_markdown(investigation: dict[str, Any]) -> str:
 
     has_chain = _has_chain_data(evidence)
 
+    # Get related code changes (if available)
+    related_code_changes = investigation.get("related_code_changes", [])
+    # Also check synthesis for code changes
+    if not related_code_changes and synthesis:
+        related_code_changes = synthesis.get("related_code_changes", [])
+
     context = {
         "investigation_id": investigation.get("investigation_id", "unknown"),
         "status": investigation.get("status", "unknown").upper(),
@@ -160,6 +189,7 @@ def render_markdown(investigation: dict[str, Any]) -> str:
         "root_hash": investigation.get("root_hash"),
         "has_chain_data": has_chain,
         "chain_metadata": CHAIN_METADATA if has_chain else None,
+        "related_code_changes": related_code_changes,
     }
 
     return template.render(**context)

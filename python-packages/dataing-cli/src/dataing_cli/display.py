@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import os
+import sys
 import time
 from typing import TYPE_CHECKING, Any
 
@@ -13,9 +15,76 @@ from rich.table import Table
 from rich.text import Text
 
 if TYPE_CHECKING:
-    pass
+    from dataing.core.domain_types import CodeChangeLink
 
 console = Console()
+
+
+def terminal_supports_hyperlinks() -> bool:
+    """Check if the terminal supports OSC 8 hyperlinks.
+
+    Returns:
+        True if terminal likely supports hyperlinks.
+    """
+    # Check common environment variables that indicate hyperlink support
+    term = os.environ.get("TERM", "")
+    term_program = os.environ.get("TERM_PROGRAM", "")
+    vte_version = os.environ.get("VTE_VERSION", "")
+
+    # iTerm2, WezTerm, and modern terminals support hyperlinks
+    if term_program in ("iTerm.app", "WezTerm", "vscode"):
+        return True
+    # VTE 0.50+ supports hyperlinks (GNOME Terminal, Tilix, etc.)
+    if vte_version and int(vte_version) >= 5000:
+        return True
+    # Kitty supports hyperlinks
+    if "kitty" in term.lower():
+        return True
+    # If COLORTERM is set, terminal is likely modern
+    if os.environ.get("COLORTERM") in ("truecolor", "24bit"):
+        return True
+    # Fallback: check if output is a TTY
+    return sys.stdout.isatty()
+
+
+def terminal_link(text: str, url: str) -> str:
+    """Create a clickable terminal hyperlink using OSC 8 escape codes.
+
+    Args:
+        text: Display text for the link.
+        url: URL to link to.
+
+    Returns:
+        Terminal hyperlink string, or plain text fallback.
+    """
+    if terminal_supports_hyperlinks():
+        # OSC 8 hyperlink format: ESC ] 8 ; ; URL ST TEXT ESC ] 8 ; ; ST
+        return f"\033]8;;{url}\033\\{text}\033]8;;\033\\"
+    else:
+        return f"{text} ({url})"
+
+
+def format_code_change_link(link: CodeChangeLink) -> str:
+    """Format a code change link for terminal display.
+
+    Args:
+        link: CodeChangeLink with commit/PR metadata.
+
+    Returns:
+        Formatted terminal string with clickable hyperlink.
+    """
+    if link.pr_number and link.pr_title:
+        # Prefer PR info
+        display_text = f"PR #{link.pr_number}: {link.pr_title}"
+    elif link.pr_number:
+        display_text = f"PR #{link.pr_number}"
+    else:
+        # Fall back to commit info
+        short_hash = link.commit_hash[:7]
+        msg = link.message[:50] + "..." if link.message and len(link.message) > 50 else link.message
+        display_text = f"{short_hash}: {msg}" if msg else short_hash
+
+    return terminal_link(display_text, link.url)
 
 
 def format_event(event: Any) -> Panel:
@@ -411,3 +480,70 @@ def print_runs_table(runs: list[Any]) -> None:
         )
 
     console.print(table)
+
+
+def format_code_changes_panel(code_changes: list[Any]) -> Panel | None:
+    """Format related code changes as a Rich panel.
+
+    Args:
+        code_changes: List of CodeChangeLink objects or dicts with code change metadata.
+
+    Returns:
+        A Rich Panel with code change links, or None if no changes.
+    """
+    if not code_changes:
+        return None
+
+    from dataing.core.domain_types import CodeChangeLink
+
+    renderables: list[Any] = []
+
+    for change in code_changes[:10]:  # Limit to 10 changes
+        # Handle both object and dict access patterns
+        if isinstance(change, CodeChangeLink):
+            link = change
+        elif isinstance(change, dict):
+            link = CodeChangeLink(
+                commit_hash=change.get("commit_hash", ""),
+                message=change.get("message"),
+                url=change.get("url", ""),
+                pr_number=change.get("pr_number"),
+                pr_title=change.get("pr_title"),
+                pr_url=change.get("pr_url"),
+                author=change.get("author"),
+            )
+        else:
+            continue
+
+        link_text = format_code_change_link(link)
+
+        # Build display line
+        author_info = f" by {link.author}" if link.author else ""
+        line = Text()
+        line.append("* ", style="cyan")
+        line.append(link_text)
+        line.append(author_info, style="dim")
+        renderables.append(line)
+
+    if not renderables:
+        return None
+
+    if len(code_changes) > 10:
+        renderables.append(Text(f"  ... and {len(code_changes) - 10} more", style="dim"))
+
+    return Panel(
+        Group(*renderables),
+        title="Related Code Changes",
+        border_style="magenta",
+    )
+
+
+def print_code_changes(code_changes: list[Any]) -> None:
+    """Print related code changes to the console.
+
+    Args:
+        code_changes: List of CodeChangeLink objects or dicts.
+    """
+    panel = format_code_changes_panel(code_changes)
+    if panel:
+        console.print(panel)

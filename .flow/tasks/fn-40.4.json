@@ -1,16 +1,25 @@
 {
-  "assignee": null,
+  "assignee": "bordumbb@gmail.com",
   "claim_note": "",
-  "claimed_at": null,
+  "claimed_at": "2026-01-31T21:13:42.980921Z",
   "created_at": "2026-01-28T03:51:20.726555Z",
   "depends_on": [
     "fn-40.1"
   ],
   "epic": "fn-40",
+  "evidence": {
+    "commits": [
+      "1dba9313157ee03f7c2a44098687f0180177cf0f"
+    ],
+    "prs": [],
+    "tests": [
+      "python -m build && twine check dist/*"
+    ]
+  },
   "id": "fn-40.4",
   "priority": 4,
   "spec_path": ".flow/tasks/fn-40.4.md",
-  "status": "todo",
+  "status": "done",
   "title": "Verify README rendering on PyPI and Python 3.10+ support",
-  "updated_at": "2026-01-28T03:51:20.726765Z"
+  "updated_at": "2026-01-31T21:16:14.316466Z"
 }

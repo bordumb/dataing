@@ -145,6 +145,8 @@ ignore = ["D100", "D104"]
 "**/tests/*" = ["D101", "D102", "D103", "D107"]
 "scripts/*" = ["D103"]
 ".flow/bin/*" = ["D103"]
+# Client packages support Python 3.10, need version blocks for tomllib
+"python-packages/dataing-cli/src/dataing_cli/config.py" = ["UP036"]
 
 [tool.ruff.lint.pydocstyle]
 convention = "google"

@@ -1,0 +1,36 @@
+name: Test Publish
+
+on:
+  pull_request:
+    paths:
+      - "python-packages/dataing-cli/**"
+      - "python-packages/dataing-sdk/**"
+      - "python-packages/dataing-notebook/**"
+
+jobs:
+  build-check:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        package:
+          - { dir: "python-packages/dataing-cli", name: "dataing-cli" }
+          - { dir: "python-packages/dataing-sdk", name: "dataing-sdk" }
+          - { dir: "python-packages/dataing-notebook", name: "dataing-notebook" }
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install build tools
+        run: pip install build twine
+
+      - name: Build package
+        working-directory: ${{ matrix.package.dir }}
+        run: python -m build
+
+      - name: Check package with twine
+        run: twine check ${{ matrix.package.dir }}/dist/*

@@ -1,16 +1,49 @@
 {
-  "assignee": null,
+  "assignee": "bordumbb@gmail.com",
   "claim_note": "",
-  "claimed_at": null,
+  "claimed_at": "2026-01-31T15:29:27.703195Z",
   "created_at": "2026-01-28T22:13:49.984424Z",
   "depends_on": [
     "fn-51.5"
   ],
   "epic": "fn-51",
+  "evidence": {
+    "api_endpoints": [
+      "GET /investigations/tests/stats",
+      "GET /investigations/tests/catches",
+      "POST /investigations/tests/adopt",
+      "POST /investigations/tests/run"
+    ],
+    "checks": {
+      "mypy": "passed",
+      "ruff": "passed"
+    },
+    "files_created": [
+      "python-packages/dataing/src/dataing/services/test_tracking.py",
+      "python-packages/dataing/migrations/033_test_tracking.sql",
+      "python-packages/dataing/tests/unit/services/test_test_tracking.py"
+    ],
+    "files_modified": [
+      "python-packages/dataing/src/dataing/entrypoints/api/routes/investigations.py"
+    ],
+    "metrics_tracked": [
+      "tests_generated",
+      "tests_adopted",
+      "tests_run",
+      "issues_caught",
+      "adoption_rate",
+      "effectiveness_rate"
+    ],
+    "tests": {
+      "command": "uv run pytest python-packages/dataing/tests/unit/services/test_test_tracking.py -v",
+      "failed": 0,
+      "passed": 11
+    }
+  },
   "id": "fn-51.6",
   "priority": null,
   "spec_path": ".flow/tasks/fn-51.6.md",
-  "status": "todo",
+  "status": "done",
   "title": "Track Test Adoption and Effectiveness",
-  "updated_at": "2026-01-28T22:23:24.894347Z"
+  "updated_at": "2026-01-31T15:33:06.535263Z"
 }

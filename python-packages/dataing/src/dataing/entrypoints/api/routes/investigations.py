@@ -191,6 +191,44 @@ class CodifyResponse(BaseModel):
     confidence: float
 
 
+class TestTrackingStatsResponse(BaseModel):
+    """Test tracking statistics response."""
+
+    tests_generated: int
+    tests_adopted: int
+    tests_run: int
+    issues_caught: int
+    adoption_rate: float
+    effectiveness_rate: float
+
+
+class TestAdoptionRequest(BaseModel):
+    """Request to mark a test as adopted."""
+
+    test_id: UUID
+    adopted_by: str | None = None
+
+
+class TestRunResultRequest(BaseModel):
+    """Request to record a test run result."""
+
+    test_id: UUID
+    passed: bool
+    failure_message: str | None = None
+
+
+class RecentCatchResponse(BaseModel):
+    """A recent test failure catch."""
+
+    test_id: str
+    run_at: str
+    failure_message: str | None
+    test_type: str
+    table: str
+    column: str | None
+    investigation_id: str
+
+
 def get_app_db(request: Request) -> AppDatabase:
     """Get the app database from app state."""
     app_db: AppDatabase = request.app.state.app_db
@@ -593,6 +631,7 @@ async def codify_investigation(
     investigation_id: UUID,
     request: CodifyRequest,
     auth: AuthDep,
+    db: AppDbDep,
     temporal_client: TemporalClientDep,
 ) -> CodifyResponse:
     """Generate regression tests from an investigation's synthesis.
@@ -604,6 +643,7 @@ async def codify_investigation(
         investigation_id: UUID of the investigation.
         request: Codify request with output format.
         auth: Authentication context from API key/JWT.
+        db: Application database for test tracking.
         temporal_client: Temporal client for durable execution.
 
     Returns:
@@ -689,6 +729,26 @@ async def codify_investigation(
     renderer = get_renderer(request.format.value)
     rendered = renderer.render_many(tests)
 
+    # Track test generation
+    try:
+        from dataing.services.test_tracking import TestTrackingService
+
+        tracker = TestTrackingService(db)
+        for test in tests:
+            await tracker.record_test_generated(
+                tenant_id=auth.tenant_id,
+                investigation_id=investigation_id,
+                test_id=test.test_id,
+                format_=request.format.value,
+                test_type=test.assertion_type.value,
+                table=test.table,
+                column=test.column,
+                description=test.description,
+            )
+    except Exception as e:
+        # Don't fail codify if tracking fails
+        logger.warning(f"Failed to track test generation: {e}")
+
     # Build response
     test_responses = [
         CodifyTestResponse(
@@ -707,6 +767,144 @@ async def codify_investigation(
         tests=test_responses,
         confidence=confidence,
     )
+
+
+@router.get("/tests/stats", response_model=TestTrackingStatsResponse)
+async def get_test_tracking_stats(
+    auth: AuthDep,
+    db: AppDbDep,
+    days: int = Query(default=30, ge=1, le=365, description="Days to look back"),
+) -> TestTrackingStatsResponse:
+    """Get test tracking statistics.
+
+    Returns metrics on tests generated, adopted, and issues caught.
+
+    Args:
+        auth: Authentication context from API key/JWT.
+        db: Application database.
+        days: Number of days to look back.
+
+    Returns:
+        TestTrackingStatsResponse with statistics.
+    """
+    from dataing.services.test_tracking import TestTrackingService
+
+    tracker = TestTrackingService(db)
+    stats = await tracker.get_stats(auth.tenant_id, days=days)
+
+    return TestTrackingStatsResponse(
+        tests_generated=stats.tests_generated,
+        tests_adopted=stats.tests_adopted,
+        tests_run=stats.tests_run,
+        issues_caught=stats.issues_caught,
+        adoption_rate=stats.adoption_rate,
+        effectiveness_rate=stats.effectiveness_rate,
+    )
+
+
+@router.get("/tests/catches", response_model=list[RecentCatchResponse])
+async def get_recent_catches(
+    auth: AuthDep,
+    db: AppDbDep,
+    limit: int = Query(default=10, ge=1, le=100, description="Maximum results"),
+) -> list[RecentCatchResponse]:
+    """Get recent tests that caught issues.
+
+    Returns a list of recent test failures (issues caught).
+
+    Args:
+        auth: Authentication context from API key/JWT.
+        db: Application database.
+        limit: Maximum number of results.
+
+    Returns:
+        List of recent catches.
+    """
+    from dataing.services.test_tracking import TestTrackingService
+
+    tracker = TestTrackingService(db)
+    catches = await tracker.get_recent_catches(auth.tenant_id, limit=limit)
+
+    return [
+        RecentCatchResponse(
+            test_id=c["test_id"],
+            run_at=c["run_at"],
+            failure_message=c["failure_message"],
+            test_type=c["test_type"],
+            table=c["table"],
+            column=c["column"],
+            investigation_id=c["investigation_id"],
+        )
+        for c in catches
+    ]
+
+
+@router.post("/tests/adopt")
+async def adopt_test(
+    request: TestAdoptionRequest,
+    auth: AuthDep,
+    db: AppDbDep,
+) -> dict[str, str]:
+    """Mark a generated test as adopted.
+
+    Call this when a test has been added to the user's project.
+
+    Args:
+        request: Adoption request with test ID.
+        auth: Authentication context from API key/JWT.
+        db: Application database.
+
+    Returns:
+        Status message.
+    """
+    from dataing.services.test_tracking import TestTrackingService
+
+    tracker = TestTrackingService(db)
+    success = await tracker.record_test_adopted(
+        tenant_id=auth.tenant_id,
+        test_id=request.test_id,
+        adopted_by=request.adopted_by,
+    )
+
+    if not success:
+        raise HTTPException(
+            status_code=404,
+            detail="Test not found or already adopted",
+        )
+
+    return {"status": "adopted", "test_id": str(request.test_id)}
+
+
+@router.post("/tests/run")
+async def record_test_run(
+    request: TestRunResultRequest,
+    auth: AuthDep,
+    db: AppDbDep,
+) -> dict[str, str]:
+    """Record a test run result.
+
+    Call this when a generated test has been executed.
+
+    Args:
+        request: Test run result.
+        auth: Authentication context from API key/JWT.
+        db: Application database.
+
+    Returns:
+        Status message.
+    """
+    from dataing.services.test_tracking import TestTrackingService
+
+    tracker = TestTrackingService(db)
+    await tracker.record_test_run(
+        tenant_id=auth.tenant_id,
+        test_id=request.test_id,
+        passed=request.passed,
+        failure_message=request.failure_message,
+    )
+
+    status = "passed" if request.passed else "caught_issue"
+    return {"status": status, "test_id": str(request.test_id)}
 
 
 @router.post("/{investigation_id}/messages", response_model=SendMessageResponse)

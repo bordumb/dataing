@@ -1,7 +1,7 @@
 {
-  "assignee": null,
+  "assignee": "bordumbb@gmail.com",
   "claim_note": "",
-  "claimed_at": null,
+  "claimed_at": "2026-01-31T22:14:19.978843Z",
   "created_at": "2026-01-28T03:51:39.567768Z",
   "depends_on": [
     "fn-41.1",
@@ -11,7 +11,7 @@
   "id": "fn-41.3",
   "priority": 3,
   "spec_path": ".flow/tasks/fn-41.3.md",
-  "status": "todo",
+  "status": "in_progress",
   "title": "Create production docker-compose.yml with all services",
-  "updated_at": "2026-01-28T03:51:39.567981Z"
+  "updated_at": "2026-01-31T22:14:19.979038Z"
 }

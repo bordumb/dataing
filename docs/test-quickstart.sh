@@ -103,7 +103,11 @@ RESPONSE=$(curl -s -X POST http://localhost:8000/api/v1/investigations \
       "column": "user_id",
       "metric": "null_rate",
       "anomaly_type": "spike",
-      "description": "NULL rate increased from 1% to 15%"
+      "description": "NULL rate increased from 1% to 15%",
+      "expected_value": "0.01",
+      "actual_value": "0.15",
+      "deviation_pct": "1400",
+      "anomaly_date": "2026-01-31"
     }
   }')
 

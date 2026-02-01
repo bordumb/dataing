@@ -191,18 +191,22 @@ Let's investigate the `null_spike` anomaly — a simulated bug where a mobile ap
           "column": "user_id",
           "metric": "null_rate",
           "anomaly_type": "spike",
-          "detected_at": "2024-01-15T10:00:00Z",
-          "description": "NULL rate increased from 1% to 15%"
+          "description": "NULL rate increased from 1% to 15%",
+          "expected_value": "0.01",
+          "actual_value": "0.15",
+          "deviation_pct": "1400",
+          "anomaly_date": "2026-01-31"
         }
       }'
     ```
 
-    Expected response (202 Accepted):
+    Expected response:
 
     ```json
     {
-      "investigation_id": "inv_abc123...",
-      "status": "running"
+      "investigation_id": "e19ac619-...",
+      "main_branch_id": "e19ac619-...",
+      "status": "queued"
     }
     ```
 
@@ -220,12 +224,16 @@ Let's investigate the `null_spike` anomaly — a simulated bug where a mobile ap
                 "column": "user_id",
                 "metric": "null_rate",
                 "anomaly_type": "spike",
-                "description": "NULL rate increased from 1% to 15%"
+                "description": "NULL rate increased from 1% to 15%",
+                "expected_value": "0.01",
+                "actual_value": "0.15",
+                "deviation_pct": "1400",
+                "anomaly_date": "2026-01-31",
             }
         }
     )
     print(response.json())
-    # {"investigation_id": "inv_abc123...", "status": "running"}
+    # {"investigation_id": "e19ac619-...", "main_branch_id": "...", "status": "queued"}
     ```
 
 ---

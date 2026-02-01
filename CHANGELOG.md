@@ -1,3 +1,10 @@
+# [1.20.0](https://github.com/bordumb/dataing/compare/v1.19.0...v1.20.0) (2026-02-01)
+
+
+### Features
+
+* sets up contributing and github docs (fn-43) ([#111](https://github.com/bordumb/dataing/issues/111)) ([4015460](https://github.com/bordumb/dataing/commit/40154608e9f0ac7c2cadf6a09fd8ac721d3b8225))
+
 # [1.19.0](https://github.com/bordumb/dataing/compare/v1.18.0...v1.19.0) (2026-02-01)
 
 

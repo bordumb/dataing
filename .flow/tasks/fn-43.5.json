@@ -1,7 +1,7 @@
 {
-  "assignee": null,
+  "assignee": "bordumbb@gmail.com",
   "claim_note": "",
-  "claimed_at": null,
+  "claimed_at": "2026-02-01T22:24:12.042982Z",
   "created_at": "2026-01-28T03:52:43.841806Z",
   "depends_on": [
     "fn-43.1",
@@ -10,10 +10,19 @@
     "fn-43.4"
   ],
   "epic": "fn-43",
+  "evidence": {
+    "commits": [
+      "ff4c70a12af8a99c21196ca2f7f0b71e38377110"
+    ],
+    "prs": [],
+    "tests": [
+      "YAML validation passed"
+    ]
+  },
   "id": "fn-43.5",
   "priority": 5,
   "spec_path": ".flow/tasks/fn-43.5.md",
-  "status": "todo",
+  "status": "done",
   "title": "Configure branch protection, Dependabot, and conventional commits",
-  "updated_at": "2026-01-28T03:52:43.841983Z"
+  "updated_at": "2026-02-01T22:25:27.932997Z"
 }

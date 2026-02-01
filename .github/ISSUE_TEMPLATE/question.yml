@@ -1,0 +1,27 @@
+name: Question
+description: Ask a question about using Dataing
+title: "[Question]: "
+labels: ["question"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Have a question about Dataing? We're here to help! For general discussion, you can also join us on [Discord](https://discord.gg/dataing).
+
+  - type: textarea
+    id: question
+    attributes:
+      label: Question
+      description: What would you like to know?
+      placeholder: How do I...?
+    validations:
+      required: true
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Context / What You've Tried
+      description: Any relevant context or things you've already tried.
+      placeholder: I've looked at the docs and tried...
+    validations:
+      required: false

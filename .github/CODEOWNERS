@@ -1,0 +1,24 @@
+# CODEOWNERS - Code ownership for pull request reviews
+# See: https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners
+
+# Default owners for everything in the repo
+* @bordumb
+
+# Core backend (Community Edition)
+python-packages/dataing/ @bordumb
+
+# Enterprise Edition - requires EE maintainer approval
+python-packages/dataing-ee/ @bordumb
+
+# Frontend
+frontend/ @bordumb
+
+# Documentation
+docs/ @bordumb
+
+# Repository configuration - admin only
+.github/ @bordumb
+
+# Infrastructure and deployment
+infra/ @bordumb
+docker-compose.yml @bordumb

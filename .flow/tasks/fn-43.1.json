@@ -1,14 +1,23 @@
 {
-  "assignee": null,
+  "assignee": "bordumbb@gmail.com",
   "claim_note": "",
-  "claimed_at": null,
+  "claimed_at": "2026-02-01T22:18:09.934750Z",
   "created_at": "2026-01-28T03:52:23.000051Z",
   "depends_on": [],
   "epic": "fn-43",
+  "evidence": {
+    "commits": [
+      "abfab81dd9e2f239d9828a6b3854e88153ad56f2"
+    ],
+    "prs": [],
+    "tests": [
+      "verification commands passed"
+    ]
+  },
   "id": "fn-43.1",
   "priority": 1,
   "spec_path": ".flow/tasks/fn-43.1.md",
-  "status": "todo",
+  "status": "done",
   "title": "Create CONTRIBUTING.md with dev setup and PR process",
-  "updated_at": "2026-01-28T03:52:23.000304Z"
+  "updated_at": "2026-02-01T22:19:46.644528Z"
 }

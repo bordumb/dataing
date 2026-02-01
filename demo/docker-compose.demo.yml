@@ -1,5 +1,5 @@
 # Demo Override - Adds DuckDB fixtures and seed data
-# Usage: docker compose -f docker-compose.yml -f docker-compose.demo.yml up -d
+# Usage: docker compose -f docker-compose.yml -f demo/docker-compose.demo.yml up -d
 #
 # This extends the base docker-compose.yml to add:
 # - DuckDB server (pg_duckdb) with pre-loaded fixtures on port 5433
@@ -21,8 +21,8 @@ services:
     ports:
       - "5433:5432"
     volumes:
-      - ./demo/fixtures/null_spike:/data:ro
-      - ./demo/init-pgduckdb.sql:/docker-entrypoint-initdb.d/init.sql:ro
+      - ./fixtures/null_spike:/data:ro
+      - ./init-pgduckdb.sql:/docker-entrypoint-initdb.d/init.sql:ro
       - demo-duckdb-data:/var/lib/postgresql/data
     environment:
       POSTGRES_USER: demo

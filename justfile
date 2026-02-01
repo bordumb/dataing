@@ -341,8 +341,8 @@ demo: demo-fixtures
     set -euo pipefail
     echo "Starting demo stack..."
     # Force recreate db-migrate to ensure seeds run
-    docker compose -f docker-compose.yml -f docker-compose.demo.yml up -d --build --force-recreate db-migrate
-    docker compose -f docker-compose.yml -f docker-compose.demo.yml up -d --build
+    docker compose -f docker-compose.yml -f demo/docker-compose.demo.yml up -d --build --force-recreate db-migrate
+    docker compose -f docker-compose.yml -f demo/docker-compose.demo.yml up -d --build
     echo ""
     echo "========================================="
     echo "  Dataing Demo Ready!"
@@ -364,11 +364,11 @@ demo: demo-fixtures
 
 # Stop demo stack
 demo-stop:
-    docker compose -f docker-compose.yml -f docker-compose.demo.yml down
+    docker compose -f docker-compose.yml -f demo/docker-compose.demo.yml down
 
 # Clean demo (stop + remove volumes)
 demo-clean:
-    docker compose -f docker-compose.yml -f docker-compose.demo.yml down -v
+    docker compose -f docker-compose.yml -f demo/docker-compose.demo.yml down -v
     rm -rf demo/fixtures/baseline demo/fixtures/null_spike demo/fixtures/volume_drop
     rm -rf demo/fixtures/schema_drift demo/fixtures/duplicates demo/fixtures/late_arriving
     rm -rf demo/fixtures/orphaned_records

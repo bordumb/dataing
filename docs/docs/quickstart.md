@@ -81,13 +81,16 @@
 
 ---
 
-## Step 2: Connect Demo Datasource
+## Step 2: Create Your Account
 
 === "Docker Compose"
 
-    The demo datasource is **automatically configured** when you start the stack.
+    The stack starts **clean** — no pre-seeded data. You'll create your own account and connect your datasources.
 
-    The demo API key `dd_demo_12345` is pre-seeded and ready to use.
+    1. Open [http://localhost:3000](http://localhost:3000) in your browser
+    2. Click **Sign Up** to create a new organization and user account
+    3. Enter your email, password, and organization name
+    4. Log in with your new credentials
 
     Verify the API is running:
 
@@ -100,6 +103,9 @@
     ```json
     {"status":"healthy"}
     ```
+
+    !!! tip "Want pre-loaded demo data?"
+        Use `just demo` instead of `docker compose up` to start with pre-seeded demo fixtures and the `dd_demo_12345` API key.
 
 === "pip install"
 
@@ -120,30 +126,23 @@
 
 ---
 
-## Step 3: Verify Connection
+## Step 3: Connect a Datasource
 
 === "Docker Compose"
 
-    List available datasources:
+    After logging in, connect your own datasource:
 
-    ```bash
-    curl -H "X-API-Key: dd_demo_12345" http://localhost:8000/api/v1/datasources
-    ```
+    1. Go to [http://localhost:3000/datasources](http://localhost:3000/datasources)
+    2. Click **Add Datasource**
+    3. Choose your datasource type (e.g., DuckDB, PostgreSQL, Snowflake)
+    4. Enter connection details and save
 
-    Expected output:
+    For a quick test, you can connect a standalone DuckDB file:
 
-    ```json
-    {
-      "datasources": [
-        {
-          "id": "demo-ecommerce",
-          "name": "Demo E-commerce",
-          "type": "duckdb",
-          "status": "connected"
-        }
-      ]
-    }
-    ```
+    - **Type**: DuckDB
+    - **Database Path**: `/path/to/your/data.duckdb`
+
+    Verify the connection shows as "connected" in the datasources list.
 
 === "pip install"
 
@@ -160,31 +159,19 @@
 
 ---
 
-## Demo Scenarios
-
-The demo datasource includes pre-seeded anomalies for testing:
-
-| Scenario | Table | Description |
-|----------|-------|-------------|
-| `null_spike` | `orders` | Mobile app bug causes NULL `user_id` values |
-| `volume_drop` | `orders` | Weekend traffic drop pattern |
-| `schema_drift` | `customers` | Column renamed from `email` to `contact_email` |
-| `duplicates` | `orders` | Duplicate orders from retry logic |
-| `late_arriving` | `orders` | ETL delay causing missing recent data |
-| `orphaned_records` | `order_items` | Foreign key violations |
-
----
-
 ## Step 4: Run Your First Investigation
 
-Let's investigate the `null_spike` anomaly — a simulated bug where a mobile app update started sending NULL user IDs.
+With your datasource connected, you can investigate data quality issues. Here's an example investigating a NULL rate spike in an `orders` table.
+
+!!! note "Get your API key"
+    After logging in, go to **Settings → API Keys** to create an API key for programmatic access.
 
 === "curl"
 
     ```bash
     curl -X POST http://localhost:8000/api/v1/investigations \
       -H "Content-Type: application/json" \
-      -H "X-API-Key: dd_demo_12345" \
+      -H "X-API-Key: YOUR_API_KEY" \
       -d '{
         "alert": {
           "table": "orders",
@@ -217,7 +204,7 @@ Let's investigate the `null_spike` anomaly — a simulated bug where a mobile ap
 
     response = httpx.post(
         "http://localhost:8000/api/v1/investigations",
-        headers={"X-API-Key": "dd_demo_12345"},
+        headers={"X-API-Key": "YOUR_API_KEY"},
         json={
             "alert": {
                 "table": "orders",
@@ -238,12 +225,29 @@ Let's investigate the `null_spike` anomaly — a simulated bug where a mobile ap
 
 ---
 
+## Demo Mode
+
+For testing with pre-seeded data, use `just demo` instead of `docker compose up`. Demo mode includes:
+
+| Scenario | Table | Description |
+|----------|-------|-------------|
+| `null_spike` | `orders` | Mobile app bug causes NULL `user_id` values |
+| `volume_drop` | `orders` | Weekend traffic drop pattern |
+| `schema_drift` | `customers` | Column renamed from `email` to `contact_email` |
+| `duplicates` | `orders` | Duplicate orders from retry logic |
+| `late_arriving` | `orders` | ETL delay causing missing recent data |
+| `orphaned_records` | `order_items` | Foreign key violations |
+
+Demo mode also pre-seeds the `dd_demo_12345` API key for immediate API access.
+
+---
+
 ## Step 5: Watch the Investigation
 
 The investigation runs asynchronously. Poll for status:
 
 ```bash
-curl -H "X-API-Key: dd_demo_12345" \
+curl -H "X-API-Key: YOUR_API_KEY" \
   http://localhost:8000/api/v1/investigations/{investigation_id}
 ```
 

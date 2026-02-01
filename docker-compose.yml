@@ -131,7 +131,6 @@ services:
       TEMPORAL_NAMESPACE: ${TEMPORAL_NAMESPACE:-default}
       TEMPORAL_TASK_QUEUE: ${TEMPORAL_TASK_QUEUE:-investigations}
       INVESTIGATION_ENGINE: temporal
-      DATADR_DEMO_MODE: "true"
       DATADR_ENCRYPTION_KEY: ${DATADR_ENCRYPTION_KEY:-}
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
       REDIS_HOST: redis
@@ -218,7 +217,7 @@ services:
     profiles: ["observability"]
     command: ["--config=/etc/otelcol-contrib/config.yaml"]
     volumes:
-      - ./demo/otel-collector-config.yaml:/etc/otelcol-contrib/config.yaml:ro
+      - ./infra/otel-collector-config.yaml:/etc/otelcol-contrib/config.yaml:ro
     ports:
       - "4317:4317"
       - "4318:4318"

@@ -32,8 +32,10 @@ from dataing.adapters.datasource.base import BaseAdapter
 from dataing.adapters.db.app_db import AppDatabase
 from dataing.adapters.investigation.pattern_adapter import InMemoryPatternRepository
 from dataing.agents import AgentClient
+from dataing.core.snapshot_store import LocalSnapshotStore
 from dataing.entrypoints.api.deps import settings
 from dataing.temporal.activities import (
+    make_capture_snapshot_activity,
     make_check_patterns_activity,
     make_counter_analyze_activity,
     make_execute_query_activity,
@@ -87,11 +89,16 @@ async def create_dependencies() -> dict[str, Any]:
     pattern_repository = InMemoryPatternRepository()
     logger.info("Pattern repository initialized")
 
+    # Snapshot store for investigation checkpoints
+    snapshot_store = LocalSnapshotStore("/tmp/dataing/snapshots")
+    logger.info("Snapshot store initialized")
+
     return {
         "app_db": app_db,
         "agent_adapter": agent_adapter,
         "context_engine": context_engine,
         "pattern_repository": pattern_repository,
+        "snapshot_store": snapshot_store,
     }
 
 
@@ -108,6 +115,7 @@ def create_activities(deps: dict[str, Any]) -> list[Any]:
     context_engine = deps["context_engine"]
     pattern_repository = deps["pattern_repository"]
     app_db = deps["app_db"]
+    snapshot_store = deps["snapshot_store"]
 
     # Cache for adapters to avoid recreating them
     adapter_cache: dict[str, BaseAdapter] = {}
@@ -205,6 +213,8 @@ def create_activities(deps: dict[str, Any]) -> list[Any]:
     adapter_database = AdapterDatabase(get_adapter)
 
     activities = [
+        # Snapshot capture (fire-and-forget)
+        make_capture_snapshot_activity(snapshot_store=snapshot_store),
         # Context and pattern activities
         make_gather_context_activity(
             context_engine=context_engine,

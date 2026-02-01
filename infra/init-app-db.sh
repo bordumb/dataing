@@ -13,8 +13,16 @@ echo "Running Dataing migrations..."
 MIGRATIONS_DIR="${MIGRATIONS_DIR:-/app/migrations}"
 
 # Run all migrations in sorted order
+# Set INCLUDE_SEEDS=true to include seed migrations (demo data)
 for f in "$MIGRATIONS_DIR"/*.sql; do
   if [ -f "$f" ]; then
+    # Skip seed migrations unless INCLUDE_SEEDS is true
+    if [[ "$(basename "$f")" == *seed* ]]; then
+      if [[ "${INCLUDE_SEEDS:-false}" != "true" ]]; then
+        echo "Skipping seed: $(basename "$f")"
+        continue
+      fi
+    fi
     echo "Applying: $(basename "$f")"
     PGPASSWORD="${PGPASSWORD:-dataing}" psql \
       -h "${PGHOST:-postgres}" \

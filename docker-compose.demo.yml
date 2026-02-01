@@ -1,0 +1,45 @@
+# Demo Override - Adds DuckDB fixtures and seed data
+# Usage: docker compose -f docker-compose.yml -f docker-compose.demo.yml up -d
+#
+# This extends the base docker-compose.yml to add:
+# - DuckDB server (pg_duckdb) with pre-loaded fixtures on port 5433
+# - Seed migrations for demo user/org authentication
+#
+# Demo workflow:
+#   1. Login at http://localhost:3000 with demo@dataing.io / demo123456
+#   2. Add DuckDB datasource via UI:
+#      Type: PostgreSQL, Host: duckdb, Port: 5432
+#      Database: demo, User: demo, Password: demo
+#   3. Run investigation on the connected datasource
+
+services:
+  # Demo PostgreSQL with DuckDB integration for analytics
+  # Uses pg_duckdb extension - real PostgreSQL with DuckDB query engine
+  # https://github.com/duckdb/pg_duckdb
+  duckdb:
+    image: pgduckdb/pgduckdb:17-v0.3.1
+    ports:
+      - "5433:5432"
+    volumes:
+      - ./demo/fixtures/null_spike:/data:ro
+      - ./demo/init-pgduckdb.sql:/docker-entrypoint-initdb.d/init.sql:ro
+      - demo-duckdb-data:/var/lib/postgresql/data
+    environment:
+      POSTGRES_USER: demo
+      POSTGRES_PASSWORD: demo  # pragma: allowlist secret
+      POSTGRES_DB: demo
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U demo -d demo"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    restart: unless-stopped
+
+  # Override db-migrate to include seed migrations (demo user/org)
+  db-migrate:
+    environment:
+      INCLUDE_SEEDS: "true"
+
+volumes:
+  demo-duckdb-data:

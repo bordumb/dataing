@@ -1,8 +1,17 @@
--- Seed demo auth data: organization, user, and membership
+-- Seed demo auth data: tenant, organization, user, and membership
 -- Demo credentials:
 --   Email: demo@dataing.io
 --   Password: demo123456
 --   Org ID: 00000000-0000-0000-0000-000000000001
+
+-- Create demo tenant (required for data_sources foreign key)
+INSERT INTO tenants (id, name, slug)
+VALUES (
+    '00000000-0000-0000-0000-000000000001',
+    'Demo Organization',
+    'demo'
+)
+ON CONFLICT (id) DO NOTHING;
 
 -- Create demo organization (if not exists)
 -- Using 'enterprise' plan to showcase all features in demo

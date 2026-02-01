@@ -106,35 +106,28 @@ fi
 echo ""
 echo "[4/8] Checking DuckDB adapter..."
 
-if [ -f "backend/src/dataing/adapters/db/duckdb.py" ]; then
+if [ -f "python-packages/dataing/src/dataing/adapters/datasource/sql/duckdb.py" ]; then
     pass "DuckDB adapter file exists"
 else
     fail "DuckDB adapter file missing"
 fi
 
-# Check if DuckDB is registered
-if grep -q "DuckDBAdapter" backend/src/dataing/adapters/db/__init__.py; then
-    pass "DuckDB adapter registered"
-else
-    fail "DuckDB adapter not registered in __init__.py"
-fi
-
 # =============================================================================
-# Test 5: Check demo mode in deps.py
+# Test 5: Check demo seed migration exists
 # =============================================================================
 echo ""
-echo "[5/8] Checking demo mode integration..."
+echo "[5/8] Checking demo seed migration..."
 
-if grep -q "DATADR_DEMO_MODE" backend/src/dataing/entrypoints/api/deps.py; then
-    pass "Demo mode check present in deps.py"
+if [ -f "python-packages/dataing/migrations/008_seed_demo_auth.sql" ]; then
+    pass "Demo seed migration exists"
 else
-    fail "Demo mode check missing in deps.py"
+    fail "Demo seed migration missing"
 fi
 
-if grep -q "_seed_demo_data" backend/src/dataing/entrypoints/api/deps.py; then
-    pass "Demo seed function present"
+if grep -q "demo@dataing.io" python-packages/dataing/migrations/008_seed_demo_auth.sql; then
+    pass "Demo user email in seed migration"
 else
-    fail "Demo seed function missing"
+    fail "Demo user email not in seed migration"
 fi
 
 # =============================================================================
@@ -149,10 +142,16 @@ else
     fail "docker-compose.demo.yml missing"
 fi
 
-if grep -q "DATADR_DEMO_MODE" docker-compose.demo.yml; then
-    pass "Demo mode configured in Docker Compose"
+if grep -q "INCLUDE_SEEDS" docker-compose.demo.yml; then
+    pass "INCLUDE_SEEDS configured in Docker Compose"
 else
-    fail "Demo mode not configured in Docker Compose"
+    fail "INCLUDE_SEEDS not configured in Docker Compose"
+fi
+
+if grep -q "duckdb:" docker-compose.demo.yml; then
+    pass "DuckDB service configured in Docker Compose"
+else
+    fail "DuckDB service not configured in Docker Compose"
 fi
 
 # =============================================================================
@@ -207,9 +206,6 @@ if [ $FAILED -eq 0 ]; then
     echo ""
     echo "To run the demo:"
     echo "  just demo"
-    echo ""
-    echo "Or with Docker:"
-    echo "  just demo-docker"
     exit 0
 else
     echo -e "${RED}Some tests failed. Please fix the issues above.${NC}"

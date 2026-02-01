@@ -94,6 +94,27 @@ services:
     restart: unless-stopped
 
   # ===========================================================================
+  # Database Migrations (runs once on startup)
+  # ===========================================================================
+  db-migrate:
+    image: postgres:16-alpine
+    volumes:
+      - ./python-packages/dataing/migrations:/migrations:ro
+      - ./infra/init-app-db.sh:/init-app-db.sh:ro
+    environment:
+      PGHOST: postgres
+      PGPORT: 5432
+      PGUSER: dataing
+      PGPASSWORD: ${POSTGRES_PASSWORD:-dataing}
+      PGDATABASE: dataing
+      MIGRATIONS_DIR: /migrations
+    entrypoint: ["/bin/sh", "/init-app-db.sh"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+
+  # ===========================================================================
   # Dataing Application
   # ===========================================================================
   api:
@@ -118,6 +139,8 @@ services:
     ports:
       - "8000:8000"
     depends_on:
+      db-migrate:
+        condition: service_completed_successfully
       postgres:
         condition: service_healthy
       redis:
@@ -152,6 +175,8 @@ services:
       REDIS_PORT: 6379
       LLM_MODEL: ${LLM_MODEL:-claude-sonnet-4-20250514}
     depends_on:
+      db-migrate:
+        condition: service_completed_successfully
       postgres:
         condition: service_healthy
       redis:
@@ -192,7 +217,7 @@ services:
     profiles: ["observability"]
     command: ["--config=/etc/otelcol-contrib/config.yaml"]
     volumes:
-      - ./demo/otel-collector-config.yaml:/etc/otelcol-contrib/config.yaml:ro
+      - ./infra/otel-collector-config.yaml:/etc/otelcol-contrib/config.yaml:ro
     ports:
       - "4317:4317"
       - "4318:4318"

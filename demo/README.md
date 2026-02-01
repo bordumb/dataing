@@ -2,153 +2,38 @@
 
 Realistic e-commerce data with pre-baked anomalies for demonstrating Dataing's detection capabilities.
 
-## Happy Path Demo (NewInvestigation Form)
-
-After running `just demo`, navigate to http://localhost:3000 and click "New Investigation". Use these values for a working demo:
-
-### Scenario: NULL Spike in Orders
-
-| Field | Value |
-|-------|-------|
-| **Dataset** | Select "E-Commerce Demo" → search for `orders` → select `public.orders` |
-| **Anomaly Date** | `2024-01-10` (middle of the anomaly window) |
-| **Metric Name** | `null_count` |
-| **Expected Value** | `5` |
-| **Actual Value** | `200` |
-| **Deviation %** | `3900` |
-| **Severity** | High |
-| **Description** | "Spike in NULL user_id values in the orders table. Started around Jan 9th. Possibly related to mobile app deployment." |
-
-### Scenario: Volume Drop in Events
-
-| Field | Value |
-|-------|-------|
-| **Dataset** | Select "E-Commerce Demo" → search for `events` → select `public.events` |
-| **Anomaly Date** | `2024-01-12` |
-| **Metric Name** | `row_count` |
-| **Expected Value** | `70000` |
-| **Actual Value** | `14000` |
-| **Deviation %** | `-80` |
-| **Severity** | Critical |
-| **Description** | "Significant drop in EU event volume. Non-EU traffic appears normal." |
-
-### Tips for Demo
-- The AI will query the database, discover the anomaly pattern, and generate hypotheses
-- For NULL spike: it should find that ~40% of orders on days 3-5 have NULL user_id
-- For volume drop: it should find that EU events dropped 80% on days 5-6
-- The investigation typically takes 30-60 seconds to complete
-
-## Repository Mappings
-
-The repo-mappings feature links datasets to their source code repositories.
-
-### Quick Test via curl
-
-```bash
-# Create a mapping
-curl -s -X POST http://localhost:8000/api/v1/dataset-repo-mappings \
-  -H "X-API-Key: dd_demo_12345" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "dataset_pattern": "public.orders",
-    "repo_owner": "acme",
-    "repo_name": "etl-pipeline",
-    "file_path": "models/orders.sql"
-  }'
-
-# List all mappings
-curl -s http://localhost:8000/api/v1/dataset-repo-mappings \
-  -H "X-API-Key: dd_demo_12345"
-
-# Resolve repo for a dataset
-curl -s http://localhost:8000/api/v1/datasets/public.orders/repo \
-  -H "X-API-Key: dd_demo_12345"
-
-# Bulk import mappings
-curl -s -X POST http://localhost:8000/api/v1/dataset-repo-mappings/bulk \
-  -H "X-API-Key: dd_demo_12345" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "mappings": [
-      {"dataset_pattern": "public.users", "repo_owner": "acme", "repo_name": "etl-pipeline", "file_path": "models/users.sql"},
-      {"dataset_pattern": "public.events", "repo_owner": "acme", "repo_name": "etl-pipeline", "file_path": "models/events.sql"}
-    ]
-  }'
-```
-
-### Test via CLI
-
-```bash
-export DATAING_API_KEY=dd_demo_12345
-export DATAING_BASE_URL=http://localhost:8000
-
-dataing repo map public.orders acme/etl-pipeline --file-path models/orders.sql
-dataing repo show public.orders
-dataing repo list
-dataing repo import-dbt path/to/manifest.json --repo acme/etl-pipeline
-dataing repo confirm <mapping-id>
-dataing repo dismiss <mapping-id>
-```
-
-### Run Integration Tests
-
-```bash
-# Start infrastructure (PostgreSQL)
-just demo-infra
-
-# Run integration tests
-just test-integration
-
-# Or run directly
-uv run pytest python-packages/dataing/tests/integration/adapters/repo_mappings/ -v -m integration
-```
-
 ## Quick Start
 
 ```bash
-# Run the full demo (from repo root)
+# Run the full demo stack (from repo root)
 just demo
 
 # This will:
 # 1. Generate fixtures if not present
-# 2. Start PostgreSQL and run all migrations
-# 3. Start backend at http://localhost:8000
-# 4. Start frontend at http://localhost:3000
-# 5. Seed demo data source "E-Commerce Demo"
+# 2. Start all services via Docker Compose
+# 3. Seed demo user/org for login
+# 4. Start DuckDB server with fixtures on port 5433
 ```
 
-### Login Credentials
+## Demo Workflow
 
-| Field | Value |
-|-------|-------|
-| **Email** | `demo@dataing.io` |
-| **Password** | `demo123456` |
-| **Org ID** | `00000000-0000-0000-0000-000000000001` |
+After running `just demo`:
 
-Legacy API key for testing: `dd_demo_12345`
+1. **Login** at http://localhost:3000
+   - Email: `demo@dataing.io`
+   - Password: `demo123456` <!-- pragma: allowlist secret -->
 
-## Running with Docker
+2. **Add DuckDB datasource** via the UI (Datasources page)
+   - Type: PostgreSQL (pg_duckdb - real PostgreSQL with DuckDB)
+   - Host: `duckdb`
+   - Port: `5432` (internal Docker port)
+   - Database: `demo`
+   - Username: `demo`
+   - Password: `demo` <!-- pragma: allowlist secret -->
 
-```bash
-# Start everything with Docker Compose
-just demo-docker
+   Note: Use port 5433 when connecting from outside Docker (e.g., `psql -h localhost -p 5433 -U demo -d demo`)
 
-# Stop
-just demo-docker-down
-```
-
-## Generate Fixtures Only
-
-```bash
-# Generate all fixtures (from repo root)
-cd demo && uv run python generate.py
-
-# Or use just
-just demo-fixtures
-
-# Regenerate (force)
-just demo-regenerate
-```
+3. **Run an investigation** on the connected datasource
 
 ## Fixtures
 
@@ -166,64 +51,84 @@ just demo-regenerate
 
 ```
 users (10,000 rows)
-  ├── orders (5,000 rows)
-  │     └── order_items (12,500 rows)
-  └── events (500,000 rows)
+  |-- orders (5,000 rows)
+  |     +-- order_items (12,500 rows)
+  +-- events (500,000 rows)
 
 products (500 rows)
-  └── categories (50 rows)
+  +-- categories (50 rows)
 ```
 
-## Demo Script
+## Demo Scenarios
 
-### Scenario: NULL Spike
+### Scenario: NULL Spike in Orders
 
-1. Load the fixture:
-   ```sql
-   CREATE TABLE orders AS SELECT * FROM 'fixtures/null_spike/orders.parquet';
-   ```
+| Field | Value |
+|-------|-------|
+| **Dataset** | `orders` table |
+| **Anomaly Date** | `2024-01-10` (middle of anomaly window) |
+| **Metric Name** | `null_count` |
+| **Expected Value** | `5` |
+| **Actual Value** | `200` |
+| **Deviation %** | `3900` |
+| **Severity** | High |
+| **Description** | "Spike in NULL user_id values in the orders table" |
 
-2. Show the anomaly:
-   ```sql
-   SELECT
-       DATE_TRUNC('day', created_at) as day,
-       ROUND(100.0 * SUM(CASE WHEN user_id IS NULL THEN 1 ELSE 0 END) / COUNT(*), 1) as null_pct
-   FROM orders
-   GROUP BY 1
-   ORDER BY 1;
-   ```
+Root cause: "Mobile app v2.3.1 shipped with a bug that doesn't pass user context to the checkout API."
 
-3. Expected output:
-   ```
-   Day 1:  0.1%
-   Day 2:  0.1%
-   Day 3:  41.2%  <- ANOMALY STARTS
-   Day 4:  39.8%
-   Day 5:  40.1%
-   Day 6:  0.2%   <- FIXED
-   Day 7:  0.1%
-   ```
+### Scenario: Volume Drop in Events
 
-4. Root cause story: "Mobile app v2.3.1 shipped with a bug that doesn't pass user context to the checkout API."
+| Field | Value |
+|-------|-------|
+| **Dataset** | `events` table |
+| **Anomaly Date** | `2024-01-12` |
+| **Metric Name** | `row_count` |
+| **Expected Value** | `70000` |
+| **Actual Value** | `14000` |
+| **Deviation %** | `-80` |
+| **Severity** | Critical |
+| **Description** | "Significant drop in EU event volume" |
 
-### Scenario: Volume Drop
+Root cause: "CDN misconfiguration blocked the tracking pixel for EU users."
 
-1. Load and query:
-   ```sql
-   SELECT
-       DATE_TRUNC('day', created_at) as day,
-       CASE WHEN country IN ('DE', 'FR', 'GB') THEN 'EU' ELSE 'Non-EU' END as region,
-       COUNT(*) as events
-   FROM events
-   GROUP BY 1, 2
-   ORDER BY 1, 2;
-   ```
+## Generate Fixtures
 
-2. Root cause story: "CDN misconfiguration blocked the tracking pixel for EU users."
+```bash
+# Generate all fixtures
+just demo-fixtures
 
-## Validation
+# Regenerate (force)
+just demo-regenerate
 
-Run validation queries to verify fixtures:
+# Or directly
+cd demo && uv run python generate.py
+```
+
+## Using Fixtures Directly with DuckDB
+
+```sql
+-- Load fixture
+CREATE TABLE orders AS SELECT * FROM 'fixtures/null_spike/orders.parquet';
+
+-- Show NULL spike anomaly
+SELECT
+    DATE_TRUNC('day', created_at) as day,
+    ROUND(100.0 * SUM(CASE WHEN user_id IS NULL THEN 1 ELSE 0 END) / COUNT(*), 1) as null_pct
+FROM orders
+GROUP BY 1
+ORDER BY 1;
+
+-- Expected output:
+-- Day 1:  0.1%
+-- Day 2:  0.1%
+-- Day 3:  41.2%  <- ANOMALY STARTS
+-- Day 4:  39.8%
+-- Day 5:  40.1%
+-- Day 6:  0.2%   <- FIXED
+-- Day 7:  0.1%
+```
+
+## Validate Fixtures
 
 ```bash
 duckdb demo.db < validate.sql
@@ -233,25 +138,21 @@ duckdb demo.db < validate.sql
 
 ```
 demo/
-├── fixtures/
-│   ├── baseline/
-│   │   ├── users.parquet
-│   │   ├── categories.parquet
-│   │   ├── products.parquet
-│   │   ├── orders.parquet
-│   │   ├── order_items.parquet
-│   │   ├── events.parquet
-│   │   └── manifest.json
-│   ├── null_spike/
-│   ├── volume_drop/
-│   ├── schema_drift/
-│   ├── duplicates/
-│   ├── late_arriving/
-│   └── orphaned_records/
-├── generate.py        # Main generation script
-├── load_duckdb.sql    # DuckDB loading script
-├── validate.sql       # Validation queries
-└── README.md
+  fixtures/
+    baseline/           # Clean data
+    null_spike/         # NULL spike anomaly (default for demo)
+    volume_drop/        # Volume drop anomaly
+    schema_drift/       # Schema drift anomaly
+    duplicates/         # Duplicate records
+    late_arriving/      # Late arriving data
+    orphaned_records/   # Orphaned records
+  generate.py           # Fixture generator
+  init-duckdb.sql       # DuckDB initialization for compose
+  load_duckdb.sql       # Manual DuckDB loading
+  quickstart-load.sql   # Quickstart loader
+  validate.sql          # Validation queries
+  demo_notebook.ipynb   # Jupyter notebook demo
+  README.md             # This file
 ```
 
 ## Manifest Format
@@ -286,14 +187,22 @@ Each fixture includes a `manifest.json`:
 }
 ```
 
-## Dependencies
+## Just Commands
 
-- Python 3.11+
-- polars >= 0.20.0
-- faker >= 22.0.0
-- pyarrow >= 15.0.0
-
-Install with:
 ```bash
-uv add polars faker pyarrow
+just demo           # Start full demo stack
+just demo-stop      # Stop demo
+just demo-clean     # Stop and remove volumes + fixtures
+just demo-fixtures  # Generate fixtures only
+just demo-regenerate # Force regenerate fixtures
 ```
+
+## Access Points
+
+| Service | URL |
+|---------|-----|
+| Frontend | http://localhost:3000 |
+| API Docs | http://localhost:8000/docs |
+| Temporal UI | http://localhost:8233 |
+| DuckDB (from host) | localhost:5433 |
+| DuckDB (in Docker) | duckdb:5432 |

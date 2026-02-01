@@ -1,16 +1,25 @@
 {
-  "assignee": null,
+  "assignee": "bordumbb@gmail.com",
   "claim_note": "",
-  "claimed_at": null,
+  "claimed_at": "2026-01-31T23:00:25.211885Z",
   "created_at": "2026-01-28T03:52:05.250749Z",
   "depends_on": [
     "fn-42.1"
   ],
   "epic": "fn-42",
+  "evidence": {
+    "commits": [
+      "4105e43dc5fd7cb929a88f9de36c2128199a0e06"
+    ],
+    "prs": [],
+    "tests": [
+      "cd docs && mkdocs build"
+    ]
+  },
   "id": "fn-42.2",
   "priority": 2,
   "spec_path": ".flow/tasks/fn-42.2.md",
-  "status": "todo",
+  "status": "done",
   "title": "Write run-first-investigation walkthrough with expected output",
-  "updated_at": "2026-01-28T03:52:05.250936Z"
+  "updated_at": "2026-01-31T23:02:10.077094Z"
 }

@@ -1,139 +1,45 @@
-version: '3.8'
+# Demo Override - Adds DuckDB fixtures and seed data
+# Usage: docker compose -f docker-compose.yml -f demo/docker-compose.demo.yml up -d
+#
+# This extends the base docker-compose.yml to add:
+# - DuckDB server (pg_duckdb) with pre-loaded fixtures on port 5433
+# - Seed migrations for demo user/org authentication
+#
+# Demo workflow:
+#   1. Login at http://localhost:3000 with demo@dataing.io / demo123456
+#   2. Add DuckDB datasource via UI:
+#      Type: PostgreSQL, Host: duckdb, Port: 5432
+#      Database: demo, User: demo, Password: demo
+#   3. Run investigation on the connected datasource
 
 services:
-  # =============================================================================
-  # Observability Stack
-  # =============================================================================
-  otel-collector:
-    image: otel/opentelemetry-collector-contrib:0.96.0
-    command: ["--config=/etc/otelcol-contrib/config.yaml"]
-    volumes:
-      - ./otel-collector-config.yaml:/etc/otelcol-contrib/config.yaml:ro
+  # Demo PostgreSQL with DuckDB integration for analytics
+  # Uses pg_duckdb extension - real PostgreSQL with DuckDB query engine
+  # https://github.com/duckdb/pg_duckdb
+  duckdb:
+    image: pgduckdb/pgduckdb:17-v0.3.1
     ports:
-      - "4317:4317"   # OTLP gRPC
-      - "4318:4318"   # OTLP HTTP
-    depends_on:
-      - jaeger
-
-  jaeger:
-    image: jaegertracing/all-in-one:1.76.0
+      - "5433:5432"
+    volumes:
+      - ./fixtures/null_spike:/data:ro
+      - ./init-pgduckdb.sql:/docker-entrypoint-initdb.d/init.sql:ro
+      - demo-duckdb-data:/var/lib/postgresql/data
     environment:
-      COLLECTOR_OTLP_ENABLED: "true"
-      QUERY_UI_CONFIG: "/etc/jaeger/ui-config.json"
-    volumes:
-      - ./jaeger-ui-config.json:/etc/jaeger/ui-config.json:ro
-    ports:
-      - "16686:16686" # Jaeger UI
-      - "14268:14268" # Jaeger HTTP collector
+      POSTGRES_USER: demo
+      POSTGRES_PASSWORD: demo  # pragma: allowlist secret
+      POSTGRES_DB: demo
     healthcheck:
-      test: ["CMD", "wget", "-q", "--spider", "http://localhost:16686"]
-      interval: 5s
-      timeout: 3s
-      retries: 5
-
-  # =============================================================================
-  # Core Services
-  # =============================================================================
-  postgres:
-    image: pgvector/pgvector:pg16
-    environment:
-      POSTGRES_DB: dataing_demo
-      POSTGRES_USER: dataing
-      POSTGRES_PASSWORD: dataing
-    volumes:
-      - demo-pgdata:/var/lib/postgresql/data
-      - ./backend/migrations:/docker-entrypoint-initdb.d:ro
-    ports:
-      - "5432:5432"
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U dataing -d dataing_demo"]
+      test: ["CMD-SHELL", "pg_isready -U demo -d demo"]
       interval: 5s
       timeout: 5s
-      retries: 5
+      retries: 10
+      start_period: 10s
+    restart: unless-stopped
 
-  redis:
-    image: redis:7-alpine
-    ports:
-      - "6379:6379"
-    volumes:
-      - redis_data:/data
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 5s
-      timeout: 3s
-      retries: 5
-
-  backend:
-    build:
-      context: ./backend
-      dockerfile: Dockerfile
+  # Override db-migrate to include seed migrations (demo user/org)
+  db-migrate:
     environment:
-      DATADR_DEMO_MODE: "true"
-      DATABASE_URL: postgresql://dataing:dataing@postgres:5432/dataing_demo
-      APP_DATABASE_URL: postgresql://dataing:dataing@postgres:5432/dataing_demo
-      DATADR_FIXTURE_PATH: /app/fixtures/null_spike
-      DATADR_ENCRYPTION_KEY: ${DATADR_ENCRYPTION_KEY:-fj_HDi4E6H02W11I5cJtMB_u7HoUrc8AMN6_L0rqGcg=}
-      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
-      REDIS_HOST: redis
-      REDIS_PORT: 6379
-      # OpenTelemetry Configuration
-      OTEL_SERVICE_NAME: dataing-api
-      OTEL_TRACES_ENABLED: "true"
-      OTEL_METRICS_ENABLED: "true"
-      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318
-    volumes:
-      - ./demo/fixtures:/app/fixtures:ro
-    ports:
-      - "8000:8000"
-    depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-      otel-collector:
-        condition: service_started
-    command: ["uvicorn", "dataing.entrypoints.api.app:app", "--host", "0.0.0.0", "--port", "8000"]
-
-  worker:
-    build:
-      context: ./backend
-      dockerfile: Dockerfile
-    environment:
-      DATADR_DEMO_MODE: "true"
-      DATABASE_URL: postgresql://dataing:dataing@postgres:5432/dataing_demo
-      APP_DATABASE_URL: postgresql://dataing:dataing@postgres:5432/dataing_demo
-      DATADR_FIXTURE_PATH: /app/fixtures/null_spike
-      DATADR_ENCRYPTION_KEY: ${DATADR_ENCRYPTION_KEY:-fj_HDi4E6H02W11I5cJtMB_u7HoUrc8AMN6_L0rqGcg=}
-      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
-      REDIS_HOST: redis
-      REDIS_PORT: 6379
-      # OpenTelemetry Configuration
-      OTEL_SERVICE_NAME: dataing-worker
-      OTEL_TRACES_ENABLED: "true"
-      OTEL_METRICS_ENABLED: "true"
-      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318
-    volumes:
-      - ./demo/fixtures:/app/fixtures:ro
-    depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-      otel-collector:
-        condition: service_started
-    command: ["python", "-m", "dataing.entrypoints.worker"]
-
-  frontend:
-    build:
-      context: ./frontend
-      dockerfile: Dockerfile
-    environment:
-      NEXT_PUBLIC_API_URL: http://localhost:8000
-    ports:
-      - "3000:3000"
-    depends_on:
-      - backend
+      INCLUDE_SEEDS: "true"
 
 volumes:
-  demo-pgdata:
-  redis_data:
+  demo-duckdb-data:

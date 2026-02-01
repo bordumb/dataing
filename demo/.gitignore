@@ -8,5 +8,9 @@ fixtures/**/*.parquet
 *.db
 *.duckdb
 
+# Packaged fixtures (build artifact)
+demo-fixtures/
+demo-fixtures.tar.gz
+
 # Allow demo notebook (overrides root .gitignore)
 !demo_notebook.ipynb

@@ -1,3 +1,10 @@
+# [1.18.0](https://github.com/bordumb/dataing/compare/v1.17.0...v1.18.0) (2026-01-31)
+
+
+### Features
+
+* Investigation Snapshot Export and Import (fn-39) ([#107](https://github.com/bordumb/dataing/issues/107)) ([6bf5bab](https://github.com/bordumb/dataing/commit/6bf5bab903dbf00dbc253be6921f506f0b69f753))
+
 # [1.17.0](https://github.com/bordumb/dataing/compare/v1.16.0...v1.17.0) (2026-01-31)
 
 

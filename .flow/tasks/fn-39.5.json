@@ -1,17 +1,26 @@
 {
-  "assignee": null,
+  "assignee": "bordumbb@gmail.com",
   "claim_note": "",
-  "claimed_at": null,
+  "claimed_at": "2026-01-31T16:41:43.005115Z",
   "created_at": "2026-01-28T03:50:57.068279Z",
   "depends_on": [
     "fn-39.3",
     "fn-39.4"
   ],
   "epic": "fn-39",
+  "evidence": {
+    "commits": [
+      "82f8cc69bef38e925eceb8f34f322d63e9b10f7e"
+    ],
+    "prs": [],
+    "tests": [
+      "uv run pytest python-packages/dataing/tests/unit/ -v -k snapshot or export"
+    ]
+  },
   "id": "fn-39.5",
   "priority": 5,
   "spec_path": ".flow/tasks/fn-39.5.md",
-  "status": "todo",
+  "status": "done",
   "title": "Add CLI commands: dataing run snapshot and dataing run import",
-  "updated_at": "2026-01-28T03:50:57.068448Z"
+  "updated_at": "2026-01-31T16:43:45.399901Z"
 }

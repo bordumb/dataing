@@ -1,6 +1,6 @@
 [project]
 name = "dataing"
-version = "1.17.0"
+version = "1.18.0"
 description = "Autonomous Data Quality Investigation - Community Edition"
 readme = "../../README.md"
 requires-python = ">=3.11"
@@ -45,6 +45,9 @@ dev = [
     "mypy>=1.8.0",
     "testcontainers>=3.7.0",
     "respx>=0.20.2",
+]
+snapshot = [
+    "pyarrow>=15.0.0",
 ]
 
 [build-system]

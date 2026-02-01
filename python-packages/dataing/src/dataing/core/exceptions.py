@@ -94,3 +94,29 @@ class TimeoutError(DataingError):  # noqa: A001
     """
 
     pass
+
+
+class SnapshotSizeExceededError(DataingError):
+    """Snapshot archive exceeds maximum allowed size.
+
+    Raised when building a snapshot archive that exceeds the configured
+    max_size_bytes limit. This prevents creating excessively large archives
+    that would be impractical to transfer or store.
+
+    Attributes:
+        actual_size: The actual size of the archive in bytes.
+        max_size: The maximum allowed size in bytes.
+    """
+
+    def __init__(self, actual_size: int, max_size: int) -> None:
+        """Initialize SnapshotSizeExceededError.
+
+        Args:
+            actual_size: The actual archive size in bytes.
+            max_size: The maximum allowed size in bytes.
+        """
+        super().__init__(
+            f"Snapshot size ({actual_size:,} bytes) exceeds maximum " f"({max_size:,} bytes)"
+        )
+        self.actual_size = actual_size
+        self.max_size = max_size

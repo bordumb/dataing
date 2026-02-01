@@ -1,16 +1,25 @@
 {
-  "assignee": null,
+  "assignee": "bordumbb@gmail.com",
   "claim_note": "",
-  "claimed_at": null,
+  "claimed_at": "2026-01-31T16:44:03.401137Z",
   "created_at": "2026-01-28T03:51:01.495736Z",
   "depends_on": [
     "fn-39.5"
   ],
   "epic": "fn-39",
+  "evidence": {
+    "commits": [
+      "82f8cc69bef38e925eceb8f34f322d63e9b10f7e"
+    ],
+    "prs": [],
+    "tests": [
+      "uv run pytest python-packages/dataing/tests/unit/ -v -k snapshot or export"
+    ]
+  },
   "id": "fn-39.6",
   "priority": 6,
   "spec_path": ".flow/tasks/fn-39.6.md",
-  "status": "todo",
+  "status": "done",
   "title": "Add unit tests for snapshot export and import",
-  "updated_at": "2026-01-28T03:51:01.495922Z"
+  "updated_at": "2026-01-31T16:46:42.683786Z"
 }

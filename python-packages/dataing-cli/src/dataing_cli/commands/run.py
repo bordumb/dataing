@@ -417,6 +417,119 @@ def _watch_run_plain_text(client: DataingClient, run_id: str) -> None:
             pass
 
 
+@app.command("snapshot")
+@cli_error_handler
+def snapshot_run(
+    ctx: typer.Context,
+    investigation_id: Annotated[str, typer.Argument(help="Investigation ID to snapshot")],
+    output: Annotated[
+        Path | None,
+        typer.Option("--output", "-o", help="Output file path (default: snapshot-<id>.tar.gz)"),
+    ] = None,
+    max_size: Annotated[
+        int,
+        typer.Option("--max-size", help="Maximum archive size in MB"),
+    ] = 100,
+) -> None:
+    """Export an investigation as a snapshot archive.
+
+    Creates a self-contained .tar.gz archive with all evidence, queries,
+    results, lineage, and agent prompts. Suitable for sharing, replay,
+    or archival.
+
+    Examples:
+        dataing run snapshot inv-abc123
+        dataing run snapshot inv-abc123 -o my-snapshot.tar.gz
+        dataing run snapshot inv-abc123 --max-size 50
+    """
+    state = ctx.obj
+    client = get_client(
+        api_key=state.api_key if state else None,
+        base_url=state.base_url if state else None,
+    )
+
+    # Default output filename
+    if output is None:
+        output = Path(f"snapshot-{investigation_id}.tar.gz")
+
+    with console.status("[bold blue]Building snapshot..."):
+        try:
+            data = client.download_snapshot(investigation_id)
+        except Exception as e:
+            console.print(f"[red]-[/red] Failed to download snapshot: {e}")
+            raise typer.Exit(1) from e
+
+    # Check size
+    size_mb = len(data) / (1024 * 1024)
+    if size_mb > max_size:
+        console.print(
+            f"[red]-[/red] Snapshot size ({size_mb:.1f} MB) exceeds " f"--max-size ({max_size} MB)"
+        )
+        raise typer.Exit(1)
+
+    # Write to file
+    output.write_bytes(data)
+    console.print(f"[green]+[/green] Snapshot saved: [cyan]{output}[/cyan] ({size_mb:.1f} MB)")
+
+
+@app.command("import")
+@cli_error_handler
+def import_run(
+    ctx: typer.Context,
+    file: Annotated[Path, typer.Argument(help="Snapshot archive file (.tar.gz)")],
+    datasource: Annotated[
+        str | None,
+        typer.Option("--datasource", "-d", help="Target datasource ID"),
+    ] = None,
+) -> None:
+    """Import a snapshot archive as a replayed investigation.
+
+    Loads a previously exported snapshot into this Dataing instance.
+    The imported investigation is marked as a replay with original timestamps.
+
+    Examples:
+        dataing run import snapshot-abc123.tar.gz
+        dataing run import snapshot-abc123.tar.gz --datasource ds-xyz
+    """
+    state = ctx.obj
+    client = get_client(
+        api_key=state.api_key if state else None,
+        base_url=state.base_url if state else None,
+    )
+
+    if not file.exists():
+        console.print(f"[red]-[/red] File not found: {file}")
+        raise typer.Exit(1)
+
+    if not file.suffix == ".gz" and not str(file).endswith(".tar.gz"):
+        console.print("[yellow]![/yellow] File doesn't appear to be a .tar.gz archive")
+
+    # Read file
+    file_data = file.read_bytes()
+    size_mb = len(file_data) / (1024 * 1024)
+    console.print(f"[dim]Uploading {size_mb:.1f} MB...[/dim]")
+
+    with console.status("[bold blue]Importing snapshot..."):
+        try:
+            result = client.import_snapshot(file_data)
+        except Exception as e:
+            console.print(f"[red]-[/red] Failed to import snapshot: {e}")
+            raise typer.Exit(1) from e
+
+    # Display result
+    new_id = result.get("investigation_id", "unknown")
+    original_id = result.get("original_investigation_id", "unknown")
+    evidence_count = result.get("evidence_count", 0)
+
+    frontend_url = get_frontend_url()
+    inv_url = f"{frontend_url}/investigations/{new_id}"
+
+    console.print(f"[green]+[/green] Imported as: [cyan]{new_id}[/cyan]")
+    console.print(f"[green]+[/green] Original ID: [dim]{original_id}[/dim]")
+    console.print(f"[green]+[/green] Evidence items: {evidence_count}")
+    console.print(f"[green]+[/green] View at: [link={inv_url}]{inv_url}[/link]")
+
+
 def _watch_run(client: DataingClient, run_id: str, state: Any) -> None:
     """Stream and display run events with Rich Live timeline.
 

@@ -1,14 +1,23 @@
 {
-  "assignee": null,
+  "assignee": "bordumbb@gmail.com",
   "claim_note": "",
-  "claimed_at": null,
+  "claimed_at": "2026-02-01T22:21:44.963680Z",
   "created_at": "2026-01-28T03:52:32.413953Z",
   "depends_on": [],
   "epic": "fn-43",
+  "evidence": {
+    "commits": [
+      "4773185a5013456add6e40abb5fa80ff47e4e471"
+    ],
+    "prs": [],
+    "tests": [
+      "YAML validation passed"
+    ]
+  },
   "id": "fn-43.3",
   "priority": 3,
   "spec_path": ".flow/tasks/fn-43.3.md",
-  "status": "todo",
+  "status": "done",
   "title": "Create issue templates: bug report, feature request, question",
-  "updated_at": "2026-01-28T03:52:32.414166Z"
+  "updated_at": "2026-02-01T22:22:33.715528Z"
 }

@@ -1,3 +1,10 @@
+# [1.19.0](https://github.com/bordumb/dataing/compare/v1.18.0...v1.19.0) (2026-02-01)
+
+
+### Features
+
+* **fn-42:** Quickstart documentation and demo infrastructure refactor   ([#110](https://github.com/bordumb/dataing/issues/110)) ([86a816e](https://github.com/bordumb/dataing/commit/86a816e71ceba16e8f1fdae31fc5f7e62857ffc5))
+
 # [1.18.0](https://github.com/bordumb/dataing/compare/v1.17.0...v1.18.0) (2026-01-31)
 
 

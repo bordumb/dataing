@@ -1,0 +1,19 @@
+{
+  "assignee": "bordumbb@gmail.com",
+  "claim_note": "",
+  "claimed_at": "2026-02-02T00:42:26.651649Z",
+  "created_at": "2026-02-02T00:27:44.239600Z",
+  "depends_on": [],
+  "epic": "fn-55",
+  "evidence": {
+    "location": "python-packages/dataing/src/dataing/adapters/db/app_db.py:30",
+    "tests": "48 tests passed in python-packages/dataing/tests/unit/adapters/db/test_app_db.py",
+    "verification": "uv run python -c shows pool attribute accessible: True"
+  },
+  "id": "fn-55.1",
+  "priority": null,
+  "spec_path": ".flow/tasks/fn-55.1.md",
+  "status": "done",
+  "title": "Expose asyncpg pool from AppDatabase",
+  "updated_at": "2026-02-02T00:44:48.168692Z"
+}

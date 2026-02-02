@@ -1,0 +1,30 @@
+{
+  "assignee": "bordumbb@gmail.com",
+  "claim_note": "",
+  "claimed_at": "2026-02-02T01:07:05.792295Z",
+  "created_at": "2026-02-02T00:27:46.758023Z",
+  "depends_on": [
+    "fn-55.1",
+    "fn-55.2",
+    "fn-55.3"
+  ],
+  "epic": "fn-55",
+  "evidence": {
+    "files_modified": [
+      "entrypoints/api/deps.py",
+      "entrypoints/temporal_worker.py"
+    ],
+    "settings_added": [
+      "openai_api_key",
+      "memory_embedding_model",
+      "memory_enabled"
+    ],
+    "tests_passed": 129
+  },
+  "id": "fn-55.4",
+  "priority": null,
+  "spec_path": ".flow/tasks/fn-55.4.md",
+  "status": "done",
+  "title": "Inject PgVectorMemoryStore at entrypoints",
+  "updated_at": "2026-02-02T01:11:25.424300Z"
+}

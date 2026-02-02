@@ -21,6 +21,7 @@ class SynthesizeInput:
     alert_summary: str
     confidence_threshold: float = 0.85
     code_changes: list[dict[str, Any]] | None = None
+    tenant_id: str | None = None
 
 
 @dataclass
@@ -58,6 +59,7 @@ def make_synthesize_activity(
                 hypotheses=input.hypotheses,
                 alert_summary=input.alert_summary,
                 code_changes=input.code_changes,
+                tenant_id=input.tenant_id,
             )
         except Exception as e:
             return SynthesizeResult(

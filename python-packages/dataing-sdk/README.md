@@ -46,4 +46,4 @@ for event in run.events():
 
 ## API Reference
 
-See the full documentation at https://docs.dataing.io/sdk
+See the full documentation at https://docs.dataing.dev/guides/sdk-reference/

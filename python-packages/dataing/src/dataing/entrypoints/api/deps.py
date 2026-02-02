@@ -10,6 +10,7 @@ from contextlib import asynccontextmanager
 from typing import TYPE_CHECKING, Any
 from uuid import UUID
 
+from bond.tools.memory import AgentMemoryProtocol, PgVectorMemoryStore
 from cryptography.fernet import Fernet
 from fastapi import Request
 
@@ -91,6 +92,13 @@ class Settings:
         # Investigation engine: "temporal" (durable workflow execution)
         self.INVESTIGATION_ENGINE = os.getenv("INVESTIGATION_ENGINE", "temporal")
 
+        # Memory settings for agent memory persistence
+        self.openai_api_key = os.getenv("OPENAI_API_KEY", "")
+        self.memory_embedding_model = os.getenv(
+            "MEMORY_EMBEDDING_MODEL", "openai:text-embedding-3-small"
+        )
+        self.memory_enabled = os.getenv("MEMORY_ENABLED", "true").lower() == "true"
+
         # GitHub OAuth settings for git integration
         self.github_client_id = os.getenv("GITHUB_CLIENT_ID", "")
         self.github_client_secret = os.getenv("GITHUB_CLIENT_SECRET", "")
@@ -120,9 +128,27 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     entitlements_adapter = DatabaseEntitlementsAdapter(pool=app_db.pool)
     app.state.entitlements_adapter = entitlements_adapter
 
+    # Create memory store for agent memory persistence (optional)
+    memory_store: AgentMemoryProtocol | None = None
+    if settings.memory_enabled and settings.openai_api_key:
+        try:
+            memory_store = PgVectorMemoryStore(
+                pool=app_db.pool,
+                embedding_model=settings.memory_embedding_model,
+            )
+            logger.info(f"Memory store initialized: model={settings.memory_embedding_model}")
+        except Exception as e:
+            logger.warning(f"Failed to initialize memory store: {e}. Continuing without memory.")
+            memory_store = None
+    elif settings.memory_enabled and not settings.openai_api_key:
+        logger.warning(
+            "Memory enabled but OPENAI_API_KEY not set. " "Agent memory features will be disabled."
+        )
+
     llm = AgentClient(
         api_key=settings.anthropic_api_key,
         model=settings.llm_model,
+        memory_store=memory_store,
     )
 
     # Create context engine

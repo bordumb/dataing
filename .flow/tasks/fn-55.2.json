@@ -1,0 +1,25 @@
+{
+  "assignee": "bordumbb@gmail.com",
+  "claim_note": "",
+  "claimed_at": "2026-02-02T00:45:02.801301Z",
+  "created_at": "2026-02-02T00:27:44.704889Z",
+  "depends_on": [],
+  "epic": "fn-55",
+  "evidence": {
+    "changes": [
+      "Added import for memory_toolset and AgentMemoryProtocol from bond.tools.memory",
+      "Added memory_store parameter to __init__",
+      "Store memory_store as self._memory_store",
+      "Configure toolsets=[memory_toolset] and deps=memory_store when store provided",
+      "Updated BondAgent type annotations to AgentMemoryProtocol | None"
+    ],
+    "file_modified": "python-packages/dataing/src/dataing/agents/client.py",
+    "tests": "101 passed in python-packages/dataing/tests/unit/agents/"
+  },
+  "id": "fn-55.2",
+  "priority": null,
+  "spec_path": ".flow/tasks/fn-55.2.md",
+  "status": "done",
+  "title": "Update AgentClient to accept memory store",
+  "updated_at": "2026-02-02T00:50:07.255937Z"
+}

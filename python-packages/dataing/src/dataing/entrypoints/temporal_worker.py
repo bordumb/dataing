@@ -22,6 +22,7 @@ import os
 from typing import Any
 from uuid import UUID
 
+from bond.tools.memory import AgentMemoryProtocol, PgVectorMemoryStore
 from cryptography.fernet import Fernet
 from temporalio.client import Client
 from temporalio.worker import Worker
@@ -73,10 +74,28 @@ async def create_dependencies() -> dict[str, Any]:
     await app_db.connect()
     logger.info("Database connected")
 
+    # Create memory store for agent memory persistence (optional)
+    memory_store: AgentMemoryProtocol | None = None
+    if settings.memory_enabled and settings.openai_api_key:
+        try:
+            memory_store = PgVectorMemoryStore(
+                pool=app_db.pool,
+                embedding_model=settings.memory_embedding_model,
+            )
+            logger.info(f"Memory store initialized: model={settings.memory_embedding_model}")
+        except Exception as e:
+            logger.warning(f"Failed to initialize memory store: {e}. Continuing without memory.")
+            memory_store = None
+    elif settings.memory_enabled and not settings.openai_api_key:
+        logger.warning(
+            "Memory enabled but OPENAI_API_KEY not set. " "Agent memory features will be disabled."
+        )
+
     # LLM client with adapter
     agent_client = AgentClient(
         api_key=settings.anthropic_api_key,
         model=settings.llm_model,
+        memory_store=memory_store,
     )
     agent_adapter = TemporalAgentAdapter(agent_client)
     logger.info(f"Agent client initialized with model: {settings.llm_model}")

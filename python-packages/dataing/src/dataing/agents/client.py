@@ -6,8 +6,10 @@ Uses BondAgent for type-safe, validated LLM responses with optional streaming.
 from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
+from uuid import UUID
 
 from bond import BondAgent, StreamHandlers
+from bond.tools.memory import AgentMemoryProtocol, memory_toolset
 from pydantic_ai.models.anthropic import AnthropicModel
 from pydantic_ai.output import PromptedOutput
 from pydantic_ai.providers.anthropic import AnthropicProvider
@@ -52,6 +54,7 @@ class AgentClient:
         api_key: str,
         model: str = "claude-sonnet-4-20250514",
         max_retries: int = 3,
+        memory_store: AgentMemoryProtocol | None = None,
     ) -> None:
         """Initialize the agent client.
 
@@ -59,46 +62,68 @@ class AgentClient:
             api_key: Anthropic API key.
             model: Model to use.
             max_retries: Max retries on validation failure.
+            memory_store: Optional memory store for agent memory persistence.
         """
         provider = AnthropicProvider(api_key=api_key)
         self._model = AnthropicModel(model, provider=provider)
+        self._memory_store = memory_store
+
+        # Configure toolsets and deps based on memory store availability
+        toolsets = [memory_toolset] if memory_store else []
+        deps = memory_store
 
         # Empty base instructions: all prompting via dynamic_instructions at runtime.
         # This ensures PromptedOutput gets the full detailed prompt without conflicts.
-        self._hypothesis_agent: BondAgent[HypothesesResponse, None] = BondAgent(
-            name="hypothesis-generator",
-            instructions="",
-            model=self._model,
-            output_type=PromptedOutput(HypothesesResponse),
-            max_retries=max_retries,
+        self._hypothesis_agent: BondAgent[HypothesesResponse, AgentMemoryProtocol | None] = (
+            BondAgent(
+                name="hypothesis-generator",
+                instructions="",
+                model=self._model,
+                output_type=PromptedOutput(HypothesesResponse),
+                max_retries=max_retries,
+                toolsets=toolsets,
+                deps=deps,
+            )
         )
-        self._interpretation_agent: BondAgent[InterpretationResponse, None] = BondAgent(
+        self._interpretation_agent: BondAgent[
+            InterpretationResponse, AgentMemoryProtocol | None
+        ] = BondAgent(
             name="evidence-interpreter",
             instructions="",
             model=self._model,
             output_type=PromptedOutput(InterpretationResponse),
             max_retries=max_retries,
+            toolsets=toolsets,
+            deps=deps,
         )
-        self._synthesis_agent: BondAgent[SynthesisResponse, None] = BondAgent(
+        self._synthesis_agent: BondAgent[SynthesisResponse, AgentMemoryProtocol | None] = BondAgent(
             name="finding-synthesizer",
             instructions="",
             model=self._model,
             output_type=PromptedOutput(SynthesisResponse),
             max_retries=max_retries,
+            toolsets=toolsets,
+            deps=deps,
         )
-        self._query_agent: BondAgent[QueryResponse, None] = BondAgent(
+        self._query_agent: BondAgent[QueryResponse, AgentMemoryProtocol | None] = BondAgent(
             name="sql-generator",
             instructions="",
             model=self._model,
             output_type=PromptedOutput(QueryResponse),
             max_retries=max_retries,
+            toolsets=toolsets,
+            deps=deps,
         )
-        self._counter_analysis_agent: BondAgent[CounterAnalysisResponse, None] = BondAgent(
+        self._counter_analysis_agent: BondAgent[
+            CounterAnalysisResponse, AgentMemoryProtocol | None
+        ] = BondAgent(
             name="counter-analyst",
             instructions="",
             model=self._model,
             output_type=PromptedOutput(CounterAnalysisResponse),
             max_retries=max_retries,
+            toolsets=toolsets,
+            deps=deps,
         )
 
     async def generate_hypotheses(
@@ -108,6 +133,7 @@ class AgentClient:
         num_hypotheses: int = 5,
         handlers: StreamHandlers | None = None,
         code_changes: list[RelevantCodeChange] | None = None,
+        tenant_id: UUID | None = None,
     ) -> list[Hypothesis]:
         """Generate hypotheses for an anomaly.
 
@@ -117,6 +143,7 @@ class AgentClient:
             num_hypotheses: Target number of hypotheses.
             handlers: Optional streaming handlers for real-time updates.
             code_changes: Optional list of recent code changes affecting the asset.
+            tenant_id: Optional tenant ID for memory scoping.
 
         Returns:
             List of validated Hypothesis objects.
@@ -283,6 +310,7 @@ class AgentClient:
         evidence: list[Evidence],
         handlers: StreamHandlers | None = None,
         code_changes: list[RelevantCodeChange] | None = None,
+        tenant_id: UUID | None = None,
     ) -> SynthesisResponse:
         """Synthesize all evidence into a root cause finding (raw response).
 
@@ -291,6 +319,7 @@ class AgentClient:
             evidence: All collected evidence.
             handlers: Optional streaming handlers for real-time updates.
             code_changes: Optional list of code changes related to the investigation.
+            tenant_id: Optional tenant ID for memory scoping.
 
         Returns:
             Raw SynthesisResponse with all fields from LLM.

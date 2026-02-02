@@ -357,6 +357,7 @@ class InvestigationWorkflow:
                 lineage_info=context.get("lineage"),
                 matched_patterns=matched_patterns,
                 max_hypotheses=input.max_hypotheses,
+                tenant_id=self._tenant_id,
             )
             hypotheses_result = await workflow.execute_activity(
                 "generate_hypotheses",
@@ -428,6 +429,7 @@ class InvestigationWorkflow:
                 hypotheses=hypotheses,
                 alert_summary=alert_summary,
                 confidence_threshold=input.confidence_threshold,
+                tenant_id=self._tenant_id,
             )
             synthesize_result = await workflow.execute_activity(
                 "synthesize",

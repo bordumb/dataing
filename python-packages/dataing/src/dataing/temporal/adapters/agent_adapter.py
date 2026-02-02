@@ -16,6 +16,7 @@ from __future__ import annotations
 
 from datetime import datetime
 from typing import Any
+from uuid import UUID
 
 from dataing.adapters.datasource.types import (
     Catalog,
@@ -68,6 +69,7 @@ class TemporalAgentAdapter:
         num_hypotheses: int = 5,
         pattern_hints: list[str] | None = None,
         code_changes: list[dict[str, Any]] | None = None,
+        tenant_id: str | None = None,
     ) -> list[dict[str, Any]]:
         """Generate hypotheses from dict inputs.
 
@@ -79,6 +81,7 @@ class TemporalAgentAdapter:
             num_hypotheses: Target number of hypotheses.
             pattern_hints: Optional hints from pattern matching.
             code_changes: Optional list of recent code changes affecting the asset.
+            tenant_id: Optional tenant ID for memory scoping.
 
         Returns:
             List of hypothesis dicts.
@@ -87,10 +90,15 @@ class TemporalAgentAdapter:
         schema_obj = self._to_schema(schema_info)
         lineage_obj = self._to_lineage(lineage_info)
         code_changes_obj = self._to_code_changes(code_changes)
+        tenant_uuid = UUID(tenant_id) if tenant_id else None
 
         context = InvestigationContext(schema=schema_obj, lineage=lineage_obj)
         hypotheses = await self._client.generate_hypotheses(
-            alert_obj, context, num_hypotheses, code_changes=code_changes_obj
+            alert_obj,
+            context,
+            num_hypotheses,
+            code_changes=code_changes_obj,
+            tenant_id=tenant_uuid,
         )
 
         # Use mode="json" to ensure dates, UUIDs, etc. are JSON-serializable
@@ -103,6 +111,7 @@ class TemporalAgentAdapter:
         hypotheses: list[dict[str, Any]],
         alert_summary: str,
         code_changes: list[dict[str, Any]] | None = None,
+        tenant_id: str | None = None,
     ) -> dict[str, Any]:
         """Synthesize findings from dict inputs.
 
@@ -111,6 +120,7 @@ class TemporalAgentAdapter:
             hypotheses: List of hypothesis dicts (unused but kept for API compat).
             alert_summary: Summary of the alert.
             code_changes: Optional list of code changes related to the investigation.
+            tenant_id: Optional tenant ID for memory scoping.
 
         Returns:
             Synthesis result as dict.
@@ -118,9 +128,13 @@ class TemporalAgentAdapter:
         evidence_objs = [self._to_evidence(e) for e in evidence]
         alert_obj = self._to_alert(None, alert_summary)
         code_changes_obj = self._to_code_changes(code_changes)
+        tenant_uuid = UUID(tenant_id) if tenant_id else None
 
         result = await self._client.synthesize_findings_raw(
-            alert_obj, evidence_objs, code_changes=code_changes_obj
+            alert_obj,
+            evidence_objs,
+            code_changes=code_changes_obj,
+            tenant_id=tenant_uuid,
         )
 
         return {

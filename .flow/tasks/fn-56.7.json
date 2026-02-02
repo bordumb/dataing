@@ -5,10 +5,24 @@
   "created_at": "2026-02-02T22:43:38.619900Z",
   "depends_on": [],
   "epic": "fn-56",
+  "evidence": {
+    "commits": [
+      "82fd221a"
+    ],
+    "files_created": [
+      "python-packages/dataing/src/dataing/agents/tools/__init__.py",
+      "python-packages/dataing/src/dataing/agents/tools/registry.py",
+      "python-packages/dataing/tests/unit/agents/tools/__init__.py",
+      "python-packages/dataing/tests/unit/agents/tools/test_registry.py"
+    ],
+    "tests": [
+      "python-packages/dataing/tests/unit/agents/tools/test_registry.py"
+    ]
+  },
   "id": "fn-56.7",
   "priority": null,
   "spec_path": ".flow/tasks/fn-56.7.md",
-  "status": "in_progress",
+  "status": "done",
   "title": "Create unified tool registry",
-  "updated_at": "2026-02-02T22:47:40.803638Z"
+  "updated_at": "2026-02-02T22:51:20.897653Z"
 }

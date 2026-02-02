@@ -1,14 +1,25 @@
 {
-  "assignee": null,
+  "assignee": "bordumbb@gmail.com",
   "claim_note": "",
-  "claimed_at": null,
+  "claimed_at": "2026-02-02T23:49:52.928183Z",
   "created_at": "2026-02-02T22:01:48.935587Z",
   "depends_on": [],
   "epic": "fn-56",
+  "evidence": {
+    "eslint": "pass",
+    "files_created": [
+      "features/assistant/index.ts",
+      "features/assistant/AssistantWidget.tsx",
+      "features/assistant/AssistantPanel.tsx",
+      "features/assistant/AssistantMessage.tsx",
+      "features/assistant/useAssistant.ts"
+    ],
+    "typescript": "pass"
+  },
   "id": "fn-56.5",
   "priority": null,
   "spec_path": ".flow/tasks/fn-56.5.md",
-  "status": "todo",
+  "status": "done",
   "title": "Create frontend chat widget components",
-  "updated_at": "2026-02-02T22:02:57.722627Z"
+  "updated_at": "2026-02-02T23:54:15.514766Z"
 }

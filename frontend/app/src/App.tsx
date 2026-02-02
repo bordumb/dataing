@@ -35,6 +35,7 @@ import { UsagePage } from "@/features/usage/usage-page";
 import { NotificationsPage } from "@/features/notifications";
 import { AdminPage } from "@/features/admin";
 import { IssueList, IssueCreate, IssueWorkspace } from "@/features/issues";
+import { AssistantWidget } from "@/features/assistant";
 import { JwtLoginPage } from "@/features/auth/jwt-login-page";
 import { SSOLoginPage } from "@/features/auth/sso-login-page";
 import { SSOCallbackPage } from "@/features/auth/sso-callback-page";
@@ -252,6 +253,8 @@ function AppWithEntitlements() {
           }
         />
       </Routes>
+      {/* Assistant chat widget - bottom-right above DemoToggle */}
+      <AssistantWidget />
       {/* CRITICAL: DO NOT REMOVE - Demo toggles for testing */}
       {/* Bottom-right: Plan tiers (free/pro/enterprise) */}
       <DemoToggle plan={plan} onPlanChange={setPlan} />

@@ -14,6 +14,6 @@
   "priority": null,
   "spec_path": ".flow/tasks/fn-56.1.md",
   "status": "todo",
-  "title": "Create SelfDebugAgent client",
+  "title": "Create DataingAssistant agent (agents/assistant.py)",
   "updated_at": "2026-02-02T22:43:54.401573Z"
 }

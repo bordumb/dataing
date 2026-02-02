@@ -8,10 +8,23 @@
     "fn-56.8"
   ],
   "epic": "fn-56",
+  "evidence": {
+    "commits": [
+      "7775de88"
+    ],
+    "files_created": [
+      "python-packages/dataing/src/dataing/agents/tools/local_files.py",
+      "python-packages/dataing/tests/unit/agents/tools/test_local_files.py"
+    ],
+    "test_count": 27,
+    "tests": [
+      "tests/unit/agents/tools/test_local_files.py"
+    ]
+  },
   "id": "fn-56.2",
   "priority": null,
   "spec_path": ".flow/tasks/fn-56.2.md",
-  "status": "in_progress",
+  "status": "done",
   "title": "Create local file reader tool with safety",
-  "updated_at": "2026-02-02T22:58:49.043128Z"
+  "updated_at": "2026-02-02T23:02:12.393355Z"
 }

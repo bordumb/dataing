@@ -1,0 +1,17 @@
+{
+  "assignee": null,
+  "claim_note": "",
+  "claimed_at": null,
+  "created_at": "2026-02-02T22:01:48.692788Z",
+  "depends_on": [
+    "fn-56.7",
+    "fn-56.8"
+  ],
+  "epic": "fn-56",
+  "id": "fn-56.2",
+  "priority": null,
+  "spec_path": ".flow/tasks/fn-56.2.md",
+  "status": "todo",
+  "title": "Create local file reader tool with safety",
+  "updated_at": "2026-02-02T22:43:53.886863Z"
+}

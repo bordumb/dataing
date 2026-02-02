@@ -1,0 +1,62 @@
+# Git
+.git
+.gitignore
+
+# Python virtual environments (including nested)
+**/.venv
+**/venv
+**/*.egg-info
+**/dist
+**/build
+
+# Python cache (including nested)
+**/__pycache__
+**/*.pyc
+**/*.pyo
+**/.pytest_cache
+**/.mypy_cache
+**/.ruff_cache
+**/.coverage
+**/htmlcov
+
+# Node (including nested)
+**/node_modules
+**/.npm
+**/.pnpm-store
+
+# IDE
+.idea
+.vscode
+*.swp
+*.swo
+
+# Local config
+.env
+.env.*
+!.env.example
+
+# Flow tracking
+.flow
+
+# Demo fixtures (large)
+demo/fixtures
+
+# Documentation build
+site
+docs/_build
+
+# Test artifacts
+.hypothesis
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs
+
+# Temporary
+tmp
+temp
+*.tmp

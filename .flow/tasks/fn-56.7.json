@@ -1,0 +1,14 @@
+{
+  "assignee": "bordumbb@gmail.com",
+  "claim_note": "",
+  "claimed_at": "2026-02-02T22:47:40.803413Z",
+  "created_at": "2026-02-02T22:43:38.619900Z",
+  "depends_on": [],
+  "epic": "fn-56",
+  "id": "fn-56.7",
+  "priority": null,
+  "spec_path": ".flow/tasks/fn-56.7.md",
+  "status": "in_progress",
+  "title": "Create unified tool registry",
+  "updated_at": "2026-02-02T22:47:40.803638Z"
+}

@@ -1,7 +1,7 @@
 {
   "name": "late_arriving",
   "description": "Mobile app queues events offline, batch uploaded later",
-  "created_at": "2026-02-01T22:23:35.087147Z",
+  "created_at": "2026-02-02T02:26:06.908134Z",
   "simulation_period": {
     "start": "2026-01-08",
     "end": "2026-01-14"

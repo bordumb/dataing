@@ -1,7 +1,7 @@
 {
   "name": "schema_drift",
   "description": "New product import job inserts price as string with currency",
-  "created_at": "2026-02-01T22:23:32.857208Z",
+  "created_at": "2026-02-02T02:25:59.992159Z",
   "simulation_period": {
     "start": "2026-01-08",
     "end": "2026-01-14"

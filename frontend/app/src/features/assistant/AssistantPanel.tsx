@@ -120,7 +120,11 @@ export function AssistantPanel() {
 
         {/* Messages */}
         {messages.map((message) => (
-          <AssistantMessage key={message.id} message={message} />
+          <AssistantMessage
+            key={message.id}
+            message={message}
+            sessionInvestigationId={session?.investigationId}
+          />
         ))}
 
         {/* Scroll anchor */}

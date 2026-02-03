@@ -42,6 +42,7 @@ class EventType(Enum):
     FEEDBACK_INVESTIGATION = "feedback.investigation"
     FEEDBACK_RECOMMENDATION = "feedback.recommendation"
     FEEDBACK_FIX = "feedback.fix"
+    FEEDBACK_ASSISTANT_MESSAGE = "feedback.assistant_message"
 
     # Fix events
     FIX_PROPOSED = "fix.proposed"

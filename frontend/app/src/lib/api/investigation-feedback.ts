@@ -8,12 +8,13 @@ export type TargetType =
   | "evidence"
   | "synthesis"
   | "investigation"
-  | "recommendation";
+  | "recommendation"
+  | "assistant_message";
 
 export interface FeedbackCreate {
   target_type: TargetType;
   target_id: string;
-  investigation_id: string;
+  investigation_id?: string; // Optional for assistant messages
   rating: 1 | -1;
   reason?: string;
   comment?: string;
@@ -72,5 +73,15 @@ export function useSubmitInvestigationFeedback(investigationId: string) {
           queryKeys.investigationFeedback.investigation(investigationId),
       });
     },
+  });
+}
+
+/**
+ * Generic feedback submission hook (not tied to a specific investigation).
+ * Used for assistant message feedback.
+ */
+export function useSubmitFeedback() {
+  return useMutation({
+    mutationFn: submitInvestigationFeedback,
   });
 }

@@ -17,4 +17,5 @@ export const FeedbackCreateTargetType = {
   synthesis: "synthesis",
   investigation: "investigation",
   recommendation: "recommendation",
+  assistant_message: "assistant_message",
 } as const;

@@ -4,18 +4,44 @@
  * Renders user and assistant messages with markdown support.
  */
 
-import { User, Bot, Wrench, Loader2 } from "lucide-react";
+import { useState } from "react";
+import { User, Bot, Wrench, Loader2, ThumbsUp, Check } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/Button";
+import { useSubmitFeedback } from "@/lib/api/investigation-feedback";
 import type { AssistantMessage as AssistantMessageType } from "./useAssistant";
 
 interface AssistantMessageProps {
   message: AssistantMessageType;
+  sessionInvestigationId?: string;
 }
 
-export function AssistantMessage({ message }: AssistantMessageProps) {
+export function AssistantMessage({
+  message,
+  sessionInvestigationId,
+}: AssistantMessageProps) {
   const isUser = message.role === "user";
   const isAssistant = message.role === "assistant";
   const isTool = message.role === "tool";
+
+  const [isMarkedHelpful, setIsMarkedHelpful] = useState(false);
+  const submitFeedback = useSubmitFeedback();
+
+  const handleMarkHelpful = () => {
+    submitFeedback.mutate(
+      {
+        target_type: "assistant_message",
+        target_id: message.id,
+        investigation_id: sessionInvestigationId,
+        rating: 1,
+      },
+      {
+        onSuccess: () => {
+          setIsMarkedHelpful(true);
+        },
+      },
+    );
+  };
 
   return (
     <div
@@ -71,6 +97,33 @@ export function AssistantMessage({ message }: AssistantMessageProps) {
                 <span className="font-mono">{tool.name}</span>
               </div>
             ))}
+          </div>
+        )}
+
+        {/* Mark as helpful button (assistant messages only, when not streaming) */}
+        {isAssistant && !message.isStreaming && message.content && (
+          <div className="mt-2 pt-2 border-t border-border/50">
+            {isMarkedHelpful ? (
+              <span className="inline-flex items-center gap-1 text-xs text-green-600 dark:text-green-400">
+                <Check className="h-3 w-3" />
+                Marked as helpful
+              </span>
+            ) : (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-7 px-2 text-xs text-muted-foreground hover:text-foreground"
+                onClick={handleMarkHelpful}
+                disabled={submitFeedback.isPending}
+              >
+                {submitFeedback.isPending ? (
+                  <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                ) : (
+                  <ThumbsUp className="h-3 w-3 mr-1" />
+                )}
+                This was helpful
+              </Button>
+            )}
           </div>
         )}
       </div>

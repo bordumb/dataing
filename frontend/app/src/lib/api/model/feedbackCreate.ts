@@ -6,6 +6,7 @@
  * OpenAPI spec version: 2.0.0
  */
 import type { FeedbackCreateComment } from "./feedbackCreateComment";
+import type { FeedbackCreateInvestigationId } from "./feedbackCreateInvestigationId";
 import type { FeedbackCreateRating } from "./feedbackCreateRating";
 import type { FeedbackCreateReason } from "./feedbackCreateReason";
 import type { FeedbackCreateTargetType } from "./feedbackCreateTargetType";
@@ -15,7 +16,7 @@ import type { FeedbackCreateTargetType } from "./feedbackCreateTargetType";
  */
 export interface FeedbackCreate {
   comment?: FeedbackCreateComment;
-  investigation_id: string;
+  investigation_id?: FeedbackCreateInvestigationId;
   rating: FeedbackCreateRating;
   reason?: FeedbackCreateReason;
   target_id: string;

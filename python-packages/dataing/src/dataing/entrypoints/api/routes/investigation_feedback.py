@@ -29,10 +29,16 @@ class FeedbackCreate(BaseModel):
     """Request body for submitting feedback."""
 
     target_type: Literal[
-        "hypothesis", "query", "evidence", "synthesis", "investigation", "recommendation"
+        "hypothesis",
+        "query",
+        "evidence",
+        "synthesis",
+        "investigation",
+        "recommendation",
+        "assistant_message",
     ]
     target_id: str  # Can be UUID or composite ID like "{investigation_id}-rec-{index}"
-    investigation_id: UUID
+    investigation_id: UUID | None = None  # Optional for assistant messages
     rating: Literal[1, -1]
     reason: str | None = None
     comment: str | None = None
@@ -53,6 +59,7 @@ TARGET_TYPE_TO_EVENT = {
     "synthesis": EventType.FEEDBACK_SYNTHESIS,
     "investigation": EventType.FEEDBACK_INVESTIGATION,
     "recommendation": EventType.FEEDBACK_RECOMMENDATION,
+    "assistant_message": EventType.FEEDBACK_ASSISTANT_MESSAGE,
 }
 
 

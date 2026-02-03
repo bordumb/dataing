@@ -39,6 +39,10 @@ const REASON_OPTIONS: Record<
     positive: ["Will implement", "Good advice"],
     negative: ["Not applicable", "Already done"],
   },
+  assistant_message: {
+    positive: ["Helpful answer", "Good suggestion"],
+    negative: ["Not relevant", "Incorrect"],
+  },
 };
 
 interface InvestigationFeedbackButtonsProps {

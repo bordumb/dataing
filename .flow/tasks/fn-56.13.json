@@ -7,10 +7,16 @@
     "fn-56.12"
   ],
   "epic": "fn-56",
+  "evidence": {
+    "commit": "0c918f6f",
+    "feedback_event_type_added": true,
+    "helpful_button_added": true,
+    "tests_passing": 24
+  },
   "id": "fn-56.13",
   "priority": null,
   "spec_path": ".flow/tasks/fn-56.13.md",
-  "status": "todo",
+  "status": "done",
   "title": "Add agent memory integration ('This was helpful')",
-  "updated_at": "2026-02-02T22:43:54.647185Z"
+  "updated_at": "2026-02-03T00:14:53.795942Z"
 }

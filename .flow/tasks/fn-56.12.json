@@ -7,10 +7,17 @@
     "fn-56.6"
   ],
   "epic": "fn-56",
+  "evidence": {
+    "commit": "6295da89",
+    "frontend_updated": true,
+    "new_endpoint_added": true,
+    "parent_context_loading": true,
+    "tests_passing": 24
+  },
   "id": "fn-56.12",
   "priority": null,
   "spec_path": ".flow/tasks/fn-56.12.md",
-  "status": "in_progress",
+  "status": "done",
   "title": "Add investigation parent/child linking",
-  "updated_at": "2026-02-03T00:05:42.793991Z"
+  "updated_at": "2026-02-03T00:10:36.386823Z"
 }

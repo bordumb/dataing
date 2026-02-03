@@ -5,14 +5,11 @@
  * Autonomous Data Quality Investigation
  * OpenAPI spec version: 2.0.0
  */
+import type { CodifyFormat } from "./codifyFormat";
 
 /**
- * Request to send a message.
+ * Request body for codifying an investigation.
  */
-export interface SendMessageRequest {
-  /**
-   * @minLength 1
-   * @maxLength 32000
-   */
-  content: string;
+export interface CodifyRequest {
+  format?: CodifyFormat;
 }

@@ -6,13 +6,9 @@
  * OpenAPI spec version: 2.0.0
  */
 
-/**
- * Request to send a message.
- */
-export interface SendMessageRequest {
+export type GetTestTrackingStatsApiV1InvestigationsTestsStatsGetParams = {
   /**
-   * @minLength 1
-   * @maxLength 32000
+   * Days to look back
    */
-  content: string;
-}
+  days?: number;
+};

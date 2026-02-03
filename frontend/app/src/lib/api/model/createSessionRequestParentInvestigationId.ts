@@ -7,12 +7,6 @@
  */
 
 /**
- * Request to send a message.
+ * Optional parent investigation to link to
  */
-export interface SendMessageRequest {
-  /**
-   * @minLength 1
-   * @maxLength 32000
-   */
-  content: string;
-}
+export type CreateSessionRequestParentInvestigationId = string | null;

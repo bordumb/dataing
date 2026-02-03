@@ -7,12 +7,10 @@
  */
 
 /**
- * Request to send a message.
+ * Response from creating a session.
  */
-export interface SendMessageRequest {
-  /**
-   * @minLength 1
-   * @maxLength 32000
-   */
-  content: string;
+export interface CreateSessionResponse {
+  created_at: string;
+  investigation_id: string;
+  session_id: string;
 }

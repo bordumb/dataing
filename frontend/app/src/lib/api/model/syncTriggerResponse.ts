@@ -7,12 +7,9 @@
  */
 
 /**
- * Request to send a message.
+ * Response for sync trigger.
  */
-export interface SendMessageRequest {
-  /**
-   * @minLength 1
-   * @maxLength 32000
-   */
-  content: string;
+export interface SyncTriggerResponse {
+  message: string;
+  sync_status: string;
 }

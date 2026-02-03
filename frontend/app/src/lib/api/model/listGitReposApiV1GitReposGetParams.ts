@@ -6,13 +6,8 @@
  * OpenAPI spec version: 2.0.0
  */
 
-/**
- * Request to send a message.
- */
-export interface SendMessageRequest {
-  /**
-   * @minLength 1
-   * @maxLength 32000
-   */
-  content: string;
-}
+export type ListGitReposApiV1GitReposGetParams = {
+  provider?: string | null;
+  limit?: number;
+  offset?: number;
+};

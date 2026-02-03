@@ -6,13 +6,9 @@
  * OpenAPI spec version: 2.0.0
  */
 
-/**
- * Request to send a message.
- */
-export interface SendMessageRequest {
+export type GetRecentCatchesApiV1InvestigationsTestsCatchesGetParams = {
   /**
-   * @minLength 1
-   * @maxLength 32000
+   * Maximum results
    */
-  content: string;
-}
+  limit?: number;
+};

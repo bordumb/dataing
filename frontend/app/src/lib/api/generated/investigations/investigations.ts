@@ -16,18 +16,32 @@ import type {
   UseQueryResult,
 } from "@tanstack/react-query";
 import type {
+  AdoptTestApiV1InvestigationsTestsAdoptPost200,
+  BodyImportSnapshotArchiveApiV1InvestigationsImportPost,
   CancelInvestigationResponse,
   ChainVerificationResponse,
+  CodifyRequest,
+  CodifyResponse,
+  DataingEntrypointsApiRoutesInvestigationsSendMessageRequest,
+  DataingEntrypointsApiRoutesInvestigationsSendMessageResponse,
+  GetRecentCatchesApiV1InvestigationsTestsCatchesGetParams,
+  GetTestTrackingStatsApiV1InvestigationsTestsStatsGetParams,
   HTTPValidationError,
+  ImportSnapshotResponse,
   InvestigationListItem,
   InvestigationStateResponse,
-  SendMessageRequest,
-  SendMessageResponse,
+  RecentCatchResponse,
+  RecordTestRunApiV1InvestigationsTestsRunPost200,
   SendUserInputApiV1InvestigationsInvestigationIdInputPost200,
+  SnapshotCheckpointParam,
+  SnapshotListResponse,
   StartInvestigationRequest,
   StartInvestigationResponse,
   StreamEventsApiV1InvestigationsInvestigationIdEventsGetParams,
   TemporalStatusResponse,
+  TestAdoptionRequest,
+  TestRunResultRequest,
+  TestTrackingStatsResponse,
   UserInputRequest,
 } from "../../model";
 import { customInstance } from "../../client";
@@ -602,6 +616,554 @@ export const useVerifyInvestigationApiV1InvestigationsInvestigationIdVerifyGet =
   };
 
 /**
+ * Generate regression tests from an investigation's synthesis.
+
+Extracts testable assertions from the investigation synthesis and renders
+them to the specified format (Great Expectations, dbt, Soda, or SQL).
+
+Args:
+    investigation_id: UUID of the investigation.
+    request: Codify request with output format.
+    auth: Authentication context from API key/JWT.
+    db: Application database for test tracking.
+    temporal_client: Temporal client for durable execution.
+
+Returns:
+    CodifyResponse with rendered test content.
+
+Raises:
+    HTTPException: If investigation not found or no synthesis available.
+ * @summary Codify Investigation
+ */
+export const codifyInvestigationApiV1InvestigationsInvestigationIdCodifyPost = (
+  investigationId: string,
+  codifyRequest: CodifyRequest,
+) => {
+  return customInstance<CodifyResponse>({
+    url: `/api/v1/investigations/${investigationId}/codify`,
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    data: codifyRequest,
+  });
+};
+
+export const getCodifyInvestigationApiV1InvestigationsInvestigationIdCodifyPostMutationOptions =
+  <TError = HTTPValidationError, TContext = unknown>(options?: {
+    mutation?: UseMutationOptions<
+      Awaited<
+        ReturnType<
+          typeof codifyInvestigationApiV1InvestigationsInvestigationIdCodifyPost
+        >
+      >,
+      TError,
+      { investigationId: string; data: CodifyRequest },
+      TContext
+    >;
+  }): UseMutationOptions<
+    Awaited<
+      ReturnType<
+        typeof codifyInvestigationApiV1InvestigationsInvestigationIdCodifyPost
+      >
+    >,
+    TError,
+    { investigationId: string; data: CodifyRequest },
+    TContext
+  > => {
+    const { mutation: mutationOptions } = options ?? {};
+
+    const mutationFn: MutationFunction<
+      Awaited<
+        ReturnType<
+          typeof codifyInvestigationApiV1InvestigationsInvestigationIdCodifyPost
+        >
+      >,
+      { investigationId: string; data: CodifyRequest }
+    > = (props) => {
+      const { investigationId, data } = props ?? {};
+
+      return codifyInvestigationApiV1InvestigationsInvestigationIdCodifyPost(
+        investigationId,
+        data,
+      );
+    };
+
+    return { mutationFn, ...mutationOptions };
+  };
+
+export type CodifyInvestigationApiV1InvestigationsInvestigationIdCodifyPostMutationResult =
+  NonNullable<
+    Awaited<
+      ReturnType<
+        typeof codifyInvestigationApiV1InvestigationsInvestigationIdCodifyPost
+      >
+    >
+  >;
+export type CodifyInvestigationApiV1InvestigationsInvestigationIdCodifyPostMutationBody =
+  CodifyRequest;
+export type CodifyInvestigationApiV1InvestigationsInvestigationIdCodifyPostMutationError =
+  HTTPValidationError;
+
+/**
+ * @summary Codify Investigation
+ */
+export const useCodifyInvestigationApiV1InvestigationsInvestigationIdCodifyPost =
+  <TError = HTTPValidationError, TContext = unknown>(options?: {
+    mutation?: UseMutationOptions<
+      Awaited<
+        ReturnType<
+          typeof codifyInvestigationApiV1InvestigationsInvestigationIdCodifyPost
+        >
+      >,
+      TError,
+      { investigationId: string; data: CodifyRequest },
+      TContext
+    >;
+  }): UseMutationResult<
+    Awaited<
+      ReturnType<
+        typeof codifyInvestigationApiV1InvestigationsInvestigationIdCodifyPost
+      >
+    >,
+    TError,
+    { investigationId: string; data: CodifyRequest },
+    TContext
+  > => {
+    const mutationOptions =
+      getCodifyInvestigationApiV1InvestigationsInvestigationIdCodifyPostMutationOptions(
+        options,
+      );
+
+    return useMutation(mutationOptions);
+  };
+/**
+ * Get test tracking statistics.
+
+Returns metrics on tests generated, adopted, and issues caught.
+
+Args:
+    auth: Authentication context from API key/JWT.
+    db: Application database.
+    days: Number of days to look back.
+
+Returns:
+    TestTrackingStatsResponse with statistics.
+ * @summary Get Test Tracking Stats
+ */
+export const getTestTrackingStatsApiV1InvestigationsTestsStatsGet = (
+  params?: GetTestTrackingStatsApiV1InvestigationsTestsStatsGetParams,
+  signal?: AbortSignal,
+) => {
+  return customInstance<TestTrackingStatsResponse>({
+    url: `/api/v1/investigations/tests/stats`,
+    method: "GET",
+    params,
+    signal,
+  });
+};
+
+export const getGetTestTrackingStatsApiV1InvestigationsTestsStatsGetQueryKey = (
+  params?: GetTestTrackingStatsApiV1InvestigationsTestsStatsGetParams,
+) => {
+  return [
+    `/api/v1/investigations/tests/stats`,
+    ...(params ? [params] : []),
+  ] as const;
+};
+
+export const getGetTestTrackingStatsApiV1InvestigationsTestsStatsGetQueryOptions =
+  <
+    TData = Awaited<
+      ReturnType<typeof getTestTrackingStatsApiV1InvestigationsTestsStatsGet>
+    >,
+    TError = HTTPValidationError,
+  >(
+    params?: GetTestTrackingStatsApiV1InvestigationsTestsStatsGetParams,
+    options?: {
+      query?: Partial<
+        UseQueryOptions<
+          Awaited<
+            ReturnType<
+              typeof getTestTrackingStatsApiV1InvestigationsTestsStatsGet
+            >
+          >,
+          TError,
+          TData
+        >
+      >;
+    },
+  ) => {
+    const { query: queryOptions } = options ?? {};
+
+    const queryKey =
+      queryOptions?.queryKey ??
+      getGetTestTrackingStatsApiV1InvestigationsTestsStatsGetQueryKey(params);
+
+    const queryFn: QueryFunction<
+      Awaited<
+        ReturnType<typeof getTestTrackingStatsApiV1InvestigationsTestsStatsGet>
+      >
+    > = ({ signal }) =>
+      getTestTrackingStatsApiV1InvestigationsTestsStatsGet(params, signal);
+
+    return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+      Awaited<
+        ReturnType<typeof getTestTrackingStatsApiV1InvestigationsTestsStatsGet>
+      >,
+      TError,
+      TData
+    > & { queryKey: QueryKey };
+  };
+
+export type GetTestTrackingStatsApiV1InvestigationsTestsStatsGetQueryResult =
+  NonNullable<
+    Awaited<
+      ReturnType<typeof getTestTrackingStatsApiV1InvestigationsTestsStatsGet>
+    >
+  >;
+export type GetTestTrackingStatsApiV1InvestigationsTestsStatsGetQueryError =
+  HTTPValidationError;
+
+/**
+ * @summary Get Test Tracking Stats
+ */
+export const useGetTestTrackingStatsApiV1InvestigationsTestsStatsGet = <
+  TData = Awaited<
+    ReturnType<typeof getTestTrackingStatsApiV1InvestigationsTestsStatsGet>
+  >,
+  TError = HTTPValidationError,
+>(
+  params?: GetTestTrackingStatsApiV1InvestigationsTestsStatsGetParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<
+          ReturnType<
+            typeof getTestTrackingStatsApiV1InvestigationsTestsStatsGet
+          >
+        >,
+        TError,
+        TData
+      >
+    >;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } => {
+  const queryOptions =
+    getGetTestTrackingStatsApiV1InvestigationsTestsStatsGetQueryOptions(
+      params,
+      options,
+    );
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  query.queryKey = queryOptions.queryKey;
+
+  return query;
+};
+
+/**
+ * Get recent tests that caught issues.
+
+Returns a list of recent test failures (issues caught).
+
+Args:
+    auth: Authentication context from API key/JWT.
+    db: Application database.
+    limit: Maximum number of results.
+
+Returns:
+    List of recent catches.
+ * @summary Get Recent Catches
+ */
+export const getRecentCatchesApiV1InvestigationsTestsCatchesGet = (
+  params?: GetRecentCatchesApiV1InvestigationsTestsCatchesGetParams,
+  signal?: AbortSignal,
+) => {
+  return customInstance<RecentCatchResponse[]>({
+    url: `/api/v1/investigations/tests/catches`,
+    method: "GET",
+    params,
+    signal,
+  });
+};
+
+export const getGetRecentCatchesApiV1InvestigationsTestsCatchesGetQueryKey = (
+  params?: GetRecentCatchesApiV1InvestigationsTestsCatchesGetParams,
+) => {
+  return [
+    `/api/v1/investigations/tests/catches`,
+    ...(params ? [params] : []),
+  ] as const;
+};
+
+export const getGetRecentCatchesApiV1InvestigationsTestsCatchesGetQueryOptions =
+  <
+    TData = Awaited<
+      ReturnType<typeof getRecentCatchesApiV1InvestigationsTestsCatchesGet>
+    >,
+    TError = HTTPValidationError,
+  >(
+    params?: GetRecentCatchesApiV1InvestigationsTestsCatchesGetParams,
+    options?: {
+      query?: Partial<
+        UseQueryOptions<
+          Awaited<
+            ReturnType<
+              typeof getRecentCatchesApiV1InvestigationsTestsCatchesGet
+            >
+          >,
+          TError,
+          TData
+        >
+      >;
+    },
+  ) => {
+    const { query: queryOptions } = options ?? {};
+
+    const queryKey =
+      queryOptions?.queryKey ??
+      getGetRecentCatchesApiV1InvestigationsTestsCatchesGetQueryKey(params);
+
+    const queryFn: QueryFunction<
+      Awaited<
+        ReturnType<typeof getRecentCatchesApiV1InvestigationsTestsCatchesGet>
+      >
+    > = ({ signal }) =>
+      getRecentCatchesApiV1InvestigationsTestsCatchesGet(params, signal);
+
+    return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+      Awaited<
+        ReturnType<typeof getRecentCatchesApiV1InvestigationsTestsCatchesGet>
+      >,
+      TError,
+      TData
+    > & { queryKey: QueryKey };
+  };
+
+export type GetRecentCatchesApiV1InvestigationsTestsCatchesGetQueryResult =
+  NonNullable<
+    Awaited<
+      ReturnType<typeof getRecentCatchesApiV1InvestigationsTestsCatchesGet>
+    >
+  >;
+export type GetRecentCatchesApiV1InvestigationsTestsCatchesGetQueryError =
+  HTTPValidationError;
+
+/**
+ * @summary Get Recent Catches
+ */
+export const useGetRecentCatchesApiV1InvestigationsTestsCatchesGet = <
+  TData = Awaited<
+    ReturnType<typeof getRecentCatchesApiV1InvestigationsTestsCatchesGet>
+  >,
+  TError = HTTPValidationError,
+>(
+  params?: GetRecentCatchesApiV1InvestigationsTestsCatchesGetParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<
+          ReturnType<typeof getRecentCatchesApiV1InvestigationsTestsCatchesGet>
+        >,
+        TError,
+        TData
+      >
+    >;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } => {
+  const queryOptions =
+    getGetRecentCatchesApiV1InvestigationsTestsCatchesGetQueryOptions(
+      params,
+      options,
+    );
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  query.queryKey = queryOptions.queryKey;
+
+  return query;
+};
+
+/**
+ * Mark a generated test as adopted.
+
+Call this when a test has been added to the user's project.
+
+Args:
+    request: Adoption request with test ID.
+    auth: Authentication context from API key/JWT.
+    db: Application database.
+
+Returns:
+    Status message.
+ * @summary Adopt Test
+ */
+export const adoptTestApiV1InvestigationsTestsAdoptPost = (
+  testAdoptionRequest: TestAdoptionRequest,
+) => {
+  return customInstance<AdoptTestApiV1InvestigationsTestsAdoptPost200>({
+    url: `/api/v1/investigations/tests/adopt`,
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    data: testAdoptionRequest,
+  });
+};
+
+export const getAdoptTestApiV1InvestigationsTestsAdoptPostMutationOptions = <
+  TError = HTTPValidationError,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof adoptTestApiV1InvestigationsTestsAdoptPost>>,
+    TError,
+    { data: TestAdoptionRequest },
+    TContext
+  >;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof adoptTestApiV1InvestigationsTestsAdoptPost>>,
+  TError,
+  { data: TestAdoptionRequest },
+  TContext
+> => {
+  const { mutation: mutationOptions } = options ?? {};
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof adoptTestApiV1InvestigationsTestsAdoptPost>>,
+    { data: TestAdoptionRequest }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return adoptTestApiV1InvestigationsTestsAdoptPost(data);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type AdoptTestApiV1InvestigationsTestsAdoptPostMutationResult =
+  NonNullable<
+    Awaited<ReturnType<typeof adoptTestApiV1InvestigationsTestsAdoptPost>>
+  >;
+export type AdoptTestApiV1InvestigationsTestsAdoptPostMutationBody =
+  TestAdoptionRequest;
+export type AdoptTestApiV1InvestigationsTestsAdoptPostMutationError =
+  HTTPValidationError;
+
+/**
+ * @summary Adopt Test
+ */
+export const useAdoptTestApiV1InvestigationsTestsAdoptPost = <
+  TError = HTTPValidationError,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof adoptTestApiV1InvestigationsTestsAdoptPost>>,
+    TError,
+    { data: TestAdoptionRequest },
+    TContext
+  >;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof adoptTestApiV1InvestigationsTestsAdoptPost>>,
+  TError,
+  { data: TestAdoptionRequest },
+  TContext
+> => {
+  const mutationOptions =
+    getAdoptTestApiV1InvestigationsTestsAdoptPostMutationOptions(options);
+
+  return useMutation(mutationOptions);
+};
+/**
+ * Record a test run result.
+
+Call this when a generated test has been executed.
+
+Args:
+    request: Test run result.
+    auth: Authentication context from API key/JWT.
+    db: Application database.
+
+Returns:
+    Status message.
+ * @summary Record Test Run
+ */
+export const recordTestRunApiV1InvestigationsTestsRunPost = (
+  testRunResultRequest: TestRunResultRequest,
+) => {
+  return customInstance<RecordTestRunApiV1InvestigationsTestsRunPost200>({
+    url: `/api/v1/investigations/tests/run`,
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    data: testRunResultRequest,
+  });
+};
+
+export const getRecordTestRunApiV1InvestigationsTestsRunPostMutationOptions = <
+  TError = HTTPValidationError,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof recordTestRunApiV1InvestigationsTestsRunPost>>,
+    TError,
+    { data: TestRunResultRequest },
+    TContext
+  >;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof recordTestRunApiV1InvestigationsTestsRunPost>>,
+  TError,
+  { data: TestRunResultRequest },
+  TContext
+> => {
+  const { mutation: mutationOptions } = options ?? {};
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof recordTestRunApiV1InvestigationsTestsRunPost>>,
+    { data: TestRunResultRequest }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return recordTestRunApiV1InvestigationsTestsRunPost(data);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type RecordTestRunApiV1InvestigationsTestsRunPostMutationResult =
+  NonNullable<
+    Awaited<ReturnType<typeof recordTestRunApiV1InvestigationsTestsRunPost>>
+  >;
+export type RecordTestRunApiV1InvestigationsTestsRunPostMutationBody =
+  TestRunResultRequest;
+export type RecordTestRunApiV1InvestigationsTestsRunPostMutationError =
+  HTTPValidationError;
+
+/**
+ * @summary Record Test Run
+ */
+export const useRecordTestRunApiV1InvestigationsTestsRunPost = <
+  TError = HTTPValidationError,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof recordTestRunApiV1InvestigationsTestsRunPost>>,
+    TError,
+    { data: TestRunResultRequest },
+    TContext
+  >;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof recordTestRunApiV1InvestigationsTestsRunPost>>,
+  TError,
+  { data: TestRunResultRequest },
+  TContext
+> => {
+  const mutationOptions =
+    getRecordTestRunApiV1InvestigationsTestsRunPostMutationOptions(options);
+
+  return useMutation(mutationOptions);
+};
+/**
  * Send a message to an investigation via Temporal signal.
 
 Args:
@@ -619,14 +1181,16 @@ Raises:
  */
 export const sendMessageApiV1InvestigationsInvestigationIdMessagesPost = (
   investigationId: string,
-  sendMessageRequest: SendMessageRequest,
+  dataingEntrypointsApiRoutesInvestigationsSendMessageRequest: DataingEntrypointsApiRoutesInvestigationsSendMessageRequest,
 ) => {
-  return customInstance<SendMessageResponse>({
-    url: `/api/v1/investigations/${investigationId}/messages`,
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    data: sendMessageRequest,
-  });
+  return customInstance<DataingEntrypointsApiRoutesInvestigationsSendMessageResponse>(
+    {
+      url: `/api/v1/investigations/${investigationId}/messages`,
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      data: dataingEntrypointsApiRoutesInvestigationsSendMessageRequest,
+    },
+  );
 };
 
 export const getSendMessageApiV1InvestigationsInvestigationIdMessagesPostMutationOptions =
@@ -638,7 +1202,10 @@ export const getSendMessageApiV1InvestigationsInvestigationIdMessagesPostMutatio
         >
       >,
       TError,
-      { investigationId: string; data: SendMessageRequest },
+      {
+        investigationId: string;
+        data: DataingEntrypointsApiRoutesInvestigationsSendMessageRequest;
+      },
       TContext
     >;
   }): UseMutationOptions<
@@ -648,7 +1215,10 @@ export const getSendMessageApiV1InvestigationsInvestigationIdMessagesPostMutatio
       >
     >,
     TError,
-    { investigationId: string; data: SendMessageRequest },
+    {
+      investigationId: string;
+      data: DataingEntrypointsApiRoutesInvestigationsSendMessageRequest;
+    },
     TContext
   > => {
     const { mutation: mutationOptions } = options ?? {};
@@ -659,7 +1229,10 @@ export const getSendMessageApiV1InvestigationsInvestigationIdMessagesPostMutatio
           typeof sendMessageApiV1InvestigationsInvestigationIdMessagesPost
         >
       >,
-      { investigationId: string; data: SendMessageRequest }
+      {
+        investigationId: string;
+        data: DataingEntrypointsApiRoutesInvestigationsSendMessageRequest;
+      }
     > = (props) => {
       const { investigationId, data } = props ?? {};
 
@@ -681,7 +1254,7 @@ export type SendMessageApiV1InvestigationsInvestigationIdMessagesPostMutationRes
     >
   >;
 export type SendMessageApiV1InvestigationsInvestigationIdMessagesPostMutationBody =
-  SendMessageRequest;
+  DataingEntrypointsApiRoutesInvestigationsSendMessageRequest;
 export type SendMessageApiV1InvestigationsInvestigationIdMessagesPostMutationError =
   HTTPValidationError;
 
@@ -699,7 +1272,10 @@ export const useSendMessageApiV1InvestigationsInvestigationIdMessagesPost = <
       >
     >,
     TError,
-    { investigationId: string; data: SendMessageRequest },
+    {
+      investigationId: string;
+      data: DataingEntrypointsApiRoutesInvestigationsSendMessageRequest;
+    },
     TContext
   >;
 }): UseMutationResult<
@@ -707,7 +1283,10 @@ export const useSendMessageApiV1InvestigationsInvestigationIdMessagesPost = <
     ReturnType<typeof sendMessageApiV1InvestigationsInvestigationIdMessagesPost>
   >,
   TError,
-  { investigationId: string; data: SendMessageRequest },
+  {
+    investigationId: string;
+    data: DataingEntrypointsApiRoutesInvestigationsSendMessageRequest;
+  },
   TContext
 > => {
   const mutationOptions =
@@ -1270,4 +1849,561 @@ export const useStreamEventsApiV1InvestigationsInvestigationIdEventsGet = <
   query.queryKey = queryOptions.queryKey;
 
   return query;
+};
+
+/**
+ * List available snapshots for an investigation.
+
+Args:
+    investigation_id: UUID of the investigation.
+    auth: Authentication context from API key/JWT.
+    db: Application database.
+
+Returns:
+    SnapshotListResponse with list of available snapshots.
+
+Raises:
+    HTTPException: If investigation not found or access denied.
+ * @summary List Snapshots
+ */
+export const listSnapshotsApiV1InvestigationsInvestigationIdSnapshotsGet = (
+  investigationId: string,
+  signal?: AbortSignal,
+) => {
+  return customInstance<SnapshotListResponse>({
+    url: `/api/v1/investigations/${investigationId}/snapshots`,
+    method: "GET",
+    signal,
+  });
+};
+
+export const getListSnapshotsApiV1InvestigationsInvestigationIdSnapshotsGetQueryKey =
+  (investigationId: string) => {
+    return [`/api/v1/investigations/${investigationId}/snapshots`] as const;
+  };
+
+export const getListSnapshotsApiV1InvestigationsInvestigationIdSnapshotsGetQueryOptions =
+  <
+    TData = Awaited<
+      ReturnType<
+        typeof listSnapshotsApiV1InvestigationsInvestigationIdSnapshotsGet
+      >
+    >,
+    TError = HTTPValidationError,
+  >(
+    investigationId: string,
+    options?: {
+      query?: Partial<
+        UseQueryOptions<
+          Awaited<
+            ReturnType<
+              typeof listSnapshotsApiV1InvestigationsInvestigationIdSnapshotsGet
+            >
+          >,
+          TError,
+          TData
+        >
+      >;
+    },
+  ) => {
+    const { query: queryOptions } = options ?? {};
+
+    const queryKey =
+      queryOptions?.queryKey ??
+      getListSnapshotsApiV1InvestigationsInvestigationIdSnapshotsGetQueryKey(
+        investigationId,
+      );
+
+    const queryFn: QueryFunction<
+      Awaited<
+        ReturnType<
+          typeof listSnapshotsApiV1InvestigationsInvestigationIdSnapshotsGet
+        >
+      >
+    > = ({ signal }) =>
+      listSnapshotsApiV1InvestigationsInvestigationIdSnapshotsGet(
+        investigationId,
+        signal,
+      );
+
+    return {
+      queryKey,
+      queryFn,
+      enabled: !!investigationId,
+      ...queryOptions,
+    } as UseQueryOptions<
+      Awaited<
+        ReturnType<
+          typeof listSnapshotsApiV1InvestigationsInvestigationIdSnapshotsGet
+        >
+      >,
+      TError,
+      TData
+    > & { queryKey: QueryKey };
+  };
+
+export type ListSnapshotsApiV1InvestigationsInvestigationIdSnapshotsGetQueryResult =
+  NonNullable<
+    Awaited<
+      ReturnType<
+        typeof listSnapshotsApiV1InvestigationsInvestigationIdSnapshotsGet
+      >
+    >
+  >;
+export type ListSnapshotsApiV1InvestigationsInvestigationIdSnapshotsGetQueryError =
+  HTTPValidationError;
+
+/**
+ * @summary List Snapshots
+ */
+export const useListSnapshotsApiV1InvestigationsInvestigationIdSnapshotsGet = <
+  TData = Awaited<
+    ReturnType<
+      typeof listSnapshotsApiV1InvestigationsInvestigationIdSnapshotsGet
+    >
+  >,
+  TError = HTTPValidationError,
+>(
+  investigationId: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<
+          ReturnType<
+            typeof listSnapshotsApiV1InvestigationsInvestigationIdSnapshotsGet
+          >
+        >,
+        TError,
+        TData
+      >
+    >;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } => {
+  const queryOptions =
+    getListSnapshotsApiV1InvestigationsInvestigationIdSnapshotsGetQueryOptions(
+      investigationId,
+      options,
+    );
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  query.queryKey = queryOptions.queryKey;
+
+  return query;
+};
+
+/**
+ * Download a snapshot for local hydration.
+
+Supports streaming response for large snapshots and optional gzip compression.
+
+Args:
+    investigation_id: UUID of the investigation.
+    checkpoint: The checkpoint to download (start, hypothesis_generated, etc).
+    auth: Authentication context from API key/JWT.
+    db: Application database.
+    snapshot_store: Snapshot storage backend.
+    accept_encoding: Accept-Encoding header for compression.
+
+Returns:
+    StreamingResponse with snapshot data.
+
+Raises:
+    HTTPException: If investigation not found, access denied, or snapshot missing.
+ * @summary Download Snapshot
+ */
+export const downloadSnapshotApiV1InvestigationsInvestigationIdSnapshotsCheckpointGet =
+  (
+    investigationId: string,
+    checkpoint: SnapshotCheckpointParam,
+    signal?: AbortSignal,
+  ) => {
+    return customInstance<unknown>({
+      url: `/api/v1/investigations/${investigationId}/snapshots/${checkpoint}`,
+      method: "GET",
+      signal,
+    });
+  };
+
+export const getDownloadSnapshotApiV1InvestigationsInvestigationIdSnapshotsCheckpointGetQueryKey =
+  (investigationId: string, checkpoint: SnapshotCheckpointParam) => {
+    return [
+      `/api/v1/investigations/${investigationId}/snapshots/${checkpoint}`,
+    ] as const;
+  };
+
+export const getDownloadSnapshotApiV1InvestigationsInvestigationIdSnapshotsCheckpointGetQueryOptions =
+  <
+    TData = Awaited<
+      ReturnType<
+        typeof downloadSnapshotApiV1InvestigationsInvestigationIdSnapshotsCheckpointGet
+      >
+    >,
+    TError = HTTPValidationError,
+  >(
+    investigationId: string,
+    checkpoint: SnapshotCheckpointParam,
+    options?: {
+      query?: Partial<
+        UseQueryOptions<
+          Awaited<
+            ReturnType<
+              typeof downloadSnapshotApiV1InvestigationsInvestigationIdSnapshotsCheckpointGet
+            >
+          >,
+          TError,
+          TData
+        >
+      >;
+    },
+  ) => {
+    const { query: queryOptions } = options ?? {};
+
+    const queryKey =
+      queryOptions?.queryKey ??
+      getDownloadSnapshotApiV1InvestigationsInvestigationIdSnapshotsCheckpointGetQueryKey(
+        investigationId,
+        checkpoint,
+      );
+
+    const queryFn: QueryFunction<
+      Awaited<
+        ReturnType<
+          typeof downloadSnapshotApiV1InvestigationsInvestigationIdSnapshotsCheckpointGet
+        >
+      >
+    > = ({ signal }) =>
+      downloadSnapshotApiV1InvestigationsInvestigationIdSnapshotsCheckpointGet(
+        investigationId,
+        checkpoint,
+        signal,
+      );
+
+    return {
+      queryKey,
+      queryFn,
+      enabled: !!(investigationId && checkpoint),
+      ...queryOptions,
+    } as UseQueryOptions<
+      Awaited<
+        ReturnType<
+          typeof downloadSnapshotApiV1InvestigationsInvestigationIdSnapshotsCheckpointGet
+        >
+      >,
+      TError,
+      TData
+    > & { queryKey: QueryKey };
+  };
+
+export type DownloadSnapshotApiV1InvestigationsInvestigationIdSnapshotsCheckpointGetQueryResult =
+  NonNullable<
+    Awaited<
+      ReturnType<
+        typeof downloadSnapshotApiV1InvestigationsInvestigationIdSnapshotsCheckpointGet
+      >
+    >
+  >;
+export type DownloadSnapshotApiV1InvestigationsInvestigationIdSnapshotsCheckpointGetQueryError =
+  HTTPValidationError;
+
+/**
+ * @summary Download Snapshot
+ */
+export const useDownloadSnapshotApiV1InvestigationsInvestigationIdSnapshotsCheckpointGet =
+  <
+    TData = Awaited<
+      ReturnType<
+        typeof downloadSnapshotApiV1InvestigationsInvestigationIdSnapshotsCheckpointGet
+      >
+    >,
+    TError = HTTPValidationError,
+  >(
+    investigationId: string,
+    checkpoint: SnapshotCheckpointParam,
+    options?: {
+      query?: Partial<
+        UseQueryOptions<
+          Awaited<
+            ReturnType<
+              typeof downloadSnapshotApiV1InvestigationsInvestigationIdSnapshotsCheckpointGet
+            >
+          >,
+          TError,
+          TData
+        >
+      >;
+    },
+  ): UseQueryResult<TData, TError> & { queryKey: QueryKey } => {
+    const queryOptions =
+      getDownloadSnapshotApiV1InvestigationsInvestigationIdSnapshotsCheckpointGetQueryOptions(
+        investigationId,
+        checkpoint,
+        options,
+      );
+
+    const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+      queryKey: QueryKey;
+    };
+
+    query.queryKey = queryOptions.queryKey;
+
+    return query;
+  };
+
+/**
+ * Download investigation as a snapshot tar.gz archive.
+
+Generates a compressed archive containing all evidence, lineage,
+and metadata needed to replay the investigation.
+
+Args:
+    investigation_id: UUID of the investigation.
+    auth: Authentication context from API key/JWT.
+    db: Application database.
+    temporal_client: Temporal client for durable execution.
+
+Returns:
+    StreamingResponse with tar.gz archive.
+
+Raises:
+    HTTPException: If investigation not found or not complete.
+ * @summary Export Snapshot Archive
+ */
+export const exportSnapshotArchiveApiV1InvestigationsInvestigationIdSnapshotGet =
+  (investigationId: string, signal?: AbortSignal) => {
+    return customInstance<unknown>({
+      url: `/api/v1/investigations/${investigationId}/snapshot`,
+      method: "GET",
+      signal,
+    });
+  };
+
+export const getExportSnapshotArchiveApiV1InvestigationsInvestigationIdSnapshotGetQueryKey =
+  (investigationId: string) => {
+    return [`/api/v1/investigations/${investigationId}/snapshot`] as const;
+  };
+
+export const getExportSnapshotArchiveApiV1InvestigationsInvestigationIdSnapshotGetQueryOptions =
+  <
+    TData = Awaited<
+      ReturnType<
+        typeof exportSnapshotArchiveApiV1InvestigationsInvestigationIdSnapshotGet
+      >
+    >,
+    TError = HTTPValidationError,
+  >(
+    investigationId: string,
+    options?: {
+      query?: Partial<
+        UseQueryOptions<
+          Awaited<
+            ReturnType<
+              typeof exportSnapshotArchiveApiV1InvestigationsInvestigationIdSnapshotGet
+            >
+          >,
+          TError,
+          TData
+        >
+      >;
+    },
+  ) => {
+    const { query: queryOptions } = options ?? {};
+
+    const queryKey =
+      queryOptions?.queryKey ??
+      getExportSnapshotArchiveApiV1InvestigationsInvestigationIdSnapshotGetQueryKey(
+        investigationId,
+      );
+
+    const queryFn: QueryFunction<
+      Awaited<
+        ReturnType<
+          typeof exportSnapshotArchiveApiV1InvestigationsInvestigationIdSnapshotGet
+        >
+      >
+    > = ({ signal }) =>
+      exportSnapshotArchiveApiV1InvestigationsInvestigationIdSnapshotGet(
+        investigationId,
+        signal,
+      );
+
+    return {
+      queryKey,
+      queryFn,
+      enabled: !!investigationId,
+      ...queryOptions,
+    } as UseQueryOptions<
+      Awaited<
+        ReturnType<
+          typeof exportSnapshotArchiveApiV1InvestigationsInvestigationIdSnapshotGet
+        >
+      >,
+      TError,
+      TData
+    > & { queryKey: QueryKey };
+  };
+
+export type ExportSnapshotArchiveApiV1InvestigationsInvestigationIdSnapshotGetQueryResult =
+  NonNullable<
+    Awaited<
+      ReturnType<
+        typeof exportSnapshotArchiveApiV1InvestigationsInvestigationIdSnapshotGet
+      >
+    >
+  >;
+export type ExportSnapshotArchiveApiV1InvestigationsInvestigationIdSnapshotGetQueryError =
+  HTTPValidationError;
+
+/**
+ * @summary Export Snapshot Archive
+ */
+export const useExportSnapshotArchiveApiV1InvestigationsInvestigationIdSnapshotGet =
+  <
+    TData = Awaited<
+      ReturnType<
+        typeof exportSnapshotArchiveApiV1InvestigationsInvestigationIdSnapshotGet
+      >
+    >,
+    TError = HTTPValidationError,
+  >(
+    investigationId: string,
+    options?: {
+      query?: Partial<
+        UseQueryOptions<
+          Awaited<
+            ReturnType<
+              typeof exportSnapshotArchiveApiV1InvestigationsInvestigationIdSnapshotGet
+            >
+          >,
+          TError,
+          TData
+        >
+      >;
+    },
+  ): UseQueryResult<TData, TError> & { queryKey: QueryKey } => {
+    const queryOptions =
+      getExportSnapshotArchiveApiV1InvestigationsInvestigationIdSnapshotGetQueryOptions(
+        investigationId,
+        options,
+      );
+
+    const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+      queryKey: QueryKey;
+    };
+
+    query.queryKey = queryOptions.queryKey;
+
+    return query;
+  };
+
+/**
+ * Import a snapshot archive as a replayed investigation.
+
+Validates the archive and creates a new investigation marked as a replay.
+
+Args:
+    auth: Authentication context from API key/JWT.
+    db: Application database.
+    file: The uploaded tar.gz file.
+
+Returns:
+    ImportSnapshotResponse with new investigation ID.
+
+Raises:
+    HTTPException: If file is invalid or too large.
+ * @summary Import Snapshot Archive
+ */
+export const importSnapshotArchiveApiV1InvestigationsImportPost = (
+  bodyImportSnapshotArchiveApiV1InvestigationsImportPost: BodyImportSnapshotArchiveApiV1InvestigationsImportPost,
+) => {
+  const formData = new FormData();
+  formData.append(
+    "file",
+    bodyImportSnapshotArchiveApiV1InvestigationsImportPost.file,
+  );
+
+  return customInstance<ImportSnapshotResponse>({
+    url: `/api/v1/investigations/import`,
+    method: "POST",
+    headers: { "Content-Type": "multipart/form-data" },
+    data: formData,
+  });
+};
+
+export const getImportSnapshotArchiveApiV1InvestigationsImportPostMutationOptions =
+  <TError = HTTPValidationError, TContext = unknown>(options?: {
+    mutation?: UseMutationOptions<
+      Awaited<
+        ReturnType<typeof importSnapshotArchiveApiV1InvestigationsImportPost>
+      >,
+      TError,
+      { data: BodyImportSnapshotArchiveApiV1InvestigationsImportPost },
+      TContext
+    >;
+  }): UseMutationOptions<
+    Awaited<
+      ReturnType<typeof importSnapshotArchiveApiV1InvestigationsImportPost>
+    >,
+    TError,
+    { data: BodyImportSnapshotArchiveApiV1InvestigationsImportPost },
+    TContext
+  > => {
+    const { mutation: mutationOptions } = options ?? {};
+
+    const mutationFn: MutationFunction<
+      Awaited<
+        ReturnType<typeof importSnapshotArchiveApiV1InvestigationsImportPost>
+      >,
+      { data: BodyImportSnapshotArchiveApiV1InvestigationsImportPost }
+    > = (props) => {
+      const { data } = props ?? {};
+
+      return importSnapshotArchiveApiV1InvestigationsImportPost(data);
+    };
+
+    return { mutationFn, ...mutationOptions };
+  };
+
+export type ImportSnapshotArchiveApiV1InvestigationsImportPostMutationResult =
+  NonNullable<
+    Awaited<
+      ReturnType<typeof importSnapshotArchiveApiV1InvestigationsImportPost>
+    >
+  >;
+export type ImportSnapshotArchiveApiV1InvestigationsImportPostMutationBody =
+  BodyImportSnapshotArchiveApiV1InvestigationsImportPost;
+export type ImportSnapshotArchiveApiV1InvestigationsImportPostMutationError =
+  HTTPValidationError;
+
+/**
+ * @summary Import Snapshot Archive
+ */
+export const useImportSnapshotArchiveApiV1InvestigationsImportPost = <
+  TError = HTTPValidationError,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<
+      ReturnType<typeof importSnapshotArchiveApiV1InvestigationsImportPost>
+    >,
+    TError,
+    { data: BodyImportSnapshotArchiveApiV1InvestigationsImportPost },
+    TContext
+  >;
+}): UseMutationResult<
+  Awaited<
+    ReturnType<typeof importSnapshotArchiveApiV1InvestigationsImportPost>
+  >,
+  TError,
+  { data: BodyImportSnapshotArchiveApiV1InvestigationsImportPost },
+  TContext
+> => {
+  const mutationOptions =
+    getImportSnapshotArchiveApiV1InvestigationsImportPostMutationOptions(
+      options,
+    );
+
+  return useMutation(mutationOptions);
 };

@@ -6,6 +6,8 @@
 
 import { useState, useCallback, useRef, useEffect } from "react";
 import { useJwtAuth } from "@/lib/auth/jwt-context";
+import { assistantApi } from "@/lib/api/assistant";
+import type { MessageResponse } from "@/lib/api/assistant";
 
 // Storage key for session persistence
 const SESSION_STORAGE_KEY = "dataing_assistant_session_id";
@@ -40,6 +42,20 @@ interface UseAssistantReturn {
   clearSession: () => void;
 }
 
+// Convert API message to our format
+function toAssistantMessage(msg: MessageResponse): AssistantMessage {
+  return {
+    id: msg.id,
+    role: msg.role as AssistantMessage["role"],
+    content: msg.content,
+    toolCalls: msg.tool_calls?.map((tc) => ({
+      name: String(tc.name || "unknown"),
+      arguments: (tc.arguments as Record<string, unknown>) || {},
+    })),
+    createdAt: new Date(msg.created_at),
+  };
+}
+
 export function useAssistant(
   options: UseAssistantOptions = {},
 ): UseAssistantReturn {
@@ -53,59 +69,26 @@ export function useAssistant(
   const eventSourceRef = useRef<EventSource | null>(null);
 
   // Load session from server
-  const loadSession = useCallback(
-    async (sessionId: string) => {
-      try {
-        setIsLoading(true);
-        const response = await fetch(`/api/assistant/sessions/${sessionId}`, {
-          headers: {
-            Authorization: `Bearer ${accessToken}`,
-          },
-        });
+  const loadSession = useCallback(async (sessionId: string) => {
+    try {
+      setIsLoading(true);
+      const data = await assistantApi.getSession(sessionId);
 
-        if (!response.ok) {
-          // Session not found or invalid, clear storage
-          localStorage.removeItem(SESSION_STORAGE_KEY);
-          return;
-        }
+      setSession({
+        id: data.id,
+        investigationId: data.investigation_id,
+        createdAt: new Date(data.created_at),
+      });
 
-        const data = await response.json();
-        setSession({
-          id: data.id,
-          investigationId: data.investigation_id,
-          createdAt: new Date(data.created_at),
-        });
-
-        // Load messages
-        setMessages(
-          data.messages.map(
-            (msg: {
-              id: string;
-              role: string;
-              content: string;
-              tool_calls?: {
-                name: string;
-                arguments: Record<string, unknown>;
-              }[];
-              created_at: string;
-            }) => ({
-              id: msg.id,
-              role: msg.role as AssistantMessage["role"],
-              content: msg.content,
-              toolCalls: msg.tool_calls,
-              createdAt: new Date(msg.created_at),
-            }),
-          ),
-        );
-      } catch (err) {
-        console.error("Failed to load session:", err);
-        localStorage.removeItem(SESSION_STORAGE_KEY);
-      } finally {
-        setIsLoading(false);
-      }
-    },
-    [accessToken],
-  );
+      // Load messages
+      setMessages(data.messages.map(toAssistantMessage));
+    } catch (err) {
+      console.error("Failed to load session:", err);
+      localStorage.removeItem(SESSION_STORAGE_KEY);
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
 
   // Load session from storage on mount
   useEffect(() => {
@@ -129,21 +112,8 @@ export function useAssistant(
       setIsLoading(true);
       setError(null);
 
-      const response = await fetch("/api/assistant/sessions", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${accessToken}`,
-        },
-        body: JSON.stringify({}),
-      });
+      const data = await assistantApi.createSession({});
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.detail || "Failed to create session");
-      }
-
-      const data = await response.json();
       const newSession: AssistantSession = {
         id: data.session_id,
         investigationId: data.investigation_id,
@@ -160,7 +130,7 @@ export function useAssistant(
     } finally {
       setIsLoading(false);
     }
-  }, [accessToken, onError]);
+  }, [onError]);
 
   const sendMessage = useCallback(
     async (content: string) => {
@@ -183,22 +153,7 @@ export function useAssistant(
         setMessages((prev) => [...prev, userMessage]);
 
         // Send message to API
-        const response = await fetch(
-          `/api/assistant/sessions/${session.id}/messages`,
-          {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              Authorization: `Bearer ${accessToken}`,
-            },
-            body: JSON.stringify({ content }),
-          },
-        );
-
-        if (!response.ok) {
-          const errorData = await response.json();
-          throw new Error(errorData.detail || "Failed to send message");
-        }
+        await assistantApi.sendMessage(session.id, { content });
 
         // Add assistant message placeholder
         const assistantMessage: AssistantMessage = {
@@ -211,9 +166,11 @@ export function useAssistant(
         setMessages((prev) => [...prev, assistantMessage]);
 
         // Connect to SSE stream
-        const eventSource = new EventSource(
-          `/api/assistant/sessions/${session.id}/stream?token=${accessToken}`,
+        const streamUrl = assistantApi.getStreamUrl(
+          session.id,
+          accessToken || undefined,
         );
+        const eventSource = new EventSource(streamUrl);
         eventSourceRef.current = eventSource;
 
         eventSource.addEventListener("text", (event: MessageEvent) => {
@@ -258,8 +215,12 @@ export function useAssistant(
         });
 
         eventSource.addEventListener("error", (event: MessageEvent) => {
-          const data = JSON.parse(event.data);
-          setError(data.error || "Stream error");
+          try {
+            const data = JSON.parse(event.data);
+            setError(data.error || "Stream error");
+          } catch {
+            setError("Stream error");
+          }
           setIsStreaming(false);
           eventSource.close();
           eventSourceRef.current = null;

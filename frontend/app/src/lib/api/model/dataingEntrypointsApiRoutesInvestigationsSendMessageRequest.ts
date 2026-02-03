@@ -7,12 +7,8 @@
  */
 
 /**
- * Request to send a message.
+ * Request body for sending a message.
  */
-export interface SendMessageRequest {
-  /**
-   * @minLength 1
-   * @maxLength 32000
-   */
-  content: string;
+export interface DataingEntrypointsApiRoutesInvestigationsSendMessageRequest {
+  message: string;
 }

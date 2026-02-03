@@ -6,13 +6,9 @@
  * OpenAPI spec version: 2.0.0
  */
 
-/**
- * Request to send a message.
- */
-export interface SendMessageRequest {
+export type StreamResponseApiV1AssistantSessionsSessionIdStreamGetParams = {
   /**
-   * @minLength 1
-   * @maxLength 32000
+   * Resume from event ID
    */
-  content: string;
-}
+  last_event_id?: number | null;
+};

@@ -7,9 +7,9 @@
  */
 
 /**
- * Response for sending a message.
+ * Response from sending a message.
  */
 export interface SendMessageResponse {
-  investigation_id: string;
-  status: string;
+  message_id: string;
+  status?: string;
 }

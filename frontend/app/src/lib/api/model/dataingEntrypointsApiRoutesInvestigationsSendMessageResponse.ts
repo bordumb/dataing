@@ -7,12 +7,9 @@
  */
 
 /**
- * Request to send a message.
+ * Response for sending a message.
  */
-export interface SendMessageRequest {
-  /**
-   * @minLength 1
-   * @maxLength 32000
-   */
-  content: string;
+export interface DataingEntrypointsApiRoutesInvestigationsSendMessageResponse {
+  investigation_id: string;
+  status: string;
 }

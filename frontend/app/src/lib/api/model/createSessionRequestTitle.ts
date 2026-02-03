@@ -7,12 +7,6 @@
  */
 
 /**
- * Request to send a message.
+ * Optional session title
  */
-export interface SendMessageRequest {
-  /**
-   * @minLength 1
-   * @maxLength 32000
-   */
-  content: string;
-}
+export type CreateSessionRequestTitle = string | null;

@@ -18,13 +18,14 @@ import type {
 import type {
   CreateSessionRequest,
   CreateSessionResponse,
+  DataingEntrypointsApiRoutesAssistantSendMessageRequest,
   DeleteSessionApiV1AssistantSessionsSessionIdDelete200,
   ExportSessionApiV1AssistantSessionsSessionIdExportPost200,
   ExportSessionApiV1AssistantSessionsSessionIdExportPostParams,
   HTTPValidationError,
   ListSessionsApiV1AssistantSessionsGetParams,
+  ListSessionsForInvestigationApiV1AssistantInvestigationsInvestigationIdSessionsGetParams,
   ListSessionsResponse,
-  SendMessageRequest,
   SendMessageResponse,
   SessionDetailResponse,
   StreamResponseApiV1AssistantSessionsSessionIdStreamGetParams,
@@ -201,6 +202,155 @@ export const useListSessionsApiV1AssistantSessionsGet = <
 
   return query;
 };
+
+/**
+ * List assistant sessions linked to an investigation.
+
+Returns sessions where the investigation is the parent.
+ * @summary List Sessions For Investigation
+ */
+export const listSessionsForInvestigationApiV1AssistantInvestigationsInvestigationIdSessionsGet =
+  (
+    investigationId: string,
+    params?: ListSessionsForInvestigationApiV1AssistantInvestigationsInvestigationIdSessionsGetParams,
+    signal?: AbortSignal,
+  ) => {
+    return customInstance<ListSessionsResponse>({
+      url: `/api/v1/assistant/investigations/${investigationId}/sessions`,
+      method: "GET",
+      params,
+      signal,
+    });
+  };
+
+export const getListSessionsForInvestigationApiV1AssistantInvestigationsInvestigationIdSessionsGetQueryKey =
+  (
+    investigationId: string,
+    params?: ListSessionsForInvestigationApiV1AssistantInvestigationsInvestigationIdSessionsGetParams,
+  ) => {
+    return [
+      `/api/v1/assistant/investigations/${investigationId}/sessions`,
+      ...(params ? [params] : []),
+    ] as const;
+  };
+
+export const getListSessionsForInvestigationApiV1AssistantInvestigationsInvestigationIdSessionsGetQueryOptions =
+  <
+    TData = Awaited<
+      ReturnType<
+        typeof listSessionsForInvestigationApiV1AssistantInvestigationsInvestigationIdSessionsGet
+      >
+    >,
+    TError = HTTPValidationError,
+  >(
+    investigationId: string,
+    params?: ListSessionsForInvestigationApiV1AssistantInvestigationsInvestigationIdSessionsGetParams,
+    options?: {
+      query?: Partial<
+        UseQueryOptions<
+          Awaited<
+            ReturnType<
+              typeof listSessionsForInvestigationApiV1AssistantInvestigationsInvestigationIdSessionsGet
+            >
+          >,
+          TError,
+          TData
+        >
+      >;
+    },
+  ) => {
+    const { query: queryOptions } = options ?? {};
+
+    const queryKey =
+      queryOptions?.queryKey ??
+      getListSessionsForInvestigationApiV1AssistantInvestigationsInvestigationIdSessionsGetQueryKey(
+        investigationId,
+        params,
+      );
+
+    const queryFn: QueryFunction<
+      Awaited<
+        ReturnType<
+          typeof listSessionsForInvestigationApiV1AssistantInvestigationsInvestigationIdSessionsGet
+        >
+      >
+    > = ({ signal }) =>
+      listSessionsForInvestigationApiV1AssistantInvestigationsInvestigationIdSessionsGet(
+        investigationId,
+        params,
+        signal,
+      );
+
+    return {
+      queryKey,
+      queryFn,
+      enabled: !!investigationId,
+      ...queryOptions,
+    } as UseQueryOptions<
+      Awaited<
+        ReturnType<
+          typeof listSessionsForInvestigationApiV1AssistantInvestigationsInvestigationIdSessionsGet
+        >
+      >,
+      TError,
+      TData
+    > & { queryKey: QueryKey };
+  };
+
+export type ListSessionsForInvestigationApiV1AssistantInvestigationsInvestigationIdSessionsGetQueryResult =
+  NonNullable<
+    Awaited<
+      ReturnType<
+        typeof listSessionsForInvestigationApiV1AssistantInvestigationsInvestigationIdSessionsGet
+      >
+    >
+  >;
+export type ListSessionsForInvestigationApiV1AssistantInvestigationsInvestigationIdSessionsGetQueryError =
+  HTTPValidationError;
+
+/**
+ * @summary List Sessions For Investigation
+ */
+export const useListSessionsForInvestigationApiV1AssistantInvestigationsInvestigationIdSessionsGet =
+  <
+    TData = Awaited<
+      ReturnType<
+        typeof listSessionsForInvestigationApiV1AssistantInvestigationsInvestigationIdSessionsGet
+      >
+    >,
+    TError = HTTPValidationError,
+  >(
+    investigationId: string,
+    params?: ListSessionsForInvestigationApiV1AssistantInvestigationsInvestigationIdSessionsGetParams,
+    options?: {
+      query?: Partial<
+        UseQueryOptions<
+          Awaited<
+            ReturnType<
+              typeof listSessionsForInvestigationApiV1AssistantInvestigationsInvestigationIdSessionsGet
+            >
+          >,
+          TError,
+          TData
+        >
+      >;
+    },
+  ): UseQueryResult<TData, TError> & { queryKey: QueryKey } => {
+    const queryOptions =
+      getListSessionsForInvestigationApiV1AssistantInvestigationsInvestigationIdSessionsGetQueryOptions(
+        investigationId,
+        params,
+        options,
+      );
+
+    const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+      queryKey: QueryKey;
+    };
+
+    query.queryKey = queryOptions.queryKey;
+
+    return query;
+  };
 
 /**
  * Get full session details with messages.
@@ -404,13 +554,13 @@ The response will be streamed via the /stream endpoint.
  */
 export const sendMessageApiV1AssistantSessionsSessionIdMessagesPost = (
   sessionId: string,
-  sendMessageRequest: SendMessageRequest,
+  dataingEntrypointsApiRoutesAssistantSendMessageRequest: DataingEntrypointsApiRoutesAssistantSendMessageRequest,
 ) => {
   return customInstance<SendMessageResponse>({
     url: `/api/v1/assistant/sessions/${sessionId}/messages`,
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    data: sendMessageRequest,
+    data: dataingEntrypointsApiRoutesAssistantSendMessageRequest,
   });
 };
 
@@ -423,7 +573,10 @@ export const getSendMessageApiV1AssistantSessionsSessionIdMessagesPostMutationOp
         >
       >,
       TError,
-      { sessionId: string; data: SendMessageRequest },
+      {
+        sessionId: string;
+        data: DataingEntrypointsApiRoutesAssistantSendMessageRequest;
+      },
       TContext
     >;
   }): UseMutationOptions<
@@ -431,7 +584,10 @@ export const getSendMessageApiV1AssistantSessionsSessionIdMessagesPostMutationOp
       ReturnType<typeof sendMessageApiV1AssistantSessionsSessionIdMessagesPost>
     >,
     TError,
-    { sessionId: string; data: SendMessageRequest },
+    {
+      sessionId: string;
+      data: DataingEntrypointsApiRoutesAssistantSendMessageRequest;
+    },
     TContext
   > => {
     const { mutation: mutationOptions } = options ?? {};
@@ -442,7 +598,10 @@ export const getSendMessageApiV1AssistantSessionsSessionIdMessagesPostMutationOp
           typeof sendMessageApiV1AssistantSessionsSessionIdMessagesPost
         >
       >,
-      { sessionId: string; data: SendMessageRequest }
+      {
+        sessionId: string;
+        data: DataingEntrypointsApiRoutesAssistantSendMessageRequest;
+      }
     > = (props) => {
       const { sessionId, data } = props ?? {};
 
@@ -462,7 +621,7 @@ export type SendMessageApiV1AssistantSessionsSessionIdMessagesPostMutationResult
     >
   >;
 export type SendMessageApiV1AssistantSessionsSessionIdMessagesPostMutationBody =
-  SendMessageRequest;
+  DataingEntrypointsApiRoutesAssistantSendMessageRequest;
 export type SendMessageApiV1AssistantSessionsSessionIdMessagesPostMutationError =
   HTTPValidationError;
 
@@ -478,7 +637,10 @@ export const useSendMessageApiV1AssistantSessionsSessionIdMessagesPost = <
       ReturnType<typeof sendMessageApiV1AssistantSessionsSessionIdMessagesPost>
     >,
     TError,
-    { sessionId: string; data: SendMessageRequest },
+    {
+      sessionId: string;
+      data: DataingEntrypointsApiRoutesAssistantSendMessageRequest;
+    },
     TContext
   >;
 }): UseMutationResult<
@@ -486,7 +648,10 @@ export const useSendMessageApiV1AssistantSessionsSessionIdMessagesPost = <
     ReturnType<typeof sendMessageApiV1AssistantSessionsSessionIdMessagesPost>
   >,
   TError,
-  { sessionId: string; data: SendMessageRequest },
+  {
+    sessionId: string;
+    data: DataingEntrypointsApiRoutesAssistantSendMessageRequest;
+  },
   TContext
 > => {
   const mutationOptions =

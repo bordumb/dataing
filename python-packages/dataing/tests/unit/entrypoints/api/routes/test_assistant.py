@@ -330,3 +330,108 @@ class TestSSEEventTypes:
         assert SSEEventType.COMPLETE.value == "complete"
         assert SSEEventType.ERROR.value == "error"
         assert SSEEventType.HEARTBEAT.value == "heartbeat"
+
+
+class TestParentInvestigationLinking:
+    """Tests for parent/child investigation linking."""
+
+    @pytest.mark.asyncio
+    async def test_load_parent_investigation_context_no_parent(self) -> None:
+        """Test loading context when no parent investigation is linked."""
+        from dataing.entrypoints.api.routes.assistant import (
+            _load_parent_investigation_context,
+        )
+
+        mock_db = AsyncMock()
+        session_id = UUID("11111111-1111-1111-1111-111111111111")
+        tenant_id = UUID("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")
+
+        # Session has no parent_investigation_id
+        mock_db.fetch_one.return_value = {"parent_investigation_id": None}
+
+        result = await _load_parent_investigation_context(mock_db, session_id, tenant_id)
+
+        assert result is None
+        mock_db.fetch_one.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_load_parent_investigation_context_session_not_found(self) -> None:
+        """Test loading context when session is not found."""
+        from dataing.entrypoints.api.routes.assistant import (
+            _load_parent_investigation_context,
+        )
+
+        mock_db = AsyncMock()
+        session_id = UUID("11111111-1111-1111-1111-111111111111")
+        tenant_id = UUID("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")
+
+        # Session not found
+        mock_db.fetch_one.return_value = None
+
+        result = await _load_parent_investigation_context(mock_db, session_id, tenant_id)
+
+        assert result is None
+
+    @pytest.mark.asyncio
+    async def test_load_parent_investigation_context_with_parent(self) -> None:
+        """Test loading context when parent investigation exists."""
+        from dataing.entrypoints.api.routes.assistant import (
+            _load_parent_investigation_context,
+        )
+
+        mock_db = AsyncMock()
+        session_id = UUID("11111111-1111-1111-1111-111111111111")
+        tenant_id = UUID("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")
+        parent_id = UUID("22222222-2222-2222-2222-222222222222")
+
+        # Session has parent_investigation_id
+        mock_db.fetch_one.side_effect = [
+            {"parent_investigation_id": parent_id},
+            {
+                "id": parent_id,
+                "dataset_id": "test_dataset",
+                "metric_name": "row_count",
+                "status": "completed",
+                "severity": "high",
+                "expected_value": 1000.0,
+                "actual_value": 500.0,
+                "deviation_pct": -50.0,
+                "anomaly_date": "2026-02-01",
+                "finding": {"root_cause": "Data missing"},
+                "events": [{"type": "step", "name": "analyze"}],
+                "metadata": {"source": "test"},
+            },
+        ]
+
+        result = await _load_parent_investigation_context(mock_db, session_id, tenant_id)
+
+        assert result is not None
+        assert "parent_investigation" in result
+        parent = result["parent_investigation"]
+        assert parent["id"] == str(parent_id)
+        assert parent["dataset_id"] == "test_dataset"
+        assert parent["metric_name"] == "row_count"
+        assert parent["status"] == "completed"
+        assert parent["finding"] == {"root_cause": "Data missing"}
+
+    @pytest.mark.asyncio
+    async def test_load_parent_investigation_context_parent_not_found(self) -> None:
+        """Test loading context when parent investigation doesn't exist."""
+        from dataing.entrypoints.api.routes.assistant import (
+            _load_parent_investigation_context,
+        )
+
+        mock_db = AsyncMock()
+        session_id = UUID("11111111-1111-1111-1111-111111111111")
+        tenant_id = UUID("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")
+        parent_id = UUID("22222222-2222-2222-2222-222222222222")
+
+        # Session has parent_investigation_id but investigation not found
+        mock_db.fetch_one.side_effect = [
+            {"parent_investigation_id": parent_id},
+            None,  # Investigation not found
+        ]
+
+        result = await _load_parent_investigation_context(mock_db, session_id, tenant_id)
+
+        assert result is None

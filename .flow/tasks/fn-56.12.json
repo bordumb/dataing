@@ -1,7 +1,7 @@
 {
-  "assignee": null,
+  "assignee": "bordumbb@gmail.com",
   "claim_note": "",
-  "claimed_at": null,
+  "claimed_at": "2026-02-03T00:05:42.793766Z",
   "created_at": "2026-02-02T22:43:39.025602Z",
   "depends_on": [
     "fn-56.6"
@@ -10,7 +10,7 @@
   "id": "fn-56.12",
   "priority": null,
   "spec_path": ".flow/tasks/fn-56.12.md",
-  "status": "todo",
+  "status": "in_progress",
   "title": "Add investigation parent/child linking",
-  "updated_at": "2026-02-02T22:43:54.566923Z"
+  "updated_at": "2026-02-03T00:05:42.793991Z"
 }

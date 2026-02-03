@@ -440,6 +440,81 @@
         }
       }
     },
+    "/api/v1/assistant/investigations/{investigation_id}/sessions": {
+      "get": {
+        "tags": [
+          "assistant"
+        ],
+        "summary": "List Sessions For Investigation",
+        "description": "List assistant sessions linked to an investigation.\n\nReturns sessions where the investigation is the parent.",
+        "operationId": "list_sessions_for_investigation_api_v1_assistant_investigations__investigation_id__sessions_get",
+        "security": [
+          {
+            "APIKeyHeader": []
+          },
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "investigation_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Investigation Id"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "default": 20,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0,
+              "title": "Offset"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ListSessionsResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/assistant/sessions/{session_id}": {
       "get": {
         "tags": [
@@ -579,7 +654,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/SendMessageRequest"
+                "$ref": "#/components/schemas/dataing__entrypoints__api__routes__assistant__SendMessageRequest"
               }
             }
           }
@@ -1402,7 +1477,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/dataing__entrypoints__api__routes__investigations__SendMessageRequest"
+                "$ref": "#/components/schemas/SendMessageRequest"
               }
             }
           }
@@ -2774,7 +2849,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/dataing__entrypoints__api__routes__datasources__TestConnectionResponse"
+                  "$ref": "#/components/schemas/TestConnectionResponse"
                 }
               }
             }
@@ -2999,7 +3074,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/dataing__entrypoints__api__routes__datasources__TestConnectionResponse"
+                  "$ref": "#/components/schemas/TestConnectionResponse"
                 }
               }
             }
@@ -3434,7 +3509,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/dataing__entrypoints__api__routes__datasources__TestConnectionResponse"
+                  "$ref": "#/components/schemas/TestConnectionResponse"
                 }
               }
             }
@@ -3659,7 +3734,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/dataing__entrypoints__api__routes__datasources__TestConnectionResponse"
+                  "$ref": "#/components/schemas/TestConnectionResponse"
                 }
               }
             }
@@ -4254,7 +4329,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/TestConnectionResponse"
+                  "$ref": "#/components/schemas/dataing__entrypoints__api__routes__credentials__TestConnectionResponse"
                 }
               }
             }
@@ -5859,7 +5934,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/LineageGraphResponse"
+                  "$ref": "#/components/schemas/dataing__entrypoints__api__routes__lineage__LineageGraphResponse"
                 }
               }
             }
@@ -11963,7 +12038,7 @@
           "lineage": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/dataing__entrypoints__api__routes__bundles__LineageGraphResponse"
+                "$ref": "#/components/schemas/LineageGraphResponse"
               },
               {
                 "type": "null"
@@ -14767,40 +14842,35 @@
       "LineageGraphResponse": {
         "properties": {
           "root": {
-            "type": "string",
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Root"
           },
           "datasets": {
             "additionalProperties": {
-              "$ref": "#/components/schemas/DatasetResponse"
+              "additionalProperties": true,
+              "type": "object"
             },
             "type": "object",
             "title": "Datasets"
           },
           "edges": {
             "items": {
-              "$ref": "#/components/schemas/LineageEdgeResponse"
+              "$ref": "#/components/schemas/LineageEdge"
             },
             "type": "array",
             "title": "Edges"
-          },
-          "jobs": {
-            "additionalProperties": {
-              "$ref": "#/components/schemas/JobResponse"
-            },
-            "type": "object",
-            "title": "Jobs"
           }
         },
         "type": "object",
-        "required": [
-          "root",
-          "datasets",
-          "edges",
-          "jobs"
-        ],
         "title": "LineageGraphResponse",
-        "description": "Response for a lineage graph."
+        "description": "Lineage graph response."
       },
       "LineageProviderResponse": {
         "properties": {
@@ -16552,19 +16622,17 @@
       },
       "SendMessageRequest": {
         "properties": {
-          "content": {
+          "message": {
             "type": "string",
-            "maxLength": 32000,
-            "minLength": 1,
-            "title": "Content"
+            "title": "Message"
           }
         },
         "type": "object",
         "required": [
-          "content"
+          "message"
         ],
         "title": "SendMessageRequest",
-        "description": "Request to send a message."
+        "description": "Request body for sending a message."
       },
       "SendMessageResponse": {
         "properties": {
@@ -17860,18 +17928,11 @@
             "type": "boolean",
             "title": "Success"
           },
-          "error": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Error"
+          "message": {
+            "type": "string",
+            "title": "Message"
           },
-          "tables_accessible": {
+          "latency_ms": {
             "anyOf": [
               {
                 "type": "integer"
@@ -17880,15 +17941,27 @@
                 "type": "null"
               }
             ],
-            "title": "Tables Accessible"
+            "title": "Latency Ms"
+          },
+          "server_version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Server Version"
           }
         },
         "type": "object",
         "required": [
-          "success"
+          "success",
+          "message"
         ],
         "title": "TestConnectionResponse",
-        "description": "Response for testing credentials."
+        "description": "Response for testing a connection."
       },
       "TestRunResultRequest": {
         "properties": {
@@ -18623,9 +18696,29 @@
         "title": "WeeklyUsageResponse",
         "description": "Weekly usage statistics response."
       },
-      "dataing__entrypoints__api__routes__bundles__LineageGraphResponse": {
+      "dataing__entrypoints__api__routes__assistant__SendMessageRequest": {
         "properties": {
-          "root": {
+          "content": {
+            "type": "string",
+            "maxLength": 32000,
+            "minLength": 1,
+            "title": "Content"
+          }
+        },
+        "type": "object",
+        "required": [
+          "content"
+        ],
+        "title": "SendMessageRequest",
+        "description": "Request to send a message."
+      },
+      "dataing__entrypoints__api__routes__credentials__TestConnectionResponse": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "title": "Success"
+          },
+          "error": {
             "anyOf": [
               {
                 "type": "string"
@@ -18634,39 +18727,9 @@
                 "type": "null"
               }
             ],
-            "title": "Root"
+            "title": "Error"
           },
-          "datasets": {
-            "additionalProperties": {
-              "additionalProperties": true,
-              "type": "object"
-            },
-            "type": "object",
-            "title": "Datasets"
-          },
-          "edges": {
-            "items": {
-              "$ref": "#/components/schemas/LineageEdge"
-            },
-            "type": "array",
-            "title": "Edges"
-          }
-        },
-        "type": "object",
-        "title": "LineageGraphResponse",
-        "description": "Lineage graph response."
-      },
-      "dataing__entrypoints__api__routes__datasources__TestConnectionResponse": {
-        "properties": {
-          "success": {
-            "type": "boolean",
-            "title": "Success"
-          },
-          "message": {
-            "type": "string",
-            "title": "Message"
-          },
-          "latency_ms": {
+          "tables_accessible": {
             "anyOf": [
               {
                 "type": "integer"
@@ -18675,41 +18738,15 @@
                 "type": "null"
               }
             ],
-            "title": "Latency Ms"
-          },
-          "server_version": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Server Version"
+            "title": "Tables Accessible"
           }
         },
         "type": "object",
         "required": [
-          "success",
-          "message"
+          "success"
         ],
         "title": "TestConnectionResponse",
-        "description": "Response for testing a connection."
-      },
-      "dataing__entrypoints__api__routes__investigations__SendMessageRequest": {
-        "properties": {
-          "message": {
-            "type": "string",
-            "title": "Message"
-          }
-        },
-        "type": "object",
-        "required": [
-          "message"
-        ],
-        "title": "SendMessageRequest",
-        "description": "Request body for sending a message."
+        "description": "Response for testing credentials."
       },
       "dataing__entrypoints__api__routes__investigations__SendMessageResponse": {
         "properties": {
@@ -18730,6 +18767,44 @@
         ],
         "title": "SendMessageResponse",
         "description": "Response for sending a message."
+      },
+      "dataing__entrypoints__api__routes__lineage__LineageGraphResponse": {
+        "properties": {
+          "root": {
+            "type": "string",
+            "title": "Root"
+          },
+          "datasets": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/DatasetResponse"
+            },
+            "type": "object",
+            "title": "Datasets"
+          },
+          "edges": {
+            "items": {
+              "$ref": "#/components/schemas/LineageEdgeResponse"
+            },
+            "type": "array",
+            "title": "Edges"
+          },
+          "jobs": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/JobResponse"
+            },
+            "type": "object",
+            "title": "Jobs"
+          }
+        },
+        "type": "object",
+        "required": [
+          "root",
+          "datasets",
+          "edges",
+          "jobs"
+        ],
+        "title": "LineageGraphResponse",
+        "description": "Response for a lineage graph."
       }
     },
     "securitySchemes": {

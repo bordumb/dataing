@@ -291,6 +291,56 @@ async def list_sessions(
     return ListSessionsResponse(sessions=sessions)
 
 
+@router.get("/investigations/{investigation_id}/sessions", response_model=ListSessionsResponse)
+async def list_sessions_for_investigation(
+    investigation_id: UUID,
+    auth: AuthDep,
+    db: AppDbDep,
+    limit: int = Query(20, ge=1, le=100),
+    offset: int = Query(0, ge=0),
+) -> ListSessionsResponse:
+    """List assistant sessions linked to an investigation.
+
+    Returns sessions where the investigation is the parent.
+    """
+    rows = await db.fetch_all(
+        """
+        SELECT
+            s.id,
+            s.title,
+            s.created_at,
+            s.last_activity,
+            s.token_count,
+            COUNT(m.id) as message_count
+        FROM assistant_sessions s
+        LEFT JOIN assistant_messages m ON m.session_id = s.id
+        WHERE s.tenant_id = $1
+          AND s.parent_investigation_id = $2
+        GROUP BY s.id
+        ORDER BY s.last_activity DESC
+        LIMIT $3 OFFSET $4
+        """,
+        auth.tenant_id,
+        investigation_id,
+        limit,
+        offset,
+    )
+
+    sessions = [
+        SessionSummary(
+            id=row["id"],
+            title=row["title"],
+            created_at=row["created_at"],
+            last_activity=row["last_activity"],
+            message_count=row["message_count"],
+            token_count=row["token_count"] or 0,
+        )
+        for row in rows
+    ]
+
+    return ListSessionsResponse(sessions=sessions)
+
+
 @router.get("/sessions/{session_id}", response_model=SessionDetailResponse)
 async def get_session(
     session_id: UUID,
@@ -434,6 +484,70 @@ async def send_message(
     )
 
 
+async def _load_parent_investigation_context(
+    db: AppDatabase,
+    session_id: UUID,
+    tenant_id: UUID,
+) -> dict[str, Any] | None:
+    """Load parent investigation context for a session.
+
+    Args:
+        db: Application database.
+        session_id: The assistant session ID.
+        tenant_id: Tenant ID for security check.
+
+    Returns:
+        Parent investigation context dict or None if no parent.
+    """
+    # Get session with parent_investigation_id
+    session = await db.fetch_one(
+        """
+        SELECT parent_investigation_id FROM assistant_sessions
+        WHERE id = $1 AND tenant_id = $2
+        """,
+        session_id,
+        tenant_id,
+    )
+
+    if not session or not session.get("parent_investigation_id"):
+        return None
+
+    parent_id = session["parent_investigation_id"]
+
+    # Load parent investigation
+    investigation = await db.fetch_one(
+        """
+        SELECT id, dataset_id, metric_name, status, severity,
+               expected_value, actual_value, deviation_pct, anomaly_date,
+               finding, events, metadata, created_at, completed_at
+        FROM investigations
+        WHERE id = $1 AND tenant_id = $2
+        """,
+        parent_id,
+        tenant_id,
+    )
+
+    if not investigation:
+        return None
+
+    return {
+        "parent_investigation": {
+            "id": str(investigation["id"]),
+            "dataset_id": investigation["dataset_id"],
+            "metric_name": investigation["metric_name"],
+            "status": investigation["status"],
+            "severity": investigation.get("severity"),
+            "expected_value": investigation.get("expected_value"),
+            "actual_value": investigation.get("actual_value"),
+            "deviation_pct": investigation.get("deviation_pct"),
+            "anomaly_date": investigation.get("anomaly_date"),
+            "finding": investigation.get("finding"),
+            "events": investigation.get("events"),
+            "metadata": investigation.get("metadata"),
+        }
+    }
+
+
 async def _process_message(
     session_id: UUID,
     message_content: str,
@@ -503,7 +617,12 @@ async def _process_message(
 
         # Build context with history
         history = [{"role": r["role"], "content": r["content"]} for r in history_rows]
-        context = {"history": history} if history else None
+        context: dict[str, Any] = {"history": history} if history else {}
+
+        # Load parent investigation context if available
+        parent_context = await _load_parent_investigation_context(db, session_id, auth.tenant_id)
+        if parent_context:
+            context.update(parent_context)
 
         # Call the assistant
         response = await assistant.ask(

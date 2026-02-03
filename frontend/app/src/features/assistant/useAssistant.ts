@@ -24,10 +24,12 @@ export interface AssistantMessage {
 export interface AssistantSession {
   id: string;
   investigationId: string;
+  parentInvestigationId?: string;
   createdAt: Date;
 }
 
 interface UseAssistantOptions {
+  parentInvestigationId?: string;
   onError?: (error: string) => void;
 }
 
@@ -38,7 +40,7 @@ interface UseAssistantReturn {
   isStreaming: boolean;
   error: string | null;
   sendMessage: (content: string) => Promise<void>;
-  createSession: () => Promise<void>;
+  createSession: (parentInvestigationId?: string) => Promise<void>;
   clearSession: () => void;
 }
 
@@ -77,6 +79,7 @@ export function useAssistant(
       setSession({
         id: data.id,
         investigationId: data.investigation_id,
+        parentInvestigationId: data.parent_investigation_id ?? undefined,
         createdAt: new Date(data.created_at),
       });
 
@@ -107,30 +110,36 @@ export function useAssistant(
     };
   }, []);
 
-  const createSession = useCallback(async () => {
-    try {
-      setIsLoading(true);
-      setError(null);
+  const createSession = useCallback(
+    async (parentInvestigationId?: string) => {
+      try {
+        setIsLoading(true);
+        setError(null);
 
-      const data = await assistantApi.createSession({});
+        const data = await assistantApi.createSession({
+          parent_investigation_id: parentInvestigationId,
+        });
 
-      const newSession: AssistantSession = {
-        id: data.session_id,
-        investigationId: data.investigation_id,
-        createdAt: new Date(data.created_at),
-      };
+        const newSession: AssistantSession = {
+          id: data.session_id,
+          investigationId: data.investigation_id,
+          parentInvestigationId,
+          createdAt: new Date(data.created_at),
+        };
 
-      setSession(newSession);
-      setMessages([]);
-      localStorage.setItem(SESSION_STORAGE_KEY, newSession.id);
-    } catch (err) {
-      const message = err instanceof Error ? err.message : "Unknown error";
-      setError(message);
-      onError?.(message);
-    } finally {
-      setIsLoading(false);
-    }
-  }, [onError]);
+        setSession(newSession);
+        setMessages([]);
+        localStorage.setItem(SESSION_STORAGE_KEY, newSession.id);
+      } catch (err) {
+        const message = err instanceof Error ? err.message : "Unknown error";
+        setError(message);
+        onError?.(message);
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    [onError],
+  );
 
   const sendMessage = useCallback(
     async (content: string) => {

@@ -22,7 +22,6 @@ import type {
   ChainVerificationResponse,
   CodifyRequest,
   CodifyResponse,
-  DataingEntrypointsApiRoutesInvestigationsSendMessageRequest,
   DataingEntrypointsApiRoutesInvestigationsSendMessageResponse,
   GetRecentCatchesApiV1InvestigationsTestsCatchesGetParams,
   GetTestTrackingStatsApiV1InvestigationsTestsStatsGetParams,
@@ -32,6 +31,7 @@ import type {
   InvestigationStateResponse,
   RecentCatchResponse,
   RecordTestRunApiV1InvestigationsTestsRunPost200,
+  SendMessageRequest,
   SendUserInputApiV1InvestigationsInvestigationIdInputPost200,
   SnapshotCheckpointParam,
   SnapshotListResponse,
@@ -1181,14 +1181,14 @@ Raises:
  */
 export const sendMessageApiV1InvestigationsInvestigationIdMessagesPost = (
   investigationId: string,
-  dataingEntrypointsApiRoutesInvestigationsSendMessageRequest: DataingEntrypointsApiRoutesInvestigationsSendMessageRequest,
+  sendMessageRequest: SendMessageRequest,
 ) => {
   return customInstance<DataingEntrypointsApiRoutesInvestigationsSendMessageResponse>(
     {
       url: `/api/v1/investigations/${investigationId}/messages`,
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      data: dataingEntrypointsApiRoutesInvestigationsSendMessageRequest,
+      data: sendMessageRequest,
     },
   );
 };
@@ -1202,10 +1202,7 @@ export const getSendMessageApiV1InvestigationsInvestigationIdMessagesPostMutatio
         >
       >,
       TError,
-      {
-        investigationId: string;
-        data: DataingEntrypointsApiRoutesInvestigationsSendMessageRequest;
-      },
+      { investigationId: string; data: SendMessageRequest },
       TContext
     >;
   }): UseMutationOptions<
@@ -1215,10 +1212,7 @@ export const getSendMessageApiV1InvestigationsInvestigationIdMessagesPostMutatio
       >
     >,
     TError,
-    {
-      investigationId: string;
-      data: DataingEntrypointsApiRoutesInvestigationsSendMessageRequest;
-    },
+    { investigationId: string; data: SendMessageRequest },
     TContext
   > => {
     const { mutation: mutationOptions } = options ?? {};
@@ -1229,10 +1223,7 @@ export const getSendMessageApiV1InvestigationsInvestigationIdMessagesPostMutatio
           typeof sendMessageApiV1InvestigationsInvestigationIdMessagesPost
         >
       >,
-      {
-        investigationId: string;
-        data: DataingEntrypointsApiRoutesInvestigationsSendMessageRequest;
-      }
+      { investigationId: string; data: SendMessageRequest }
     > = (props) => {
       const { investigationId, data } = props ?? {};
 
@@ -1254,7 +1245,7 @@ export type SendMessageApiV1InvestigationsInvestigationIdMessagesPostMutationRes
     >
   >;
 export type SendMessageApiV1InvestigationsInvestigationIdMessagesPostMutationBody =
-  DataingEntrypointsApiRoutesInvestigationsSendMessageRequest;
+  SendMessageRequest;
 export type SendMessageApiV1InvestigationsInvestigationIdMessagesPostMutationError =
   HTTPValidationError;
 
@@ -1272,10 +1263,7 @@ export const useSendMessageApiV1InvestigationsInvestigationIdMessagesPost = <
       >
     >,
     TError,
-    {
-      investigationId: string;
-      data: DataingEntrypointsApiRoutesInvestigationsSendMessageRequest;
-    },
+    { investigationId: string; data: SendMessageRequest },
     TContext
   >;
 }): UseMutationResult<
@@ -1283,10 +1271,7 @@ export const useSendMessageApiV1InvestigationsInvestigationIdMessagesPost = <
     ReturnType<typeof sendMessageApiV1InvestigationsInvestigationIdMessagesPost>
   >,
   TError,
-  {
-    investigationId: string;
-    data: DataingEntrypointsApiRoutesInvestigationsSendMessageRequest;
-  },
+  { investigationId: string; data: SendMessageRequest },
   TContext
 > => {
   const mutationOptions =

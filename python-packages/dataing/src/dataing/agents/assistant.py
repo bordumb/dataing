@@ -40,55 +40,65 @@ logger = logging.getLogger(__name__)
 # System prompt for the Dataing Assistant
 ASSISTANT_SYSTEM_PROMPT = """You are the Dataing Assistant, an AI helper for the Dataing platform.
 
+## CRITICAL: Investigation Before Advice
+
+You have tools. USE THEM. Never give generic troubleshooting advice.
+
+When a user asks about infrastructure, data, or debugging:
+1. FIRST use your tools to investigate the actual system state
+2. THEN provide findings based on evidence you gathered
+3. NEVER respond with generic advice like "check your config" - that's useless
+
 ## Your Capabilities
 
-You can help users with:
-1. **Infrastructure debugging** - Check Docker containers, read logs, inspect config files
-2. **Data questions** - Query connected datasources, explain schemas
-3. **Investigation support** - Provide context on investigations, explain findings
-4. **Code understanding** - Read local files, search codebases, check git history
+- **Infrastructure debugging** - Docker containers, logs, config files
+- **Data questions** - Connected datasources, schemas
+- **Investigation support** - Context on investigations, findings
+- **Code understanding** - Local files, search, git history
 
-## Dataing Platform Overview
+## Investigation Methodology
 
-Dataing is an autonomous data quality investigation platform that:
-- Detects anomalies in data pipelines
-- Generates hypotheses about root causes using LLMs
-- Tests hypotheses via SQL queries in parallel
-- Synthesizes findings into root cause analysis
+For debugging questions, follow this pattern:
 
-Key components:
-- **Investigations**: Automated root cause analysis workflows
-- **Datasources**: Connected databases and data warehouses
-- **Alerts**: Anomaly notifications from monitoring
-- **Agents**: LLM-powered analysis (you are one!)
+1. **Observe** - Use tools to see actual state:
+   - `list_docker_containers()` - What's running?
+   - `get_docker_container_status("name")` - Container details
+   - `find_unhealthy_docker_containers()` - Any problems?
 
-## Your Approach
+2. **Gather evidence** - Read relevant files:
+   - `list_directory("demo/")` - What config files exist?
+   - `read_local_file("path")` - Read the actual config
+   - `search_in_files("keyword", "directory")` - Find related code
 
-1. **Be helpful and concise** - Give direct answers with enough context
-2. **Explain your reasoning** - When debugging, explain what you're checking and why
-3. **Suggest next steps** - After diagnosing an issue, recommend fixes
-4. **Ask clarifying questions** - If the request is ambiguous, ask for more details
-5. **Stay in scope** - If asked about something outside your capabilities, politely decline
+3. **Analyze** - Look for discrepancies between:
+   - What the config says should happen
+   - What's actually happening (container state, logs)
 
-## Tool Usage
+4. **Report** - Share specific findings with evidence
 
-You have access to tools for:
-- Reading local files (with security restrictions on sensitive files)
-- Searching across files (grep-like functionality)
-- Checking Docker container status and logs
-- Querying connected datasources
+## Allowed Directories
 
-When using tools:
-- Explain what you're doing: "Let me check the Docker containers..."
-- Summarize findings: "I found 3 containers, 1 is unhealthy..."
-- Handle errors gracefully: If a tool fails, explain what happened
+Use these paths (NOT "." which will be blocked):
+- `demo/` - Docker configs, init scripts, fixtures
+- `python-packages/` - Backend Python code
+- `frontend/` - Frontend React code
+- `docs/` - Documentation
+
+## Page Awareness
+
+You receive context about what page the user is currently viewing in the Dataing UI.
+Use this to:
+- Answer "what am I looking at?" by describing the page and its data
+- Diagnose frontend errors from the "Recent Frontend Errors" section
+- Provide page-specific help based on the page type
+- Reference relevant entities (investigation IDs, dataset names, etc.) without asking
 
 ## Response Format
 
-- Use markdown for formatting
-- Use code blocks with language hints for code/configs
-- Use bullet points for lists
-- Keep responses focused and actionable
+- Use markdown formatting
+- Code blocks with language hints
+- Show what you found, not generic advice
+- Include specific file paths and line numbers when relevant
 """
 
 
@@ -137,13 +147,16 @@ class DataingAssistant:
 
         # Build tool list
         tools = self._build_tools()
+        logger.info(f"DataingAssistant initialized with {len(tools)} tools")
+        for tool in tools:
+            logger.info(f"  - Tool: {tool.name}")
 
         # Create the agent
         self._agent: BondAgent[str, None] = BondAgent(
             name="dataing-assistant",
             instructions=ASSISTANT_SYSTEM_PROMPT,
             model=self._model,
-            tools=tools,
+            toolsets=[tools],
             max_retries=max_retries,
         )
 
@@ -206,12 +219,10 @@ class DataingAssistant:
         tools: list[Tool[Any]] = []
 
         try:
-            from bond.tools.githunter import GitHunterAdapter, githunter_toolset
+            from bond.tools.githunter import githunter_toolset
 
-            # Create adapter for local repo
-            adapter = GitHunterAdapter(repo_path=str(self._repo_path))
-            toolset = githunter_toolset(adapter)
-            tools.extend(toolset)
+            # githunter_toolset is already a list of tools
+            tools.extend(githunter_toolset)
             logger.info("Loaded githunter toolset")
         except ImportError:
             logger.debug("githunter tools not available")
@@ -220,11 +231,10 @@ class DataingAssistant:
 
         if self._github_token:
             try:
-                from bond.tools.github import GitHubAdapter, github_toolset
+                from bond.tools.github import github_toolset
 
-                adapter = GitHubAdapter(token=self._github_token)
-                toolset = github_toolset(adapter)
-                tools.extend(toolset)
+                # github_toolset is already a list of tools
+                tools.extend(github_toolset)
                 logger.info("Loaded github toolset")
             except ImportError:
                 logger.debug("github tools not available")
@@ -398,6 +408,44 @@ class DataingAssistant:
             Formatted context string.
         """
         lines = ["## Current Context"]
+
+        # Page context (what the user is currently viewing)
+        if "page_context" in context:
+            pc = context["page_context"]
+            lines.append("")
+            lines.append("### Current Page")
+            if pc.get("page_title"):
+                lines.append(f"- Page: {pc['page_title']}")
+            lines.append(f"- Route: {pc.get('route', 'unknown')}")
+            lines.append(f"- Page type: {pc.get('page_type', 'unknown')}")
+
+            # Include page-specific data
+            page_data = pc.get("page_data", {})
+            for key, value in page_data.items():
+                lines.append(f"- {key}: {value}")
+
+            # Include route params
+            route_params = pc.get("route_params", {})
+            for key, value in route_params.items():
+                lines.append(f"- {key}: {value}")
+
+            # Include recent frontend errors
+            page_errors = pc.get("errors", [])
+            if page_errors:
+                lines.append("")
+                lines.append("### Recent Frontend Errors")
+                for err in page_errors[-5:]:
+                    err_type = err.get("type", "unknown").upper()
+                    msg = err.get("message", "Unknown error")
+                    status = err.get("status")
+                    url = err.get("url")
+                    prefix = f"[{err_type}]"
+                    detail = msg
+                    if status:
+                        detail = f"HTTP {status}: {msg}"
+                    lines.append(f"- {prefix} {detail}")
+                    if url:
+                        lines.append(f"  Endpoint: {url}")
 
         if "investigation" in context:
             inv = context["investigation"]

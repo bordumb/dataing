@@ -1,12 +1,15 @@
-"""Temporal client for interacting with investigation workflows."""
+"""Temporal client for interacting with investigation and agent workflows."""
 
 from __future__ import annotations
 
 from dataclasses import dataclass
 from typing import Any
 
-from temporalio.client import Client
+from temporalio.client import Client, WorkflowHandle
+from temporalio.service import RPCError
 
+from dataing.temporal.agents.protocol import AgentWorkflowInput, AgentWorkflowResult
+from dataing.temporal.workflows.agent import AgentWorkflow, AgentWorkflowQueryStatus
 from dataing.temporal.workflows.investigation import (
     InvestigationInput,
     InvestigationQueryStatus,
@@ -279,3 +282,324 @@ class TemporalInvestigationClient:
         handle = await self.get_handle(investigation_id)
         status: InvestigationQueryStatus = await handle.query(InvestigationWorkflow.get_status)
         return status
+
+
+@dataclass
+class AgentWorkflowStatus:
+    """Status of an agent workflow."""
+
+    workflow_id: str
+    run_id: str | None
+    workflow_status: str  # Temporal workflow status
+    session_id: str | None = None
+    agent_name: str | None = None
+    turn_count: int | None = None
+    total_tokens: int | None = None
+    last_response: str | None = None
+    is_processing: bool = False
+
+
+class TemporalAgentClient:
+    """Client for interacting with agent workflows via Temporal.
+
+    This client provides a high-level interface for:
+    - Starting agent sessions (workflows)
+    - Sending messages via signals
+    - Querying session status
+    - Getting responses
+
+    Usage:
+        client = await TemporalAgentClient.connect(
+            host="localhost:7233",
+            namespace="default",
+            task_queue="investigations",
+        )
+
+        # Start or get agent session
+        handle = await client.start_or_get_session(
+            agent_name="dataing-assistant",
+            session_id="sess-123",
+            tenant_id="tenant-1",
+        )
+
+        # Send message
+        await client.send_message("sess-123", "What's wrong with the data?")
+
+        # Poll for response
+        status = await client.get_status("sess-123")
+    """
+
+    def __init__(
+        self,
+        client: Client,
+        task_queue: str = "investigations",
+    ) -> None:
+        """Initialize the Temporal agent client.
+
+        Args:
+            client: Temporal client connection.
+            task_queue: Task queue for agent workflows.
+        """
+        self._client = client
+        self._task_queue = task_queue
+
+    @classmethod
+    async def connect(
+        cls,
+        host: str = "localhost:7233",
+        namespace: str = "default",
+        task_queue: str = "investigations",
+    ) -> TemporalAgentClient:
+        """Connect to Temporal and create client.
+
+        Args:
+            host: Temporal server host.
+            namespace: Temporal namespace.
+            task_queue: Task queue for agent workflows.
+
+        Returns:
+            Connected TemporalAgentClient.
+        """
+        client = await Client.connect(target_host=host, namespace=namespace)
+        return cls(client=client, task_queue=task_queue)
+
+    def _workflow_id(self, session_id: str) -> str:
+        """Generate workflow ID for a session.
+
+        Args:
+            session_id: Session ID.
+
+        Returns:
+            Workflow ID in format "assistant-{session_id}".
+        """
+        return f"assistant-{session_id}"
+
+    async def start_session(
+        self,
+        agent_name: str,
+        session_id: str,
+        tenant_id: str,
+        context: dict[str, Any] | None = None,
+        initial_message: str | None = None,
+    ) -> WorkflowHandle[AgentWorkflowResult, Any]:
+        """Start a new agent session workflow.
+
+        Args:
+            agent_name: Name of the agent to use.
+            session_id: Unique session ID.
+            tenant_id: Tenant ID for multi-tenancy.
+            context: Optional initial context.
+            initial_message: Optional first message to process.
+
+        Returns:
+            Workflow handle for the session.
+        """
+        input_data = AgentWorkflowInput(
+            agent_name=agent_name,
+            session_id=session_id,
+            tenant_id=tenant_id,
+            context=context or {},
+            initial_message=initial_message,
+        )
+
+        handle: WorkflowHandle[AgentWorkflowResult, Any] = await self._client.start_workflow(
+            AgentWorkflow.run,
+            input_data,
+            id=self._workflow_id(session_id),
+            task_queue=self._task_queue,
+        )
+
+        return handle
+
+    async def get_handle(self, session_id: str) -> WorkflowHandle[AgentWorkflowResult, Any]:
+        """Get a handle to an existing session workflow.
+
+        Args:
+            session_id: Session ID.
+
+        Returns:
+            Workflow handle for the session.
+        """
+        handle: WorkflowHandle[AgentWorkflowResult, Any] = self._client.get_workflow_handle(
+            self._workflow_id(session_id),
+            result_type=AgentWorkflowResult,
+        )
+        return handle
+
+    async def workflow_exists(self, session_id: str) -> bool:
+        """Check if a workflow exists for the session.
+
+        Args:
+            session_id: Session ID.
+
+        Returns:
+            True if workflow exists and is running.
+        """
+        try:
+            handle = await self.get_handle(session_id)
+            desc = await handle.describe()
+            # Check if workflow is running
+            status = desc.status
+            if status is None:
+                return False
+            status_name = status.name if hasattr(status, "name") else str(status)
+            return status_name == "RUNNING"
+        except RPCError:
+            return False
+
+    async def start_or_get_session(
+        self,
+        agent_name: str,
+        session_id: str,
+        tenant_id: str,
+        context: dict[str, Any] | None = None,
+    ) -> WorkflowHandle[AgentWorkflowResult, Any]:
+        """Start a new session or get existing one.
+
+        Args:
+            agent_name: Name of the agent to use.
+            session_id: Unique session ID.
+            tenant_id: Tenant ID for multi-tenancy.
+            context: Optional context.
+
+        Returns:
+            Workflow handle for the session.
+        """
+        if await self.workflow_exists(session_id):
+            return await self.get_handle(session_id)
+        return await self.start_session(
+            agent_name=agent_name,
+            session_id=session_id,
+            tenant_id=tenant_id,
+            context=context,
+        )
+
+    async def send_message(self, session_id: str, message: str) -> None:
+        """Send a message to an agent session.
+
+        Args:
+            session_id: Session ID.
+            message: The user's message.
+        """
+        handle = await self.get_handle(session_id)
+        await handle.signal(AgentWorkflow.send_message, message)
+
+    async def update_context(self, session_id: str, context: dict[str, Any]) -> None:
+        """Update the context for a session.
+
+        Args:
+            session_id: Session ID.
+            context: Context to merge with existing context.
+        """
+        handle = await self.get_handle(session_id)
+        await handle.signal(AgentWorkflow.update_context, context)
+
+    async def complete_session(self, session_id: str) -> None:
+        """Complete a session and end the workflow.
+
+        Args:
+            session_id: Session ID.
+        """
+        handle = await self.get_handle(session_id)
+        await handle.signal(AgentWorkflow.complete_session)
+
+    async def get_status(self, session_id: str) -> AgentWorkflowStatus:
+        """Get the status of an agent session.
+
+        Args:
+            session_id: Session ID.
+
+        Returns:
+            Session status including workflow state and progress.
+        """
+        handle = await self.get_handle(session_id)
+        desc = await handle.describe()
+
+        # Map Temporal status
+        status = desc.status
+        if status is None:
+            workflow_status = "unknown"
+        else:
+            status_name = status.name if hasattr(status, "name") else str(status)
+            status_map = {
+                "RUNNING": "running",
+                "COMPLETED": "completed",
+                "FAILED": "failed",
+                "CANCELED": "cancelled",
+                "CANCELLED": "cancelled",
+                "TERMINATED": "terminated",
+                "TIMED_OUT": "timed_out",
+            }
+            workflow_status = status_map.get(status_name, "unknown")
+
+        query_status: AgentWorkflowQueryStatus | None = None
+
+        # If running, try to get detailed status via query
+        if workflow_status == "running":
+            try:
+                query_status = await handle.query(AgentWorkflow.get_status)
+            except Exception:
+                pass
+
+        return AgentWorkflowStatus(
+            workflow_id=self._workflow_id(session_id),
+            run_id=desc.run_id,
+            workflow_status=workflow_status,
+            session_id=query_status.session_id if query_status else None,
+            agent_name=query_status.agent_name if query_status else None,
+            turn_count=query_status.turn_count if query_status else None,
+            total_tokens=query_status.total_tokens if query_status else None,
+            last_response=query_status.last_response if query_status else None,
+            is_processing=query_status.is_processing if query_status else False,
+        )
+
+    async def get_last_turn(self, session_id: str) -> dict[str, Any] | None:
+        """Get the most recent turn from a session.
+
+        Args:
+            session_id: Session ID.
+
+        Returns:
+            Last turn dictionary or None if no turns yet.
+        """
+        handle = await self.get_handle(session_id)
+        result: dict[str, Any] | None = await handle.query(AgentWorkflow.get_last_turn)
+        return result
+
+    async def wait_for_response(
+        self,
+        session_id: str,
+        timeout_seconds: float = 300,
+        poll_interval: float = 0.5,
+    ) -> str | None:
+        """Wait for the agent to finish processing and return the response.
+
+        Args:
+            session_id: Session ID.
+            timeout_seconds: Maximum time to wait.
+            poll_interval: Time between polls.
+
+        Returns:
+            The agent's response, or None if timeout.
+        """
+        import asyncio
+
+        start_time = asyncio.get_event_loop().time()
+
+        while True:
+            status = await self.get_status(session_id)
+
+            # If not processing and we have a response, return it
+            if not status.is_processing and status.last_response:
+                return status.last_response
+
+            # Check for workflow completion or error
+            if status.workflow_status in ("completed", "failed", "cancelled"):
+                return status.last_response
+
+            # Check timeout
+            elapsed = asyncio.get_event_loop().time() - start_time
+            if elapsed >= timeout_seconds:
+                return None
+
+            await asyncio.sleep(poll_interval)

@@ -13,6 +13,33 @@
 #   3. Run investigation on the connected datasource
 
 services:
+  # Override API to mount repo files for assistant file reading
+  api:
+    volumes:
+      # Mount repo root for assistant file reading
+      # PWD is set by 'just demo' or defaults to current directory
+      - ${PWD:-.}/demo:/repo/demo:ro
+      - ${PWD:-.}/python-packages:/repo/python-packages:ro
+      - ${PWD:-.}/frontend:/repo/frontend:ro
+      - ${PWD:-.}/docs:/repo/docs:ro
+      # Docker socket for container introspection
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    environment:
+      DATAING_REPO_ROOT: /repo
+
+  # Override worker to mount repo files for assistant file reading (Temporal agent)
+  worker:
+    volumes:
+      # Mount repo root for assistant file reading
+      # PWD is set by 'just demo' or defaults to current directory
+      - ${PWD:-.}/demo:/repo/demo:ro
+      - ${PWD:-.}/python-packages:/repo/python-packages:ro
+      - ${PWD:-.}/frontend:/repo/frontend:ro
+      - ${PWD:-.}/docs:/repo/docs:ro
+      # Docker socket for container introspection
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    environment:
+      DATAING_REPO_ROOT: /repo
   # Demo PostgreSQL with DuckDB integration for analytics
   # Uses pg_duckdb extension - real PostgreSQL with DuckDB query engine
   # https://github.com/duckdb/pg_duckdb

@@ -528,11 +528,20 @@ def get_file_reader(repo_root: Path | None = None) -> LocalFileReader:
     Returns:
         LocalFileReader instance.
     """
+    import os
+
     global _reader
     if _reader is None:
         if repo_root is None:
-            # Auto-detect from current file location
-            repo_root = Path(__file__).resolve().parents[5]
+            # Check for environment variable first (for Docker)
+            env_root = os.environ.get("DATAING_REPO_ROOT")
+            if env_root:
+                repo_root = Path(env_root)
+                logger.info(f"Using DATAING_REPO_ROOT: {repo_root}")
+            else:
+                # Auto-detect from current file location (for local dev)
+                repo_root = Path(__file__).resolve().parents[5]
+                logger.info(f"Auto-detected repo root: {repo_root}")
         _reader = LocalFileReader(repo_root)
     return _reader
 
@@ -559,6 +568,7 @@ async def read_local_file(
     Returns:
         File contents or error message.
     """
+    logger.info(f"[TOOL CALLED] read_local_file: {file_path}")
     reader = get_file_reader()
     result = reader.read_file(file_path, start_line, end_line)
 
@@ -568,8 +578,10 @@ async def read_local_file(
             header += f" ({result.line_count} lines)"
         if result.truncated:
             header += " [TRUNCATED]"
+        logger.info(f"[TOOL RESULT] read_local_file: success, {result.line_count} lines")
         return f"{header}\n\n{result.content}"
     else:
+        logger.info(f"[TOOL RESULT] read_local_file: error - {result.error}")
         return f"Error: {result.error}"
 
 
@@ -588,10 +600,12 @@ async def search_in_files(
     Returns:
         Search results or error message.
     """
+    logger.info(f"[TOOL CALLED] search_in_files: pattern='{pattern}', directory={directory}")
     reader = get_file_reader()
     results = reader.search_files(pattern, directory, max_results)
 
     if not results:
+        logger.info("[TOOL RESULT] search_in_files: no matches")
         return f"No matches found for '{pattern}'"
 
     lines = [f"Found {len(results)} matches for '{pattern}':\n"]
@@ -603,6 +617,7 @@ async def search_in_files(
             lines.append(f"\n{file_path}:")
         lines.append(f"  {line_num}: {content[:100]}")
 
+    logger.info(f"[TOOL RESULT] search_in_files: {len(results)} matches")
     return "\n".join(lines)
 
 
@@ -614,17 +629,36 @@ async def list_directory(
 
     Args:
         directory: Directory path relative to repository root.
-        pattern: Optional glob pattern (default: all files).
+            ALLOWED directories: python-packages/, frontend/, demo/, docs/
+            Use 'demo/' to find Docker and infrastructure configuration.
 
     Returns:
         File listing or error message.
     """
+    logger.info(f"[TOOL CALLED] list_directory: directory='{directory}', pattern='{pattern}'")
     reader = get_file_reader()
+
+    # Check if path is allowed first and give helpful error
+    is_allowed, error = reader.is_path_allowed(directory)
+    if not is_allowed:
+        logger.info(f"[TOOL RESULT] list_directory: blocked - {error}")
+        return (
+            f"Cannot list '{directory}': {error}\n\n"
+            f"ALLOWED directories you can list:\n"
+            f"  - demo/ (Docker configs, init scripts, fixtures)\n"
+            f"  - python-packages/ (backend code)\n"
+            f"  - frontend/ (frontend code)\n"
+            f"  - docs/ (documentation)\n\n"
+            f"Try: list_directory('demo/') to see infrastructure configuration."
+        )
+
     files = reader.list_files(directory, pattern)
 
     if not files:
+        logger.info("[TOOL RESULT] list_directory: no files found")
         return f"No files found in '{directory}' matching '{pattern}'"
 
+    logger.info(f"[TOOL RESULT] list_directory: {len(files)} files")
     return f"Files in {directory}:\n" + "\n".join(f"  {f}" for f in files)
 
 

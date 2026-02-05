@@ -1,5 +1,7 @@
+import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
+import { useRegisterPageContext } from "@/lib/assistant/page-context";
 import {
   Search,
   Database,
@@ -21,6 +23,22 @@ export function DashboardPage() {
     queryKey: ["dashboard-stats"],
     queryFn: fetchDashboardStats,
   });
+
+  useRegisterPageContext(
+    useMemo(
+      () => ({
+        pageType: "dashboard",
+        pageTitle: "Dashboard",
+        pageData: {
+          activeInvestigations: stats?.activeInvestigations ?? 0,
+          totalDatasources: stats?.dataSources ?? 0,
+          completedToday: stats?.completedToday ?? 0,
+          pendingApprovals: stats?.pendingApprovals ?? 0,
+        },
+      }),
+      [stats],
+    ),
+  );
 
   return (
     <div className="space-y-6">

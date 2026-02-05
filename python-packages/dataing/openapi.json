@@ -665,7 +665,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/SendMessageResponse"
+                  "$ref": "#/components/schemas/dataing__entrypoints__api__routes__assistant__SendMessageResponse"
                 }
               }
             }
@@ -1488,7 +1488,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/dataing__entrypoints__api__routes__investigations__SendMessageResponse"
+                  "$ref": "#/components/schemas/SendMessageResponse"
                 }
               }
             }
@@ -2849,7 +2849,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/dataing__entrypoints__api__routes__datasources__TestConnectionResponse"
+                  "$ref": "#/components/schemas/TestConnectionResponse"
                 }
               }
             }
@@ -3074,7 +3074,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/dataing__entrypoints__api__routes__datasources__TestConnectionResponse"
+                  "$ref": "#/components/schemas/TestConnectionResponse"
                 }
               }
             }
@@ -3509,7 +3509,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/dataing__entrypoints__api__routes__datasources__TestConnectionResponse"
+                  "$ref": "#/components/schemas/TestConnectionResponse"
                 }
               }
             }
@@ -3734,7 +3734,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/dataing__entrypoints__api__routes__datasources__TestConnectionResponse"
+                  "$ref": "#/components/schemas/TestConnectionResponse"
                 }
               }
             }
@@ -4329,7 +4329,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/TestConnectionResponse"
+                  "$ref": "#/components/schemas/dataing__entrypoints__api__routes__credentials__TestConnectionResponse"
                 }
               }
             }
@@ -15312,6 +15312,112 @@
         "title": "OrgMemberResponse",
         "description": "Response for an org member."
       },
+      "PageContext": {
+        "properties": {
+          "route": {
+            "type": "string",
+            "title": "Route"
+          },
+          "route_pattern": {
+            "type": "string",
+            "title": "Route Pattern"
+          },
+          "route_params": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "title": "Route Params"
+          },
+          "page_type": {
+            "type": "string",
+            "title": "Page Type"
+          },
+          "page_title": {
+            "type": "string",
+            "title": "Page Title"
+          },
+          "page_data": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Page Data"
+          },
+          "errors": {
+            "items": {
+              "$ref": "#/components/schemas/PageContextError"
+            },
+            "type": "array",
+            "title": "Errors"
+          }
+        },
+        "type": "object",
+        "required": [
+          "route",
+          "route_pattern",
+          "page_type",
+          "page_title"
+        ],
+        "title": "PageContext",
+        "description": "Context about the page the user is currently viewing."
+      },
+      "PageContextError": {
+        "properties": {
+          "type": {
+            "type": "string",
+            "title": "Type",
+            "description": "Error type: api, react, or console"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Status"
+          },
+          "url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Url"
+          },
+          "timestamp": {
+            "type": "integer",
+            "title": "Timestamp"
+          },
+          "stack_preview": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stack Preview"
+          }
+        },
+        "type": "object",
+        "required": [
+          "type",
+          "message",
+          "timestamp"
+        ],
+        "title": "PageContextError",
+        "description": "A frontend error captured by the error bus."
+      },
       "PasswordResetConfirm": {
         "properties": {
           "token": {
@@ -16643,23 +16749,23 @@
       },
       "SendMessageResponse": {
         "properties": {
-          "message_id": {
-            "type": "string",
-            "format": "uuid",
-            "title": "Message Id"
-          },
           "status": {
             "type": "string",
-            "title": "Status",
-            "default": "processing"
+            "title": "Status"
+          },
+          "investigation_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Investigation Id"
           }
         },
         "type": "object",
         "required": [
-          "message_id"
+          "status",
+          "investigation_id"
         ],
         "title": "SendMessageResponse",
-        "description": "Response from sending a message."
+        "description": "Response for sending a message."
       },
       "SessionDetailResponse": {
         "properties": {
@@ -17935,18 +18041,11 @@
             "type": "boolean",
             "title": "Success"
           },
-          "error": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Error"
+          "message": {
+            "type": "string",
+            "title": "Message"
           },
-          "tables_accessible": {
+          "latency_ms": {
             "anyOf": [
               {
                 "type": "integer"
@@ -17955,15 +18054,27 @@
                 "type": "null"
               }
             ],
-            "title": "Tables Accessible"
+            "title": "Latency Ms"
+          },
+          "server_version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Server Version"
           }
         },
         "type": "object",
         "required": [
-          "success"
+          "success",
+          "message"
         ],
         "title": "TestConnectionResponse",
-        "description": "Response for testing credentials."
+        "description": "Response for testing a connection."
       },
       "TestRunResultRequest": {
         "properties": {
@@ -18705,6 +18816,16 @@
             "maxLength": 32000,
             "minLength": 1,
             "title": "Content"
+          },
+          "page_context": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PageContext"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "type": "object",
@@ -18714,28 +18835,33 @@
         "title": "SendMessageRequest",
         "description": "Request to send a message."
       },
-      "dataing__entrypoints__api__routes__datasources__TestConnectionResponse": {
+      "dataing__entrypoints__api__routes__assistant__SendMessageResponse": {
+        "properties": {
+          "message_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Message Id"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status",
+            "default": "processing"
+          }
+        },
+        "type": "object",
+        "required": [
+          "message_id"
+        ],
+        "title": "SendMessageResponse",
+        "description": "Response from sending a message."
+      },
+      "dataing__entrypoints__api__routes__credentials__TestConnectionResponse": {
         "properties": {
           "success": {
             "type": "boolean",
             "title": "Success"
           },
-          "message": {
-            "type": "string",
-            "title": "Message"
-          },
-          "latency_ms": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Latency Ms"
-          },
-          "server_version": {
+          "error": {
             "anyOf": [
               {
                 "type": "string"
@@ -18744,36 +18870,26 @@
                 "type": "null"
               }
             ],
-            "title": "Server Version"
+            "title": "Error"
+          },
+          "tables_accessible": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tables Accessible"
           }
         },
         "type": "object",
         "required": [
-          "success",
-          "message"
+          "success"
         ],
         "title": "TestConnectionResponse",
-        "description": "Response for testing a connection."
-      },
-      "dataing__entrypoints__api__routes__investigations__SendMessageResponse": {
-        "properties": {
-          "status": {
-            "type": "string",
-            "title": "Status"
-          },
-          "investigation_id": {
-            "type": "string",
-            "format": "uuid",
-            "title": "Investigation Id"
-          }
-        },
-        "type": "object",
-        "required": [
-          "status",
-          "investigation_id"
-        ],
-        "title": "SendMessageResponse",
-        "description": "Response for sending a message."
+        "description": "Response for testing credentials."
       },
       "dataing__entrypoints__api__routes__lineage__LineageGraphResponse": {
         "properties": {

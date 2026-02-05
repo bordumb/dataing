@@ -5,14 +5,15 @@
  * Autonomous Data Quality Investigation
  * OpenAPI spec version: 2.0.0
  */
-import type { TestConnectionResponseError } from "./testConnectionResponseError";
-import type { TestConnectionResponseTablesAccessible } from "./testConnectionResponseTablesAccessible";
+import type { TestConnectionResponseLatencyMs } from "./testConnectionResponseLatencyMs";
+import type { TestConnectionResponseServerVersion } from "./testConnectionResponseServerVersion";
 
 /**
- * Response for testing credentials.
+ * Response for testing a connection.
  */
 export interface TestConnectionResponse {
-  error?: TestConnectionResponseError;
+  latency_ms?: TestConnectionResponseLatencyMs;
+  message: string;
+  server_version?: TestConnectionResponseServerVersion;
   success: boolean;
-  tables_accessible?: TestConnectionResponseTablesAccessible;
 }

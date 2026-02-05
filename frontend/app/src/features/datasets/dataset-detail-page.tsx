@@ -1,5 +1,6 @@
 import { useState, useMemo } from "react";
 import { useParams, Link } from "react-router-dom";
+import { useRegisterPageContext } from "@/lib/assistant/page-context";
 import {
   Table as TableIcon,
   AlertCircle,
@@ -93,6 +94,26 @@ export function DatasetDetailPage() {
   }, [allSchemaComments]);
 
   const investigations = investigationsResponse?.investigations ?? [];
+
+  // Register page context for assistant (must be before early returns)
+  const pageCtx = useMemo(
+    () => ({
+      pageType: "dataset_detail",
+      pageTitle: dataset ? `Dataset: ${dataset.name}` : "Dataset",
+      pageData: dataset
+        ? {
+            datasetId: datasetId,
+            datasetName: dataset.name,
+            nativePath: dataset.native_path,
+            columnCount: dataset.column_count ?? (dataset.columns?.length || 0),
+            tableType: dataset.table_type,
+            datasourceType: dataset.datasource_type ?? null,
+          }
+        : { datasetId: datasetId },
+    }),
+    [datasetId, dataset],
+  );
+  useRegisterPageContext(pageCtx);
 
   if (isLoading) {
     return (

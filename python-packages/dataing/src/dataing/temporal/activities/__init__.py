@@ -15,6 +15,10 @@ Production Usage:
 
 # Factory functions (for production with dependency injection)
 # Input/Result dataclasses
+from dataing.temporal.activities.agent_turn import (
+    AgentTurnActivityInput,
+    make_agent_turn_activity,
+)
 from dataing.temporal.activities.capture_snapshot import (
     CaptureSnapshotInput,
     CaptureSnapshotResult,
@@ -68,6 +72,7 @@ from dataing.temporal.activities.synthesize import (
 
 __all__ = [
     # Factory functions
+    "make_agent_turn_activity",
     "make_capture_snapshot_activity",
     "make_gather_context_activity",
     "make_check_patterns_activity",
@@ -79,6 +84,7 @@ __all__ = [
     "make_counter_analyze_activity",
     "make_finalize_evidence_chain_activity",
     # Input/Result types
+    "AgentTurnActivityInput",
     "CaptureSnapshotInput",
     "CaptureSnapshotResult",
     "GatherContextInput",

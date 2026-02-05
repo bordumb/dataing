@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useParams, Link } from "react-router-dom";
+import { useRegisterPageContext } from "@/lib/assistant/page-context";
 import type { UseQueryResult } from "@tanstack/react-query";
 import {
   ArrowLeft,
@@ -476,6 +477,23 @@ function IssueWorkspaceContent({ issue }: IssueWorkspaceContentProps) {
   const updateIssue = useUpdateIssue();
   const invalidate = useInvalidateIssues();
   const [isEditingStatus, setIsEditingStatus] = useState(false);
+
+  const pageCtx = useMemo(
+    () => ({
+      pageType: "issue_detail",
+      pageTitle: `Issue #${issue.number}: ${issue.title}`,
+      pageData: {
+        issueId: issue.id,
+        title: issue.title,
+        status: issue.status,
+        priority: issue.priority ?? null,
+        severity: issue.severity ?? null,
+        labels: issue.labels,
+      },
+    }),
+    [issue],
+  );
+  useRegisterPageContext(pageCtx);
 
   const handleStatusChange = async (newStatus: string) => {
     try {

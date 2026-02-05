@@ -1,5 +1,6 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { useParams, Link } from "react-router-dom";
+import { useRegisterPageContext } from "@/lib/assistant/page-context";
 import {
   useInvestigation,
   useSendMessage,
@@ -494,6 +495,27 @@ export function InvestigationDetail() {
       console.error("Failed to cancel investigation:", err);
     }
   };
+
+  // Register page context for assistant (must be before early returns)
+  const pageContextData = useMemo(
+    () => ({
+      pageType: "investigation_detail",
+      pageTitle: data
+        ? `Investigation: ${data.main_branch.matched_patterns?.[0] || data.status}`
+        : "Investigation",
+      pageData: data
+        ? {
+            investigationId: id,
+            status: data.status,
+            hasFindings: !!data.main_branch.synthesis,
+            evidenceCount: data.main_branch.evidence.length,
+            patternCount: data.main_branch.matched_patterns?.length ?? 0,
+          }
+        : { investigationId: id },
+    }),
+    [id, data],
+  );
+  useRegisterPageContext(pageContextData);
 
   if (!id) {
     return (

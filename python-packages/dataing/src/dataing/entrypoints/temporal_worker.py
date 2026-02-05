@@ -2,8 +2,8 @@
 
 This module creates a production-ready Temporal worker that:
 - Connects to Temporal using settings from environment
-- Wires all 8 activities with factory closures capturing dependencies
-- Registers both InvestigationWorkflow and EvaluateHypothesisWorkflow
+- Wires all activities with factory closures capturing dependencies
+- Registers InvestigationWorkflow, EvaluateHypothesisWorkflow, and AgentWorkflow
 - Sets appropriate concurrency limits
 
 Usage:
@@ -35,6 +35,7 @@ from dataing.agents import AgentClient
 from dataing.core.snapshot_store import LocalSnapshotStore
 from dataing.entrypoints.api.deps import settings
 from dataing.temporal.activities import (
+    make_agent_turn_activity,
     make_capture_snapshot_activity,
     make_check_patterns_activity,
     make_counter_analyze_activity,
@@ -47,7 +48,13 @@ from dataing.temporal.activities import (
     make_synthesize_activity,
 )
 from dataing.temporal.adapters import TemporalAgentAdapter
-from dataing.temporal.workflows import EvaluateHypothesisWorkflow, InvestigationWorkflow
+from dataing.temporal.agents import AgentRegistry
+from dataing.temporal.agents.assistant_agent import AssistantTemporalAgent
+from dataing.temporal.workflows import (
+    AgentWorkflow,
+    EvaluateHypothesisWorkflow,
+    InvestigationWorkflow,
+)
 
 logging.basicConfig(
     level=logging.INFO,
@@ -93,13 +100,44 @@ async def create_dependencies() -> dict[str, Any]:
     snapshot_store = LocalSnapshotStore("/tmp/dataing/snapshots")
     logger.info("Snapshot store initialized")
 
+    # Agent registry for unified agent execution
+    agent_registry = create_agent_registry()
+    logger.info("Agent registry initialized")
+
     return {
         "app_db": app_db,
         "agent_adapter": agent_adapter,
         "context_engine": context_engine,
         "pattern_repository": pattern_repository,
         "snapshot_store": snapshot_store,
+        "agent_registry": agent_registry,
     }
+
+
+def create_agent_registry() -> AgentRegistry:
+    """Create and populate the agent registry.
+
+    Returns:
+        Configured AgentRegistry with all available agents.
+    """
+    registry = AgentRegistry()
+
+    # Register the assistant agent
+    # Note: Tenant ID will be passed via activity context
+    # repo_path is set via DATAING_REPO_ROOT environment variable
+    assistant_agent = AssistantTemporalAgent(
+        api_key=settings.anthropic_api_key,
+        tenant_id="worker-default",  # Will be overridden by activity input
+        model=settings.llm_model,
+        repo_path=settings.repo_root,  # /repo in container, . locally
+    )
+    registry.register(assistant_agent)
+
+    logger.info(
+        f"Agent registry created with agents: {registry.list_agents()}, "
+        f"repo_root={settings.repo_root}"
+    )
+    return registry
 
 
 def create_activities(deps: dict[str, Any]) -> list[Any]:
@@ -116,6 +154,7 @@ def create_activities(deps: dict[str, Any]) -> list[Any]:
     pattern_repository = deps["pattern_repository"]
     app_db = deps["app_db"]
     snapshot_store = deps["snapshot_store"]
+    agent_registry = deps["agent_registry"]
 
     # Cache for adapters to avoid recreating them
     adapter_cache: dict[str, BaseAdapter] = {}
@@ -213,6 +252,8 @@ def create_activities(deps: dict[str, Any]) -> list[Any]:
     adapter_database = AdapterDatabase(get_adapter)
 
     activities = [
+        # Agent turn activity (generic for all agents)
+        make_agent_turn_activity(registry=agent_registry),
         # Snapshot capture (fire-and-forget)
         make_capture_snapshot_activity(snapshot_store=snapshot_store),
         # Context and pattern activities
@@ -269,7 +310,7 @@ async def run_worker() -> None:
     worker = Worker(
         client,
         task_queue=settings.TEMPORAL_TASK_QUEUE,
-        workflows=[InvestigationWorkflow, EvaluateHypothesisWorkflow],
+        workflows=[InvestigationWorkflow, EvaluateHypothesisWorkflow, AgentWorkflow],
         activities=activities,
         max_concurrent_activities=MAX_CONCURRENT_ACTIVITIES,
         max_concurrent_workflow_tasks=MAX_CONCURRENT_WORKFLOW_TASKS,

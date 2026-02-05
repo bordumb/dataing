@@ -1,6 +1,7 @@
 import * as React from "react";
 import { Plus, Database, AlertCircle, RefreshCw } from "lucide-react";
 import { Link } from "react-router-dom";
+import { useRegisterPageContext } from "@/lib/assistant/page-context";
 
 import { Button } from "@/components/ui/Button";
 import { PageHeader } from "@/components/shared/page-header";
@@ -14,6 +15,26 @@ import { EmptyState } from "@/components/shared/empty-state";
 export function DataSourcePage() {
   const [formOpen, setFormOpen] = React.useState(false);
   const { data: datasources, isLoading, error, refetch } = useDataSources();
+
+  const dsTypes = React.useMemo(() => {
+    if (!datasources) return [];
+    const types = new Set(datasources.map((ds) => ds.type ?? "unknown"));
+    return [...types];
+  }, [datasources]);
+
+  useRegisterPageContext(
+    React.useMemo(
+      () => ({
+        pageType: "datasource_list",
+        pageTitle: "Data Sources",
+        pageData: {
+          count: datasources?.length ?? 0,
+          types: dsTypes,
+        },
+      }),
+      [datasources, dsTypes],
+    ),
+  );
 
   if (isLoading) {
     return (

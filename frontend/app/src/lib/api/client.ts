@@ -1,3 +1,5 @@
+import { emitApiError } from "@/lib/assistant/error-bus";
+
 // API base URL - empty for same-origin (dev), set VITE_API_URL for production
 const API_BASE_URL = import.meta.env.VITE_API_URL || "";
 
@@ -78,11 +80,18 @@ export const customInstance = async <T>(config: RequestConfig): Promise<T> => {
       throw new Error(messages || `HTTP error ${response.status}`);
     }
 
-    throw new Error(
+    const errorMessage =
       errorData.detail?.message ||
-        errorData.detail ||
-        `HTTP error ${response.status}`,
-    );
+      errorData.detail ||
+      `HTTP error ${response.status}`;
+
+    emitApiError({
+      message: String(errorMessage),
+      status: response.status,
+      url: url,
+    });
+
+    throw new Error(String(errorMessage));
   }
 
   return response.json();

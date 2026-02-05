@@ -1,5 +1,9 @@
 """Temporal workflow definitions for investigation orchestration."""
 
+from dataing.temporal.workflows.agent import (
+    AgentWorkflow,
+    AgentWorkflowQueryStatus,
+)
 from dataing.temporal.workflows.evaluate_hypothesis import (
     EvaluateHypothesisInput,
     EvaluateHypothesisResult,
@@ -13,6 +17,7 @@ from dataing.temporal.workflows.investigation import (
 )
 
 __all__ = [
+    # Investigation workflows
     "InvestigationWorkflow",
     "InvestigationInput",
     "InvestigationResult",
@@ -20,4 +25,7 @@ __all__ = [
     "EvaluateHypothesisWorkflow",
     "EvaluateHypothesisInput",
     "EvaluateHypothesisResult",
+    # Generic agent workflow
+    "AgentWorkflow",
+    "AgentWorkflowQueryStatus",
 ]

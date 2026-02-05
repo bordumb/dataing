@@ -5,6 +5,7 @@
  * Autonomous Data Quality Investigation
  * OpenAPI spec version: 2.0.0
  */
+import type { DataingEntrypointsApiRoutesAssistantSendMessageRequestPageContext } from "./dataingEntrypointsApiRoutesAssistantSendMessageRequestPageContext";
 
 /**
  * Request to send a message.
@@ -15,4 +16,5 @@ export interface DataingEntrypointsApiRoutesAssistantSendMessageRequest {
    * @maxLength 32000
    */
   content: string;
+  page_context?: DataingEntrypointsApiRoutesAssistantSendMessageRequestPageContext;
 }

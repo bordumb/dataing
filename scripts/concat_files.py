@@ -16,11 +16,11 @@ ROOT_DIR = Path(".")
 
 SEARCH_PREFIXES = [
     "python-packages",
-    "frontend/jupyterlab-dataing/src",
+    # "frontend/jupyterlab-dataing/src",
     # "frontend",
     # "bond",
     # "maistro",
-    # "docs/feedback",
+    # "docs",
 ]
 
 INCLUDE_ROOT_FILES = [
@@ -73,6 +73,8 @@ EXCLUDE = {
     "site",
     "output",
     "tests",
+    "test-quickstart.sh",
+    "./docs/plans"
 }
 
 ENCODING = "utf-8"

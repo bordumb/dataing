@@ -373,10 +373,19 @@ async def list_docker_containers(include_stopped: bool = True) -> str:
     Returns:
         Formatted string with container list or error message.
     """
+    logger.info(f"[TOOL CALLED] list_docker_containers: include_stopped={include_stopped}")
     tool = get_docker_tool()
     result = await tool.list_containers(include_stopped=include_stopped)
 
     if not result.success:
+        if "Permission denied" in str(result.error):
+            return (
+                "Cannot access Docker (permission denied). "
+                "Use file reading tools instead:\n"
+                "- Read demo/docker-compose.demo.yml for container configuration\n"
+                "- Read demo/init-pgduckdb.sql for database initialization\n"
+                "- List demo/fixtures/ for data files"
+            )
         return f"Error listing containers: {result.error}"
 
     if not result.containers:
@@ -399,6 +408,7 @@ async def get_docker_container_status(container_id: str) -> str:
     Returns:
         Formatted string with container details or error message.
     """
+    logger.info(f"[TOOL CALLED] get_docker_container_status: {container_id}")
     tool = get_docker_tool()
     result = await tool.get_container_status(container_id)
 
@@ -498,6 +508,7 @@ async def find_unhealthy_docker_containers() -> str:
     Returns:
         Formatted string with unhealthy container list or success message.
     """
+    logger.info("[TOOL CALLED] find_unhealthy_docker_containers")
     tool = get_docker_tool()
     unhealthy = await tool.find_unhealthy_containers()
 
@@ -505,7 +516,14 @@ async def find_unhealthy_docker_containers() -> str:
         return "✅ All containers are healthy and running."
 
     if len(unhealthy) == 1 and "error" in unhealthy[0]:
-        return f"Error checking containers: {unhealthy[0]['error']}"
+        error_msg = unhealthy[0]["error"]
+        if "Permission denied" in str(error_msg):
+            return (
+                "Cannot access Docker (permission denied). "
+                "Check container status manually with: docker ps\n"
+                "For initialization issues, read demo/init-pgduckdb.sql"
+            )
+        return f"Error checking containers: {error_msg}"
 
     lines = ["⚠️ Unhealthy or stopped containers:"]
     for c in unhealthy:

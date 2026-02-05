@@ -22,7 +22,6 @@ import type {
   ChainVerificationResponse,
   CodifyRequest,
   CodifyResponse,
-  DataingEntrypointsApiRoutesInvestigationsSendMessageResponse,
   GetRecentCatchesApiV1InvestigationsTestsCatchesGetParams,
   GetTestTrackingStatsApiV1InvestigationsTestsStatsGetParams,
   HTTPValidationError,
@@ -32,6 +31,7 @@ import type {
   RecentCatchResponse,
   RecordTestRunApiV1InvestigationsTestsRunPost200,
   SendMessageRequest,
+  SendMessageResponse,
   SendUserInputApiV1InvestigationsInvestigationIdInputPost200,
   SnapshotCheckpointParam,
   SnapshotListResponse,
@@ -1183,14 +1183,12 @@ export const sendMessageApiV1InvestigationsInvestigationIdMessagesPost = (
   investigationId: string,
   sendMessageRequest: SendMessageRequest,
 ) => {
-  return customInstance<DataingEntrypointsApiRoutesInvestigationsSendMessageResponse>(
-    {
-      url: `/api/v1/investigations/${investigationId}/messages`,
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      data: sendMessageRequest,
-    },
-  );
+  return customInstance<SendMessageResponse>({
+    url: `/api/v1/investigations/${investigationId}/messages`,
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    data: sendMessageRequest,
+  });
 };
 
 export const getSendMessageApiV1InvestigationsInvestigationIdMessagesPostMutationOptions =

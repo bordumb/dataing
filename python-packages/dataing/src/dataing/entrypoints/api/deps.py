@@ -95,6 +95,9 @@ class Settings:
         self.github_client_id = os.getenv("GITHUB_CLIENT_ID", "")
         self.github_client_secret = os.getenv("GITHUB_CLIENT_SECRET", "")
 
+        # Repository root path for assistant file access
+        self.repo_root = os.getenv("DATAING_REPO_ROOT", ".")
+
 
 settings = Settings()
 

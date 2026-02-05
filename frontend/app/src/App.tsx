@@ -36,6 +36,7 @@ import { NotificationsPage } from "@/features/notifications";
 import { AdminPage } from "@/features/admin";
 import { IssueList, IssueCreate, IssueWorkspace } from "@/features/issues";
 import { AssistantWidget } from "@/features/assistant";
+import { PageContextProvider } from "@/lib/assistant/page-context";
 import { JwtLoginPage } from "@/features/auth/jwt-login-page";
 import { SSOLoginPage } from "@/features/auth/sso-login-page";
 import { SSOCallbackPage } from "@/features/auth/sso-callback-page";
@@ -114,6 +115,7 @@ function AppWithEntitlements() {
 
   return (
     <EntitlementsProvider entitlements={entitlements}>
+      <PageContextProvider>
       <Routes>
         {/* Public routes */}
         <Route path="/login" element={<JwtLoginPage />} />
@@ -265,6 +267,7 @@ function AppWithEntitlements() {
         onClose={handleCloseUpgradeModal}
       />
       <Toaster />
+      </PageContextProvider>
     </EntitlementsProvider>
   );
 }

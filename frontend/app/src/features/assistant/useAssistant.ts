@@ -8,6 +8,7 @@ import { useState, useCallback, useRef, useEffect } from "react";
 import { useJwtAuth } from "@/lib/auth/jwt-context";
 import { assistantApi } from "@/lib/api/assistant";
 import type { MessageResponse } from "@/lib/api/assistant";
+import { usePageContext } from "@/lib/assistant/page-context";
 
 // Storage key for session persistence
 const SESSION_STORAGE_KEY = "dataing_assistant_session_id";
@@ -63,6 +64,7 @@ export function useAssistant(
 ): UseAssistantReturn {
   const { onError } = options;
   const { accessToken } = useJwtAuth();
+  const pageContext = usePageContext();
   const [messages, setMessages] = useState<AssistantMessage[]>([]);
   const [session, setSession] = useState<AssistantSession | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -112,13 +114,16 @@ export function useAssistant(
 
   const createSession = useCallback(
     async (parentInvestigationId?: string) => {
+      console.log("[Assistant] createSession called");
       try {
         setIsLoading(true);
         setError(null);
 
+        console.log("[Assistant] calling API...");
         const data = await assistantApi.createSession({
           parent_investigation_id: parentInvestigationId,
         });
+        console.log("[Assistant] API response:", data);
 
         const newSession: AssistantSession = {
           id: data.session_id,
@@ -143,7 +148,9 @@ export function useAssistant(
 
   const sendMessage = useCallback(
     async (content: string) => {
+      console.log("[Assistant] sendMessage called, session:", session);
       if (!session) {
+        console.log("[Assistant] No session, returning early");
         setError("No active session");
         return;
       }
@@ -162,7 +169,27 @@ export function useAssistant(
         setMessages((prev) => [...prev, userMessage]);
 
         // Send message to API
-        await assistantApi.sendMessage(session.id, { content });
+        console.log("[Assistant] sending message to API...");
+        await assistantApi.sendMessage(session.id, {
+          content,
+          page_context: {
+            route: pageContext.route,
+            route_pattern: pageContext.routePattern,
+            route_params: pageContext.routeParams,
+            page_type: pageContext.pageType,
+            page_title: pageContext.pageTitle,
+            page_data: pageContext.pageData,
+            errors: pageContext.errors.map((e) => ({
+              type: e.type,
+              message: e.message,
+              status: e.status ?? null,
+              url: e.url ?? null,
+              timestamp: e.timestamp,
+              stack_preview: e.stackPreview ?? null,
+            })),
+          },
+        });
+        console.log("[Assistant] message sent successfully");
 
         // Add assistant message placeholder
         const assistantMessage: AssistantMessage = {
@@ -254,7 +281,7 @@ export function useAssistant(
         setMessages((prev) => prev.slice(0, -1));
       }
     },
-    [session, accessToken, onError],
+    [session, accessToken, onError, pageContext],
   );
 
   const clearSession = useCallback(() => {

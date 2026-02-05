@@ -1,6 +1,7 @@
 """API routes for Dataing Assistant.
 
 Provides endpoints for chat sessions, messages, and real-time streaming.
+Uses Temporal workflows for durable execution and observability.
 """
 
 from __future__ import annotations
@@ -13,16 +14,16 @@ from enum import Enum
 from typing import Annotated, Any
 from uuid import UUID
 
-from bond import StreamHandlers
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from pydantic import BaseModel, Field
 from sse_starlette.sse import EventSourceResponse
+from temporalio.service import RPCError
 
 from dataing.adapters.db.app_db import AppDatabase
-from dataing.agents.assistant import DataingAssistant
 from dataing.core.json_utils import to_json_string
 from dataing.entrypoints.api.deps import get_app_db, settings
 from dataing.entrypoints.api.middleware.auth import ApiKeyContext, verify_api_key
+from dataing.temporal.client import TemporalAgentClient
 
 logger = logging.getLogger(__name__)
 
@@ -113,10 +114,34 @@ class SessionDetailResponse(BaseModel):
     parent_investigation_id: UUID | None = None
 
 
+class PageContextError(BaseModel):
+    """A frontend error captured by the error bus."""
+
+    type: str = Field(..., description="Error type: api, react, or console")
+    message: str
+    status: int | None = None
+    url: str | None = None
+    timestamp: int
+    stack_preview: str | None = None
+
+
+class PageContext(BaseModel):
+    """Context about the page the user is currently viewing."""
+
+    route: str
+    route_pattern: str
+    route_params: dict[str, str] = Field(default_factory=dict)
+    page_type: str
+    page_title: str
+    page_data: dict[str, Any] = Field(default_factory=dict)
+    errors: list[PageContextError] = Field(default_factory=list)
+
+
 class SendMessageRequest(BaseModel):
     """Request to send a message."""
 
     content: str = Field(..., min_length=1, max_length=32000)
+    page_context: PageContext | None = None
 
 
 class SendMessageResponse(BaseModel):
@@ -145,28 +170,36 @@ class ExportFormat(str, Enum):
 
 
 # =============================================================================
-# Helper Functions
+# Temporal Client Cache
 # =============================================================================
 
+# Cache the Temporal client connection (lazy initialization)
+_temporal_client: TemporalAgentClient | None = None
 
-async def get_assistant(
-    auth: ApiKeyContext,
-    db: AppDatabase,
-) -> DataingAssistant:
-    """Create a DataingAssistant instance for the request.
 
-    Args:
-        auth: Authentication context.
-        db: Application database.
+async def get_temporal_client() -> TemporalAgentClient:
+    """Get or create the Temporal agent client.
 
     Returns:
-        Configured DataingAssistant.
+        Connected TemporalAgentClient.
     """
-    return DataingAssistant(
-        api_key=settings.anthropic_api_key,
-        tenant_id=auth.tenant_id,
-        model=settings.llm_model,
-    )
+    global _temporal_client
+    if _temporal_client is None:
+        _temporal_client = await TemporalAgentClient.connect(
+            host=settings.TEMPORAL_HOST,
+            namespace=settings.TEMPORAL_NAMESPACE,
+            task_queue=settings.TEMPORAL_TASK_QUEUE,
+        )
+        logger.info(
+            f"Temporal agent client connected: host={settings.TEMPORAL_HOST}, "
+            f"namespace={settings.TEMPORAL_NAMESPACE}"
+        )
+    return _temporal_client
+
+
+# =============================================================================
+# Helper Functions
+# =============================================================================
 
 
 async def create_investigation_for_session(
@@ -472,6 +505,7 @@ async def send_message(
         _process_message(
             session_id=session_id,
             message_content=request_body.content,
+            page_context=request_body.page_context,
             auth=auth,
             db=db,
             queue=queue,
@@ -551,58 +585,30 @@ async def _load_parent_investigation_context(
 async def _process_message(
     session_id: UUID,
     message_content: str,
+    page_context: PageContext | None,
     auth: ApiKeyContext,
     db: AppDatabase,
     queue: asyncio.Queue[dict[str, Any]],
 ) -> None:
-    """Process a message and send events to the queue.
+    """Process a message via Temporal workflow and send events to the queue.
+
+    This function:
+    1. Gets or creates a Temporal workflow for the session
+    2. Sends the message via signal
+    3. Polls for the response
+    4. Streams the response via SSE
 
     Args:
         session_id: The session ID.
         message_content: The user's message.
+        page_context: Optional context about the page the user is viewing.
         auth: Authentication context.
         db: Application database.
         queue: Queue for SSE events.
     """
     try:
-        assistant = await get_assistant(auth, db)
-
-        # Create streaming handlers that push to the queue
-        collected_text: list[str] = []
-
-        async def on_text(text: str) -> None:
-            collected_text.append(text)
-            await queue.put(
-                {
-                    "event": SSEEventType.TEXT.value,
-                    "data": to_json_string({"text": text}),
-                }
-            )
-
-        async def on_tool_call(name: str, args: dict[str, Any]) -> None:
-            await queue.put(
-                {
-                    "event": SSEEventType.TOOL_CALL.value,
-                    "data": to_json_string({"tool": name, "arguments": args}),
-                }
-            )
-
-            # Log to audit
-            await db.execute(
-                """
-                INSERT INTO assistant_audit_log (session_id, action, target, metadata)
-                VALUES ($1, $2, $3, $4)
-                """,
-                session_id,
-                name,
-                str(args.get("path", args.get("query", str(args))))[:500],
-                to_json_string(args),
-            )
-
-        handlers = StreamHandlers(
-            on_text=on_text,
-            on_tool_call=on_tool_call,
-        )
+        # Get Temporal client
+        temporal_client = await get_temporal_client()
 
         # Get conversation history for context
         history_rows = await db.fetch_all(
@@ -624,23 +630,60 @@ async def _process_message(
         if parent_context:
             context.update(parent_context)
 
-        # Call the assistant
-        response = await assistant.ask(
-            message_content,
-            session_id=str(session_id),
-            handlers=handlers,
-            context=context,
+        # Attach page context if provided
+        if page_context:
+            context["page_context"] = page_context.model_dump()
+
+        logger.info(f"[ASSISTANT] Processing message via Temporal: {message_content[:100]}...")
+
+        # Get or create workflow for this session
+        session_str = str(session_id)
+        workflow_exists = await temporal_client.workflow_exists(session_str)
+
+        if workflow_exists:
+            # Update context and send message to existing workflow
+            logger.info(f"[ASSISTANT] Signaling existing workflow for session {session_str}")
+            await temporal_client.update_context(session_str, context)
+            await temporal_client.send_message(session_str, message_content)
+        else:
+            # Start new workflow with initial message
+            logger.info(f"[ASSISTANT] Starting new workflow for session {session_str}")
+            await temporal_client.start_session(
+                agent_name="dataing-assistant",
+                session_id=session_str,
+                tenant_id=str(auth.tenant_id),
+                context=context,
+                initial_message=message_content,
+            )
+
+        # Poll for response with timeout
+        response = await temporal_client.wait_for_response(
+            session_id=session_str,
+            timeout_seconds=300,  # 5 minutes
+            poll_interval=0.5,
+        )
+
+        if response is None:
+            raise TimeoutError("Agent did not respond within timeout")
+
+        logger.info(f"[ASSISTANT] Response length: {len(response)}")
+
+        # Send the full response as a single text event
+        await queue.put(
+            {
+                "event": SSEEventType.TEXT.value,
+                "data": to_json_string({"text": response}),
+            }
         )
 
         # Store assistant response
-        full_response = "".join(collected_text) if collected_text else response
         await db.execute(
             """
             INSERT INTO assistant_messages (session_id, role, content)
             VALUES ($1, 'assistant', $2)
             """,
             session_id,
-            full_response,
+            response,
         )
 
         # Send completion event
@@ -648,6 +691,24 @@ async def _process_message(
             {
                 "event": SSEEventType.COMPLETE.value,
                 "data": to_json_string({"status": "complete"}),
+            }
+        )
+
+    except RPCError as e:
+        logger.exception(f"Temporal RPC error for session {session_id}")
+        await queue.put(
+            {
+                "event": SSEEventType.ERROR.value,
+                "data": to_json_string({"error": f"Temporal error: {e}"}),
+            }
+        )
+
+    except TimeoutError as e:
+        logger.exception(f"Timeout processing message for session {session_id}")
+        await queue.put(
+            {
+                "event": SSEEventType.ERROR.value,
+                "data": to_json_string({"error": str(e)}),
             }
         )
 

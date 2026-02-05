@@ -19,6 +19,7 @@ import type {
   CreateSessionRequest,
   CreateSessionResponse,
   DataingEntrypointsApiRoutesAssistantSendMessageRequest,
+  DataingEntrypointsApiRoutesAssistantSendMessageResponse,
   DeleteSessionApiV1AssistantSessionsSessionIdDelete200,
   ExportSessionApiV1AssistantSessionsSessionIdExportPost200,
   ExportSessionApiV1AssistantSessionsSessionIdExportPostParams,
@@ -26,7 +27,6 @@ import type {
   ListSessionsApiV1AssistantSessionsGetParams,
   ListSessionsForInvestigationApiV1AssistantInvestigationsInvestigationIdSessionsGetParams,
   ListSessionsResponse,
-  SendMessageResponse,
   SessionDetailResponse,
   StreamResponseApiV1AssistantSessionsSessionIdStreamGetParams,
 } from "../../model";
@@ -556,12 +556,14 @@ export const sendMessageApiV1AssistantSessionsSessionIdMessagesPost = (
   sessionId: string,
   dataingEntrypointsApiRoutesAssistantSendMessageRequest: DataingEntrypointsApiRoutesAssistantSendMessageRequest,
 ) => {
-  return customInstance<SendMessageResponse>({
-    url: `/api/v1/assistant/sessions/${sessionId}/messages`,
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    data: dataingEntrypointsApiRoutesAssistantSendMessageRequest,
-  });
+  return customInstance<DataingEntrypointsApiRoutesAssistantSendMessageResponse>(
+    {
+      url: `/api/v1/assistant/sessions/${sessionId}/messages`,
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      data: dataingEntrypointsApiRoutesAssistantSendMessageRequest,
+    },
+  );
 };
 
 export const getSendMessageApiV1AssistantSessionsSessionIdMessagesPostMutationOptions =

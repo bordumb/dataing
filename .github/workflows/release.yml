@@ -109,7 +109,7 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build and push backend
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v7
         with:
           context: .
           file: infra/Dockerfile.backend
@@ -121,7 +121,7 @@ jobs:
           cache-to: type=gha,mode=max
 
       - name: Build and push frontend
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v7
         with:
           context: .
           file: infra/Dockerfile.frontend

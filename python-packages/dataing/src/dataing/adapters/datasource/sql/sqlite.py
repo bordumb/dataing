@@ -75,6 +75,7 @@ SQLITE_CAPABILITIES = AdapterCapabilities(
     supports_preview=True,
     supports_write=False,
     query_language=QueryLanguage.SQL,
+    sql_dialect="sqlite",
     max_concurrent_queries=1,
 )
 

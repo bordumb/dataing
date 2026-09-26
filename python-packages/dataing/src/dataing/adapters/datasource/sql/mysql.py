@@ -114,6 +114,7 @@ MYSQL_CAPABILITIES = AdapterCapabilities(
     supports_preview=True,
     supports_write=False,
     query_language=QueryLanguage.SQL,
+    sql_dialect="mysql",
     max_concurrent_queries=10,
 )
 

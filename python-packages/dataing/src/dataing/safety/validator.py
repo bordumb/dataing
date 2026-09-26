@@ -6,8 +6,9 @@ detection which can be bypassed.
 
 SAFETY IS NON-NEGOTIABLE:
 - Only SELECT statements are allowed
-- No mutation statements (DROP, DELETE, UPDATE, INSERT, etc.)
-- All queries must have a LIMIT clause
+- No mutation statements (DROP, DELETE, UPDATE, INSERT, SELECT INTO, etc.)
+- Queries are parsed in the caller's SQL dialect; there is no default
+- Queries must have a LIMIT clause unless the caller opts out
 - Forbidden keywords are checked even in subqueries
 """
 
@@ -32,6 +33,7 @@ FORBIDDEN_STATEMENTS: set[type[exp.Expression]] = {
     exp.Grant,
     exp.Revoke,
     exp.Merge,
+    exp.Into,  # SELECT ... INTO creates a table
 }
 
 # Forbidden keywords even in comments or subqueries
@@ -54,9 +56,10 @@ FORBIDDEN_KEYWORDS: set[str] = {
 
 def validate_query(
     sql: str,
-    dialect: str = "postgres",
     *,
+    dialect: str,
     require_select: bool = True,
+    require_limit: bool = True,
 ) -> None:
     """Validate that a SQL query is safe to execute.
 
@@ -66,22 +69,26 @@ def validate_query(
     2. Check that it's a SELECT statement (if require_select=True)
     3. Check for forbidden statement types in the AST
     4. Check for forbidden keywords as whole words
-    5. Ensure LIMIT clause is present
+    5. Ensure LIMIT clause is present (if require_limit=True)
 
     Args:
         sql: The SQL query to validate.
-        dialect: SQL dialect for parsing (default: postgres).
-        require_select: If True (default), query must be a SELECT statement.
-            Set to False for hypothesis queries where other read-only statements
-            might be acceptable.
+        dialect: sqlglot dialect of the database that will run the query
+            (e.g. "postgres", "mysql", "snowflake"). Statement boundaries,
+            comments and quoting differ between dialects, so validating in
+            the wrong one can let a second statement through.
+        require_select: If True (default), query must be a SELECT statement,
+            or UNION/INTERSECT/EXCEPT of SELECTs. Set to False for hypothesis
+            queries where other read-only statements might be acceptable.
+        require_limit: If True (default), query must include a LIMIT clause.
 
     Raises:
         QueryValidationError: If query is not safe.
 
     Examples:
-        >>> validate_query("SELECT * FROM users LIMIT 10")  # OK
-        >>> validate_query("DROP TABLE users")  # Raises QueryValidationError
-        >>> validate_query("SELECT * FROM users")  # Raises (no LIMIT)
+        >>> validate_query("SELECT * FROM users LIMIT 10", dialect="postgres")  # OK
+        >>> validate_query("DROP TABLE users", dialect="postgres")  # Raises
+        >>> validate_query("SELECT * FROM users", dialect="postgres")  # Raises (no LIMIT)
     """
     if not sql or not sql.strip():
         raise QueryValidationError("Empty query")
@@ -103,8 +110,10 @@ def validate_query(
     except Exception as e:
         raise QueryValidationError(f"Failed to parse SQL: {e}") from e
 
-    # 2. Check statement type - must be SELECT (if required)
-    if require_select and not isinstance(parsed, exp.Select):
+    # 2. Check statement type - must be SELECT or a set operation over SELECTs (if required)
+    if require_select and not isinstance(
+        parsed, exp.Select | exp.Union | exp.Intersect | exp.Except
+    ):
         raise QueryValidationError(f"Only SELECT statements allowed, got: {type(parsed).__name__}")
 
     # 3. Walk the AST and check for forbidden statement types
@@ -122,8 +131,8 @@ def validate_query(
         if re.search(rf"\b{keyword}\b", sql_upper):
             raise QueryValidationError(f"Forbidden keyword: {keyword}")
 
-    # 5. Must have LIMIT (safety against large result sets)
-    if not parsed.find(exp.Limit):
+    # 5. Must have LIMIT (safety against large result sets), if required
+    if require_limit and not parsed.find(exp.Limit):
         raise QueryValidationError("Query must include LIMIT clause")
 
 

@@ -22,7 +22,7 @@ class TestSafetyIntegration:
         query = "SELECT email FROM users WHERE email = 'john@example.com' LIMIT 10"
 
         # Validate query is safe
-        validate_query(query)
+        validate_query(query, dialect="postgres")
 
         # Check for PII in query
         assert contains_pii(query) is True
@@ -46,7 +46,7 @@ class TestSafetyIntegration:
         # Simulate successful queries
         for i in range(2):
             query = f"SELECT * FROM table{i} LIMIT 10"
-            validate_query(query)  # Validate first
+            validate_query(query, dialect="postgres")  # Validate first
 
             events.append(
                 Event(
@@ -92,7 +92,7 @@ class TestSafetyIntegration:
         for query in unsafe_queries:
             # Should be rejected by validator first
             with pytest.raises(QueryValidationError):
-                validate_query(query)
+                validate_query(query, dialect="postgres")
 
             # Circuit breaker never gets called for invalid queries
 
@@ -104,7 +104,7 @@ class TestSafetyIntegration:
         safe_query = add_limit_if_missing(query, limit=1000)
 
         # Now validate
-        validate_query(safe_query)
+        validate_query(safe_query, dialect="postgres")
 
         # Should pass validation
         assert "LIMIT" in safe_query.upper()

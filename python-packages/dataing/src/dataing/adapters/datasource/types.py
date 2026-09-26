@@ -284,6 +284,8 @@ class AdapterCapabilities(BaseModel):
     rate_limit_requests_per_minute: int | None = None
     max_concurrent_queries: int = 1
     query_language: QueryLanguage = QueryLanguage.SCAN_ONLY
+    # sqlglot dialect used to parse and validate SQL sent to this source
+    sql_dialect: str | None = None
 
 
 class FieldGroup(BaseModel):

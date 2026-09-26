@@ -17,25 +17,29 @@ class TestValidateQuery:
 
     def test_valid_select_with_limit(self) -> None:
         """Test that valid SELECT with LIMIT passes."""
-        validate_query("SELECT * FROM users LIMIT 10")  # Should not raise
+        validate_query("SELECT * FROM users LIMIT 10", dialect="postgres")  # Should not raise
 
     def test_valid_select_with_columns(self) -> None:
         """Test valid SELECT with specific columns."""
-        validate_query("SELECT id, name, email FROM users LIMIT 100")
+        validate_query("SELECT id, name, email FROM users LIMIT 100", dialect="postgres")
 
     def test_valid_select_with_where(self) -> None:
         """Test valid SELECT with WHERE clause."""
-        validate_query("SELECT * FROM users WHERE id = 1 LIMIT 10")
+        validate_query("SELECT * FROM users WHERE id = 1 LIMIT 10", dialect="postgres")
 
     def test_valid_select_with_join(self) -> None:
         """Test valid SELECT with JOIN."""
         validate_query(
-            "SELECT u.id, o.total FROM users u JOIN orders o ON u.id = o.user_id LIMIT 10"
+            "SELECT u.id, o.total FROM users u JOIN orders o ON u.id = o.user_id LIMIT 10",
+            dialect="postgres",
         )
 
     def test_valid_select_with_subquery(self) -> None:
         """Test valid SELECT with subquery."""
-        validate_query("SELECT * FROM users WHERE id IN (SELECT user_id FROM orders) LIMIT 10")
+        validate_query(
+            "SELECT * FROM users WHERE id IN (SELECT user_id FROM orders) LIMIT 10",
+            dialect="postgres",
+        )
 
     def test_valid_select_with_cte(self) -> None:
         """Test valid SELECT with CTE."""
@@ -43,128 +47,203 @@ class TestValidateQuery:
             """
             WITH active_users AS (SELECT id FROM users WHERE active = true)
             SELECT * FROM active_users LIMIT 10
-            """
+            """,
+            dialect="postgres",
         )
 
     def test_empty_query_raises(self) -> None:
         """Test that empty query raises error."""
         with pytest.raises(QueryValidationError) as exc_info:
-            validate_query("")
+            validate_query("", dialect="postgres")
 
         assert "Empty query" in str(exc_info.value)
 
     def test_whitespace_only_raises(self) -> None:
         """Test that whitespace-only query raises error."""
         with pytest.raises(QueryValidationError) as exc_info:
-            validate_query("   \n\t  ")
+            validate_query("   \n\t  ", dialect="postgres")
 
         assert "Empty query" in str(exc_info.value)
 
     def test_missing_limit_raises(self) -> None:
         """Test that missing LIMIT raises error."""
         with pytest.raises(QueryValidationError) as exc_info:
-            validate_query("SELECT * FROM users")
+            validate_query("SELECT * FROM users", dialect="postgres")
 
         assert "LIMIT" in str(exc_info.value)
 
     def test_drop_table_raises(self) -> None:
         """Test that DROP TABLE raises error."""
         with pytest.raises(QueryValidationError) as exc_info:
-            validate_query("DROP TABLE users")
+            validate_query("DROP TABLE users", dialect="postgres")
 
         assert "Only SELECT statements allowed" in str(exc_info.value)
 
     def test_delete_raises(self) -> None:
         """Test that DELETE raises error."""
         with pytest.raises(QueryValidationError) as exc_info:
-            validate_query("DELETE FROM users WHERE id = 1")
+            validate_query("DELETE FROM users WHERE id = 1", dialect="postgres")
 
         assert "Only SELECT statements allowed" in str(exc_info.value)
 
     def test_truncate_raises(self) -> None:
         """Test that TRUNCATE raises error."""
         with pytest.raises(QueryValidationError) as exc_info:
-            validate_query("TRUNCATE TABLE users")
+            validate_query("TRUNCATE TABLE users", dialect="postgres")
 
         assert "Only SELECT statements allowed" in str(exc_info.value)
 
     def test_update_raises(self) -> None:
         """Test that UPDATE raises error."""
         with pytest.raises(QueryValidationError) as exc_info:
-            validate_query("UPDATE users SET name = 'test' WHERE id = 1")
+            validate_query("UPDATE users SET name = 'test' WHERE id = 1", dialect="postgres")
 
         assert "Only SELECT statements allowed" in str(exc_info.value)
 
     def test_insert_raises(self) -> None:
         """Test that INSERT raises error."""
         with pytest.raises(QueryValidationError) as exc_info:
-            validate_query("INSERT INTO users (name) VALUES ('test')")
+            validate_query("INSERT INTO users (name) VALUES ('test')", dialect="postgres")
 
         assert "Only SELECT statements allowed" in str(exc_info.value)
 
     def test_create_raises(self) -> None:
         """Test that CREATE raises error."""
         with pytest.raises(QueryValidationError) as exc_info:
-            validate_query("CREATE TABLE test (id INT)")
+            validate_query("CREATE TABLE test (id INT)", dialect="postgres")
 
         assert "Only SELECT statements allowed" in str(exc_info.value)
 
     def test_alter_raises(self) -> None:
         """Test that ALTER raises error."""
         with pytest.raises(QueryValidationError) as exc_info:
-            validate_query("ALTER TABLE users ADD COLUMN email VARCHAR")
+            validate_query("ALTER TABLE users ADD COLUMN email VARCHAR", dialect="postgres")
 
         assert "Only SELECT statements allowed" in str(exc_info.value)
 
     def test_grant_raises(self) -> None:
         """Test that GRANT raises error."""
         with pytest.raises(QueryValidationError) as exc_info:
-            validate_query("GRANT SELECT ON users TO public")
+            validate_query("GRANT SELECT ON users TO public", dialect="postgres")
 
         assert "Only SELECT statements allowed" in str(exc_info.value)
 
     def test_revoke_raises(self) -> None:
         """Test that REVOKE raises error."""
         with pytest.raises(QueryValidationError) as exc_info:
-            validate_query("REVOKE SELECT ON users FROM public")
+            validate_query("REVOKE SELECT ON users FROM public", dialect="postgres")
 
         assert "Only SELECT statements allowed" in str(exc_info.value)
 
     def test_exec_in_query_raises(self) -> None:
         """Test that EXEC keyword raises error."""
         with pytest.raises(QueryValidationError) as exc_info:
-            validate_query("EXEC sp_executesql @sql")
+            validate_query("EXEC sp_executesql @sql", dialect="postgres")
 
         assert "Only SELECT statements allowed" in str(exc_info.value)
 
     def test_column_named_update_ok(self) -> None:
         """Test that column named 'updated_at' is allowed."""
-        validate_query("SELECT updated_at FROM users LIMIT 10")  # Should not raise
+        # Should not raise
+        validate_query("SELECT updated_at FROM users LIMIT 10", dialect="postgres")
 
     def test_invalid_sql_raises(self) -> None:
         """Test that invalid SQL raises error."""
         with pytest.raises(QueryValidationError) as exc_info:
-            validate_query("SELECTT * FORM users LIMIT 10")
+            validate_query("SELECTT * FORM users LIMIT 10", dialect="postgres")
 
         assert "parse" in str(exc_info.value).lower()
 
     def test_multi_statement_raises(self) -> None:
         """Test that multi-statement queries are rejected."""
         with pytest.raises(QueryValidationError) as exc_info:
-            validate_query("SELECT * FROM users LIMIT 10; DROP TABLE users")
+            validate_query("SELECT * FROM users LIMIT 10; DROP TABLE users", dialect="postgres")
 
         assert "Multi-statement" in str(exc_info.value)
 
     def test_multi_statement_injection_raises(self) -> None:
         """Test that hidden multi-statement injection is rejected."""
         with pytest.raises(QueryValidationError) as exc_info:
-            validate_query("SELECT 1 LIMIT 1; DELETE FROM users WHERE 1=1")
+            validate_query("SELECT 1 LIMIT 1; DELETE FROM users WHERE 1=1", dialect="postgres")
 
         assert "Multi-statement" in str(exc_info.value)
 
     def test_single_statement_with_trailing_semicolon_ok(self) -> None:
         """Test that single statement with trailing semicolon passes."""
-        validate_query("SELECT * FROM users LIMIT 10;")  # Should not raise
+        validate_query("SELECT * FROM users LIMIT 10;", dialect="postgres")  # Should not raise
+
+    @pytest.mark.parametrize(
+        "sql",
+        [
+            "SELECT * INTO pwned FROM users LIMIT 10",
+            "SELECT * FROM (SELECT * INTO pwned FROM users) AS s LIMIT 10",
+        ],
+    )
+    def test_select_into_raises(self, sql: str) -> None:
+        """Test that SELECT ... INTO is rejected: it creates a table."""
+        with pytest.raises(QueryValidationError):
+            validate_query(sql, dialect="postgres")
+
+    @pytest.mark.parametrize("operator", ["UNION", "UNION ALL", "INTERSECT", "EXCEPT"])
+    def test_set_operations_allowed(self, operator: str) -> None:
+        """Test that set operations over SELECTs count as read-only queries."""
+        validate_query(f"SELECT id FROM a {operator} SELECT id FROM b LIMIT 10", dialect="postgres")
+
+    def test_dialect_is_required(self) -> None:
+        """Test that callers must name a dialect rather than silently get postgres."""
+        with pytest.raises(TypeError):
+            validate_query("SELECT 1 LIMIT 1")  # type: ignore[call-arg]
+
+    def test_unknown_dialect_raises(self) -> None:
+        """Test that an unknown dialect fails closed."""
+        with pytest.raises(QueryValidationError):
+            validate_query("SELECT 1 LIMIT 1", dialect="not-a-dialect")
+
+
+class TestValidateQueryDialect:
+    """Tests that validate_query parses in the caller's dialect."""
+
+    def test_mysql_identifiers_accepted_in_mysql(self) -> None:
+        """Test that MySQL backtick identifiers pass in the MySQL dialect."""
+        validate_query("SELECT `id` FROM `users` LIMIT 10", dialect="mysql")
+
+    def test_mysql_identifiers_rejected_in_postgres(self) -> None:
+        """Test that the same query does not parse as postgres."""
+        with pytest.raises(QueryValidationError):
+            validate_query("SELECT `id` FROM `users` LIMIT 10", dialect="postgres")
+
+    def test_nested_comment_smuggling_rejected_in_mysql(self) -> None:
+        """Test that a second statement hidden in a nested comment is caught.
+
+        Postgres nests block comments, so a postgres parser sees one SELECT.
+        MySQL ends the comment at the first */ and runs the RENAME.
+        """
+        sql = "SELECT 1 LIMIT 1 /* /* */ ; RENAME TABLE a TO b; /* */ */"
+        validate_query(sql, dialect="postgres")
+
+        with pytest.raises(QueryValidationError):
+            validate_query(sql, dialect="mysql")
+
+
+class TestValidateQueryWithoutLimit:
+    """Tests for validate_query(require_limit=False), used for ad-hoc queries."""
+
+    def test_missing_limit_allowed(self) -> None:
+        """Test that a SELECT without LIMIT passes when LIMIT is not required."""
+        validate_query("SELECT * FROM users", dialect="postgres", require_limit=False)
+
+    @pytest.mark.parametrize(
+        "sql",
+        [
+            "DELETE FROM users",
+            "SELECT * INTO pwned FROM users",
+            "SELECT 1; DROP TABLE users",
+        ],
+    )
+    def test_other_checks_still_apply(self, sql: str) -> None:
+        """Test that dropping the LIMIT requirement keeps every other check."""
+        with pytest.raises(QueryValidationError):
+            validate_query(sql, dialect="postgres", require_limit=False)
 
 
 class TestAddLimitIfMissing:

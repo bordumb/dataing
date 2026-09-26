@@ -10165,6 +10165,178 @@
         "title": "ColumnLineageResponse",
         "description": "Response for column lineage."
       },
+      "ConfigField": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "string",
+              "integer",
+              "boolean",
+              "enum",
+              "secret",
+              "file",
+              "json"
+            ],
+            "title": "Type"
+          },
+          "required": {
+            "type": "boolean",
+            "title": "Required"
+          },
+          "group": {
+            "type": "string",
+            "title": "Group"
+          },
+          "default_value": {
+            "anyOf": [
+              {},
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Default Value"
+          },
+          "placeholder": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Placeholder"
+          },
+          "min_value": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Min Value"
+          },
+          "max_value": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Value"
+          },
+          "pattern": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pattern"
+          },
+          "options": {
+            "anyOf": [
+              {
+                "items": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Options"
+          },
+          "show_if": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Show If"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "help_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Help Url"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "label",
+          "type",
+          "required",
+          "group"
+        ],
+        "title": "ConfigField",
+        "description": "Configuration field for connection forms."
+      },
+      "ConfigSchema": {
+        "properties": {
+          "fields": {
+            "items": {
+              "$ref": "#/components/schemas/ConfigField"
+            },
+            "type": "array",
+            "title": "Fields"
+          },
+          "field_groups": {
+            "items": {
+              "$ref": "#/components/schemas/FieldGroup"
+            },
+            "type": "array",
+            "title": "Field Groups"
+          }
+        },
+        "type": "object",
+        "required": [
+          "fields",
+          "field_groups"
+        ],
+        "title": "ConfigSchema",
+        "description": "Configuration schema for an adapter."
+      },
       "ContextBundleResponse": {
         "properties": {
           "bundle_id": {
@@ -11469,6 +11641,41 @@
         ],
         "title": "FeedbackResponse",
         "description": "Response after submitting feedback."
+      },
+      "FieldGroup": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "collapsed_by_default": {
+            "type": "boolean",
+            "title": "Collapsed By Default",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "label"
+        ],
+        "title": "FieldGroup",
+        "description": "Group of configuration fields."
       },
       "HTTPValidationError": {
         "properties": {
@@ -14514,9 +14721,7 @@
             "title": "Capabilities"
           },
           "config_schema": {
-            "additionalProperties": true,
-            "type": "object",
-            "title": "Config Schema"
+            "$ref": "#/components/schemas/ConfigSchema"
           }
         },
         "type": "object",

@@ -6,7 +6,7 @@
  * OpenAPI spec version: 2.0.0
  */
 import type { SourceTypeResponseCapabilities } from "./sourceTypeResponseCapabilities";
-import type { SourceTypeResponseConfigSchema } from "./sourceTypeResponseConfigSchema";
+import type { ConfigSchema } from "./configSchema";
 
 /**
  * Response for a source type definition.
@@ -14,7 +14,7 @@ import type { SourceTypeResponseConfigSchema } from "./sourceTypeResponseConfigS
 export interface SourceTypeResponse {
   capabilities: SourceTypeResponseCapabilities;
   category: string;
-  config_schema: SourceTypeResponseConfigSchema;
+  config_schema: ConfigSchema;
   description: string;
   display_name: string;
   icon: string;

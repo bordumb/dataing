@@ -20,8 +20,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { useDynamicForm, getSchemaForType } from "@/components/forms";
-import { DynamicField } from "@/components/forms/dynamic-field";
+import { DynamicForm, useDynamicForm } from "@/components/forms";
 import {
   createDataSource,
   testDataSourceConnection,
@@ -34,25 +33,27 @@ interface DataSourceFormProps {
   onOpenChange: (open: boolean) => void;
 }
 
+function RequiredMark() {
+  return (
+    <span aria-hidden="true" className="text-destructive ml-1">
+      *
+    </span>
+  );
+}
+
 export function DataSourceForm({ open, onOpenChange }: DataSourceFormProps) {
   const queryClient = useQueryClient();
-  const { data: sourceTypes } = useSourceTypes();
+  const sourceTypes = useSourceTypes();
+  const form = useDynamicForm();
 
   const [name, setName] = React.useState("");
-  const [selectedType, setSelectedType] = React.useState("postgresql");
+  const [nameError, setNameError] = React.useState<string>();
+  const [selectedType, setSelectedType] = React.useState("");
 
-  // Get schema for the selected type
-  const schema = React.useMemo(
-    () => getSchemaForType(selectedType),
-    [selectedType],
-  );
-  const form = useDynamicForm(schema);
-
-  // Reset form when type changes
-  React.useEffect(() => {
-    form.reset();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedType]);
+  const chooseType = (type: string) => {
+    setSelectedType(type);
+    form.reset(sourceTypes.data?.find((t) => t.type === type)?.config_schema);
+  };
 
   const createMutation = useMutation({
     mutationFn: createDataSource,
@@ -61,7 +62,7 @@ export function DataSourceForm({ open, onOpenChange }: DataSourceFormProps) {
       onOpenChange(false);
       toast.success("Data source created successfully");
       setName("");
-      setSelectedType("postgresql");
+      setSelectedType("");
       form.reset();
     },
     onError: (error) => {
@@ -71,8 +72,12 @@ export function DataSourceForm({ open, onOpenChange }: DataSourceFormProps) {
 
   const testMutation = useMutation({
     mutationFn: testDataSourceConnection,
-    onSuccess: () => {
-      toast.success("Connection successful!");
+    onSuccess: (result) => {
+      if (result.success) {
+        toast.success("Connection successful!");
+      } else {
+        toast.error(`Connection failed: ${result.message}`);
+      }
     },
     onError: (error) => {
       toast.error(`Connection failed: ${error.message}`);
@@ -82,51 +87,32 @@ export function DataSourceForm({ open, onOpenChange }: DataSourceFormProps) {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!form.validate()) {
-      toast.error("Please fill in all required fields");
+    const configValid = form.validate();
+    const missingName = name.trim() === "";
+    setNameError(missingName ? "Name is required" : undefined);
+    if (!configValid || missingName) {
+      toast.error("Please fix the highlighted fields");
       return;
     }
 
     createMutation.mutate({
-      name,
+      name: name.trim(),
       type: selectedType,
-      config: form.getConfigObject(),
+      config: form.config(),
     });
   };
 
   const handleTest = () => {
     if (!form.validate()) {
-      toast.error("Please fill in all required fields");
+      toast.error("Please fix the highlighted fields");
       return;
     }
 
     testMutation.mutate({
       type: selectedType,
-      config: form.getConfigObject(),
+      config: form.config(),
     });
   };
-
-  // Build type options from API or fallback
-  const typeOptions = React.useMemo(() => {
-    if (sourceTypes) {
-      return sourceTypes.map((t) => ({
-        value: t.type,
-        label: t.display_name,
-      }));
-    }
-    // Fallback options
-    return [
-      { value: "postgresql", label: "PostgreSQL" },
-      { value: "mysql", label: "MySQL" },
-      { value: "snowflake", label: "Snowflake" },
-      { value: "bigquery", label: "BigQuery" },
-      { value: "redshift", label: "Redshift" },
-      { value: "trino", label: "Trino" },
-      { value: "duckdb", label: "DuckDB" },
-      { value: "mongodb", label: "MongoDB" },
-      { value: "s3", label: "Amazon S3" },
-    ];
-  }, [sourceTypes]);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -138,51 +124,70 @@ export function DataSourceForm({ open, onOpenChange }: DataSourceFormProps) {
           </DialogDescription>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} noValidate className="space-y-4">
           <div className="grid gap-4">
             <div className="grid gap-2">
-              <Label htmlFor="name">
-                Name <span className="text-destructive">*</span>
+              <Label htmlFor="datasource-name">
+                Name
+                <RequiredMark />
               </Label>
               <Input
-                id="name"
+                id="datasource-name"
                 value={name}
-                onChange={(e) => setName(e.target.value)}
+                onChange={(e) => {
+                  setName(e.target.value);
+                  setNameError(undefined);
+                }}
                 placeholder="Production Warehouse"
                 required
+                aria-invalid={nameError !== undefined}
               />
+              {nameError && (
+                <p className="text-sm text-destructive">{nameError}</p>
+              )}
             </div>
 
             <div className="grid gap-2">
-              <Label htmlFor="type">
-                Type <span className="text-destructive">*</span>
+              <Label htmlFor="datasource-type">
+                Type
+                <RequiredMark />
               </Label>
-              <Select value={selectedType} onValueChange={setSelectedType}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select type" />
+              <Select
+                value={selectedType}
+                onValueChange={chooseType}
+                disabled={!sourceTypes.data}
+              >
+                <SelectTrigger id="datasource-type">
+                  <SelectValue
+                    placeholder={
+                      sourceTypes.isPending ? "Loading types..." : "Select type"
+                    }
+                  />
                 </SelectTrigger>
                 <SelectContent>
-                  {typeOptions.map((type) => (
-                    <SelectItem key={type.value} value={type.value}>
-                      {type.label}
+                  {sourceTypes.data?.map((type) => (
+                    <SelectItem key={type.type} value={type.type}>
+                      {type.display_name}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
+              {sourceTypes.isLoadingError && (
+                <p className="text-sm text-destructive">
+                  Couldn&apos;t load data source types:{" "}
+                  {sourceTypes.error.message}{" "}
+                  <button
+                    type="button"
+                    onClick={() => sourceTypes.refetch()}
+                    className="underline underline-offset-4"
+                  >
+                    Retry
+                  </button>
+                </p>
+              )}
             </div>
 
-            {/* Dynamic fields based on selected type */}
-            {schema.fields.map((field) => (
-              <DynamicField
-                key={field.name}
-                field={field}
-                value={form.values[field.name]}
-                onChange={form.setValue}
-                error={
-                  form.touched[field.name] ? form.errors[field.name] : undefined
-                }
-              />
-            ))}
+            <DynamicForm form={form} />
           </div>
 
           <DialogFooter className="flex gap-2">
@@ -190,11 +195,14 @@ export function DataSourceForm({ open, onOpenChange }: DataSourceFormProps) {
               type="button"
               variant="outline"
               onClick={handleTest}
-              disabled={testMutation.isPending}
+              disabled={!form.schema || testMutation.isPending}
             >
               {testMutation.isPending ? "Testing..." : "Test Connection"}
             </Button>
-            <Button type="submit" disabled={createMutation.isPending}>
+            <Button
+              type="submit"
+              disabled={!form.schema || createMutation.isPending}
+            >
               {createMutation.isPending ? "Creating..." : "Create"}
             </Button>
           </DialogFooter>

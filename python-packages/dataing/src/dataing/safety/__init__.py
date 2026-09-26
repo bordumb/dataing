@@ -5,6 +5,7 @@ This module contains all safety-related components:
 - SQL fix validation
 - Circuit breaker for runaway investigations
 - PII detection and redaction
+- URL redaction for logs and audit records
 
 Safety is non-negotiable - these components are designed to be
 impossible to circumvent within the normal application flow.
@@ -13,6 +14,7 @@ impossible to circumvent within the normal application flow.
 from .circuit_breaker import CircuitBreaker, CircuitBreakerConfig
 from .fix_validator import FixValidationResult, validate_fix_proposal, validate_fix_sql
 from .pii import redact_pii, scan_for_pii
+from .urls import redact_url
 from .validator import add_limit_if_missing, validate_query
 
 __all__ = [
@@ -25,4 +27,5 @@ __all__ = [
     "FixValidationResult",
     "scan_for_pii",
     "redact_pii",
+    "redact_url",
 ]

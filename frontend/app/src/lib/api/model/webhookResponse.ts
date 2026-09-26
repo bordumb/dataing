@@ -13,10 +13,11 @@ import type { WebhookResponseLastTriggeredAt } from "./webhookResponseLastTrigge
  */
 export interface WebhookResponse {
   created_at: string;
+  /** Webhook URL reduced to scheme://host */
+  display_url: string;
   events: string[];
   id: string;
   is_active: boolean;
   last_status?: WebhookResponseLastStatus;
   last_triggered_at?: WebhookResponseLastTriggeredAt;
-  url: string;
 }

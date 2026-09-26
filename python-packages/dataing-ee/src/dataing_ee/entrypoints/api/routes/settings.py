@@ -20,6 +20,7 @@ from dataing.adapters.audit import audited
 from dataing.adapters.db.app_db import AppDatabase
 from dataing.entrypoints.api.deps import get_app_db
 from dataing.entrypoints.api.middleware.auth import ApiKeyContext, require_scope, verify_api_key
+from dataing.safety.urls import redact_url
 from dataing_ee.adapters.sso import SSORepository
 from dataing_ee.core.sso import SSOProviderType
 
@@ -184,7 +185,9 @@ class WebhookResponse(BaseModel):
     """Response for a webhook."""
 
     id: str
-    url: str
+    # Never the full URL: Slack, Microsoft Teams, and Discord incoming-webhook
+    # URLs carry a bearer secret in the path.
+    display_url: str = Field(..., description="Webhook URL reduced to scheme://host")
     events: list[str]
     is_active: bool
     last_triggered_at: str | None = None
@@ -219,7 +222,7 @@ async def list_webhooks(
     return [
         WebhookResponse(
             id=str(w["id"]),
-            url=w["url"],
+            display_url=redact_url(w["url"]),
             events=w["events"] if isinstance(w["events"], list) else json.loads(w["events"]),
             is_active=w["is_active"],
             last_triggered_at=w["last_triggered_at"].isoformat()

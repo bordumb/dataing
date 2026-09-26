@@ -47,3 +47,10 @@ def test_api_deps_does_not_import_app_module() -> None:
     loaded = _modules_loaded_by_import("dataing.entrypoints.api.deps")
 
     assert "dataing.entrypoints.api.app" not in loaded
+
+
+def test_api_factory_does_not_import_app_module() -> None:
+    """The EE app imports create_app() from the factory without also building the CE app."""
+    loaded = _modules_loaded_by_import("dataing.entrypoints.api.factory")
+
+    assert "dataing.entrypoints.api.app" not in loaded

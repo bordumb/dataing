@@ -9,7 +9,7 @@ import logging
 
 from fastapi import FastAPI
 
-from dataing.entrypoints.api.app import create_app as create_ce_app
+from dataing.entrypoints.api.factory import create_app as create_ce_app
 from dataing_ee.adapters.audit import AuditRepository
 from dataing_ee.entrypoints.api.middleware.audit import AuditMiddleware
 from dataing_ee.entrypoints.api.routes.audit import router as audit_router

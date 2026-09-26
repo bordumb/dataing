@@ -14,7 +14,7 @@ class TestInvestigationEndpointsRegistered:
     @pytest.fixture
     def app_routes(self):
         """Get all registered routes from the app."""
-        from dataing.entrypoints.api.app import create_app
+        from dataing.entrypoints.api.factory import create_app
 
         app = create_app()
         # Extract path patterns from all routes

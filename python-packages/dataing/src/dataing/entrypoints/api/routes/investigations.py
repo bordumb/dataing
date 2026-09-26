@@ -280,9 +280,10 @@ async def list_investigations(
         results = await db.fetch_all(
             """
             SELECT id,
-                   alert,
                    created_at,
-                   COALESCE(outcome->>'status', status) AS status
+                   COALESCE(outcome->>'status', status) AS status,
+                   -- Primary dataset, "unknown" when there is none (as AnomalyAlert.dataset_id)
+                   COALESCE(alert->'dataset_ids'->>0, 'unknown') AS dataset_id
             FROM investigations
             WHERE tenant_id = $1
             ORDER BY created_at DESC
@@ -296,16 +297,12 @@ async def list_investigations(
 
     items = []
     for row in results:
-        alert_data = row["alert"]
-        if isinstance(alert_data, str):
-            alert_data = json.loads(alert_data)
-
         items.append(
             InvestigationListItem(
                 investigation_id=row["id"],
                 status=row.get("status", "active"),
                 created_at=row["created_at"].isoformat(),
-                dataset_id=alert_data.get("dataset_id", "unknown"),
+                dataset_id=row["dataset_id"],
             )
         )
 

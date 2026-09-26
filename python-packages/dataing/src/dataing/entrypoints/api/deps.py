@@ -259,18 +259,11 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     # Demo mode: seed demo data
     demo_mode = os.getenv("DATADR_DEMO_MODE", "").lower()
     print(f"[DEBUG] DATADR_DEMO_MODE={demo_mode}", flush=True)
-    enc_key = app.state.encryption_key
-    enc_preview = enc_key[:15] if enc_key else "None"
-    print(f"[DEBUG] Initial encryption_key: {enc_preview}...", flush=True)
     if demo_mode == "true":
         print("[DEBUG] Running in DEMO MODE - seeding demo data", flush=True)
         await _seed_demo_data(app_db)
         # Re-read encryption key in case _seed_demo_data generated one
         app.state.encryption_key = os.getenv("DATADR_ENCRYPTION_KEY") or os.getenv("ENCRYPTION_KEY")
-
-    enc_key = app.state.encryption_key
-    enc_preview = enc_key[:15] if enc_key else "None"
-    print(f"[DEBUG] Final encryption_key prefix: {enc_preview}...", flush=True)
 
     yield
 
@@ -457,28 +450,12 @@ async def get_tenant_adapter(
         )
 
     encrypted_config = ds.get("connection_config_encrypted", "")
-    key_preview = encryption_key[:10] if encryption_key else "None"
-    print(f"[DECRYPT DEBUG] encryption_key type: {type(encryption_key)}", flush=True)
-    print(f"[DECRYPT DEBUG] encryption_key full: {encryption_key}", flush=True)
-    print(
-        f"[DECRYPT DEBUG] encryption_key length: {len(encryption_key) if encryption_key else 0}",
-        flush=True,
-    )
-    print(f"[DECRYPT DEBUG] encrypted_config length: {len(encrypted_config)}", flush=True)
-    print(f"[DECRYPT DEBUG] encrypted_config start: {encrypted_config[:50]}", flush=True)
     try:
         f = Fernet(encryption_key.encode())
         decrypted = f.decrypt(encrypted_config.encode()).decode()
         config: dict[str, Any] = json.loads(decrypted)
-        print(f"[DECRYPT DEBUG] SUCCESS: {decrypted}", flush=True)
     except Exception as e:
-        print(f"[DECRYPT DEBUG] FAILED: {e}", flush=True)
-        import traceback
-
-        traceback.print_exc()
-        raise RuntimeError(
-            f"Failed to decrypt connection config (key_prefix={key_preview}): {e}"
-        ) from e
+        raise RuntimeError(f"Failed to decrypt connection config: {e}") from e
 
     # Create adapter using registry
     registry = get_registry()

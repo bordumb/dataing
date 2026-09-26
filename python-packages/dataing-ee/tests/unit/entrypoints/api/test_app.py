@@ -4,6 +4,10 @@ import os
 import subprocess
 import sys
 
+from dataing_ee.entrypoints.api.app import app
+from fastapi.routing import APIRoute
+from fastapi.testclient import TestClient
+
 # Imports the EE app and prints how many FastAPI apps were constructed along the way.
 _COUNT_APPS_BUILT_BY_IMPORT = """
 import fastapi
@@ -42,3 +46,17 @@ def test_importing_app_builds_one_fastapi_app() -> None:
 
     assert result.returncode == 0, result.stderr
     assert int(result.stdout.splitlines()[-1]) == 1
+
+
+def test_health_reports_enterprise_edition() -> None:
+    """GET /health identifies the server as the Enterprise Edition."""
+    response = TestClient(app).get("/health")
+
+    assert response.json() == {"status": "healthy", "edition": "enterprise"}
+
+
+def test_app_has_one_health_route() -> None:
+    """EE replaces CE's /health route instead of adding a second one that never matches."""
+    health_routes = [r for r in app.routes if isinstance(r, APIRoute) and r.path == "/health"]
+
+    assert len(health_routes) == 1

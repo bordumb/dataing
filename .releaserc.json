@@ -7,7 +7,7 @@
     [
       "@semantic-release/exec",
       {
-        "prepareCmd": "python scripts/sync_versions.py ${nextRelease.version}"
+        "prepareCmd": "python scripts/sync_versions.py ${nextRelease.version} && uv lock"
       }
     ],
     [
@@ -17,7 +17,8 @@
           "CHANGELOG.md",
           "pyproject.toml",
           "python-packages/*/pyproject.toml",
-          "python-packages/*/CHANGELOG.md"
+          "python-packages/*/CHANGELOG.md",
+          "uv.lock"
         ],
         "message": "chore(release): ${nextRelease.version} [skip ci]\n\n${nextRelease.notes}"
       }

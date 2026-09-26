@@ -35,8 +35,9 @@ jobs:
         with:
           python-version: '3.11'
 
+      # --locked fails the job when uv.lock is out of date with the pyproject files
       - name: Install dependencies
-        run: uv sync --all-extras
+        run: uv sync --locked --all-extras
 
       - name: Run Ruff
         run: uv run ruff check python-packages/dataing/src python-packages/dataing-ee/src
@@ -89,7 +90,7 @@ jobs:
           python-version: '3.11'
 
       - name: Install dependencies
-        run: uv sync --extra dev
+        run: uv sync --locked --extra dev
 
       # The migrated_db fixture (tests/integration/conftest.py) creates a throwaway
       # database on this server and applies every migration to it with psql.

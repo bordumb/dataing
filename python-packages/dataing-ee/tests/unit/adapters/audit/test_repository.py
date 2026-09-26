@@ -6,7 +6,8 @@ from uuid import uuid4
 
 import pytest
 from dataing_ee.adapters.audit.repository import AuditRepository
-from dataing_ee.adapters.audit.types import AuditLogCreate
+
+from dataing.adapters.audit import AuditLogCreate
 
 
 class TestAuditRepository:

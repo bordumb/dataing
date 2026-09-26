@@ -11,7 +11,7 @@ from typing import Annotated
 from uuid import UUID
 
 import structlog
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
 
 from dataing.adapters.audit import audited
@@ -77,6 +77,7 @@ class DeleteCredentialsResponse(BaseModel):
 @router.post("", status_code=201)
 @audited(action="credentials.save", resource_type="credentials")
 async def save_credentials(
+    http_request: Request,
     datasource_id: UUID,
     body: SaveCredentialsRequest,
     auth: WriteScopeDep,
@@ -140,6 +141,7 @@ async def get_credentials_status(
 @router.delete("", response_model=DeleteCredentialsResponse)
 @audited(action="credentials.delete", resource_type="credentials")
 async def delete_credentials(
+    http_request: Request,
     datasource_id: UUID,
     auth: WriteScopeDep,
     app_db: AppDbDep,
@@ -165,6 +167,7 @@ async def delete_credentials(
 @router.post("/test", response_model=TestConnectionResponse)
 @audited(action="credentials.test", resource_type="credentials")
 async def test_credentials(
+    http_request: Request,
     datasource_id: UUID,
     body: SaveCredentialsRequest,
     auth: AuthDep,

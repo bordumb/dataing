@@ -486,6 +486,7 @@ async def get_datasource(
 @router.delete("/{datasource_id}", status_code=204, response_class=Response)
 @audited(action="datasource.delete", resource_type="datasource")
 async def delete_datasource(
+    http_request: Request,
     datasource_id: UUID,
     auth: WriteScopeDep,
     app_db: AppDbDep,
@@ -502,6 +503,7 @@ async def delete_datasource(
 @router.post("/{datasource_id}/test", response_model=TestConnectionResponse)
 @audited(action="datasource.test_connection", resource_type="datasource")
 async def test_datasource_connection(
+    http_request: Request,
     datasource_id: UUID,
     auth: AuthDep,
     app_db: AppDbDep,
@@ -808,6 +810,7 @@ async def get_column_stats(
 @router.post("/{datasource_id}/sync", response_model=SyncResponse)
 @audited(action="datasource.sync", resource_type="datasource")
 async def sync_datasource_schema(
+    http_request: Request,
     datasource_id: UUID,
     auth: AuthDep,
     app_db: AppDbDep,

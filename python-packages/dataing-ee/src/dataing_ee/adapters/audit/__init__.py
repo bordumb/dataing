@@ -1,13 +1,14 @@
-"""Audit logging adapters - Enterprise Edition."""
+"""Audit logging adapters - Enterprise Edition.
 
-from dataing_ee.adapters.audit.decorator import audited, get_client_ip
+Route handlers use the CE `dataing.adapters.audit.audited` decorator. EE
+persists what it records by installing this AuditRepository as
+`app.state.audit_repo`.
+"""
+
 from dataing_ee.adapters.audit.repository import AuditRepository
-from dataing_ee.adapters.audit.types import AuditLogCreate, AuditLogEntry
+from dataing_ee.adapters.audit.types import AuditLogEntry
 
 __all__ = [
-    "AuditLogCreate",
     "AuditLogEntry",
     "AuditRepository",
-    "audited",
-    "get_client_ip",
 ]

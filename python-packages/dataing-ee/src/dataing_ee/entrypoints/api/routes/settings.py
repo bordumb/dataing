@@ -16,10 +16,10 @@ from asyncpg import Connection
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from pydantic import BaseModel, Field, HttpUrl
 
+from dataing.adapters.audit import audited
 from dataing.adapters.db.app_db import AppDatabase
 from dataing.entrypoints.api.deps import get_app_db
 from dataing.entrypoints.api.middleware.auth import ApiKeyContext, require_scope, verify_api_key
-from dataing_ee.adapters.audit import audited
 from dataing_ee.adapters.sso import SSORepository
 from dataing_ee.core.sso import SSOProviderType
 
@@ -128,6 +128,7 @@ async def get_tenant_settings(
 @router.patch("/tenant", response_model=TenantSettings)
 @audited(action="settings.update", resource_type="settings")
 async def update_tenant_settings(
+    http_request: Request,
     request: UpdateTenantSettingsRequest,
     auth: AdminScopeDep,
     app_db: AppDbDep,
@@ -234,6 +235,7 @@ async def list_webhooks(
 @router.post("/webhooks", response_model=WebhookCreatedResponse, status_code=201)
 @audited(action="webhook.create", resource_type="webhook")
 async def create_webhook(
+    http_request: Request,
     request: CreateWebhookRequest,
     auth: WriteScopeDep,
     app_db: AppDbDep,
@@ -263,6 +265,7 @@ async def create_webhook(
 @router.delete("/webhooks/{webhook_id}", status_code=204, response_class=Response)
 @audited(action="webhook.delete", resource_type="webhook")
 async def delete_webhook(
+    http_request: Request,
     webhook_id: UUID,
     auth: WriteScopeDep,
     app_db: AppDbDep,
@@ -341,6 +344,7 @@ async def list_api_keys(
 @router.post("/api-keys", response_model=ApiKeyCreatedResponse, status_code=201)
 @audited(action="api_key.create", resource_type="api_key")
 async def create_api_key(
+    http_request: Request,
     request: CreateApiKeyRequest,
     auth: AdminScopeDep,
     app_db: AppDbDep,
@@ -372,6 +376,7 @@ async def create_api_key(
 @router.delete("/api-keys/{key_id}", status_code=204, response_class=Response)
 @audited(action="api_key.revoke", resource_type="api_key")
 async def revoke_api_key(
+    http_request: Request,
     key_id: UUID,
     auth: AdminScopeDep,
     app_db: AppDbDep,
@@ -484,6 +489,7 @@ async def get_sso_config(
 @router.post("/sso/config", response_model=SSOConfigResponse, status_code=201)
 @audited(action="sso.config.create", resource_type="sso_config")
 async def create_or_update_sso_config(
+    http_request: Request,
     request: SSOConfigRequest,
     auth: AdminScopeDep,
     sso_repo: SSORepoDep,
@@ -549,6 +555,7 @@ async def create_or_update_sso_config(
 @router.delete("/sso/config", status_code=204, response_class=Response)
 @audited(action="sso.config.disable", resource_type="sso_config")
 async def disable_sso_config(
+    http_request: Request,
     auth: AdminScopeDep,
     sso_repo: SSORepoDep,
 ) -> Response:
@@ -690,6 +697,7 @@ async def list_domain_claims(
 @router.post("/sso/domains", response_model=DomainClaimResponse, status_code=201)
 @audited(action="sso.domain.claim", resource_type="domain_claim")
 async def claim_domain(
+    http_request: Request,
     request: DomainClaimRequest,
     auth: AdminScopeDep,
     sso_repo: SSORepoDep,
@@ -765,6 +773,7 @@ async def claim_domain(
 @router.delete("/sso/domains/{domain}", status_code=204, response_class=Response)
 @audited(action="sso.domain.delete", resource_type="domain_claim")
 async def delete_domain_claim(
+    http_request: Request,
     domain: str,
     auth: AdminScopeDep,
     sso_repo: SSORepoDep,
@@ -791,6 +800,7 @@ async def delete_domain_claim(
 @router.post("/sso/domains/{domain}/verify", response_model=DomainVerifyResponse)
 @audited(action="sso.domain.verify", resource_type="domain_claim")
 async def verify_domain_claim(
+    http_request: Request,
     domain: str,
     auth: AdminScopeDep,
     sso_repo: SSORepoDep,

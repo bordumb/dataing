@@ -6,7 +6,6 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, EmailStr, Field
 
-from dataing.adapters.audit import audited
 from dataing.adapters.auth.postgres import PostgresAuthRepository
 from dataing.core.auth.recovery import PasswordRecoveryAdapter
 from dataing.core.auth.service import AuthError, AuthService
@@ -83,7 +82,6 @@ def get_auth_service(request: Request) -> AuthService:
 
 
 @router.post("/login", response_model=TokenResponse)
-@audited(action="auth.login", resource_type="auth")
 async def login(
     body: LoginRequest,
     service: Annotated[AuthService, Depends(get_auth_service)],
@@ -109,7 +107,6 @@ async def login(
 
 
 @router.post("/register", response_model=TokenResponse, status_code=201)
-@audited(action="auth.register", resource_type="auth")
 async def register(
     body: RegisterRequest,
     service: Annotated[AuthService, Depends(get_auth_service)],
@@ -217,7 +214,6 @@ async def get_recovery_method(
 
 
 @router.post("/password-reset/request")
-@audited(action="auth.password_reset_request", resource_type="auth")
 async def request_password_reset(
     body: PasswordResetRequest,
     service: Annotated[AuthService, Depends(get_auth_service)],
@@ -254,7 +250,6 @@ async def request_password_reset(
 
 
 @router.post("/password-reset/confirm")
-@audited(action="auth.password_reset_confirm", resource_type="auth")
 async def confirm_password_reset(
     body: PasswordResetConfirm,
     service: Annotated[AuthService, Depends(get_auth_service)],

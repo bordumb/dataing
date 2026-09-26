@@ -8,7 +8,8 @@ from uuid import UUID
 import structlog
 from asyncpg import Pool
 
-from dataing_ee.adapters.audit.types import AuditLogCreate, AuditLogEntry
+from dataing.adapters.audit import AuditLogCreate
+from dataing_ee.adapters.audit.types import AuditLogEntry
 
 logger = structlog.get_logger()
 

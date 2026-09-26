@@ -6,7 +6,7 @@ from datetime import datetime
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Response
+from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from pydantic import BaseModel, Field
 
 from dataing.adapters.audit import audited
@@ -65,6 +65,7 @@ async def list_knowledge_comments(
 @router.post("", status_code=201, response_model=KnowledgeCommentResponse)
 @audited(action="knowledge_comment.create", resource_type="knowledge_comment")
 async def create_knowledge_comment(
+    http_request: Request,
     dataset_id: UUID,
     body: KnowledgeCommentCreate,
     auth: AuthDep,
@@ -88,6 +89,7 @@ async def create_knowledge_comment(
 @router.patch("/{comment_id}", response_model=KnowledgeCommentResponse)
 @audited(action="knowledge_comment.update", resource_type="knowledge_comment")
 async def update_knowledge_comment(
+    http_request: Request,
     dataset_id: UUID,
     comment_id: UUID,
     body: KnowledgeCommentUpdate,
@@ -110,6 +112,7 @@ async def update_knowledge_comment(
 @router.delete("/{comment_id}", status_code=204, response_class=Response)
 @audited(action="knowledge_comment.delete", resource_type="knowledge_comment")
 async def delete_knowledge_comment(
+    http_request: Request,
     dataset_id: UUID,
     comment_id: UUID,
     auth: AuthDep,

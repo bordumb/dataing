@@ -1,38 +1,14 @@
-"""Audit logging stubs for Community Edition.
+"""Audit logging for route handlers.
 
-The full audit logging implementation is available in Enterprise Edition.
-These stubs provide no-op implementations to maintain API compatibility.
+`audited` records entries through `app.state.audit_repo`. Community Edition
+installs the no-op `AuditRepository` below; Enterprise Edition swaps in a
+repository that persists entries to the audit_logs table.
 """
 
-from collections.abc import Awaitable, Callable
-from typing import Any, TypeVar
+from typing import Any
 
-F = TypeVar("F", bound=Callable[..., Awaitable[Any]])
-
-
-def audited(
-    action: str,
-    resource_type: str | None = None,
-) -> Callable[[F], F]:
-    """No-op audit decorator for Community Edition.
-
-    In CE, this decorator simply passes through without recording audit logs.
-    The full audit logging implementation is available in Enterprise Edition.
-
-    Args:
-        action: Action identifier (ignored in CE).
-        resource_type: Type of resource (ignored in CE).
-
-    Returns:
-        The original function unchanged.
-    """
-    del action, resource_type  # Unused in CE
-
-    def decorator(func: F) -> F:
-        """Return function unchanged."""
-        return func
-
-    return decorator
+from dataing.adapters.audit.decorator import audited, get_client_ip
+from dataing.adapters.audit.types import AuditLogCreate
 
 
 class AuditRepository:
@@ -50,7 +26,7 @@ class AuditRepository:
         """
         pass
 
-    async def record(self, entry: Any) -> None:
+    async def record(self, entry: AuditLogCreate) -> None:
         """No-op record method.
 
         Args:
@@ -67,4 +43,4 @@ class AuditRepository:
         return []
 
 
-__all__ = ["audited", "AuditRepository"]
+__all__ = ["AuditLogCreate", "AuditRepository", "audited", "get_client_ip"]

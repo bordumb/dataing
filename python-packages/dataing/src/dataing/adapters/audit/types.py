@@ -1,19 +1,16 @@
 """Audit log types."""
 
-from datetime import datetime
 from typing import Any
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict
 
 
-class AuditLogEntry(BaseModel):
-    """Audit log entry from database."""
+class AuditLogCreate(BaseModel):
+    """Request to create an audit log entry."""
 
     model_config = ConfigDict(frozen=True)
 
-    id: UUID
-    timestamp: datetime
     tenant_id: UUID
     actor_id: UUID | None = None
     actor_email: str | None = None
@@ -28,4 +25,3 @@ class AuditLogEntry(BaseModel):
     status_code: int | None = None
     changes: dict[str, Any] | None = None
     metadata: dict[str, Any] | None = None
-    created_at: datetime | None = None

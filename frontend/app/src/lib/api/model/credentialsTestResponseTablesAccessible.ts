@@ -6,5 +6,4 @@
  * OpenAPI spec version: 2.0.0
  */
 
-export type DataingEntrypointsApiRoutesCredentialsTestConnectionResponseTablesAccessible =
-  number | null;
+export type CredentialsTestResponseTablesAccessible = number | null;

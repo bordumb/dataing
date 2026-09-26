@@ -6,6 +6,4 @@
  * OpenAPI spec version: 2.0.0
  */
 
-export type DataingEntrypointsApiRoutesBundlesLineageGraphResponseDatasets = {
-  [key: string]: { [key: string]: unknown };
-};
+export type BundleLineageGraphResponseRoot = string | null;

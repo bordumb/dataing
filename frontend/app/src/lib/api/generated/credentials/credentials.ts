@@ -17,7 +17,7 @@ import type {
 } from "@tanstack/react-query";
 import type {
   CredentialsStatusResponse,
-  DataingEntrypointsApiRoutesCredentialsTestConnectionResponse,
+  CredentialsTestResponse,
   DeleteCredentialsResponse,
   HTTPValidationError,
   SaveCredentialsRequest,
@@ -381,14 +381,12 @@ export const testCredentialsApiV1DatasourcesDatasourceIdCredentialsTestPost = (
   datasourceId: string,
   saveCredentialsRequest: SaveCredentialsRequest,
 ) => {
-  return customInstance<DataingEntrypointsApiRoutesCredentialsTestConnectionResponse>(
-    {
-      url: `/api/v1/datasources/${datasourceId}/credentials/test`,
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      data: saveCredentialsRequest,
-    },
-  );
+  return customInstance<CredentialsTestResponse>({
+    url: `/api/v1/datasources/${datasourceId}/credentials/test`,
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    data: saveCredentialsRequest,
+  });
 };
 
 export const getTestCredentialsApiV1DatasourcesDatasourceIdCredentialsTestPostMutationOptions =

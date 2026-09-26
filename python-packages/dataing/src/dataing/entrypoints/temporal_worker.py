@@ -33,8 +33,8 @@ from dataing.adapters.datasource.base import BaseAdapter
 from dataing.adapters.db.app_db import AppDatabase
 from dataing.adapters.investigation.pattern_adapter import InMemoryPatternRepository
 from dataing.agents import AgentClient
+from dataing.config import settings
 from dataing.core.snapshot_store import LocalSnapshotStore
-from dataing.entrypoints.api.deps import settings
 from dataing.telemetry import configure_logging
 from dataing.temporal.activities import (
     make_capture_snapshot_activity,
@@ -286,9 +286,9 @@ async def run_worker() -> None:
 
 def main() -> None:
     """Main entry point for the Temporal worker."""
-    # Set up logging here rather than relying on the API package's import-time create_app().
-    # Unconfigured, structlog's default renderer prints traceback frame locals, such as the
-    # encryption key and decrypted connection configs in get_adapter().
+    # Nothing else configures logging in the worker process. Unconfigured, structlog's
+    # default renderer prints traceback frame locals, such as the encryption key and
+    # decrypted connection configs in get_adapter().
     configure_logging(
         log_level=os.getenv("LOG_LEVEL", "INFO"),
         json_output=os.getenv("LOG_FORMAT", "json").lower() == "json",

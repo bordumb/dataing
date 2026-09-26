@@ -15,8 +15,8 @@ class TestWorkerLogging:
 
     def setup_method(self) -> None:
         """Reset structlog so the test covers main()'s own logging setup."""
-        # Importing the worker imports the API package, whose app.py calls create_app() and
-        # so configures logging as a side effect. The worker must not depend on that.
+        # Other tests may have built the API app in this process, and create_app()
+        # configures structlog. The worker must not depend on that.
         structlog.reset_defaults()
 
     def teardown_method(self) -> None:

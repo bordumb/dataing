@@ -511,12 +511,16 @@ async def _start_auto_investigation(
     investigation_id = uuid4()
     now = datetime.now(UTC)
 
-    # Resolve datasource
+    # Resolve the tenant's own datasource. There is no fallback ID: a fixed ID
+    # would point the investigation at a datasource owned by another tenant.
     try:
         datasource_id = await resolve_datasource_id(request, auth.tenant_id, explicit_id=None)
     except ValueError:
-        # No default datasource, use placeholder
-        datasource_id = UUID("00000000-0000-0000-0000-000000000003")
+        logger.warning(
+            f"Skipping auto investigation for issue={issue_id}: "
+            f"no single active datasource for tenant={auth.tenant_id}"
+        )
+        return None
 
     # Build alert data
     alert_data: dict[str, Any] = {

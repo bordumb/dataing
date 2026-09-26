@@ -6,9 +6,9 @@ import json
 import time
 from datetime import UTC, datetime
 from typing import Any
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, MagicMock, patch
 from urllib.parse import urlencode
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 import httpx
 import pytest
@@ -35,6 +35,8 @@ from fastapi.testclient import TestClient
 
 from dataing.entrypoints.api.deps import get_app_db
 from dataing.entrypoints.api.middleware.auth import ApiKeyContext, verify_api_key
+
+TENANT_ID = UUID("5f0c2a9e-0000-0000-0000-000000000001")
 
 
 class TestIntegrationCreateSchema:
@@ -1020,3 +1022,80 @@ class TestPostReply:
         await _post_reply(url, {"text": "Created dataing issue #7."})
 
         assert route.called
+
+
+class TestEvaluateAndStartInvestigation:
+    """Auto-investigations only run against the tenant's own datasource."""
+
+    MODULE = "dataing_ee.entrypoints.api.routes.integrations"
+
+    async def _run(self, resolve_datasource: AsyncMock) -> tuple[object, AsyncMock, AsyncMock]:
+        from dataing_ee.entrypoints.api.routes.integrations import (
+            _evaluate_and_start_investigation,
+        )
+
+        from dataing.adapters.db.team_policy_repository import PolicyAction
+        from dataing.services.policy import PolicyResult, QueueConfig
+
+        team_id = uuid4()
+        db = AsyncMock()
+        temporal = AsyncMock()
+        request = MagicMock()
+        request.app.state.temporal_client = temporal
+
+        with (
+            patch(f"{self.MODULE}.TeamPolicyRepository") as repo,
+            patch(f"{self.MODULE}.PolicyService") as policy_service,
+            patch(f"{self.MODULE}.resolve_datasource_id", resolve_datasource),
+        ):
+            repo.return_value.get_default_team_for_tenant = AsyncMock(return_value=team_id)
+            policy_service.return_value.evaluate = AsyncMock(
+                return_value=PolicyResult(
+                    action=PolicyAction.AUTO,
+                    queue_config=QueueConfig(),
+                    source="team_default",
+                    team_id=team_id,
+                )
+            )
+            investigation_id = await _evaluate_and_start_investigation(
+                request=request,
+                db=db,
+                tenant_id=TENANT_ID,
+                issue_id=uuid4(),
+                issue_data={"title": "orders volume drop", "severity": "high"},
+                adapter=None,
+                webhook_request=None,
+                idempotency_key="jira_1_created",
+                provider="jira",
+            )
+        return investigation_id, db, temporal
+
+    async def test_starts_investigation_on_tenant_datasource(self) -> None:
+        """The resolved tenant datasource is what the workflow receives."""
+        datasource_id = uuid4()
+
+        investigation_id, _, temporal = await self._run(AsyncMock(return_value=datasource_id))
+
+        assert investigation_id is not None
+        temporal.start_investigation.assert_awaited_once()
+        kwargs = temporal.start_investigation.await_args.kwargs
+        assert kwargs["tenant_id"] == str(TENANT_ID)
+        assert kwargs["datasource_id"] == str(datasource_id)
+
+    @pytest.mark.parametrize(
+        "resolve_error",
+        [
+            "No active datasources found for tenant",
+            "ambiguous_datasource:Multiple datasources available.",
+        ],
+    )
+    async def test_unresolvable_datasource_skips_investigation(self, resolve_error: str) -> None:
+        """No datasource of the tenant's own means no investigation (no fallback ID)."""
+        investigation_id, db, temporal = await self._run(
+            AsyncMock(side_effect=ValueError(resolve_error))
+        )
+
+        assert investigation_id is None
+        temporal.start_investigation.assert_not_called()
+        executed_sql = [call.args[0] for call in db.execute.call_args_list]
+        assert not any("INSERT INTO investigations" in sql for sql in executed_sql)

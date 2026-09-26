@@ -4,6 +4,7 @@ import uuid
 from unittest.mock import MagicMock, patch
 
 import pytest
+from opentelemetry import trace
 from starlette.applications import Starlette
 from starlette.requests import Request
 from starlette.responses import PlainTextResponse
@@ -94,6 +95,9 @@ def test_sets_span_attribute_when_span_active() -> None:
     """Correlation ID is set as span attribute when a span is recording."""
     mock_span = MagicMock()
     mock_span.is_recording.return_value = True
+    # The patch is global, so the logging trace-context processor also reads this span
+    # when httpx logs the request.
+    mock_span.get_span_context.return_value = trace.SpanContext(1, 1, is_remote=False)
 
     with patch("dataing.telemetry.correlation.trace.get_current_span") as mock_get_span:
         mock_get_span.return_value = mock_span
@@ -132,6 +136,9 @@ def test_skips_span_attribute_when_span_not_recording() -> None:
     """No error when span exists but is not recording."""
     mock_span = MagicMock()
     mock_span.is_recording.return_value = False
+    # The patch is global, so the logging trace-context processor also reads this span
+    # when httpx logs the request.
+    mock_span.get_span_context.return_value = trace.SpanContext(1, 1, is_remote=False)
 
     with patch("dataing.telemetry.correlation.trace.get_current_span") as mock_get_span:
         mock_get_span.return_value = mock_span

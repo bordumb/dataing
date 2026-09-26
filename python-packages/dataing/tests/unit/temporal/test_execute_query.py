@@ -19,6 +19,7 @@ QUERY_INPUT = ExecuteQueryInput(
     investigation_id="inv-1",
     query="SELECT day, amount FROM orders LIMIT 10",
     hypothesis_id="h-1",
+    tenant_id="tenant-1",
     datasource_id="ds-1",
 )
 
@@ -44,8 +45,8 @@ class FakeAdapter:
 
 
 def _activity_for(adapter: FakeAdapter) -> Any:
-    async def get_adapter(datasource_id: str) -> FakeAdapter:
-        assert datasource_id == "ds-1"
+    async def get_adapter(*, tenant_id: str, datasource_id: str) -> FakeAdapter:
+        assert (tenant_id, datasource_id) == ("tenant-1", "ds-1")
         return adapter
 
     return make_execute_query_activity(get_adapter=get_adapter)
@@ -123,4 +124,5 @@ def test_query_requires_datasource() -> None:
             investigation_id="inv-1",
             query="SELECT 1 LIMIT 1",
             hypothesis_id="h-1",
+            tenant_id="tenant-1",
         )

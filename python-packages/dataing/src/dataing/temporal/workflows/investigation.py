@@ -278,6 +278,7 @@ class InvestigationWorkflow:
         try:
             gather_input = GatherContextInput(
                 investigation_id=input.investigation_id,
+                tenant_id=input.tenant_id,
                 datasource_id=input.datasource_id,
                 alert=input.alert_data,
             )
@@ -403,6 +404,7 @@ class InvestigationWorkflow:
             hypotheses=hypotheses,
             schema_info=context.get("schema", {}),
             alert_summary=alert_summary,
+            tenant_id=input.tenant_id,
             datasource_id=input.datasource_id,
             alert=input.alert_data,
         )
@@ -572,6 +574,7 @@ class InvestigationWorkflow:
         hypotheses: list[dict[str, Any]],
         schema_info: dict[str, Any],
         alert_summary: str,
+        tenant_id: str,
         datasource_id: str,
         alert: dict[str, Any] | None = None,
     ) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
@@ -582,6 +585,7 @@ class InvestigationWorkflow:
             hypotheses: List of hypothesis dictionaries.
             schema_info: Schema information for query generation.
             alert_summary: Summary of the alert being investigated.
+            tenant_id: ID of the tenant that owns the investigation and datasource.
             datasource_id: ID of the datasource to query.
             alert: Optional full alert data.
 
@@ -609,6 +613,7 @@ class InvestigationWorkflow:
                 hypothesis=hypothesis,
                 schema_info=schema_info,
                 alert_summary=alert_summary,
+                tenant_id=tenant_id,
                 datasource_id=datasource_id,
                 alert=alert,
             )

@@ -352,7 +352,6 @@ export function DatasetDetailPage() {
                     <TableHead>Status</TableHead>
                     <TableHead>Severity</TableHead>
                     <TableHead>Created</TableHead>
-                    <TableHead>Completed</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -388,11 +387,6 @@ export function DatasetDetailPage() {
                       </TableCell>
                       <TableCell className="text-muted-foreground">
                         {formatRelativeTime(investigation.created_at)}
-                      </TableCell>
-                      <TableCell className="text-muted-foreground">
-                        {investigation.completed_at
-                          ? formatRelativeTime(investigation.completed_at)
-                          : "-"}
                       </TableCell>
                     </TableRow>
                   ))}

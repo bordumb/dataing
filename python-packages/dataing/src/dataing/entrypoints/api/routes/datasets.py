@@ -152,12 +152,10 @@ class InvestigationSummary(BaseModel):
     """Summary of an investigation for dataset detail."""
 
     id: str
-    dataset_id: str
     metric_name: str
     status: str
     severity: str | None = None
     created_at: str
-    completed_at: str | None = None
 
 
 class DatasetInvestigationsResponse(BaseModel):
@@ -228,19 +226,17 @@ async def get_dataset_investigations(
 
     investigations = await app_db.list_investigations_for_dataset(
         auth.tenant_id,
-        ds["native_path"],
+        dataset_id,
         limit=limit,
     )
 
     summaries = [
         InvestigationSummary(
             id=str(inv["id"]),
-            dataset_id=inv["dataset_id"],
             metric_name=inv["metric_name"],
             status=inv["status"],
-            severity=inv.get("severity"),
+            severity=inv["severity"],
             created_at=inv["created_at"].isoformat(),
-            completed_at=(inv["completed_at"].isoformat() if inv.get("completed_at") else None),
         )
         for inv in investigations
     ]

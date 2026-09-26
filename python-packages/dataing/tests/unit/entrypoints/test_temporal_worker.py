@@ -1,6 +1,7 @@
 """Tests for the Temporal worker entrypoint."""
 
 import json
+import logging
 import re
 import uuid
 
@@ -105,3 +106,19 @@ class TestWorkerLogging:
         assert entry["level"] == "error"
         assert entry["event"] == "Worker failed: temporal unreachable"
         assert entry["exception"].endswith("RuntimeError: temporal unreachable")
+
+    @pytest.mark.usefixtures("unset_http_client_log_levels")
+    def test_worker_keeps_http_client_loggers_at_warning(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """main()'s logging setup quiets httpx and httpcore: webhook URLs carry secrets."""
+
+        async def fake_run_worker() -> None:
+            return None
+
+        # The real run_worker() needs a Temporal server; main() still does its own setup.
+        monkeypatch.setattr(temporal_worker, "run_worker", fake_run_worker)
+        temporal_worker.main()
+
+        assert logging.getLogger("httpx").level == logging.WARNING
+        assert logging.getLogger("httpcore").level == logging.WARNING

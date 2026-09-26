@@ -50,3 +50,18 @@ def restore_root_logger() -> Iterator[None]:
 def anyio_backend() -> str:
     """Configure anyio to use asyncio backend."""
     return "asyncio"
+
+
+@pytest.fixture
+def unset_http_client_log_levels() -> Iterator[None]:
+    """Unset the httpx and httpcore logger levels, as in a fresh process.
+
+    Logger levels are process-global, so the original levels are restored afterwards.
+    """
+    loggers = [logging.getLogger(name) for name in ("httpx", "httpcore")]
+    original_levels = [http_logger.level for http_logger in loggers]
+    for http_logger in loggers:
+        http_logger.setLevel(logging.NOTSET)
+    yield
+    for http_logger, level in zip(loggers, original_levels, strict=True):
+        http_logger.setLevel(level)

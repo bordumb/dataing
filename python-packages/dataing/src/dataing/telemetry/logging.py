@@ -9,6 +9,16 @@ import structlog
 from dataing.telemetry.structlog_processor import add_trace_context
 
 
+def quiet_http_client_loggers() -> None:
+    """Keep httpx and httpcore at WARNING, whatever the app log level.
+
+    httpx logs every request's full URL at INFO, and incoming-webhook URLs (Slack,
+    Microsoft Teams, Discord) carry a bearer secret in the path.
+    """
+    for name in ("httpx", "httpcore"):
+        logging.getLogger(name).setLevel(logging.WARNING)
+
+
 class _RootHandler(logging.StreamHandler[TextIO]):
     """Stdout handler that configure_logging() owns on the root logger."""
 
@@ -89,3 +99,4 @@ def configure_logging(
         root.removeHandler(previous)
     root.addHandler(handler)
     root.setLevel(log_level.upper())
+    quiet_http_client_loggers()

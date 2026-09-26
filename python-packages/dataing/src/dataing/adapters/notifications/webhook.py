@@ -5,6 +5,7 @@ import hmac
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any
+from urllib.parse import urlsplit
 
 import httpx
 import structlog
@@ -12,6 +13,27 @@ import structlog
 from dataing.core.json_utils import to_json_string
 
 logger = structlog.get_logger()
+
+
+def _redact_url(url: str) -> str:
+    """Reduce a URL to its scheme and host so it is safe to log.
+
+    Incoming-webhook URLs (Slack, Microsoft Teams, Discord) embed a bearer secret
+    in the path, and any URL can carry credentials in its userinfo or query string.
+
+    Args:
+        url: Destination URL.
+
+    Returns:
+        ``scheme://host``, or a placeholder when the URL has no parseable host.
+    """
+    try:
+        parts = urlsplit(url)
+    except ValueError:
+        return "<invalid url>"
+    if not parts.scheme or not parts.hostname:
+        return "<invalid url>"
+    return f"{parts.scheme}://{parts.hostname}"
 
 
 @dataclass
@@ -75,7 +97,7 @@ class WebhookNotifier:
 
                 logger.info(
                     "webhook_sent",
-                    url=self.config.url,
+                    url=_redact_url(self.config.url),
                     event_type=event_type,
                     status_code=response.status_code,
                     success=success,
@@ -86,7 +108,7 @@ class WebhookNotifier:
         except httpx.TimeoutException:
             logger.warning(
                 "webhook_timeout",
-                url=self.config.url,
+                url=_redact_url(self.config.url),
                 event_type=event_type,
             )
             return False
@@ -94,7 +116,7 @@ class WebhookNotifier:
         except httpx.RequestError as e:
             logger.error(
                 "webhook_error",
-                url=self.config.url,
+                url=_redact_url(self.config.url),
                 event_type=event_type,
                 error=str(e),
             )

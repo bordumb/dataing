@@ -4,8 +4,11 @@ from __future__ import annotations
 
 import hashlib
 import hmac
+import logging
+from collections.abc import Iterator
 from unittest.mock import AsyncMock, patch
 
+import httpx
 import pytest
 
 from dataing.adapters.notifications.webhook import WebhookConfig, WebhookNotifier
@@ -156,6 +159,90 @@ class TestWebhookNotifier:
         result = WebhookNotifier.verify_signature(body, signature, secret)
 
         assert result is False
+
+
+class TestWebhookNotifierLogRedaction:
+    """Webhook logs must never contain the secret parts of the destination URL.
+
+    Incoming-webhook URLs (Slack, Microsoft Teams, Discord) embed a bearer secret in
+    the path, so only the scheme and host may be logged.
+    """
+
+    SECRET_URL = (
+        "https://bot:SECRETPASS@hooks.example.com/services/T000/B000/SECRETTOKEN?sig=SECRETQUERY"
+    )
+    SECRET_PARTS = ("SECRETPASS", "SECRETTOKEN", "SECRETQUERY", "/services/")
+
+    @pytest.fixture
+    def mock_post(self) -> Iterator[AsyncMock]:
+        """Patch httpx.AsyncClient and return the mocked ``post`` method."""
+        with patch("httpx.AsyncClient") as mock_client_class:
+            mock_client = AsyncMock()
+            mock_client.__aenter__.return_value = mock_client
+            mock_client.__aexit__.return_value = None
+            mock_client_class.return_value = mock_client
+            yield mock_client.post
+
+    @staticmethod
+    def _logged_output(capsys: pytest.CaptureFixture[str], caplog: pytest.LogCaptureFixture) -> str:
+        """Return all log output, whether structlog printed it or routed it to stdlib."""
+        captured = capsys.readouterr()
+        return captured.out + captured.err + caplog.text
+
+    @pytest.mark.parametrize(
+        ("outcome", "event_name"),
+        [
+            (httpx.Response(200), "webhook_sent"),
+            (httpx.TimeoutException("timed out"), "webhook_timeout"),
+            (httpx.ConnectError("All connection attempts failed"), "webhook_error"),
+        ],
+        ids=["success", "timeout", "request_error"],
+    )
+    async def test_send_logs_only_scheme_and_host(
+        self,
+        mock_post: AsyncMock,
+        outcome: httpx.Response | httpx.RequestError,
+        event_name: str,
+        capsys: pytest.CaptureFixture[str],
+        caplog: pytest.LogCaptureFixture,
+    ) -> None:
+        """Test that every send outcome logs the host but no secret part of the URL."""
+        caplog.set_level(logging.DEBUG)
+        mock_post.side_effect = [outcome]
+
+        await WebhookNotifier(WebhookConfig(url=self.SECRET_URL)).send("test.event", {})
+
+        output = self._logged_output(capsys, caplog)
+        assert event_name in output
+        for secret in self.SECRET_PARTS:
+            assert secret not in output
+        assert "https://hooks.example.com" in output
+
+    @pytest.mark.parametrize(
+        "url",
+        [
+            "hooks.example.com/services/T000/B000/SECRETTOKEN",
+            "https://[hooks.example.com/services/T000/B000/SECRETTOKEN",
+        ],
+        ids=["missing_scheme", "unparseable"],
+    )
+    async def test_send_never_echoes_malformed_url(
+        self,
+        mock_post: AsyncMock,
+        url: str,
+        capsys: pytest.CaptureFixture[str],
+        caplog: pytest.LogCaptureFixture,
+    ) -> None:
+        """Test that a URL without a parseable host is neither logged nor fatal to send."""
+        caplog.set_level(logging.DEBUG)
+        mock_post.side_effect = [httpx.Response(200)]
+
+        result = await WebhookNotifier(WebhookConfig(url=url)).send("test.event", {})
+
+        output = self._logged_output(capsys, caplog)
+        assert result is True
+        assert "webhook_sent" in output
+        assert "SECRETTOKEN" not in output
 
 
 class TestWebhookConfig:

@@ -374,7 +374,7 @@ async def create_api_key(
 
 
 @router.delete("/api-keys/{key_id}", status_code=204, response_class=Response)
-@audited(action="api_key.revoke", resource_type="api_key")
+@audited(action="api_key.revoke", resource_type="api_key", resource_id_param="key_id")
 async def revoke_api_key(
     http_request: Request,
     key_id: UUID,

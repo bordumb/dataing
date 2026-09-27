@@ -218,7 +218,7 @@ async def create_permission(
 
 
 @router.delete("/{grant_id}", status_code=status.HTTP_204_NO_CONTENT, response_class=Response)
-@audited(action="permission.revoke", resource_type="permission")
+@audited(action="permission.revoke", resource_type="permission", resource_id_param="grant_id")
 async def delete_permission(
     http_request: Request,
     grant_id: UUID,

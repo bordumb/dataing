@@ -1,5 +1,6 @@
 """Tests for audit repository."""
 
+import json
 from datetime import UTC, datetime, timedelta
 from unittest.mock import AsyncMock, MagicMock
 from uuid import uuid4
@@ -49,6 +50,28 @@ class TestAuditRepository:
 
         assert result == entry_id
         mock_conn.fetchrow.assert_called_once()
+
+    async def test_record_sends_json_columns_as_text(
+        self, repository: AuditRepository, mock_pool: MagicMock
+    ) -> None:
+        """The pool has no JSONB codec, so changes and metadata must go as JSON text."""
+        mock_conn = AsyncMock()
+        mock_conn.fetchrow = AsyncMock(return_value={"id": uuid4()})
+        mock_pool.acquire.return_value.__aenter__ = AsyncMock(return_value=mock_conn)
+        mock_pool.acquire.return_value.__aexit__ = AsyncMock(return_value=None)
+
+        await repository.record(
+            AuditLogCreate(
+                tenant_id=uuid4(),
+                action="auth.login_failed",
+                changes={"name": "Engineering"},
+                metadata={"reason": "Invalid email or password"},
+            )
+        )
+
+        *_, changes, metadata = mock_conn.fetchrow.await_args.args
+        assert json.loads(changes) == {"name": "Engineering"}
+        assert json.loads(metadata) == {"reason": "Invalid email or password"}
 
     async def test_list_returns_entries(
         self, repository: AuditRepository, mock_pool: MagicMock

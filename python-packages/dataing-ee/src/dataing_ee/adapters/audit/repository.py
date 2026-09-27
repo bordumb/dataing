@@ -9,6 +9,7 @@ import structlog
 from asyncpg import Pool
 
 from dataing.adapters.audit import AuditLogCreate
+from dataing.core.json_utils import to_json_string
 from dataing_ee.adapters.audit.types import AuditLogEntry
 
 logger = structlog.get_logger()
@@ -58,7 +59,8 @@ class AuditRepository:
                 action, resource_type, resource_id, resource_name,
                 request_method, request_path, status_code, changes, metadata
             ) VALUES (
-                $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14
+                $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12,
+                $13::text::jsonb, $14::text::jsonb
             )
             RETURNING id
         """
@@ -79,8 +81,10 @@ class AuditRepository:
                 entry.request_method,
                 entry.request_path,
                 entry.status_code,
-                entry.changes,
-                entry.metadata,
+                # Sent as text and cast in SQL, so this works whether or not the
+                # pool registers a json/jsonb codec
+                to_json_string(entry.changes) if entry.changes else None,
+                to_json_string(entry.metadata) if entry.metadata else None,
             )
             result: UUID = row["id"]
             return result

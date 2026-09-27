@@ -75,7 +75,7 @@ class DeleteCredentialsResponse(BaseModel):
 
 
 @router.post("", status_code=201)
-@audited(action="credentials.save", resource_type="credentials")
+@audited(action="credentials.save", resource_type="credentials", resource_id_param="datasource_id")
 async def save_credentials(
     http_request: Request,
     datasource_id: UUID,
@@ -139,7 +139,11 @@ async def get_credentials_status(
 
 
 @router.delete("", response_model=DeleteCredentialsResponse)
-@audited(action="credentials.delete", resource_type="credentials")
+@audited(
+    action="credentials.delete",
+    resource_type="credentials",
+    resource_id_param="datasource_id",
+)
 async def delete_credentials(
     http_request: Request,
     datasource_id: UUID,
@@ -165,7 +169,7 @@ async def delete_credentials(
 
 
 @router.post("/test", response_model=TestConnectionResponse)
-@audited(action="credentials.test", resource_type="credentials")
+@audited(action="credentials.test", resource_type="credentials", resource_id_param="datasource_id")
 async def test_credentials(
     http_request: Request,
     datasource_id: UUID,

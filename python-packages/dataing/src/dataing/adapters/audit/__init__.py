@@ -12,6 +12,7 @@ from dataing.adapters.audit.decorator import (
     get_client_ip,
     record_audit,
     suppress_audit_errors,
+    was_audited,
 )
 from dataing.adapters.audit.types import AuditLogCreate
 
@@ -55,4 +56,5 @@ __all__ = [
     "get_client_ip",
     "record_audit",
     "suppress_audit_errors",
+    "was_audited",
 ]

@@ -14,6 +14,7 @@ from fastapi.testclient import TestClient
 
 from dataing.entrypoints.api.deps import get_app_db
 from dataing.entrypoints.api.middleware.auth import ApiKeyContext, verify_api_key
+from dataing.services.auth import AuthService
 
 
 @pytest.fixture
@@ -83,3 +84,35 @@ def test_create_webhook_records_audit_entry(
     assert entry.actor_id == auth_context.user_id
     assert entry.request_method == "POST"
     assert entry.request_path == "/settings/webhooks"
+
+
+def test_delete_webhook_records_the_webhook(
+    client: TestClient, audit_repo: AsyncMock, app_db: AsyncMock
+) -> None:
+    """DELETE /settings/webhooks/{id} records webhook.delete against that webhook, as a 204."""
+    webhook_id = uuid4()
+    app_db.execute.return_value = "DELETE 1"
+
+    response = client.delete(f"/settings/webhooks/{webhook_id}")
+
+    assert response.status_code == 204
+    entry = audit_repo.record.await_args.args[0]
+    assert entry.action == "webhook.delete"
+    assert entry.resource_id == webhook_id
+    assert entry.status_code == 204
+
+
+def test_revoke_api_key_records_the_key(
+    client: TestClient, audit_repo: AsyncMock, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """DELETE /settings/api-keys/{key_id} records api_key.revoke against that key, as a 204."""
+    key_id = uuid4()
+    monkeypatch.setattr(AuthService, "revoke_api_key", AsyncMock(return_value=True))
+
+    response = client.delete(f"/settings/api-keys/{key_id}")
+
+    assert response.status_code == 204
+    entry = audit_repo.record.await_args.args[0]
+    assert entry.action == "api_key.revoke"
+    assert entry.resource_id == key_id
+    assert entry.status_code == 204

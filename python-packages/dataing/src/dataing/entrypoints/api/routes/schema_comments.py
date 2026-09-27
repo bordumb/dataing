@@ -92,7 +92,11 @@ async def create_schema_comment(
 
 
 @router.patch("/{comment_id}", response_model=SchemaCommentResponse)
-@audited(action="schema_comment.update", resource_type="schema_comment")
+@audited(
+    action="schema_comment.update",
+    resource_type="schema_comment",
+    resource_id_param="comment_id",
+)
 async def update_schema_comment(
     http_request: Request,
     dataset_id: UUID,
@@ -115,7 +119,11 @@ async def update_schema_comment(
 
 
 @router.delete("/{comment_id}", status_code=204, response_class=Response)
-@audited(action="schema_comment.delete", resource_type="schema_comment")
+@audited(
+    action="schema_comment.delete",
+    resource_type="schema_comment",
+    resource_id_param="comment_id",
+)
 async def delete_schema_comment(
     http_request: Request,
     dataset_id: UUID,

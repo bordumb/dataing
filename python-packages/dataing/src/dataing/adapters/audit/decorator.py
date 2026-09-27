@@ -13,6 +13,7 @@ from uuid import UUID
 
 import structlog
 from starlette.requests import Request
+from starlette.responses import Response
 
 from dataing.adapters.audit.types import AuditLogCreate
 
@@ -98,6 +99,11 @@ async def record_audit(
             logger.warning("Audit repository not configured, skipping audit log")
             return
 
+        # Set by EE's AuditMiddleware, which returns it as X-Request-ID
+        request_id = getattr(request.state, "request_id", None)
+        if request_id is not None:
+            metadata = {**(metadata or {}), "request_id": request_id}
+
         entry = AuditLogCreate(
             tenant_id=tenant_id,
             actor_id=actor_id,
@@ -114,7 +120,23 @@ async def record_audit(
             metadata=metadata,
         )
         await audit_repo.record(entry)
+        request.state.audit_recorded = True
         logger.debug(f"Recorded audit log: {action}", resource_id=str(resource_id))
+
+
+def was_audited(request: Request) -> bool:
+    """Check whether record_audit stored an entry for this request.
+
+    EE's AuditMiddleware uses this to skip its generic entry for requests
+    that already have a specific one.
+
+    Args:
+        request: FastAPI request object.
+
+    Returns:
+        True if an audit log entry was recorded for the request.
+    """
+    return bool(getattr(request.state, "audit_recorded", False))
 
 
 def _takes_request(func: Callable[..., Any]) -> bool:
@@ -184,51 +206,79 @@ def _resolve_actor(request: Request) -> tuple[UUID, UUID | None] | None:
     return None
 
 
-def _extract_resource_info(result: Any, kwargs: dict[str, Any]) -> tuple[UUID | None, str | None]:
-    """Extract resource ID and name from result or kwargs.
+def _as_uuid(value: Any) -> UUID | None:
+    """Parse a value as a UUID.
 
     Args:
+        value: Value to parse.
+
+    Returns:
+        The UUID, or None if the value isn't one.
+    """
+    if value is None:
+        return None
+    try:
+        return UUID(str(value))
+    except (ValueError, TypeError):
+        return None
+
+
+def _extract_resource_info(
+    request: Request,
+    result: Any,
+    resource_type: str | None,
+    resource_id_param: str | None,
+) -> tuple[UUID | None, str | None]:
+    """Extract resource ID and name for a handler's audit log entry.
+
+    The ID comes from the path param named by resource_id_param, else the
+    result's `id` (creates and updates return the resource), else the path
+    param named `{resource_type}_id` (deletes return a bare Response).
+
+    Args:
+        request: FastAPI request object.
         result: Return value from handler.
-        kwargs: Keyword arguments passed to handler.
+        resource_type: Type of resource.
+        resource_id_param: Path param that identifies the resource, if named.
 
     Returns:
         Tuple of (resource_id, resource_name).
     """
-    resource_id: UUID | None = None
-    resource_name: str | None = None
-
-    # Try to extract from result
+    path_params = request.path_params
     if isinstance(result, dict):
-        if "id" in result:
-            try:
-                resource_id = UUID(str(result["id"]))
-            except (ValueError, TypeError):
-                pass
-        resource_name = result.get("name")
-    elif hasattr(result, "id"):
-        try:
-            resource_id = UUID(str(result.id))
-        except (ValueError, TypeError):
-            pass
-        if hasattr(result, "name"):
-            resource_name = result.name
+        result_id, name = result.get("id"), result.get("name")
+    else:
+        result_id, name = getattr(result, "id", None), getattr(result, "name", None)
 
-    # Try to extract from path params if not in result
+    resource_id = _as_uuid(path_params.get(resource_id_param)) if resource_id_param else None
     if resource_id is None:
-        for key in ("team_id", "tag_id", "datasource_id", "investigation_id", "id"):
-            if key in kwargs:
-                try:
-                    resource_id = UUID(str(kwargs[key]))
-                    break
-                except (ValueError, TypeError):
-                    pass
+        resource_id = _as_uuid(result_id)
+    if resource_id is None and resource_type is not None:
+        resource_id = _as_uuid(path_params.get(f"{resource_type}_id"))
 
-    return resource_id, resource_name
+    return resource_id, name if isinstance(name, str) else None
+
+
+def _status_code(request: Request, result: Any) -> int:
+    """Get the status code the route responds with.
+
+    Args:
+        request: FastAPI request object.
+        result: Return value from handler.
+
+    Returns:
+        The returned Response's status, else the route's declared one, else 200.
+    """
+    if isinstance(result, Response):
+        return result.status_code
+    status_code = getattr(request.scope.get("route"), "status_code", None)
+    return status_code if isinstance(status_code, int) else 200
 
 
 def audited(
     action: str,
     resource_type: str | None = None,
+    resource_id_param: str | None = None,
 ) -> Callable[[Callable[P, Awaitable[R]]], Callable[P, Awaitable[R]]]:
     """Decorate route handlers to record audit logs.
 
@@ -238,21 +288,28 @@ def audited(
     Args:
         action: Action identifier (e.g., "team.create").
         resource_type: Type of resource (e.g., "team").
+        resource_id_param: Path param that identifies the resource, when it
+            isn't named `{resource_type}_id` (e.g., "key_id" for "api_key").
 
     Returns:
         Decorated function that records audit logs.
 
     Raises:
-        TypeError: If the handler has no Request parameter to record from.
+        TypeError: If the handler has no Request parameter to record from, or
+            no parameter named resource_id_param.
     """
 
     def decorator(func: Callable[P, Awaitable[R]]) -> Callable[P, Awaitable[R]]:
         """Wrap the function to record audit logs."""
+        name = getattr(func, "__qualname__", repr(func))
         if not _takes_request(func):
-            name = getattr(func, "__qualname__", repr(func))
             raise TypeError(
                 f"@audited({action!r}) handler {name} needs a Request parameter "
                 "(e.g. `http_request: Request`) to record the audit log"
+            )
+        if resource_id_param and resource_id_param not in inspect.signature(func).parameters:
+            raise TypeError(
+                f"@audited({action!r}) handler {name} has no {resource_id_param!r} parameter"
             )
 
         @wraps(func)
@@ -272,8 +329,8 @@ def audited(
                     request=request,
                     action=action,
                     resource_type=resource_type,
+                    resource_id_param=resource_id_param,
                     result=result,
-                    kwargs=dict(kwargs),
                 )
 
             return result
@@ -287,8 +344,8 @@ async def _record_audit(
     request: Request,
     action: str,
     resource_type: str | None,
+    resource_id_param: str | None,
     result: Any,
-    kwargs: dict[str, Any],
 ) -> None:
     """Record the audit log entry for a decorated handler's result.
 
@@ -296,8 +353,8 @@ async def _record_audit(
         request: FastAPI request object.
         action: Action identifier.
         resource_type: Type of resource.
+        resource_id_param: Path param that identifies the resource, if named.
         result: Handler result.
-        kwargs: Handler kwargs.
     """
     actor = _resolve_actor(request)
     if actor is None:
@@ -305,7 +362,11 @@ async def _record_audit(
         return
 
     tenant_id, actor_id = actor
-    resource_id, resource_name = _extract_resource_info(result, kwargs)
+    resource_id, resource_name = _extract_resource_info(
+        request, result, resource_type, resource_id_param
+    )
+    # Keeps the IDs resource_id doesn't carry, e.g. the member a team lost
+    path_params = {key: str(value) for key, value in request.path_params.items()}
 
     # actor_email is not available in either auth context
     await record_audit(
@@ -316,4 +377,6 @@ async def _record_audit(
         resource_type=resource_type,
         resource_id=resource_id,
         resource_name=resource_name,
+        status_code=_status_code(request, result),
+        metadata={"path_params": path_params} if path_params else None,
     )

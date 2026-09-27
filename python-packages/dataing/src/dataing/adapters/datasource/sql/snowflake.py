@@ -7,6 +7,7 @@ data source interface with full schema discovery and query capabilities.
 from __future__ import annotations
 
 import time
+from collections.abc import Sequence
 from typing import Any
 
 from dataing.adapters.datasource.errors import (
@@ -261,11 +262,11 @@ class SnowflakeAdapter(SQLAdapter):
     async def execute_query(
         self,
         sql: str,
-        params: dict[str, Any] | None = None,
+        params: Sequence[Any] | None = None,
         timeout_seconds: int = 30,
         limit: int | None = None,
     ) -> QueryResult:
-        """Execute a SQL query against Snowflake."""
+        """Execute a SQL query against Snowflake, binding params to its %s placeholders."""
         if not self._connected or not self._conn:
             raise ConnectionFailedError(message="Not connected to Snowflake")
 
@@ -277,8 +278,9 @@ class SnowflakeAdapter(SQLAdapter):
             # Set query timeout
             cursor.execute(f"ALTER SESSION SET STATEMENT_TIMEOUT_IN_SECONDS = {timeout_seconds}")
 
-            # Execute query
-            cursor.execute(sql)
+            # Execute query. The connector escapes params into the %s placeholders
+            # (its default pyformat style) only when params is not None.
+            cursor.execute(sql, tuple(params) if params else None)
 
             # Get column info
             columns_info = cursor.description
@@ -345,21 +347,22 @@ class SnowflakeAdapter(SQLAdapter):
             raise ConnectionFailedError(message="Not connected to Snowflake")
 
         try:
+            schema_filter = filter or SchemaFilter()
             database = self._config.get("database", "")
             schema = self._config.get("schema", "PUBLIC")
 
-            # Build filter conditions
-            conditions = [f"TABLE_SCHEMA = '{schema}'"]
-            if filter:
-                if filter.table_pattern:
-                    conditions.append(f"TABLE_NAME LIKE '{filter.table_pattern}'")
-                if filter.schema_pattern:
-                    conditions.append(f"TABLE_SCHEMA LIKE '{filter.schema_pattern}'")
-                if not filter.include_views:
-                    conditions.append("TABLE_TYPE = 'BASE TABLE'")
-
-            where_clause = " AND ".join(conditions)
-            limit_clause = f"LIMIT {filter.max_tables}" if filter else "LIMIT 1000"
+            # Values are bound as %s parameters, never spliced into the SQL text.
+            conditions = ["TABLE_SCHEMA = %s"]
+            params: list[Any] = [schema]
+            if schema_filter.table_pattern:
+                conditions.append("TABLE_NAME LIKE %s")
+                params.append(schema_filter.table_pattern)
+            if schema_filter.schema_pattern:
+                conditions.append("TABLE_SCHEMA LIKE %s")
+                params.append(schema_filter.schema_pattern)
+            name_filter = " AND ".join(conditions)
+            # INFORMATION_SCHEMA.COLUMNS has no TABLE_TYPE, so only tables filter on it
+            type_filter = "" if schema_filter.include_views else "AND TABLE_TYPE = 'BASE TABLE'"
 
             # Get tables
             tables_sql = f"""
@@ -370,11 +373,11 @@ class SnowflakeAdapter(SQLAdapter):
                     ROW_COUNT as row_count,
                     BYTES as size_bytes
                 FROM {database}.INFORMATION_SCHEMA.TABLES
-                WHERE {where_clause}
+                WHERE {name_filter} {type_filter}
                 ORDER BY TABLE_NAME
-                {limit_clause}
+                LIMIT {int(schema_filter.max_tables)}
             """
-            tables_result = await self.execute_query(tables_sql)
+            tables_result = await self.execute_query(tables_sql, params)
 
             # Get columns
             columns_sql = f"""
@@ -387,10 +390,10 @@ class SnowflakeAdapter(SQLAdapter):
                     COLUMN_DEFAULT as column_default,
                     ORDINAL_POSITION as ordinal_position
                 FROM {database}.INFORMATION_SCHEMA.COLUMNS
-                WHERE {where_clause}
+                WHERE {name_filter}
                 ORDER BY TABLE_NAME, ORDINAL_POSITION
             """
-            columns_result = await self.execute_query(columns_sql)
+            columns_result = await self.execute_query(columns_sql, params)
 
             # Organize into schema response
             schema_map: dict[str, dict[str, dict[str, Any]]] = {}

@@ -7,6 +7,7 @@ data source adapters, adding query execution capabilities.
 from __future__ import annotations
 
 from abc import abstractmethod
+from collections.abc import Sequence
 from typing import Any
 
 from dataing.adapters.datasource.base import BaseAdapter
@@ -47,7 +48,7 @@ class SQLAdapter(BaseAdapter):
     async def execute_query(
         self,
         sql: str,
-        params: dict[str, Any] | None = None,
+        params: Sequence[Any] | None = None,
         timeout_seconds: int = 30,
         limit: int | None = None,
     ) -> QueryResult:
@@ -55,7 +56,10 @@ class SQLAdapter(BaseAdapter):
 
         Args:
             sql: The SQL query to execute.
-            params: Optional query parameters.
+            params: Values bound to the query's placeholders, in order. The driver
+                does the binding, so use its placeholder style: $1, $2 for asyncpg
+                (Postgres, Redshift); %s for MySQL and Snowflake; ? for Trino,
+                BigQuery, DuckDB and SQLite.
             timeout_seconds: Query timeout in seconds.
             limit: Optional row limit (may be applied via LIMIT clause).
 

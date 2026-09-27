@@ -10,6 +10,7 @@ import logging
 import re
 import sqlite3
 import time
+from collections.abc import Sequence
 from pathlib import Path
 from typing import Any
 
@@ -195,11 +196,11 @@ class SQLiteAdapter(SQLAdapter):
     async def execute_query(
         self,
         sql: str,
-        params: dict[str, Any] | None = None,
+        params: Sequence[Any] | None = None,
         timeout_seconds: int = 30,
         limit: int | None = None,
     ) -> QueryResult:
-        """Execute a SQL query against SQLite."""
+        """Execute a SQL query against SQLite, binding params to its ? placeholders."""
         if not self._connected or not self._conn:
             raise ConnectionFailedError(message="Not connected to SQLite")
 
@@ -209,7 +210,7 @@ class SQLiteAdapter(SQLAdapter):
             # execution time. SQLite does not support query-level timeouts natively.
             self._conn.execute(f"PRAGMA busy_timeout = {timeout_seconds * 1000}")
 
-            cursor = self._conn.execute(sql)
+            cursor = self._conn.execute(sql, tuple(params or ()))
             rows = cursor.fetchall()
 
             execution_time_ms = int((time.time() - start_time) * 1000)

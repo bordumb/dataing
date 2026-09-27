@@ -6,16 +6,19 @@ and provider-specific webhook endpoints.
 
 from __future__ import annotations
 
+import functools
 import hashlib
 import hmac
 import json
 import logging
 import secrets
+from collections.abc import Awaitable, Callable
 from datetime import UTC, datetime
 from typing import Annotated, Any
 from uuid import UUID, uuid4
 
-from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
+import httpx
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request, Response, status
 from pydantic import BaseModel, Field
 
 from dataing.adapters.db.app_db import AppDatabase
@@ -24,7 +27,7 @@ from dataing.core.json_utils import to_json_string
 from dataing.entrypoints.api.deps import get_app_db, resolve_datasource_id
 from dataing.entrypoints.api.middleware.auth import ApiKeyContext, require_scope, verify_api_key
 from dataing.services.policy import IssueContext, PolicyService
-from dataing_ee.adapters.integrations.base import IssueData, WebhookRequest
+from dataing_ee.adapters.integrations.base import IntegrationAdapter, IssueData, WebhookRequest
 from dataing_ee.adapters.integrations.registry import get_adapter
 from dataing_ee.models.integration import IntegrationEventStatus, IntegrationProvider
 
@@ -473,6 +476,7 @@ async def receive_provider_webhook(
     provider: str,
     request: Request,
     db: AppDbDep,
+    background_tasks: BackgroundTasks,
     integration_id: UUID | None = None,
 ) -> dict[str, Any]:
     """Receive a webhook from an integration provider.
@@ -482,9 +486,10 @@ async def receive_provider_webhook(
     without a signing secret rejects every webhook.
     Uses adapter classes for MC/GX when available, falls back to inline logic otherwise.
     Idempotency is enforced via the integration_events table. The adapter shapes
-    the response, such as the reply to a Slack slash command.
+    the response, such as the reply to a Slack slash command, and can have the
+    webhook handled after replying when the provider can't wait for the outcome.
     """
-    result = await _handle_provider_webhook(provider, request, db, integration_id)
+    result = await _handle_provider_webhook(provider, request, db, integration_id, background_tasks)
     adapter = get_adapter(provider)
     if adapter is None:
         return result
@@ -501,6 +506,7 @@ async def _handle_provider_webhook(
     request: Request,
     db: AppDatabase,
     integration_id: UUID | None,
+    background_tasks: BackgroundTasks,
 ) -> dict[str, Any]:
     """Authenticate and handle a provider webhook for receive_provider_webhook."""
     if provider not in IntegrationProvider.all():
@@ -591,6 +597,41 @@ async def _handle_provider_webhook(
         )
         return {"status": "skipped", "reason": "filtered_by_adapter"}
 
+    process = functools.partial(
+        _process_webhook_event,
+        request=request,
+        db=db,
+        integration=integration,
+        integration_id=integration_id,
+        provider=provider,
+        adapter=adapter,
+        webhook_request=webhook_request,
+        payload=payload,
+        body=body,
+    )
+
+    # A provider that can't wait, like Slack for a slash command, is answered at
+    # once and sent the outcome when the event has been handled
+    reply_url = adapter.deferred_reply_url(webhook_request) if adapter and webhook_request else None
+    if reply_url and adapter and webhook_request:
+        background_tasks.add_task(_process_then_reply, process, adapter, webhook_request, reply_url)
+        return {"status": "accepted"}
+
+    return await process()
+
+
+async def _process_webhook_event(
+    request: Request,
+    db: AppDatabase,
+    integration: dict[str, Any],
+    integration_id: UUID,
+    provider: str,
+    adapter: IntegrationAdapter | None,
+    webhook_request: WebhookRequest | None,
+    payload: dict[str, Any],
+    body: bytes,
+) -> dict[str, Any]:
+    """Record an authenticated webhook event and create an issue from it."""
     # Extract idempotency key and event type (provider-specific)
     if adapter and webhook_request:
         # Use adapter for fingerprinting and event type
@@ -799,6 +840,31 @@ async def _handle_provider_webhook(
     if investigation_id:
         result["investigation_id"] = str(investigation_id)
     return result
+
+
+async def _process_then_reply(
+    process: Callable[[], Awaitable[dict[str, Any]]],
+    adapter: IntegrationAdapter,
+    webhook_request: WebhookRequest,
+    reply_url: str,
+) -> None:
+    """Handle a webhook event after replying to it, then post the outcome."""
+    try:
+        result = await process()
+    except Exception:
+        logger.exception(f"Deferred webhook handling failed: provider={adapter.provider}")
+        result = {"status": "error"}
+    await _post_reply(reply_url, adapter.format_response(webhook_request, result))
+
+
+async def _post_reply(url: str, body: dict[str, Any]) -> None:
+    """Post a reply to a provider, logging rather than raising if that fails."""
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            response = await client.post(url, json=body)
+            response.raise_for_status()
+    except httpx.HTTPError as e:
+        logger.warning(f"Webhook reply to provider failed: {e}")
 
 
 async def _evaluate_and_start_investigation(

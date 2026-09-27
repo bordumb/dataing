@@ -43,13 +43,15 @@ def sign_hmac_sha256(body: bytes, secret: str) -> str:
     return hmac.new(secret.encode(), body, hashlib.sha256).hexdigest()
 
 
-def slash_command(text: str) -> WebhookRequest:
+def slash_command(
+    text: str, response_url: str = "https://hooks.slack.com/commands/T123/1/abc"
+) -> WebhookRequest:
     """Create a Slack slash-command request, form-encoded as Slack sends it."""
     fields = {
         "command": "/dataing",
         "text": text,
         "token": "legacy-verification-token",
-        "response_url": "https://hooks.slack.com/commands/T123/1/abc",
+        "response_url": response_url,
         "channel_id": "C123",
         "user_id": "U123",
         "trigger_id": "13345224609.738474920.8088930838d88f008e1",
@@ -611,7 +613,9 @@ class TestSlackAdapter:
     @pytest.mark.parametrize(
         ("result", "reply"),
         [
+            ({"status": "accepted"}, "Creating a dataing issue..."),
             ({"status": "processed", "issue_number": 7}, "Created dataing issue #7."),
+            ({"status": "error"}, "Couldn't create the dataing issue. Try again in a moment."),
             ({"status": "deduplicated"}, "This is already a dataing issue."),
             (
                 {"status": "skipped", "reason": "integration_disabled"},
@@ -623,7 +627,7 @@ class TestSlackAdapter:
                 "`/dataing orders has null customer ids`.",
             ),
         ],
-        ids=["processed", "deduplicated", "disabled", "no_text"],
+        ids=["accepted", "processed", "error", "deduplicated", "disabled", "no_text"],
     )
     def test_format_response_replies_to_slash_command(
         self, adapter: SlackAdapter, result: dict[str, Any], reply: str
@@ -645,6 +649,38 @@ class TestSlackAdapter:
         assert other is not None
         result = {"status": "processed", "issue_number": 7}
         assert other.format_response(slash_command("orders has nulls"), result) == result
+
+    def test_slash_command_is_answered_at_its_response_url(self, adapter: SlackAdapter) -> None:
+        """Test a slash command's outcome goes to its response_url, as Slack can't wait."""
+        request = slash_command("orders has nulls")
+        assert adapter.deferred_reply_url(request) == "https://hooks.slack.com/commands/T123/1/abc"
+
+    @pytest.mark.parametrize(
+        "response_url",
+        [
+            "https://attacker.example/commands/T123/1/abc",
+            "https://hooks.slack.com.attacker.example/commands/T123/1/abc",
+            "http://hooks.slack.com/commands/T123/1/abc",
+        ],
+    )
+    def test_only_slack_response_urls_are_answered(
+        self, adapter: SlackAdapter, response_url: str
+    ) -> None:
+        """Test dataing never posts a reply anywhere but Slack's hooks host."""
+        request = slash_command("orders has nulls", response_url=response_url)
+        assert adapter.deferred_reply_url(request) is None
+
+    def test_events_are_not_deferred(self, adapter: SlackAdapter) -> None:
+        """Test only slash commands are answered later."""
+        request = make_request({"type": "event_callback", "event": {"type": "message"}})
+        assert adapter.deferred_reply_url(request) is None
+
+    @pytest.mark.parametrize("provider", sorted(set(AdapterRegistry.list_providers()) - {"slack"}))
+    def test_other_providers_are_not_deferred(self, provider: str) -> None:
+        """Test other providers are answered once their webhook is handled."""
+        other = get_adapter(provider)
+        assert other is not None
+        assert other.deferred_reply_url(slash_command("orders has nulls")) is None
 
 
 class TestSodaAdapter:

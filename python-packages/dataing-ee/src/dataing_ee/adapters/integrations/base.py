@@ -209,6 +209,26 @@ class IntegrationAdapter(ABC):
         _ = request  # Available for subclass overrides
         return result
 
+    def deferred_reply_url(
+        self,
+        request: WebhookRequest,  # noqa: ARG002
+    ) -> str | None:
+        """Return where to post the outcome, if the provider can't wait for it.
+
+        Override for providers that need an immediate reply, such as Slack,
+        which gives a slash command 3 seconds. The webhook is then acknowledged
+        at once, handled in the background, and its formatted outcome posted to
+        the returned URL.
+
+        Args:
+            request: The incoming webhook request
+
+        Returns:
+            The URL to post the outcome to, or None to reply once it is handled
+        """
+        _ = request  # Available for subclass overrides
+        return None
+
     # Helper methods for common signature verification patterns
 
     def _verify_hmac_sha256(

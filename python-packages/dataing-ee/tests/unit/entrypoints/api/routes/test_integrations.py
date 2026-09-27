@@ -10,7 +10,9 @@ from unittest.mock import AsyncMock
 from urllib.parse import urlencode
 from uuid import uuid4
 
+import httpx
 import pytest
+import respx
 from dataing_ee.adapters.integrations.registry import AdapterRegistry
 from dataing_ee.entrypoints.api.routes.integrations import (
     FieldMappingCreate,
@@ -23,6 +25,7 @@ from dataing_ee.entrypoints.api.routes.integrations import (
     _get_default_description,
     _get_default_title,
     _get_nested_value,
+    _post_reply,
     _verify_provider_signature,
     router,
 )
@@ -895,6 +898,14 @@ def no_auto_investigation(monkeypatch: pytest.MonkeyPatch) -> None:
     )
 
 
+@pytest.fixture
+def replies(monkeypatch: pytest.MonkeyPatch) -> AsyncMock:
+    """Capture the replies posted to providers after a webhook is handled."""
+    post_reply = AsyncMock()
+    monkeypatch.setattr("dataing_ee.entrypoints.api.routes.integrations._post_reply", post_reply)
+    return post_reply
+
+
 class TestFormEncodedWebhooks:
     """Webhook bodies are decoded once authenticated, JSON or form-encoded."""
 
@@ -911,17 +922,56 @@ class TestFormEncodedWebhooks:
         assert "Slack Action: flag_issue = orders" in db.fetch_one.await_args.args
 
     @pytest.mark.usefixtures("no_auto_investigation")
-    def test_slash_command_creates_issue_and_replies(self) -> None:
+    def test_slash_command_is_acknowledged_then_answered(self, replies: AsyncMock) -> None:
+        # Slack gives a slash command 3 seconds: acknowledge, then report back
         body = urlencode(SLACK_SLASH_COMMAND).encode()
         db = _processing_db("slack")
 
         headers = {"Content-Type": FORM, **_signed_body("slack", body)}
         response = _post_raw(db, "slack", body, headers)
 
-        reply = {"response_type": "ephemeral", "text": "Created dataing issue #7."}
+        ack = {"response_type": "ephemeral", "text": "Creating a dataing issue..."}
         assert response.status_code == 200
-        assert response.json() == reply
+        assert response.json() == ack
         assert "orders has nulls" in db.fetch_one.await_args.args
+        replies.assert_awaited_once_with(
+            SLACK_SLASH_COMMAND["response_url"],
+            {"response_type": "ephemeral", "text": "Created dataing issue #7."},
+        )
+
+    def test_slash_command_failure_is_reported(self, replies: AsyncMock) -> None:
+        body = urlencode(SLACK_SLASH_COMMAND).encode()
+        db = AsyncMock()
+        db.fetch_one.side_effect = [
+            _integration_row("slack", WEBHOOK_SECRET),
+            None,  # not delivered before
+            RuntimeError("database went away"),
+        ]
+
+        headers = {"Content-Type": FORM, **_signed_body("slack", body)}
+        response = _post_raw(db, "slack", body, headers)
+
+        assert response.status_code == 200
+        replies.assert_awaited_once_with(
+            SLACK_SLASH_COMMAND["response_url"],
+            {
+                "response_type": "ephemeral",
+                "text": "Couldn't create the dataing issue. Try again in a moment.",
+            },
+        )
+
+    @pytest.mark.usefixtures("no_auto_investigation")
+    def test_untrusted_response_url_is_never_posted_to(self, replies: AsyncMock) -> None:
+        command = {**SLACK_SLASH_COMMAND, "response_url": "https://attacker.example/hook"}
+        body = urlencode(command).encode()
+        db = _processing_db("slack")
+
+        headers = {"Content-Type": FORM, **_signed_body("slack", body)}
+        response = _post_raw(db, "slack", body, headers)
+
+        # Answered directly instead, once the issue exists
+        assert response.json()["text"] == "Created dataing issue #7."
+        replies.assert_not_awaited()
 
     def test_slash_command_without_text_gets_usage_reply(self) -> None:
         body = urlencode({**SLACK_SLASH_COMMAND, "text": ""}).encode()
@@ -943,3 +993,30 @@ class TestFormEncodedWebhooks:
 
         assert response.status_code == 400
         assert not _recorded_event(db)
+
+
+class TestPostReply:
+    """Replies are posted as JSON, and a failed post is logged, not raised."""
+
+    async def test_posts_reply_as_json(self, respx_mock: respx.MockRouter) -> None:
+        url = SLACK_SLASH_COMMAND["response_url"]
+        route = respx_mock.post(url).mock(return_value=httpx.Response(200))
+
+        await _post_reply(url, {"text": "Created dataing issue #7."})
+
+        assert json.loads(route.calls.last.request.content) == {"text": "Created dataing issue #7."}
+
+    @pytest.mark.parametrize(
+        "outcome",
+        [{"return_value": httpx.Response(500)}, {"side_effect": httpx.ConnectError("down")}],
+        ids=["error_status", "unreachable"],
+    )
+    async def test_failed_reply_is_not_raised(
+        self, respx_mock: respx.MockRouter, outcome: dict[str, Any]
+    ) -> None:
+        url = SLACK_SLASH_COMMAND["response_url"]
+        route = respx_mock.post(url).mock(**outcome)
+
+        await _post_reply(url, {"text": "Created dataing issue #7."})
+
+        assert route.called

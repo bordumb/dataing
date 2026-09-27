@@ -6,9 +6,13 @@ import hashlib
 import hmac
 import time
 from typing import Any
+from urllib.parse import urlsplit
 
 from dataing_ee.adapters.integrations.base import IntegrationAdapter, IssueData, WebhookRequest
 from dataing_ee.adapters.integrations.registry import register_adapter
+
+# Slack posts slash-command response URLs on this host only
+SLACK_HOOKS_HOST = "hooks.slack.com"
 
 
 @register_adapter
@@ -118,10 +122,32 @@ class SlackAdapter(IntegrationAdapter):
             return result
         return {"response_type": "ephemeral", "text": self._slash_command_reply(payload, result)}
 
+    def deferred_reply_url(
+        self,
+        request: WebhookRequest,
+    ) -> str | None:
+        """Send a slash command's outcome to its response_url.
+
+        Slack gives a slash command 3 seconds for its reply. Only an HTTPS URL on
+        Slack's hooks host is used, so a request can't make dataing post elsewhere.
+        """
+        payload = request.body_json
+        response_url = payload.get("response_url")
+        if not self._is_slash_command(payload) or not isinstance(response_url, str):
+            return None
+        url = urlsplit(response_url)
+        if url.scheme == "https" and url.hostname == SLACK_HOOKS_HOST:
+            return response_url
+        return None
+
     def _slash_command_reply(self, payload: dict[str, Any], result: dict[str, Any]) -> str:
         """Tell the user who ran a slash command what came of it."""
+        if result.get("status") == "accepted":
+            return "Creating a dataing issue..."
         if result.get("status") == "processed":
             return f"Created dataing issue #{result['issue_number']}."
+        if result.get("status") == "error":
+            return "Couldn't create the dataing issue. Try again in a moment."
         if result.get("status") == "deduplicated":
             return "This is already a dataing issue."
         if result.get("reason") == "integration_disabled":

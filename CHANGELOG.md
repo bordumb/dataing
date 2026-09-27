@@ -1,3 +1,10 @@
+## [1.22.4](https://github.com/bordumb/dataing/compare/v1.22.3...v1.22.4) (2026-09-27)
+
+
+### Bug Fixes
+
+* **git:** encrypt repository access tokens at rest ([#151](https://github.com/bordumb/dataing/issues/151)) ([293109d](https://github.com/bordumb/dataing/commit/293109d8b23fc6a398c97f0ca664dba1303d157e))
+
 ## [1.22.3](https://github.com/bordumb/dataing/compare/v1.22.2...v1.22.3) (2026-09-27)
 
 

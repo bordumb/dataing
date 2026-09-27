@@ -15,7 +15,6 @@ from fixtures.temporal import FakeAgent, FakeDatasource, InProcessTemporal, sql_
 from dataing.adapters.datasource.errors import ConnectionFailedError, QuerySyntaxError
 from dataing.adapters.datasource.types import QueryResult
 from dataing.core.domain_types import UntestedHypothesis
-from dataing.entrypoints.temporal_worker import AdapterDatabase
 from dataing.temporal.activities import (
     CheckPatternsInput,
     CheckPatternsResult,
@@ -78,7 +77,7 @@ async def _investigate(
         generate_hypotheses,
         finalize_evidence_chain,
         make_generate_query_activity(adapter=agent),
-        make_execute_query_activity(database=AdapterDatabase(get_adapter)),
+        make_execute_query_activity(get_adapter=get_adapter),
         make_interpret_evidence_activity(adapter=agent),
         make_synthesize_activity(adapter=agent),
         terminated=terminated,

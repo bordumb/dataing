@@ -147,6 +147,39 @@ class TestValidateQuery:
         # Should not raise
         validate_query("SELECT updated_at FROM users LIMIT 10", dialect="postgres")
 
+    @pytest.mark.parametrize(
+        "sql",
+        [
+            "SELECT id, deleted_at FROM users WHERE deleted_at IS NULL LIMIT 100",
+            "SELECT * FROM update_log WHERE id = 1 LIMIT 100",
+            "SELECT id, created_by FROM records LIMIT 100",
+            "SELECT inserted_at FROM events LIMIT 100",
+        ],
+        ids=["deleted_at", "update_log", "created_by", "inserted_at"],
+    )
+    def test_identifiers_containing_keywords_ok(self, sql: str) -> None:
+        """Test that identifiers containing a forbidden keyword are not false positives."""
+        validate_query(sql, dialect="postgres")
+
+    @pytest.mark.parametrize("dialect", ["postgres", "duckdb"])
+    def test_copy_raises(self, dialect: str) -> None:
+        """Test that COPY is rejected even though it wraps a SELECT with a LIMIT."""
+        with pytest.raises(QueryValidationError):
+            validate_query("COPY (SELECT * FROM users LIMIT 10) TO '/tmp/out.csv'", dialect=dialect)
+
+    def test_select_requirement_cannot_be_disabled(self) -> None:
+        """Test that the SELECT-only check cannot be traded for a denylist.
+
+        With the check off, COPY (SELECT ... LIMIT n) TO ... passed: it has a
+        LIMIT and no forbidden keyword.
+        """
+        with pytest.raises(TypeError):
+            validate_query(
+                "COPY (SELECT * FROM users LIMIT 10) TO '/tmp/out.csv'",
+                dialect="postgres",
+                require_select=False,  # type: ignore[call-arg]
+            )
+
     def test_invalid_sql_raises(self) -> None:
         """Test that invalid SQL raises error."""
         with pytest.raises(QueryValidationError) as exc_info:
@@ -354,18 +387,10 @@ class TestCopyStatements:
     """Tests that COPY is rejected: it writes files, runs programs and loads tables."""
 
     @pytest.mark.parametrize("dialect", ["duckdb", "postgres"])
-    def test_copy_to_file_forbidden_without_require_select(self, dialect: str) -> None:
+    def test_copy_to_file_rejected(self, dialect: str) -> None:
         """Test COPY ... TO a file is rejected even though its inner SELECT has a LIMIT."""
         with pytest.raises(QueryValidationError) as exc_info:
-            validate_query(COPY_QUERY_TO_FILE, dialect=dialect, require_select=False)
-
-        assert "Forbidden statement type: Copy" in str(exc_info.value)
-
-    @pytest.mark.parametrize("dialect", ["duckdb", "postgres"])
-    def test_copy_to_file_rejected_with_require_select(self, dialect: str) -> None:
-        """Test COPY ... TO a file fails the SELECT-only check."""
-        with pytest.raises(QueryValidationError) as exc_info:
-            validate_query(COPY_QUERY_TO_FILE, dialect=dialect, require_select=True)
+            validate_query(COPY_QUERY_TO_FILE, dialect=dialect)
 
         assert "Only SELECT statements allowed, got: Copy" in str(exc_info.value)
 
@@ -375,10 +400,9 @@ class TestCopyStatements:
             validate_query(
                 "COPY (SELECT * FROM orders LIMIT 10) TO PROGRAM 'rm -rf /data/src'",
                 dialect="postgres",
-                require_select=False,
             )
 
-        assert "Forbidden statement type: Copy" in str(exc_info.value)
+        assert "Only SELECT statements allowed, got: Copy" in str(exc_info.value)
 
     @pytest.mark.parametrize("dialect", ["duckdb", "postgres"])
     @pytest.mark.parametrize(
@@ -390,11 +414,11 @@ class TestCopyStatements:
         ids=["to_file", "from_file"],
     )
     def test_copy_table_forbidden(self, sql: str, dialect: str) -> None:
-        """Test COPY of a whole table is forbidden, not just rejected for lacking a LIMIT."""
+        """Test COPY of a whole table is rejected, not just for lacking a LIMIT."""
         with pytest.raises(QueryValidationError) as exc_info:
-            validate_query(sql, dialect=dialect, require_select=False)
+            validate_query(sql, dialect=dialect)
 
-        assert "Forbidden statement type: Copy" in str(exc_info.value)
+        assert "Only SELECT statements allowed, got: Copy" in str(exc_info.value)
 
 
 class TestWriteCapableStatements:
@@ -466,11 +490,11 @@ class TestWriteCapableStatements:
         ],
     )
     def test_statement_forbidden(self, sql: str, dialect: str, statement_type: str) -> None:
-        """Test the statement is rejected as forbidden when SELECT is not required."""
+        """Test the statement is rejected: only SELECTs and set operations may run."""
         with pytest.raises(QueryValidationError) as exc_info:
-            validate_query(sql, dialect=dialect, require_select=False)
+            validate_query(sql, dialect=dialect)
 
-        assert f"Forbidden statement type: {statement_type}" in str(exc_info.value)
+        assert f"Only SELECT statements allowed, got: {statement_type}" in str(exc_info.value)
 
     @pytest.mark.parametrize(
         "sql",
@@ -480,7 +504,7 @@ class TestWriteCapableStatements:
     def test_duckdb_database_export_import_rejected(self, sql: str) -> None:
         """Test DuckDB EXPORT/IMPORT DATABASE are rejected (sqlglot cannot parse them)."""
         with pytest.raises(QueryValidationError):
-            validate_query(sql, dialect="duckdb", require_select=False)
+            validate_query(sql, dialect="duckdb")
 
     @pytest.mark.parametrize(
         ("sql", "dialect"),
@@ -505,9 +529,15 @@ class TestWriteCapableStatements:
                 "duckdb",
                 id="copy_in_string_literal",
             ),
-            pytest.param("SUMMARIZE SELECT * FROM orders LIMIT 10", "duckdb", id="summarize"),
         ],
     )
     def test_read_only_statement_allowed(self, sql: str, dialect: str) -> None:
         """Test read-only statements that resemble forbidden ones still pass."""
-        validate_query(sql, dialect=dialect, require_select=False)  # Should not raise
+        validate_query(sql, dialect=dialect)  # Should not raise
+
+    def test_read_only_non_select_statement_rejected(self) -> None:
+        """Test a read-only statement that is not a SELECT is rejected: there is no opt-out."""
+        with pytest.raises(QueryValidationError) as exc_info:
+            validate_query("SUMMARIZE SELECT * FROM orders LIMIT 10", dialect="duckdb")
+
+        assert "Only SELECT statements allowed" in str(exc_info.value)

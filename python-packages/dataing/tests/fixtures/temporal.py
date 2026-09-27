@@ -20,16 +20,26 @@ from temporalio import workflow
 from temporalio.converter import DataConverter
 from temporalio.exceptions import ChildWorkflowError, TerminatedError
 
-from dataing.adapters.datasource.types import QueryResult
+from dataing.adapters.datasource.types import AdapterCapabilities, QueryLanguage, QueryResult
 
 
 def sql_for(hypothesis_id: str) -> str:
-    """Return the SQL FakeAgent generates to test a hypothesis."""
-    return f"SELECT order_id, amount FROM orders /* {hypothesis_id} */"
+    """Return the SQL FakeAgent generates to test a hypothesis.
+
+    It passes execute_query's validation: a single SELECT with a LIMIT.
+    """
+    return f"SELECT order_id, amount FROM orders LIMIT 100 /* {hypothesis_id} */"
 
 
 class FakeDatasource:
-    """Datasource adapter that answers each query with a canned result or error."""
+    """Datasource adapter that answers each query with a canned result or error.
+
+    It declares the postgres dialect, which execute_query validates queries in.
+    """
+
+    capabilities = AdapterCapabilities(
+        supports_sql=True, query_language=QueryLanguage.SQL, sql_dialect="postgres"
+    )
 
     def __init__(self, answers: dict[str, QueryResult | Exception]) -> None:
         self._answers = answers

@@ -1,6 +1,6 @@
 """Unit tests for EvaluateHypothesisWorkflow query and interpretation error propagation.
 
-These run the real chain (AdapterDatabase -> execute_query activity -> workflow ->
+These run the real chain (datasource adapter -> execute_query activity -> workflow ->
 interpret_evidence activity) in-process via fixtures.temporal.
 """
 
@@ -11,7 +11,6 @@ from fixtures.temporal import FakeAgent, FakeDatasource, InProcessTemporal, sql_
 
 from dataing.adapters.datasource.errors import QuerySyntaxError
 from dataing.adapters.datasource.types import QueryResult
-from dataing.entrypoints.temporal_worker import AdapterDatabase
 from dataing.temporal.activities import (
     make_execute_query_activity,
     make_generate_query_activity,
@@ -34,7 +33,7 @@ async def _evaluate(
 
     InProcessTemporal(
         make_generate_query_activity(adapter=agent),
-        make_execute_query_activity(database=AdapterDatabase(get_adapter)),
+        make_execute_query_activity(get_adapter=get_adapter),
         make_interpret_evidence_activity(adapter=agent),
     ).install(monkeypatch)
 

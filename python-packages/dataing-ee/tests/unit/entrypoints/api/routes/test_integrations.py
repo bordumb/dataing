@@ -2,7 +2,10 @@
 
 import hashlib
 import hmac
+import json
 from datetime import UTC, datetime
+from typing import Any
+from unittest.mock import AsyncMock
 from uuid import uuid4
 
 import pytest
@@ -18,8 +21,13 @@ from dataing_ee.entrypoints.api.routes.integrations import (
     _get_default_title,
     _get_nested_value,
     _verify_provider_signature,
+    router,
 )
-from dataing_ee.models.integration import IntegrationProvider
+from dataing_ee.models.integration import Integration, IntegrationProvider
+from fastapi import FastAPI
+from fastapi.testclient import TestClient
+
+from dataing.entrypoints.api.deps import get_app_db
 
 
 class TestIntegrationCreateSchema:
@@ -145,6 +153,14 @@ class TestFieldMappingCreateSchema:
         for target in ["title", "description", "severity", "priority", "dataset_id", "labels"]:
             mapping = FieldMappingCreate(source_field="test.field", target_field=target)
             assert mapping.target_field == target
+
+
+class TestIntegrationModel:
+    """Test the Integration ORM model matches the schema."""
+
+    def test_signing_secret_is_required(self) -> None:
+        """Test signing_secret is NOT NULL, as in migration 035."""
+        assert Integration.__table__.c.signing_secret.nullable is False
 
 
 class TestVerifyProviderSignature:
@@ -492,3 +508,125 @@ class TestAdapterDelegation:
             query_params={},
         )
         assert adapter.should_process(request) is False
+
+
+WEBHOOK_SECRET = "whsec_test"
+WRONG_SIGNATURE = "sha256=" + "0" * 64
+
+
+def _integration_row(
+    provider: str, signing_secret: str | None, *, enabled: bool = True
+) -> dict[str, Any]:
+    return {
+        "id": uuid4(),
+        "tenant_id": uuid4(),
+        "provider": provider,
+        "enabled": enabled,
+        "signing_secret": signing_secret,
+        "rate_limit_per_minute": 60,
+    }
+
+
+def _webhook_db(integration: dict[str, Any]) -> AsyncMock:
+    """App DB holding one integration; accepts the writes of a skipped webhook."""
+    db = AsyncMock()
+    db.fetch_one.side_effect = [integration, None, {"id": uuid4()}]
+    db.fetch_all.return_value = []
+    return db
+
+
+def _post_webhook(
+    db: AsyncMock, provider: str, payload: dict[str, Any], headers: dict[str, str] | None = None
+) -> Any:
+    app = FastAPI()
+    app.include_router(router, prefix="/api/v1")
+    app.dependency_overrides[get_app_db] = lambda: db
+    return TestClient(app).post(
+        f"/api/v1/integrations/{provider}/webhook",
+        params={"integration_id": str(uuid4())},
+        content=json.dumps(payload).encode(),
+        headers={"Content-Type": "application/json", **(headers or {})},
+    )
+
+
+def _signed(payload: dict[str, Any], header: str) -> dict[str, str]:
+    digest = hmac.new(
+        WEBHOOK_SECRET.encode(), json.dumps(payload).encode(), hashlib.sha256
+    ).hexdigest()
+    return {header: f"sha256={digest}"}
+
+
+def _recorded_event(db: AsyncMock) -> bool:
+    return any(
+        "INSERT INTO integration_events" in call.args[0] for call in db.fetch_one.await_args_list
+    )
+
+
+class TestProviderWebhookAuthentication:
+    """Webhooks are authenticated before any processing, and fail closed."""
+
+    @pytest.mark.parametrize("signing_secret", [None, ""])
+    @pytest.mark.parametrize(
+        ("provider", "payload"),
+        [
+            # No adapter: inline signature check
+            ("custom", {"event": "ping"}),
+            # Adapter-based signature check
+            ("jira", {"webhookEvent": "jira:issue_created", "issue": {"id": "1", "fields": {}}}),
+        ],
+    )
+    def test_rejects_webhook_when_no_signing_secret(
+        self, provider: str, payload: dict[str, Any], signing_secret: str | None
+    ) -> None:
+        db = _webhook_db(_integration_row(provider, signing_secret))
+
+        response = _post_webhook(db, provider, payload)
+
+        assert response.status_code == 401
+        assert not _recorded_event(db)
+
+    @pytest.mark.parametrize(
+        ("signing_secret", "headers"),
+        [(None, {}), (WEBHOOK_SECRET, {"X-GE-Signature": WRONG_SIGNATURE})],
+    )
+    def test_rejects_unauthenticated_webhook_before_adapter_filtering(
+        self, signing_secret: str | None, headers: dict[str, str]
+    ) -> None:
+        # Great Expectations skips successful validations; that must not bypass auth.
+        db = _webhook_db(_integration_row("great_expectations", signing_secret))
+
+        response = _post_webhook(db, "great_expectations", {"result": {"success": True}}, headers)
+
+        assert response.status_code == 401
+
+    @pytest.mark.parametrize(
+        ("signing_secret", "headers"),
+        [(None, {}), (WEBHOOK_SECRET, {"X-Webhook-Signature": WRONG_SIGNATURE})],
+    )
+    def test_rejects_unauthenticated_webhook_for_disabled_integration(
+        self, signing_secret: str | None, headers: dict[str, str]
+    ) -> None:
+        db = _webhook_db(_integration_row("custom", signing_secret, enabled=False))
+
+        response = _post_webhook(db, "custom", {"event": "ping"}, headers)
+
+        assert response.status_code == 401
+
+    def test_processes_webhook_with_valid_signature(self) -> None:
+        payload = {"event": "ping"}
+        db = _webhook_db(_integration_row("custom", WEBHOOK_SECRET))
+
+        response = _post_webhook(db, "custom", payload, _signed(payload, "X-Webhook-Signature"))
+
+        assert response.status_code == 200
+        assert response.json() == {"status": "skipped", "reason": "no_title"}
+        assert _recorded_event(db)
+
+    def test_acknowledges_signed_webhook_for_disabled_integration(self) -> None:
+        payload = {"event": "ping"}
+        db = _webhook_db(_integration_row("custom", WEBHOOK_SECRET, enabled=False))
+
+        response = _post_webhook(db, "custom", payload, _signed(payload, "X-Webhook-Signature"))
+
+        assert response.status_code == 200
+        assert response.json() == {"status": "skipped", "reason": "integration_disabled"}

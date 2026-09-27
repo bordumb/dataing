@@ -93,6 +93,7 @@ GCS_CAPABILITIES = AdapterCapabilities(
     supports_preview=True,
     supports_write=False,
     query_language=QueryLanguage.SQL,
+    sql_dialect="duckdb",
     max_concurrent_queries=5,
 )
 

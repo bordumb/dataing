@@ -460,7 +460,9 @@ async def receive_provider_webhook(
 ) -> dict[str, Any]:
     """Receive a webhook from an integration provider.
 
-    The webhook is verified using the provider-specific signature scheme.
+    The webhook is verified using the provider-specific signature scheme before
+    anything else is done with it. Verification fails closed: an integration
+    without a signing secret rejects every webhook.
     Uses adapter classes for MC/GX when available, falls back to inline logic otherwise.
     Idempotency is enforced via the integration_events table.
     """
@@ -490,9 +492,6 @@ async def receive_provider_webhook(
     if not integration:
         raise HTTPException(status_code=404, detail="Integration not found")
 
-    if not integration["enabled"]:
-        return {"status": "skipped", "reason": "integration_disabled"}
-
     # Read body
     body = await request.body()
 
@@ -508,39 +507,36 @@ async def receive_provider_webhook(
             query_params=dict(request.query_params),
         )
 
-        # Check if adapter wants to process this event
-        if not adapter.should_process(webhook_request):
-            logger.info(
-                f"Webhook skipped by adapter: integration={integration_id}, provider={provider}"
-            )
-            return {"status": "skipped", "reason": "filtered_by_adapter"}
+    # Verify signature before anything else. Fail closed: without a signing
+    # secret no webhook can be verified, so none is accepted.
+    signing_secret = integration["signing_secret"]
+    if not signing_secret:
+        authenticated = False
+    elif adapter and webhook_request:
+        authenticated = adapter.verify_signature(webhook_request, signing_secret)
+    else:
+        signature = request.headers.get(_get_signature_header_name(provider))
+        authenticated = _verify_provider_signature(body, signature, signing_secret, provider)
 
-    # Verify signature
-    if integration["signing_secret"]:
-        if adapter and webhook_request:
-            # Use adapter for signature verification
-            if not adapter.verify_signature(webhook_request, integration["signing_secret"]):
-                logger.warning(
-                    f"Webhook signature invalid: integration={integration_id}, provider={provider}"
-                )
-                raise HTTPException(
-                    status_code=status.HTTP_401_UNAUTHORIZED,
-                    detail="Invalid webhook signature",
-                )
-        else:
-            # Fallback to inline verification
-            sig_header_name = _get_signature_header_name(provider)
-            signature = request.headers.get(sig_header_name)
-            if not _verify_provider_signature(
-                body, signature, integration["signing_secret"], provider
-            ):
-                logger.warning(
-                    f"Webhook signature invalid: integration={integration_id}, provider={provider}"
-                )
-                raise HTTPException(
-                    status_code=status.HTTP_401_UNAUTHORIZED,
-                    detail="Invalid webhook signature",
-                )
+    if not authenticated:
+        reason = "invalid signature" if signing_secret else "no signing secret configured"
+        logger.warning(
+            f"Webhook rejected ({reason}): integration={integration_id}, provider={provider}"
+        )
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid webhook signature",
+        )
+
+    if not integration["enabled"]:
+        return {"status": "skipped", "reason": "integration_disabled"}
+
+    # Check if adapter wants to process this event
+    if adapter and webhook_request and not adapter.should_process(webhook_request):
+        logger.info(
+            f"Webhook skipped by adapter: integration={integration_id}, provider={provider}"
+        )
+        return {"status": "skipped", "reason": "filtered_by_adapter"}
 
     # Parse payload and compute idempotency key
     import json

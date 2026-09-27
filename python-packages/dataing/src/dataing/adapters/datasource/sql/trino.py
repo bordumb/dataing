@@ -343,24 +343,6 @@ class TrinoAdapter(SQLAdapter):
             if cursor:
                 cursor.close()
 
-    async def _fetch_table_metadata(self) -> list[dict[str, Any]]:
-        """Fetch table metadata from Trino."""
-        catalog = self._config.get("catalog", "hive")
-        schema = self._config.get("schema", "default")
-
-        sql = f"""
-            SELECT
-                table_catalog,
-                table_schema,
-                table_name,
-                table_type
-            FROM {catalog}.information_schema.tables
-            WHERE table_schema = '{schema}'
-            ORDER BY table_name
-        """
-        result = await self.execute_query(sql)
-        return list(result.rows)
-
     async def get_schema(
         self,
         filter: SchemaFilter | None = None,

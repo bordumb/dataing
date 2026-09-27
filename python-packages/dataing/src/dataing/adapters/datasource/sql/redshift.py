@@ -109,15 +109,6 @@ REDSHIFT_CONFIG_SCHEMA = ConfigSchema(
             min_value=5,
             max_value=300,
         ),
-        ConfigField(
-            name="schemas",
-            label="Schemas to Include",
-            type="string",
-            required=False,
-            group="advanced",
-            placeholder="public,analytics",
-            description="Comma-separated list of schemas to include (default: all)",
-        ),
     ],
 )
 
@@ -162,7 +153,6 @@ class RedshiftAdapter(SQLAdapter):
                 - password: Password
                 - ssl_mode: SSL mode (optional)
                 - connection_timeout: Timeout in seconds (optional)
-                - schemas: Comma-separated schemas to include (optional)
         """
         super().__init__(config)
         self._pool: Any = None

@@ -301,21 +301,6 @@ class DuckDBAdapter(SQLAdapter):
         result: str = normalize_type(type_str, SourceType.DUCKDB).value
         return result
 
-    async def _fetch_table_metadata(self) -> list[dict[str, Any]]:
-        """Fetch table metadata from DuckDB."""
-        sql = """
-            SELECT
-                database_name as table_catalog,
-                schema_name as table_schema,
-                table_name,
-                table_type
-            FROM information_schema.tables
-            WHERE table_schema NOT IN ('pg_catalog', 'information_schema')
-            ORDER BY table_schema, table_name
-        """
-        result = await self.execute_query(sql)
-        return list(result.rows)
-
     async def get_schema(
         self,
         filter: SchemaFilter | None = None,

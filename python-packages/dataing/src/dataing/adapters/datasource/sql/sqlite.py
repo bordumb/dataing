@@ -252,28 +252,6 @@ class SQLiteAdapter(SQLAdapter):
                 ) from e
             raise
 
-    async def _fetch_table_metadata(self) -> list[dict[str, Any]]:
-        """Fetch table metadata from SQLite."""
-        if not self._conn:
-            raise ConnectionFailedError(message="Not connected to SQLite")
-
-        cursor = self._conn.execute(
-            "SELECT name, type FROM sqlite_master "
-            "WHERE type IN ('table', 'view') AND name NOT LIKE 'sqlite_%'"
-        )
-        tables = []
-        for row in cursor:
-            tables.append(
-                {
-                    "table_catalog": DEFAULT_CATALOG,
-                    "table_schema": DEFAULT_SCHEMA,
-                    "table_name": row["name"],
-                    "table_type": row["type"].upper(),
-                }
-            )
-        cursor.close()
-        return tables
-
     async def get_schema(
         self,
         filter: SchemaFilter | None = None,

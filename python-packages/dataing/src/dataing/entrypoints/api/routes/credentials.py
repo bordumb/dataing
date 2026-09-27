@@ -7,7 +7,7 @@ database credentials for each datasource.
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Annotated
+from typing import Annotated, Any
 from uuid import UUID
 
 import structlog
@@ -15,8 +15,9 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
 
 from dataing.adapters.audit import audited
-from dataing.adapters.datasource import SourceType, get_registry
+from dataing.adapters.datasource import CredentialsNotSupportedError, SourceType, get_registry
 from dataing.adapters.datasource.encryption import decrypt_config, get_encryption_key
+from dataing.adapters.datasource.gateway import ensure_user_credentials_supported
 from dataing.adapters.db.app_db import AppDatabase
 from dataing.core.credentials import CredentialsService, DecryptedCredentials
 from dataing.entrypoints.api.deps import get_app_db
@@ -71,6 +72,40 @@ class DeleteCredentialsResponse(BaseModel):
     deleted: bool
 
 
+def _login_source_type(ds: dict[str, Any]) -> SourceType:
+    """Return a datasource's source type, if users log in to it with their own credentials.
+
+    Args:
+        ds: The datasource record.
+
+    Returns:
+        The datasource's source type.
+
+    Raises:
+        HTTPException: 400 if the source type is unknown, not available on this
+            server, or has no database login for a user's credentials to replace.
+    """
+    try:
+        source_type = SourceType(ds["type"])
+    except ValueError:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Unsupported source type: {ds['type']}",
+        ) from None
+
+    if not get_registry().is_registered(source_type):
+        raise HTTPException(
+            status_code=400,
+            detail=f"Source type not available: {ds['type']}",
+        )
+
+    try:
+        ensure_user_credentials_supported(source_type)
+    except CredentialsNotSupportedError as e:
+        raise HTTPException(status_code=400, detail=e.message) from e
+    return source_type
+
+
 # Route handlers
 
 
@@ -92,6 +127,7 @@ async def save_credentials(
     ds = await app_db.get_data_source(datasource_id, auth.tenant_id)
     if not ds:
         raise HTTPException(status_code=404, detail="Data source not found")
+    _login_source_type(ds)
 
     # Verify user_id is available
     if not auth.user_id:
@@ -187,21 +223,8 @@ async def test_credentials(
     if not ds:
         raise HTTPException(status_code=404, detail="Data source not found")
 
+    source_type = _login_source_type(ds)
     registry = get_registry()
-
-    try:
-        source_type = SourceType(ds["type"])
-    except ValueError:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Unsupported source type: {ds['type']}",
-        ) from None
-
-    if not registry.is_registered(source_type):
-        raise HTTPException(
-            status_code=400,
-            detail=f"Source type not available: {ds['type']}",
-        )
 
     # Decrypt base config and merge with test credentials
     encryption_key = get_encryption_key()

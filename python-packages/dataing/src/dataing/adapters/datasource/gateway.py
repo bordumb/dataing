@@ -20,6 +20,7 @@ from dataing.adapters.datasource.encryption import decrypt_config, get_encryptio
 from dataing.adapters.datasource.errors import (
     CredentialsInvalidError,
     CredentialsNotConfiguredError,
+    CredentialsNotSupportedError,
 )
 from dataing.adapters.datasource.registry import get_registry
 from dataing.adapters.datasource.types import QueryResult, SourceType
@@ -29,6 +30,25 @@ if TYPE_CHECKING:
     from dataing.adapters.db.app_db import AppDatabase
 
 logger = structlog.get_logger(__name__)
+
+
+def ensure_user_credentials_supported(source_type: SourceType) -> None:
+    """Refuse per-user credentials for a source type that has no database login.
+
+    A user's own credentials replace the stored login under ``username`` (see
+    ``DecryptedCredentials.apply_to``). A source type whose config schema has no
+    ``username`` field ignores them and connects with its stored config.
+
+    Args:
+        source_type: The datasource's source type.
+
+    Raises:
+        CredentialsNotSupportedError: If the source type's config has no ``username``.
+    """
+    definition = get_registry().get_definition(source_type)
+    fields = definition.config_schema.fields if definition else []
+    if not any(field.name == "username" for field in fields):
+        raise CredentialsNotSupportedError(source_type.value)
 
 
 @dataclass(frozen=True)
@@ -100,6 +120,7 @@ class QueryGateway:
         Raises:
             CredentialsNotConfiguredError: User hasn't configured credentials.
             CredentialsInvalidError: User's credentials were rejected.
+            CredentialsNotSupportedError: The datasource has no database login.
         """
         ctx = context or QueryContext()
         sql_hash = self._hash_sql(sql)
@@ -200,6 +221,9 @@ class QueryGateway:
 
         Returns:
             A configured SQL adapter.
+
+        Raises:
+            CredentialsNotSupportedError: The datasource has no database login.
         """
         # Get datasource config (host, port, database, etc.)
         ds_info = await self._app_db.get_data_source(
@@ -209,6 +233,9 @@ class QueryGateway:
         if not ds_info:
             raise ValueError(f"Datasource not found: {principal.datasource_id}")
 
+        source_type = SourceType(ds_info["type"])
+        ensure_user_credentials_supported(source_type)
+
         # Decrypt base connection config
         base_config = decrypt_config(
             ds_info["connection_config_encrypted"],
@@ -217,7 +244,6 @@ class QueryGateway:
         connection_config = credentials.apply_to(base_config)
 
         # Create fresh adapter with user's credentials
-        source_type = SourceType(ds_info["type"])
         adapter = self._registry.create(source_type, connection_config)
 
         return adapter

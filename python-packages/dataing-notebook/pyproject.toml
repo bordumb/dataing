@@ -1,6 +1,6 @@
 [project]
 name = "dataing-notebook"
-version = "1.21.10"
+version = "1.22.0"
 description = "Dataing notebook extension with IPython magics"
 readme = "README.md"
 requires-python = ">=3.10"

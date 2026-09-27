@@ -1,3 +1,10 @@
+# [1.22.0](https://github.com/bordumb/dataing/compare/v1.21.10...v1.22.0) (2026-09-27)
+
+
+### Features
+
+* **api:** enforce org roles on every mutating route and in the UI ([#150](https://github.com/bordumb/dataing/issues/150)) ([6c10bb9](https://github.com/bordumb/dataing/commit/6c10bb98c010b72341d720c6875360082b91c868))
+
 ## [1.21.10](https://github.com/bordumb/dataing/compare/v1.21.9...v1.21.10) (2026-09-27)
 
 

@@ -1,3 +1,10 @@
+## [1.22.7](https://github.com/bordumb/dataing/compare/v1.22.6...v1.22.7) (2026-09-27)
+
+
+### Bug Fixes
+
+* **api:** read lineage providers from org settings, not query params ([#190](https://github.com/bordumb/dataing/issues/190)) ([eed6fd8](https://github.com/bordumb/dataing/commit/eed6fd89c08d032eebe885867630e609f4913e7b))
+
 ## [1.22.6](https://github.com/bordumb/dataing/compare/v1.22.5...v1.22.6) (2026-09-27)
 
 

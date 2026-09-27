@@ -9,6 +9,7 @@ from __future__ import annotations
 import time
 from typing import Any
 
+from dataing.adapters.datasource import duckdb_sandbox
 from dataing.adapters.datasource.errors import (
     AccessDeniedError,
     AuthenticationFailedError,
@@ -198,10 +199,16 @@ class HDFSAdapter(FileSystemAdapter):
             ) from e
 
         try:
-            self._conn = duckdb.connect(":memory:")
+            self._conn = duckdb.connect(":memory:", config=duckdb_sandbox.connection_config())
 
             self._conn.execute("INSTALL httpfs")
             self._conn.execute("LOAD httpfs")
+
+            # Queries may read below the configured base path only
+            host = self._config.get("namenode_host", "localhost")
+            port = self._config.get("namenode_port", 9000)
+            base_path = self._config.get("path", "/").strip("/")
+            duckdb_sandbox.confine(self._conn, directories=[f"hdfs://{host}:{port}/{base_path}"])
 
             self._connected = True
 

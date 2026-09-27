@@ -10,6 +10,7 @@ import time
 from datetime import datetime
 from typing import Any
 
+from dataing.adapters.datasource import duckdb_sandbox
 from dataing.adapters.datasource.errors import (
     AccessDeniedError,
     AuthenticationFailedError,
@@ -188,16 +189,25 @@ class S3Adapter(FileSystemAdapter):
                 aws_secret_access_key=secret_key,
             )
 
-            # Initialize DuckDB with S3 credentials
-            self._duckdb_conn = duckdb.connect(":memory:")
+            bucket = self._config.get("bucket", "")
+            prefix = self._config.get("prefix", "").strip("/")
+            location = f"s3://{bucket}/{prefix}/" if prefix else f"s3://{bucket}/"
+
+            # Initialize DuckDB with S3 credentials. A scoped secret is only sent for
+            # this source's location, and unlike SET s3_secret_access_key it cannot be
+            # read back with current_setting().
+            self._duckdb_conn = duckdb.connect(
+                ":memory:", config=duckdb_sandbox.connection_config()
+            )
             self._duckdb_conn.execute("INSTALL httpfs")
             self._duckdb_conn.execute("LOAD httpfs")
-            self._duckdb_conn.execute(f"SET s3_region = '{region}'")
-            self._duckdb_conn.execute(f"SET s3_access_key_id = '{access_key}'")
-            self._duckdb_conn.execute(f"SET s3_secret_access_key = '{secret_key}'")
+            self._duckdb_conn.execute(
+                "CREATE SECRET (TYPE s3, KEY_ID ?, SECRET ?, REGION ?, SCOPE ?)",
+                [access_key, secret_key, region, location],
+            )
+            duckdb_sandbox.confine(self._duckdb_conn, directories=[location])
 
             # Test connection by listing bucket
-            bucket = self._config.get("bucket", "")
             self._s3_client.head_bucket(Bucket=bucket)
 
             self._connected = True

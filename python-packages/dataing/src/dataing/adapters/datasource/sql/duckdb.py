@@ -12,6 +12,7 @@ import time
 from collections.abc import Sequence
 from typing import Any
 
+from dataing.adapters.datasource import duckdb_sandbox
 from dataing.adapters.datasource.errors import (
     ConnectionFailedError,
     QuerySyntaxError,
@@ -146,22 +147,26 @@ class DuckDBAdapter(SQLAdapter):
         read_only = self._config.get("read_only", True)
 
         try:
+            config = duckdb_sandbox.connection_config()
             if self._is_directory_mode:
-                # In directory mode, use in-memory database
-                self._conn = duckdb.connect(":memory:")
+                # In directory mode, use in-memory database that may read the directory
+                self._conn = duckdb.connect(":memory:", config=config)
+                duckdb_sandbox.confine(self._conn, directories=[path])
                 # Register parquet files as views
                 await self._register_directory_files()
             elif path == ":memory:":
                 # In-memory mode - cannot be read-only
-                self._conn = duckdb.connect(":memory:")
+                self._conn = duckdb.connect(":memory:", config=config)
+                duckdb_sandbox.confine(self._conn, directories=[])
             else:
-                # Database file mode
+                # Database file mode: queries read the database and no other files
                 if not os.path.exists(path):
                     raise ConnectionFailedError(
                         message=f"Database file not found: {path}",
                         details={"path": path},
                     )
-                self._conn = duckdb.connect(path, read_only=read_only)
+                self._conn = duckdb.connect(path, read_only=read_only, config=config)
+                duckdb_sandbox.confine(self._conn, directories=[])
 
             self._connected = True
         except Exception as e:

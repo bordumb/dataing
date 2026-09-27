@@ -9,6 +9,7 @@ from __future__ import annotations
 import time
 from typing import Any
 
+from dataing.adapters.datasource import duckdb_sandbox
 from dataing.adapters.datasource.errors import (
     AccessDeniedError,
     AuthenticationFailedError,
@@ -182,7 +183,7 @@ class GCSAdapter(FileSystemAdapter):
             ) from e
 
         try:
-            self._conn = duckdb.connect(":memory:")
+            self._conn = duckdb.connect(":memory:", config=duckdb_sandbox.connection_config())
 
             self._conn.execute("INSTALL httpfs")
             self._conn.execute("LOAD httpfs")
@@ -195,6 +196,7 @@ class GCSAdapter(FileSystemAdapter):
                 [hmac_access_id, hmac_secret, self._get_gcs_path()],
             )
 
+            duckdb_sandbox.confine(self._conn, directories=[self._get_gcs_path()])
             self._connected = True
 
         except Exception as e:

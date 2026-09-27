@@ -8,13 +8,14 @@ from unittest.mock import AsyncMock, MagicMock, patch
 from urllib.parse import urlsplit
 from uuid import uuid4
 
-import pytest
-from fastapi import HTTPException
+import httpx
+from fastapi import FastAPI
+from fastapi.testclient import TestClient
 
 from dataing.adapters.datasource.encryption import encrypt_config
-from dataing.entrypoints.api.middleware.auth import ApiKeyContext
+from dataing.entrypoints.api.deps import get_app_db
+from dataing.entrypoints.api.middleware.auth import ApiKeyContext, verify_api_key
 from dataing.entrypoints.api.routes import credentials as credentials_routes
-from dataing.entrypoints.api.routes.credentials import SaveCredentialsRequest
 
 ENCRYPTION_KEY = b"Ug_OGzRGbeFOYC2ANwtmmroRE87szZDtGhwSIZRFX4M="
 
@@ -26,7 +27,6 @@ AUTH = ApiKeyContext(
     user_id=uuid4(),
     scopes=["read", "write"],
 )
-USER_LOGIN = SaveCredentialsRequest(username="alice", password="alice-secret")
 
 
 def _app_db_with_datasource(source_type: str, config: dict[str, Any]) -> AsyncMock:
@@ -51,16 +51,24 @@ def _fake_asyncpg() -> MagicMock:
     return MagicMock(create_pool=AsyncMock(return_value=pool))
 
 
-async def _test_credentials(app_db: AsyncMock) -> credentials_routes.TestConnectionResponse:
-    """Call the test-credentials route with the user's login."""
+def _post_user_login(app_db: AsyncMock) -> httpx.Response:
+    """POST the user's own login to the test-credentials route."""
+    app = FastAPI()
+    app.include_router(credentials_routes.router)
+    app.dependency_overrides[verify_api_key] = lambda: AUTH
+    app.dependency_overrides[get_app_db] = lambda: app_db
+
     with patch.object(credentials_routes, "get_encryption_key", return_value=ENCRYPTION_KEY):
-        return await credentials_routes.test_credentials(uuid4(), USER_LOGIN, AUTH, app_db)
+        return TestClient(app).post(
+            f"/datasources/{uuid4()}/credentials/test",
+            json={"username": "alice", "password": "alice-secret"},
+        )
 
 
 class TestTestCredentials:
     """Tests for POST /datasources/{datasource_id}/credentials/test."""
 
-    async def test_connects_as_the_user(self) -> None:
+    def test_connects_as_the_user(self) -> None:
         """The connection test logs in with the submitted login, not the service account."""
         app_db = _app_db_with_datasource(
             "postgresql",
@@ -69,17 +77,18 @@ class TestTestCredentials:
         asyncpg = _fake_asyncpg()
 
         with patch.dict(sys.modules, {"asyncpg": asyncpg}):
-            response = await _test_credentials(app_db)
+            response = _post_user_login(app_db)
 
-        assert response.success is True
+        assert response.status_code == 200
+        assert response.json()["success"] is True
         dsn = urlsplit(asyncpg.create_pool.call_args.args[0])
         assert (dsn.username, dsn.password) == ("alice", "alice-secret")
 
-    async def test_rejects_source_without_a_login(self) -> None:
+    def test_rejects_source_without_a_login(self) -> None:
         """A source with no database login can't test per-user credentials."""
         app_db = _app_db_with_datasource("sqlite", {"path": "file::memory:"})
 
-        with pytest.raises(HTTPException) as exc_info:
-            await _test_credentials(app_db)
+        response = _post_user_login(app_db)
 
-        assert exc_info.value.status_code == 400
+        assert response.status_code == 400
+        assert "not supported" in response.json()["detail"]

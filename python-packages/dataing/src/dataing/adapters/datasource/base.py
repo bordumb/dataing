@@ -126,7 +126,8 @@ class BaseAdapter(ABC):
 
         Args:
             source_id: ID of the data source.
-            catalogs: List of catalog dictionaries.
+            catalogs: List of catalog dictionaries. Each table in them may be
+                a dictionary or an already-built Table.
 
         Returns:
             Properly formatted SchemaResponse.
@@ -144,6 +145,9 @@ class BaseAdapter(ABC):
             for schema_data in cat_data.get("schemas", []):
                 tables = []
                 for table_data in schema_data.get("tables", []):
+                    if isinstance(table_data, Table):
+                        tables.append(table_data)
+                        continue
                     columns = [Column(**col_data) for col_data in table_data.get("columns", [])]
                     tables.append(
                         Table(

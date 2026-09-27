@@ -8,6 +8,7 @@ import pytest
 from dataing.adapters.datasource.base import BaseAdapter
 from dataing.adapters.datasource.types import (
     AdapterCapabilities,
+    Column,
     ConnectionTestResult,
     NormalizedType,
     QueryLanguage,
@@ -15,6 +16,7 @@ from dataing.adapters.datasource.types import (
     SchemaResponse,
     SourceCategory,
     SourceType,
+    Table,
 )
 
 
@@ -275,6 +277,25 @@ class TestBuildSchemaResponse:
         assert table.table_type == "table"
         assert table.native_type == "TABLE"
         assert table.native_path == "minimal_table"
+
+    def test_build_schema_response_accepts_table_models(self):
+        """Test tables given as Table models are used as-is."""
+        adapter = ConcreteAdapter({})
+        table = Table(
+            name="orders",
+            table_type="file",
+            native_type="LOCAL_CSV_FILE",
+            native_path="/data/orders.csv",
+            columns=[Column(name="id", data_type=NormalizedType.INTEGER, native_type="BIGINT")],
+            size_bytes=42,
+        )
+
+        response = adapter._build_schema_response(
+            source_id="test",
+            catalogs=[{"name": "default", "schemas": [{"name": "data", "tables": [table]}]}],
+        )
+
+        assert response.catalogs[0].schemas[0].tables == [table]
 
 
 class TestGetSourceCategory:

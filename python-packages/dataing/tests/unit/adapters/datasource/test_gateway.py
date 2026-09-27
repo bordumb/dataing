@@ -3,18 +3,25 @@
 from __future__ import annotations
 
 import uuid
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
 from dataing.adapters.datasource.errors import (
+    CredentialsInvalidError,
     CredentialsNotConfiguredError,
+    DatasourceNotFoundError,
 )
 from dataing.adapters.datasource.gateway import (
     QueryContext,
     QueryGateway,
     QueryPrincipal,
+    UserPrincipal,
 )
+from dataing.adapters.datasource.types import AdapterCapabilities, QueryResult
+from dataing.core.credentials import DecryptedCredentials
+
+TEST_KEY = b"Ug_OGzRGbeFOYC2ANwtmmroRE87szZDtGhwSIZRFX4M="
 
 
 @pytest.fixture
@@ -33,17 +40,21 @@ def mock_app_db() -> AsyncMock:
 
 
 @pytest.fixture
-def query_principal() -> QueryPrincipal:
+def query_principal() -> UserPrincipal:
     """Create a test query principal."""
-    return QueryPrincipal(
+    return UserPrincipal(
         user_id=uuid.uuid4(),
         tenant_id=uuid.uuid4(),
         datasource_id=uuid.uuid4(),
     )
 
 
-class TestQueryPrincipal:
-    """Tests for QueryPrincipal dataclass."""
+class TestUserPrincipal:
+    """Tests for UserPrincipal dataclass."""
+
+    def test_query_principal_is_alias(self) -> None:
+        """QueryPrincipal is the same class as UserPrincipal."""
+        assert QueryPrincipal is UserPrincipal
 
     def test_creation(self) -> None:
         """Test creating a query principal."""
@@ -51,7 +62,7 @@ class TestQueryPrincipal:
         tenant_id = uuid.uuid4()
         datasource_id = uuid.uuid4()
 
-        principal = QueryPrincipal(
+        principal = UserPrincipal(
             user_id=user_id,
             tenant_id=tenant_id,
             datasource_id=datasource_id,
@@ -62,8 +73,8 @@ class TestQueryPrincipal:
         assert principal.datasource_id == datasource_id
 
     def test_frozen(self) -> None:
-        """Test that QueryPrincipal is frozen."""
-        principal = QueryPrincipal(
+        """Test that UserPrincipal is frozen."""
+        principal = UserPrincipal(
             user_id=uuid.uuid4(),
             tenant_id=uuid.uuid4(),
             datasource_id=uuid.uuid4(),
@@ -184,7 +195,7 @@ class TestQueryGatewayExecute:
     async def test_execute_raises_when_no_credentials(
         self,
         mock_app_db: AsyncMock,
-        query_principal: QueryPrincipal,
+        query_principal: UserPrincipal,
     ) -> None:
         """Test that execute raises when credentials not configured."""
         # Patch get_encryption_key in both modules
@@ -215,7 +226,7 @@ class TestQueryGatewayExecute:
     async def test_execute_audits_on_error(
         self,
         mock_app_db: AsyncMock,
-        query_principal: QueryPrincipal,
+        query_principal: UserPrincipal,
     ) -> None:
         """Test that errors are properly audited."""
         with (
@@ -244,3 +255,132 @@ class TestQueryGatewayExecute:
             assert call_kwargs["status"] == "denied"
             assert call_kwargs["user_id"] == query_principal.user_id
             assert call_kwargs["datasource_id"] == query_principal.datasource_id
+
+
+class _Adapter:
+    """Minimal SQL adapter double."""
+
+    def __init__(self, error: Exception | None = None) -> None:
+        """Initialize the double."""
+        self.error = error
+        self.executed: list[str] = []
+        self.connected = 0
+
+    @property
+    def capabilities(self) -> AdapterCapabilities:
+        """Declare a dialect."""
+        return AdapterCapabilities(supports_sql=True, sql_dialect="postgres")
+
+    async def __aenter__(self) -> _Adapter:
+        """Connect."""
+        self.connected += 1
+        return self
+
+    async def __aexit__(self, *exc: object) -> None:
+        """Disconnect."""
+
+    async def execute_query(self, sql: str, timeout_seconds: int = 30) -> QueryResult:
+        """Record the query."""
+        self.executed.append(sql)
+        if self.error:
+            raise self.error
+        return QueryResult(columns=[], rows=[], row_count=0)
+
+
+def _gateway(mock_app_db: AsyncMock, adapter: _Adapter) -> QueryGateway:
+    credentials = MagicMock()
+    credentials.get_credentials = AsyncMock(
+        return_value=DecryptedCredentials(username="u", password="p")
+    )
+    credentials.update_last_used = AsyncMock()
+    registry = MagicMock()
+    registry.create.return_value = adapter
+    return QueryGateway(
+        mock_app_db,
+        credentials_service=credentials,
+        registry=registry,
+        encryption_key=TEST_KEY,
+    )
+
+
+class TestQueryGatewayPrepareAndErrors:
+    """Tests for the prepare hook and error translation."""
+
+    async def test_prepare_rewrites_sql(
+        self, mock_app_db: AsyncMock, query_principal: UserPrincipal
+    ) -> None:
+        """The prepare hook gets the adapter dialect and its result is what runs."""
+        adapter = _Adapter()
+        gateway = _gateway(mock_app_db, adapter)
+        seen: list[str | None] = []
+
+        def prepare(sql: str, dialect: str | None) -> str:
+            seen.append(dialect)
+            return sql + " LIMIT 1"
+
+        with patch("dataing.adapters.datasource.gateway.decrypt_config", return_value={}):
+            await gateway.execute(query_principal, "SELECT 1", prepare=prepare)
+
+        assert seen == ["postgres"]
+        assert adapter.executed == ["SELECT 1 LIMIT 1"]
+        assert mock_app_db.insert_query_audit_log.call_args.kwargs["sql_text"] == (
+            "SELECT 1 LIMIT 1"
+        )
+
+    async def test_prepare_refusal_never_connects(
+        self, mock_app_db: AsyncMock, query_principal: UserPrincipal
+    ) -> None:
+        """A refused query is audited as rejected and never connects."""
+        adapter = _Adapter()
+        gateway = _gateway(mock_app_db, adapter)
+
+        def prepare(sql: str, dialect: str | None) -> str:
+            raise ValueError("nope")
+
+        with (
+            patch("dataing.adapters.datasource.gateway.decrypt_config", return_value={}),
+            pytest.raises(ValueError),
+        ):
+            await gateway.execute(query_principal, "DROP TABLE x", prepare=prepare)
+
+        assert adapter.connected == 0
+        assert mock_app_db.insert_query_audit_log.call_args.kwargs["status"] == "rejected"
+
+    async def test_missing_datasource(
+        self, mock_app_db: AsyncMock, query_principal: UserPrincipal
+    ) -> None:
+        """A datasource the tenant does not have raises DatasourceNotFoundError."""
+        mock_app_db.get_data_source.return_value = None
+        gateway = _gateway(mock_app_db, _Adapter())
+
+        with pytest.raises(DatasourceNotFoundError):
+            await gateway.execute(query_principal, "SELECT 1")
+
+    async def test_login_failure_is_credentials_invalid(
+        self, mock_app_db: AsyncMock, query_principal: UserPrincipal
+    ) -> None:
+        """A rejected login becomes CredentialsInvalidError, audited as denied."""
+        gateway = _gateway(mock_app_db, _Adapter(RuntimeError("password authentication failed")))
+
+        with (
+            patch("dataing.adapters.datasource.gateway.decrypt_config", return_value={}),
+            pytest.raises(CredentialsInvalidError),
+        ):
+            await gateway.execute(query_principal, "SELECT 1")
+
+        assert mock_app_db.insert_query_audit_log.call_args.kwargs["status"] == "denied"
+
+    async def test_column_named_author_is_not_a_login_failure(
+        self, mock_app_db: AsyncMock, query_principal: UserPrincipal
+    ) -> None:
+        """Errors that merely mention auth-like words are not credential errors."""
+        error = RuntimeError('column "author_id" does not exist')
+        gateway = _gateway(mock_app_db, _Adapter(error))
+
+        with (
+            patch("dataing.adapters.datasource.gateway.decrypt_config", return_value={}),
+            pytest.raises(RuntimeError, match="author_id"),
+        ):
+            await gateway.execute(query_principal, "SELECT author_id FROM t")
+
+        assert mock_app_db.insert_query_audit_log.call_args.kwargs["status"] == "error"

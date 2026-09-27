@@ -30,6 +30,9 @@ def create_ee_app() -> FastAPI:
     Returns:
         Configured FastAPI application with EE features.
     """
+    # Import the EE datasource adapters to register them
+    from dataing_ee.adapters import datasource as _datasource  # noqa: F401
+
     # Start with CE app (includes lifespan, routes, middleware)
     app = create_ce_app()
 

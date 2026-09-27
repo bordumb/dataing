@@ -11535,10 +11535,6 @@
             "type": "string",
             "title": "Id"
           },
-          "dataset_id": {
-            "type": "string",
-            "title": "Dataset Id"
-          },
           "metric_name": {
             "type": "string",
             "title": "Metric Name"
@@ -11561,23 +11557,11 @@
           "created_at": {
             "type": "string",
             "title": "Created At"
-          },
-          "completed_at": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Completed At"
           }
         },
         "type": "object",
         "required": [
           "id",
-          "dataset_id",
           "metric_name",
           "status",
           "created_at"

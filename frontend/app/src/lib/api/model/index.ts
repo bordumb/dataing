@@ -261,7 +261,6 @@ export * from "./investigationStatusResponseEventsItem";
 export * from "./investigationStatusResponseFinding";
 export * from "./investigationStatusResponseFindingAnyOf";
 export * from "./investigationSummary";
-export * from "./investigationSummaryCompletedAt";
 export * from "./investigationSummarySeverity";
 export * from "./investigationTagAdd";
 export * from "./inviteUserApiV1UsersInvitePost201";

@@ -638,28 +638,47 @@ class AppDatabase:
     async def list_investigations_for_dataset(
         self,
         tenant_id: UUID,
-        dataset_native_path: str,
+        dataset_id: UUID,
         limit: int = 50,
     ) -> list[dict[str, Any]]:
-        """List investigations that reference a dataset.
+        """List investigations whose alert references a dataset.
+
+        The alert JSONB holds an AnomalyAlert plus the datasource it ran against.
+        An investigation references the dataset when it ran against the dataset's
+        datasource and any of its alert dataset_ids (primary or reference context)
+        equals the dataset's native_path or table name, ignoring case - the rule
+        SchemaLookupAdapter uses to resolve those ids to tables.
 
         Args:
             tenant_id: The tenant ID.
-            dataset_native_path: The native path of the dataset.
+            dataset_id: The dataset ID.
             limit: Maximum number of investigations to return.
 
         Returns:
-            List of investigation dictionaries.
+            Newest first: id, metric_name, severity, status and created_at.
         """
         query = """
-            SELECT id, dataset_id, metric_name, status, severity,
-                   created_at, completed_at
-            FROM investigations
-            WHERE tenant_id = $1 AND dataset_id = $2
-            ORDER BY created_at DESC
+            SELECT i.id,
+                   COALESCE(NULLIF(i.alert #>> '{metric_spec,display_name}', ''),
+                            i.alert ->> 'anomaly_type') AS metric_name,
+                   i.alert ->> 'severity' AS severity,
+                   COALESCE(i.outcome ->> 'status', i.status) AS status,
+                   i.created_at
+            FROM datasets d
+            JOIN investigations i
+              ON i.tenant_id = d.tenant_id
+             AND i.alert ->> 'datasource_id' = d.datasource_id::text
+            WHERE d.tenant_id = $1
+              AND d.id = $2
+              AND EXISTS (
+                  SELECT 1
+                  FROM jsonb_array_elements_text(i.alert -> 'dataset_ids') AS ref(dataset_ref)
+                  WHERE lower(ref.dataset_ref) IN (lower(d.native_path), lower(d.name))
+              )
+            ORDER BY i.created_at DESC
             LIMIT $3
         """
-        return await self.fetch_all(query, tenant_id, dataset_native_path, limit)
+        return await self.fetch_all(query, tenant_id, dataset_id, limit)
 
     async def update_investigation_status(
         self,

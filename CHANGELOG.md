@@ -1,3 +1,10 @@
+## [1.22.5](https://github.com/bordumb/dataing/compare/v1.22.4...v1.22.5) (2026-09-27)
+
+
+### Bug Fixes
+
+* **temporal:** stop hiding failed queries and evaluations from synthesis ([#182](https://github.com/bordumb/dataing/issues/182)) ([8e2db95](https://github.com/bordumb/dataing/commit/8e2db9517e1acab5655d916d3ae68f2e9fa57e0f))
+
 ## [1.22.4](https://github.com/bordumb/dataing/compare/v1.22.3...v1.22.4) (2026-09-27)
 
 

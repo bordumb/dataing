@@ -1,3 +1,10 @@
+## [1.21.3](https://github.com/bordumb/dataing/compare/v1.21.2...v1.21.3) (2026-09-27)
+
+
+### Bug Fixes
+
+* **core:** start every AgentClient LLM call from an empty history ([#167](https://github.com/bordumb/dataing/issues/167)) ([0469d15](https://github.com/bordumb/dataing/commit/0469d153f8df69ba262088f3a0f808a48da306f9))
+
 ## [1.21.2](https://github.com/bordumb/dataing/compare/v1.21.1...v1.21.2) (2026-09-27)
 
 

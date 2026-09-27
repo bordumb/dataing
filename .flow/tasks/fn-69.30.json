@@ -1,0 +1,17 @@
+{
+  "assignee": null,
+  "claim_note": "",
+  "claimed_at": null,
+  "created_at": "2026-09-27T15:11:24.047364Z",
+  "depends_on": [
+    "fn-69.29",
+    "fn-69.34"
+  ],
+  "epic": "fn-69",
+  "id": "fn-69.30",
+  "priority": 4,
+  "spec_path": ".flow/tasks/fn-69.30.md",
+  "status": "todo",
+  "title": "[M4] Rescope the Helm epic (fn-13) for GHES self-hosting",
+  "updated_at": "2026-09-27T15:11:34.726344Z"
+}

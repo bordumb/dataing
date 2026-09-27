@@ -8,7 +8,7 @@
   "id": "fn-47.1",
   "priority": 1,
   "spec_path": ".flow/tasks/fn-47.1.md",
-  "status": "todo",
+  "status": "blocked",
   "title": "Create migration for scheduled_investigations table",
-  "updated_at": "2026-01-28T03:52:06.296162Z"
+  "updated_at": "2026-09-27T15:11:35.976421Z"
 }

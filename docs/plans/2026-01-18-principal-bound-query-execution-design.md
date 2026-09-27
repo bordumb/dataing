@@ -8,6 +8,14 @@
 
 **Tech Stack:** Python, FastAPI, SQLAlchemy, Fernet encryption
 
+> **Amendment (2026-09-26):** Principle 2 now has one deliberate exception.
+> - **Who it covers:** automated runs, meaning scheduled checks, API-triggered runs, PR previews, and investigations started by checks.
+> - **How they run:** as an `AutomationPrincipal`, using a per-datasource automation credential that an admin configures on purpose.
+> - **No fallback:** user and automation credentials never stand in for each other.
+> - **Principle 4 still holds:** without an automation credential, automated runs don't execute.
+>
+> See [Checks as Code §5.2](2026-09-26-checks-as-code-design.md).
+
 ---
 
 ## Overview

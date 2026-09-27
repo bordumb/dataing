@@ -1,0 +1,14 @@
+{
+  "assignee": null,
+  "claim_note": "",
+  "claimed_at": null,
+  "created_at": "2026-09-27T15:11:17.519260Z",
+  "depends_on": [],
+  "epic": "fn-69",
+  "id": "fn-69.7",
+  "priority": 1,
+  "spec_path": ".flow/tasks/fn-69.7.md",
+  "status": "todo",
+  "title": "[M1] Per-datasource concurrency cap (Redis) and Redis client wiring",
+  "updated_at": "2026-09-27T15:11:17.660605Z"
+}

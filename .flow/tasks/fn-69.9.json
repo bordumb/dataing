@@ -1,0 +1,18 @@
+{
+  "assignee": null,
+  "claim_note": "",
+  "claimed_at": null,
+  "created_at": "2026-09-27T15:11:18.086228Z",
+  "depends_on": [
+    "fn-69.1",
+    "fn-69.3",
+    "fn-69.8"
+  ],
+  "epic": "fn-69",
+  "id": "fn-69.9",
+  "priority": 1,
+  "spec_path": ".flow/tasks/fn-69.9.md",
+  "status": "todo",
+  "title": "[M1] Checks API: apply, suites, runs and Run now",
+  "updated_at": "2026-09-27T15:11:27.306675Z"
+}

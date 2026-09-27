@@ -10,7 +10,7 @@
   "id": "fn-47.4",
   "priority": 4,
   "spec_path": ".flow/tasks/fn-47.4.md",
-  "status": "todo",
+  "status": "blocked",
   "title": "Add schedule CRUD API routes with pause/resume",
-  "updated_at": "2026-01-28T03:52:22.820174Z"
+  "updated_at": "2026-09-27T15:11:36.395594Z"
 }

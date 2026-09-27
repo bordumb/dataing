@@ -1,0 +1,19 @@
+{
+  "assignee": null,
+  "claim_note": "",
+  "claimed_at": null,
+  "created_at": "2026-09-27T15:11:20.665656Z",
+  "depends_on": [
+    "fn-69.1",
+    "fn-69.4",
+    "fn-69.5",
+    "fn-69.6"
+  ],
+  "epic": "fn-69",
+  "id": "fn-69.18",
+  "priority": 2,
+  "spec_path": ".flow/tasks/fn-69.18.md",
+  "status": "todo",
+  "title": "[M2] Codify writes CheckSpec via LLM structured output; exports rebuilt",
+  "updated_at": "2026-09-27T15:11:31.099076Z"
+}

@@ -8,7 +8,6 @@ from __future__ import annotations
 
 import time
 from typing import Any
-from urllib.parse import quote_plus
 
 from dataing.adapters.datasource.errors import (
     AccessDeniedError,
@@ -179,21 +178,6 @@ class PostgresAdapter(SQLAdapter):
         """Get the capabilities of this adapter."""
         return POSTGRES_CAPABILITIES
 
-    def _build_dsn(self) -> str:
-        """Build PostgreSQL DSN from config."""
-        host = self._config.get("host", "localhost")
-        port = int(self._config.get("port", 5432))
-        database = self._config.get("database", "postgres")
-        username = str(self._config.get("username", ""))
-        password = str(self._config.get("password", ""))
-        ssl_mode = self._config.get("ssl_mode", "prefer")
-
-        # URL-encode credentials to handle special characters like @, :, /
-        encoded_username = quote_plus(username) if username else ""
-        encoded_password = quote_plus(password) if password else ""
-
-        return f"postgresql://{encoded_username}:{encoded_password}@{host}:{port}/{database}?sslmode={ssl_mode}"
-
     async def connect(self) -> None:
         """Establish connection to PostgreSQL."""
         try:
@@ -206,8 +190,16 @@ class PostgresAdapter(SQLAdapter):
 
         try:
             timeout = self._config.get("connection_timeout", 30)
+            # Discrete arguments, not a DSN, so credentials reach the server verbatim.
+            # Never pass None: asyncpg would fill the gap from the server's own PG*
+            # environment and ~/.pgpass.
             self._pool = await asyncpg.create_pool(
-                self._build_dsn(),
+                host=self._config.get("host") or "localhost",
+                port=int(self._config.get("port") or 5432),
+                database=self._config.get("database") or "postgres",
+                user=self._config.get("username") or "",
+                password=self._config.get("password") or "",
+                ssl=self._config.get("ssl_mode") or "prefer",
                 min_size=1,
                 max_size=10,
                 command_timeout=timeout,

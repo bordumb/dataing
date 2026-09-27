@@ -1,3 +1,10 @@
+# [1.21.0](https://github.com/bordumb/dataing/compare/v1.20.4...v1.21.0) (2026-09-27)
+
+
+### Features
+
+* **datasources:** render connection form from backend config_schema ([#157](https://github.com/bordumb/dataing/issues/157)) ([20b02b0](https://github.com/bordumb/dataing/commit/20b02b074e5fdbabb9b01e7f4e18d3c9b584b553))
+
 ## [1.20.4](https://github.com/bordumb/dataing/compare/v1.20.3...v1.20.4) (2026-09-27)
 
 

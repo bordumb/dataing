@@ -336,33 +336,6 @@ class BigQueryAdapter(SQLAdapter):
         result: str = normalize_type(bq_type, SourceType.BIGQUERY).value
         return result
 
-    async def _fetch_table_metadata(self) -> list[dict[str, Any]]:
-        """Fetch table metadata from BigQuery."""
-        project_id = self._config.get("project_id", "")
-        dataset = self._config.get("dataset", "")
-
-        if dataset:
-            sql = f"""
-                SELECT
-                    '{project_id}' as table_catalog,
-                    table_schema,
-                    table_name,
-                    table_type
-                FROM `{project_id}.{dataset}.INFORMATION_SCHEMA.TABLES`
-                ORDER BY table_name
-            """
-        else:
-            sql = f"""
-                SELECT
-                    '{project_id}' as table_catalog,
-                    schema_name as table_schema,
-                    '' as table_name,
-                    'SCHEMA' as table_type
-                FROM `{project_id}.INFORMATION_SCHEMA.SCHEMATA`
-            """
-        result = await self.execute_query(sql)
-        return list(result.rows)
-
     async def get_schema(
         self,
         filter: SchemaFilter | None = None,

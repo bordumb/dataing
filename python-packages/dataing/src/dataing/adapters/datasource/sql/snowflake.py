@@ -335,24 +335,6 @@ class SnowflakeAdapter(SQLAdapter):
             if cursor:
                 cursor.close()
 
-    async def _fetch_table_metadata(self) -> list[dict[str, Any]]:
-        """Fetch table metadata from Snowflake."""
-        database = self._config.get("database", "")
-        schema = self._config.get("schema", "PUBLIC")
-
-        sql = f"""
-            SELECT
-                TABLE_CATALOG as table_catalog,
-                TABLE_SCHEMA as table_schema,
-                TABLE_NAME as table_name,
-                TABLE_TYPE as table_type
-            FROM {database}.INFORMATION_SCHEMA.TABLES
-            WHERE TABLE_SCHEMA = '{schema}'
-            ORDER BY TABLE_NAME
-        """
-        result = await self.execute_query(sql)
-        return list(result.rows)
-
     async def get_schema(
         self,
         filter: SchemaFilter | None = None,

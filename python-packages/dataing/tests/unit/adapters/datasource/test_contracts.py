@@ -16,6 +16,7 @@ from dataing.adapters.datasource import (
     SourceType,
     get_registry,
 )
+from dataing.adapters.datasource.sql.base import SQLAdapter
 from dataing.adapters.datasource.types import (
     Catalog,
     Column,
@@ -66,6 +67,19 @@ class TestAdapterRegistryContracts:
             definition = registry.get_definition(source_type)
             assert definition is not None
             assert isinstance(definition, SourceTypeDefinition)
+
+    def test_registered_sql_adapters_are_concrete(self):
+        """Registered SQL adapters implement every abstract method, so create() works."""
+        registry = get_registry()
+        adapter_classes = [registry.get_adapter_class(t) for t in registry.registered_types]
+
+        still_abstract = {
+            cls.__name__: sorted(cls.__abstractmethods__)
+            for cls in adapter_classes
+            if issubclass(cls, SQLAdapter) and cls.__abstractmethods__
+        }
+
+        assert still_abstract == {}
 
     @pytest.mark.parametrize("source_type", list(SourceType))
     def test_type_definition_has_required_fields(self, source_type: SourceType):

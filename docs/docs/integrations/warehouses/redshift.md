@@ -31,6 +31,9 @@ ALTER DEFAULT PRIVILEGES IN SCHEMA public
 GRANT SELECT ON TABLES TO dataing_reader;
 ```
 
+Schema discovery lists only the tables this user has privileges on, so these grants
+also decide which schemas dataing sees.
+
 ---
 
 ## Configuration
@@ -58,7 +61,6 @@ GRANT SELECT ON TABLES TO dataing_reader;
         "username": "dataing_reader",
         "password": "secure-password",  # pragma: allowlist secret
         "ssl_mode": "require",  # Optional
-        "schemas": "public,analytics",  # Optional
     })
     ```
 
@@ -73,7 +75,6 @@ GRANT SELECT ON TABLES TO dataing_reader;
 | `password` | Yes | - | Database password |
 | `ssl_mode` | No | require | SSL mode (disable, require, verify-ca, verify-full) |
 | `connection_timeout` | No | 30 | Connection timeout in seconds |
-| `schemas` | No | all | Comma-separated schemas to include |
 
 ---
 

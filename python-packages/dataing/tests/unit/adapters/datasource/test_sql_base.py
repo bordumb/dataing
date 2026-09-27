@@ -64,9 +64,6 @@ class ConcreteSQLAdapter(SQLAdapter):
             row_count=1,
         )
 
-    async def _fetch_table_metadata(self) -> list[dict[str, Any]]:
-        return []
-
     def set_query_results(self, results: list[QueryResult]) -> None:
         """Set mock query results for testing."""
         self._query_results = results

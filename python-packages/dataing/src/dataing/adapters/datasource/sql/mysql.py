@@ -337,22 +337,6 @@ class MySQLAdapter(SQLAdapter):
             else:
                 raise
 
-    async def _fetch_table_metadata(self) -> list[dict[str, Any]]:
-        """Fetch table metadata from MySQL."""
-        database = self._config.get("database", "")
-        sql = f"""
-            SELECT
-                TABLE_CATALOG as table_catalog,
-                TABLE_SCHEMA as table_schema,
-                TABLE_NAME as table_name,
-                TABLE_TYPE as table_type
-            FROM information_schema.TABLES
-            WHERE TABLE_SCHEMA = '{database}'
-            ORDER BY TABLE_NAME
-        """
-        result = await self.execute_query(sql)
-        return list(result.rows)
-
     async def get_schema(
         self,
         filter: SchemaFilter | None = None,

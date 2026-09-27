@@ -112,15 +112,6 @@ POSTGRES_CONFIG_SCHEMA = ConfigSchema(
             min_value=5,
             max_value=300,
         ),
-        ConfigField(
-            name="schemas",
-            label="Schemas to Include",
-            type="string",
-            required=False,
-            group="advanced",
-            placeholder="public,analytics",
-            description="Comma-separated list of schemas to include (default: all)",
-        ),
     ],
 )
 
@@ -163,7 +154,6 @@ class PostgresAdapter(SQLAdapter):
                 - password: Password
                 - ssl_mode: SSL mode (optional)
                 - connection_timeout: Timeout in seconds (optional)
-                - schemas: Comma-separated schemas to include (optional)
         """
         super().__init__(config)
         self._pool: Any = None
@@ -341,30 +331,6 @@ class PostgresAdapter(SQLAdapter):
                 ) from e
             else:
                 raise
-
-    async def _fetch_table_metadata(self) -> list[dict[str, Any]]:
-        """Fetch table metadata from PostgreSQL."""
-        schemas_filter = self._config.get("schemas", "")
-        if schemas_filter:
-            schema_list = [s.strip() for s in schemas_filter.split(",")]
-            schema_condition = f"AND table_schema IN ({','.join(repr(s) for s in schema_list)})"
-        else:
-            schema_condition = "AND table_schema NOT IN ('pg_catalog', 'information_schema')"
-
-        sql = f"""
-            SELECT
-                table_catalog,
-                table_schema,
-                table_name,
-                table_type
-            FROM information_schema.tables
-            WHERE 1=1
-            {schema_condition}
-            ORDER BY table_schema, table_name
-        """
-
-        result = await self.execute_query(sql)
-        return list(result.rows)
 
     async def get_schema(
         self,

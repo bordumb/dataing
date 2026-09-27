@@ -7,7 +7,12 @@ repository that persists entries to the audit_logs table.
 
 from typing import Any
 
-from dataing.adapters.audit.decorator import audited, get_client_ip
+from dataing.adapters.audit.decorator import (
+    audited,
+    get_client_ip,
+    record_audit,
+    suppress_audit_errors,
+)
 from dataing.adapters.audit.types import AuditLogCreate
 
 
@@ -43,4 +48,11 @@ class AuditRepository:
         return []
 
 
-__all__ = ["AuditLogCreate", "AuditRepository", "audited", "get_client_ip"]
+__all__ = [
+    "AuditLogCreate",
+    "AuditRepository",
+    "audited",
+    "get_client_ip",
+    "record_audit",
+    "suppress_audit_errors",
+]

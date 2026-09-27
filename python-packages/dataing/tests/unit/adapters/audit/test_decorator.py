@@ -9,7 +9,7 @@ from fastapi import FastAPI
 from pydantic import BaseModel
 from starlette.requests import Request
 
-from dataing.adapters.audit import audited, get_client_ip
+from dataing.adapters.audit import audited, get_client_ip, record_audit, suppress_audit_errors
 from dataing.core.auth.types import OrgRole
 from dataing.entrypoints.api.middleware.auth import ApiKeyContext
 from dataing.entrypoints.api.middleware.jwt_auth import JwtContext
@@ -80,6 +80,63 @@ class TestGetClientIp:
         request = _make_request(headers=[], client=None)
 
         assert get_client_ip(request) is None
+
+
+class TestRecordAudit:
+    """Tests for record_audit, used by routes @audited can't cover."""
+
+    async def test_records_entry_with_request_details(self) -> None:
+        """Explicit fields are combined with the caller's IP, user agent, method and path."""
+        audit_repo = AsyncMock()
+        tenant_id = uuid4()
+
+        await record_audit(
+            _make_request(audit_repo),
+            action="auth.login_failed",
+            tenant_id=tenant_id,
+            actor_email="bob@example.com",
+            resource_type="user",
+            resource_name="bob@example.com",
+            status_code=401,
+            metadata={"reason": "Invalid email or password"},
+        )
+
+        audit_repo.record.assert_awaited_once()
+        entry = audit_repo.record.await_args.args[0]
+        assert entry.action == "auth.login_failed"
+        assert entry.tenant_id == tenant_id
+        assert entry.actor_id is None
+        assert entry.actor_email == "bob@example.com"
+        assert entry.resource_type == "user"
+        assert entry.resource_name == "bob@example.com"
+        assert entry.status_code == 401
+        assert entry.metadata == {"reason": "Invalid email or password"}
+        assert entry.actor_ip == "203.0.113.7"
+        assert entry.actor_user_agent == "pytest-agent"
+        assert entry.request_method == "POST"
+        assert entry.request_path == "/api/v1/widgets"
+
+    async def test_never_raises_when_recording_fails(self) -> None:
+        """A failure to audit must not fail the request."""
+        audit_repo = AsyncMock()
+        audit_repo.record.side_effect = RuntimeError("database down")
+
+        await record_audit(_make_request(audit_repo), action="auth.login", tenant_id=uuid4())
+
+        audit_repo.record.assert_awaited_once()
+
+    async def test_skips_without_audit_repo(self) -> None:
+        """Nothing to record into, nothing raised."""
+        await record_audit(_make_request(audit_repo=None), action="auth.login", tenant_id=uuid4())
+
+
+class TestSuppressAuditErrors:
+    """Tests for suppress_audit_errors."""
+
+    def test_swallows_errors(self) -> None:
+        """Errors while preparing an audit entry don't reach the caller."""
+        with suppress_audit_errors("auth.login"):
+            raise RuntimeError("lookup failed")
 
 
 class TestAuditedDecorator:

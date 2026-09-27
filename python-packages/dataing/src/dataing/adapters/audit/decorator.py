@@ -1,7 +1,12 @@
-"""Audit logging decorator for route handlers."""
+"""Audit logging for route handlers.
+
+`audited` records an entry after a handler succeeds. `record_audit` records
+one explicitly, for routes the decorator can't cover.
+"""
 
 import inspect
-from collections.abc import Awaitable, Callable
+from collections.abc import Awaitable, Callable, Iterator
+from contextlib import contextmanager
 from functools import wraps
 from typing import Any, ParamSpec, TypeVar
 from uuid import UUID
@@ -37,6 +42,79 @@ def get_client_ip(request: Request) -> str | None:
         return request.client.host
 
     return None
+
+
+@contextmanager
+def suppress_audit_errors(action: str) -> Iterator[None]:
+    """Log and swallow errors raised while auditing.
+
+    A failure to audit must not fail the request being audited.
+
+    Args:
+        action: Action being audited, for the log line.
+
+    Yields:
+        None.
+    """
+    try:
+        yield
+    except Exception as e:
+        logger.error(f"Failed to record audit log for {action}: {e}", exc_info=True)
+
+
+async def record_audit(
+    request: Request,
+    *,
+    action: str,
+    tenant_id: UUID,
+    actor_id: UUID | None = None,
+    actor_email: str | None = None,
+    resource_type: str | None = None,
+    resource_id: UUID | None = None,
+    resource_name: str | None = None,
+    status_code: int = 200,
+    metadata: dict[str, Any] | None = None,
+) -> None:
+    """Record an audit log entry for a request through `app.state.audit_repo`.
+
+    Fills in the caller's IP, user agent, method and path from the request.
+    Never raises.
+
+    Args:
+        request: FastAPI request object.
+        action: Action identifier (e.g., "auth.login").
+        tenant_id: Tenant the entry belongs to.
+        actor_id: User who acted, if known.
+        actor_email: Email of the user who acted.
+        resource_type: Type of resource acted on.
+        resource_id: ID of resource acted on.
+        resource_name: Name of resource acted on.
+        status_code: HTTP status code of the response.
+        metadata: Extra details for the entry.
+    """
+    with suppress_audit_errors(action):
+        audit_repo = getattr(request.app.state, "audit_repo", None)
+        if audit_repo is None:
+            logger.warning("Audit repository not configured, skipping audit log")
+            return
+
+        entry = AuditLogCreate(
+            tenant_id=tenant_id,
+            actor_id=actor_id,
+            actor_email=actor_email,
+            actor_ip=get_client_ip(request),
+            actor_user_agent=request.headers.get("user-agent"),
+            action=action,
+            resource_type=resource_type,
+            resource_id=resource_id,
+            resource_name=resource_name,
+            request_method=request.method,
+            request_path=str(request.url.path),
+            status_code=status_code,
+            metadata=metadata,
+        )
+        await audit_repo.record(entry)
+        logger.debug(f"Recorded audit log: {action}", resource_id=str(resource_id))
 
 
 def _takes_request(func: Callable[..., Any]) -> bool:
@@ -189,7 +267,7 @@ def audited(
                 logger.warning(f"audit_decorator: no request found for {action}")
                 return result
 
-            try:
+            with suppress_audit_errors(action):
                 await _record_audit(
                     request=request,
                     action=action,
@@ -197,9 +275,6 @@ def audited(
                     result=result,
                     kwargs=dict(kwargs),
                 )
-            except Exception as e:
-                # Log but don't fail the request
-                logger.error(f"Failed to record audit log: {e}", exc_info=True)
 
             return result
 
@@ -215,7 +290,7 @@ async def _record_audit(
     result: Any,
     kwargs: dict[str, Any],
 ) -> None:
-    """Record an audit log entry.
+    """Record the audit log entry for a decorated handler's result.
 
     Args:
         request: FastAPI request object.
@@ -224,37 +299,21 @@ async def _record_audit(
         result: Handler result.
         kwargs: Handler kwargs.
     """
-    # Get audit repo from app state
-    audit_repo = getattr(request.app.state, "audit_repo", None)
-    if audit_repo is None:
-        logger.warning("Audit repository not configured, skipping audit log")
-        return
-
     actor = _resolve_actor(request)
     if actor is None:
         logger.warning(f"No authenticated caller for {action}, skipping audit log")
         return
 
     tenant_id, actor_id = actor
-    actor_email = None  # Not available in either auth context, could be added later
-
-    # Extract resource info
     resource_id, resource_name = _extract_resource_info(result, kwargs)
 
-    entry = AuditLogCreate(
+    # actor_email is not available in either auth context
+    await record_audit(
+        request,
+        action=action,
         tenant_id=tenant_id,
         actor_id=actor_id,
-        actor_email=actor_email,
-        actor_ip=get_client_ip(request),
-        actor_user_agent=request.headers.get("user-agent"),
-        action=action,
         resource_type=resource_type,
         resource_id=resource_id,
         resource_name=resource_name,
-        request_method=request.method,
-        request_path=str(request.url.path),
-        status_code=200,
     )
-
-    await audit_repo.record(entry)
-    logger.debug(f"Recorded audit log: {action}", resource_id=str(resource_id))

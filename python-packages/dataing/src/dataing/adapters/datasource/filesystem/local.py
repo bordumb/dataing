@@ -10,6 +10,7 @@ import os
 import time
 from typing import Any
 
+from dataing.adapters.datasource import duckdb_sandbox
 from dataing.adapters.datasource.errors import (
     ConnectionFailedError,
     QuerySyntaxError,
@@ -162,7 +163,8 @@ class LocalFileAdapter(FileSystemAdapter):
                     details={"path": base_path},
                 )
 
-            self._conn = duckdb.connect(":memory:")
+            self._conn = duckdb.connect(":memory:", config=duckdb_sandbox.connection_config())
+            duckdb_sandbox.confine(self._conn, directories=[base_path])
             self._connected = True
 
         except ConnectionFailedError:

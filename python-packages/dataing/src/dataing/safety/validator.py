@@ -12,6 +12,7 @@ SAFETY IS NON-NEGOTIABLE:
 - Forbidden keywords are checked even in subqueries
 - No statements that move data to files or programs, or change session
   state (COPY, EXPORT DATA, ATTACH, SET, etc.)
+- Functions that read raw files, directory listings or engine settings are rejected
 """
 
 from __future__ import annotations
@@ -75,6 +76,21 @@ FORBIDDEN_KEYWORDS: set[str] = {
     "MERGE",
 }
 
+# Functions that reach past the tables a query names: raw file contents and
+# directory listings, SQL passed as a string (which would hide calls from this
+# check), and engine settings and secrets. DuckDB-backed adapters also confine
+# their connection to the source's own location; this check is defense in depth.
+# read_csv/read_parquet/read_json stay allowed: file sources are queried with them.
+FORBIDDEN_FUNCTIONS: set[str] = {
+    "read_text",
+    "read_blob",
+    "glob",
+    "query",
+    "current_setting",
+    "duckdb_settings",
+    "duckdb_secrets",
+}
+
 
 def validate_query(
     sql: str,
@@ -89,7 +105,7 @@ def validate_query(
     0. Check for multi-statement queries (rejected)
     1. Parse with sqlglot to get AST
     2. Check that it's a SELECT statement (if require_select=True)
-    3. Check for forbidden statement types in the AST
+    3. Check for forbidden statement types and functions in the AST
     4. Check for forbidden keywords as whole words
     5. Ensure LIMIT clause is present (if require_limit=True)
 
@@ -138,11 +154,13 @@ def validate_query(
     ):
         raise QueryValidationError(f"Only SELECT statements allowed, got: {type(parsed).__name__}")
 
-    # 3. Walk the AST and check for forbidden statement types
+    # 3. Walk the AST and check for forbidden statement types and functions
     for node in parsed.walk():
         for forbidden in FORBIDDEN_STATEMENTS:
             if isinstance(node, forbidden):
                 raise QueryValidationError(f"Forbidden statement type: {type(node).__name__}")
+        if isinstance(node, exp.Anonymous) and node.name.lower() in FORBIDDEN_FUNCTIONS:
+            raise QueryValidationError(f"Forbidden function: {node.name}")
 
     # 4. Check for forbidden keywords as whole words
     # This catches edge cases that might slip through AST parsing

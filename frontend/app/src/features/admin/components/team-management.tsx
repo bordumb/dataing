@@ -33,6 +33,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { useJwtAuth } from "@/lib/auth";
+import { apiErrorMessage } from "@/lib/api/error-message";
 
 interface Team {
   id: string;
@@ -96,7 +97,7 @@ export function TeamManagement() {
 
       if (!response.ok) {
         const error = await response.json().catch(() => ({}));
-        throw new Error(error.detail || `HTTP ${response.status}`);
+        throw new Error(apiErrorMessage(error, response.status));
       }
 
       setNewTeamName("");
@@ -123,7 +124,7 @@ export function TeamManagement() {
 
       if (!response.ok) {
         const error = await response.json().catch(() => ({}));
-        throw new Error(error.detail || `HTTP ${response.status}`);
+        throw new Error(apiErrorMessage(error, response.status));
       }
 
       await fetchTeams();

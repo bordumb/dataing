@@ -13,6 +13,7 @@ import {
   CardTitle,
 } from "@/components/ui/Card";
 import { useJwtAuth } from "@/lib/auth/jwt-context";
+import { apiErrorMessage } from "@/lib/api/error-message";
 
 type LoginStep = "email" | "password" | "sso-redirect";
 
@@ -58,8 +59,14 @@ export function SSOLoginPage() {
       });
 
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.detail || "Failed to discover login method");
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(
+          apiErrorMessage(
+            errorData,
+            response.status,
+            "Failed to discover login method",
+          ),
+        );
       }
 
       const data: SSODiscoveryResult = await response.json();
@@ -101,8 +108,10 @@ export function SSOLoginPage() {
       });
 
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.detail || "Invalid credentials");
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(
+          apiErrorMessage(errorData, response.status, "Invalid credentials"),
+        );
       }
 
       const data = await response.json();

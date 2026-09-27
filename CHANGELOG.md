@@ -1,3 +1,10 @@
+# [1.23.0](https://github.com/bordumb/dataing/compare/v1.22.7...v1.23.0) (2026-09-27)
+
+
+### Features
+
+* type config field options and show_if, register EE adapters ([#165](https://github.com/bordumb/dataing/issues/165)) ([8929afe](https://github.com/bordumb/dataing/commit/8929afe89921f6f8517ea5c6567d89ab889290e1))
+
 ## [1.22.7](https://github.com/bordumb/dataing/compare/v1.22.6...v1.22.7) (2026-09-27)
 
 

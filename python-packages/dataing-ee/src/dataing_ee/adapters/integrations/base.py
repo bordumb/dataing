@@ -4,12 +4,16 @@ from __future__ import annotations
 
 import hashlib
 import hmac
+import json
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from datetime import date
 from typing import Any
+from urllib.parse import parse_qsl
 
 from dataing.core.domain_types import AnomalyAlert, MetricSpec
+
+FORM_CONTENT_TYPE = "application/x-www-form-urlencoded"
 
 
 @dataclass
@@ -34,10 +38,25 @@ class WebhookRequest:
 
     @property
     def body_json(self) -> dict[str, Any]:
-        """Parse body as JSON."""
-        import json
+        """Parse the body as a JSON object.
 
-        result: dict[str, Any] = json.loads(self.body)
+        Form-encoded bodies are decoded too, in the two shapes Slack sends: a
+        JSON document in a ``payload`` field (interactive components), or plain
+        fields (slash commands).
+
+        Raises:
+            ValueError: If the body is neither a JSON object nor such a form.
+        """
+        content_type = (self.header("Content-Type") or "").split(";")[0].strip().lower()
+        if content_type == FORM_CONTENT_TYPE:
+            fields: dict[str, Any] = dict(parse_qsl(self.body.decode(), keep_blank_values=True))
+            if "payload" not in fields:
+                return fields
+            result = json.loads(fields["payload"])
+        else:
+            result = json.loads(self.body)
+        if not isinstance(result, dict):
+            raise ValueError("Webhook body is not a JSON object")
         return result
 
 
@@ -151,6 +170,65 @@ class IntegrationAdapter(ABC):
         _ = request  # Available for subclass overrides
         return True
 
+    def handshake_response(
+        self,
+        request: WebhookRequest,  # noqa: ARG002
+    ) -> dict[str, Any] | None:
+        """Answer the provider's endpoint-verification handshake, if this is one.
+
+        Override for providers that check a webhook URL by expecting a specific
+        response, such as Slack's url_verification challenge. Only called once
+        the request's signature has been verified.
+
+        Args:
+            request: The incoming webhook request
+
+        Returns:
+            The response body to send back, or None if the request is not a handshake
+        """
+        _ = request  # Available for subclass overrides
+        return None
+
+    def format_response(
+        self,
+        request: WebhookRequest,  # noqa: ARG002
+        result: dict[str, Any],
+    ) -> dict[str, Any]:
+        """Shape the response body once the webhook has been handled.
+
+        Override for providers that show the response to a user, such as the
+        reply to a Slack slash command.
+
+        Args:
+            request: The incoming webhook request
+            result: What handling the webhook produced, such as its status
+
+        Returns:
+            The response body to send back
+        """
+        _ = request  # Available for subclass overrides
+        return result
+
+    def deferred_reply_url(
+        self,
+        request: WebhookRequest,  # noqa: ARG002
+    ) -> str | None:
+        """Return where to post the outcome, if the provider can't wait for it.
+
+        Override for providers that need an immediate reply, such as Slack,
+        which gives a slash command 3 seconds. The webhook is then acknowledged
+        at once, handled in the background, and its formatted outcome posted to
+        the returned URL.
+
+        Args:
+            request: The incoming webhook request
+
+        Returns:
+            The URL to post the outcome to, or None to reply once it is handled
+        """
+        _ = request  # Available for subclass overrides
+        return None
+
     # Helper methods for common signature verification patterns
 
     def _verify_hmac_sha256(
@@ -257,8 +335,6 @@ class IntegrationAdapter(ABC):
 
     def _hash_payload(self, payload: dict[str, Any]) -> str:
         """Generate hash of payload for fallback fingerprinting."""
-        import json
-
         payload_str = json.dumps(payload, sort_keys=True)
         return hashlib.sha256(payload_str.encode()).hexdigest()[:16]
 

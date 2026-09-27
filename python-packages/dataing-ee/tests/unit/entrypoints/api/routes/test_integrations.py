@@ -7,9 +7,12 @@ import time
 from datetime import UTC, datetime
 from typing import Any
 from unittest.mock import AsyncMock
+from urllib.parse import urlencode
 from uuid import uuid4
 
+import httpx
 import pytest
+import respx
 from dataing_ee.adapters.integrations.registry import AdapterRegistry
 from dataing_ee.entrypoints.api.routes.integrations import (
     FieldMappingCreate,
@@ -22,6 +25,7 @@ from dataing_ee.entrypoints.api.routes.integrations import (
     _get_default_description,
     _get_default_title,
     _get_nested_value,
+    _post_reply,
     _verify_provider_signature,
     router,
 )
@@ -30,6 +34,7 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 from dataing.entrypoints.api.deps import get_app_db
+from dataing.entrypoints.api.middleware.auth import ApiKeyContext, verify_api_key
 
 
 class TestIntegrationCreateSchema:
@@ -566,7 +571,11 @@ def _signed_by(
     provider: str, payload: dict[str, Any], secret: str = WEBHOOK_SECRET
 ) -> dict[str, str]:
     """Sign ``payload`` the way ``provider`` does, under its own header names."""
-    body = json.dumps(payload).encode()
+    return _signed_body(provider, json.dumps(payload).encode(), secret)
+
+
+def _signed_body(provider: str, body: bytes, secret: str = WEBHOOK_SECRET) -> dict[str, str]:
+    """Sign a raw request ``body`` the way ``provider`` does."""
     if provider == "slack":
         timestamp = str(int(time.time()))
         digest = _hmac_hex(secret, f"v0:{timestamp}:{body.decode()}".encode())
@@ -714,3 +723,300 @@ class TestProviderWebhookAuthentication:
 
     def test_signed_webhooks_cover_every_adapter(self) -> None:
         assert set(ADAPTER_WEBHOOKS) == set(AdapterRegistry.list_providers())
+
+
+SLACK_URL_VERIFICATION = {"type": "url_verification", "token": "legacy", "challenge": "3eZbrw1aB"}
+
+
+class TestProviderHandshake:
+    """Endpoint-verification handshakes are answered only once authenticated."""
+
+    def test_answers_signed_slack_url_verification(self) -> None:
+        payload = SLACK_URL_VERIFICATION
+        db = _webhook_db(_integration_row("slack", WEBHOOK_SECRET))
+
+        response = _post_webhook(db, "slack", payload, _signed_by("slack", payload))
+
+        assert response.status_code == 200
+        assert response.json() == {"challenge": "3eZbrw1aB"}
+        assert not _recorded_event(db)
+
+    def test_rejects_url_verification_with_bad_signature(self) -> None:
+        payload = SLACK_URL_VERIFICATION
+        db = _webhook_db(_integration_row("slack", WEBHOOK_SECRET))
+
+        response = _post_webhook(
+            db, "slack", payload, _signed_by("slack", payload, secret="another_secret")
+        )
+
+        assert response.status_code == 401
+        assert response.json() == {"detail": "Invalid webhook signature"}
+
+
+# Shaped like a Slack signing secret: 32 hex characters, issued by the provider.
+PROVIDER_SECRET = "0123456789abcdef" * 2
+
+
+def _admin_client(db: AsyncMock) -> TestClient:
+    app = FastAPI()
+    app.include_router(router, prefix="/api/v1")
+    app.dependency_overrides[get_app_db] = lambda: db
+    app.dependency_overrides[verify_api_key] = lambda: ApiKeyContext(
+        key_id=uuid4(),
+        tenant_id=uuid4(),
+        tenant_slug="test",
+        tenant_name="Test",
+        user_id=uuid4(),
+        scopes=["admin"],
+    )
+    return TestClient(app)
+
+
+def _integration_record() -> dict[str, Any]:
+    """An integrations row as the CRUD routes read it back."""
+    now = datetime.now(UTC)
+    return {
+        "id": uuid4(),
+        "tenant_id": uuid4(),
+        "name": "Slack",
+        "provider": "slack",
+        "enabled": True,
+        "config": {},
+        "rate_limit_per_minute": 60,
+        "last_webhook_at": None,
+        "webhook_count": 0,
+        "error_count": 0,
+        "created_at": now,
+        "updated_at": now,
+    }
+
+
+class TestProviderSigningSecret:
+    """Providers that issue their own signing secret (Slack, dbt Cloud) can supply it."""
+
+    def test_create_stores_supplied_secret(self) -> None:
+        db = AsyncMock()
+        db.fetch_one.return_value = {"id": uuid4()}
+
+        response = _admin_client(db).post(
+            "/api/v1/integrations",
+            json={"name": "Slack", "provider": "slack", "signing_secret": PROVIDER_SECRET},
+        )
+
+        assert response.status_code == 201
+        assert response.json()["signing_secret"] == PROVIDER_SECRET
+        assert PROVIDER_SECRET in db.fetch_one.await_args.args
+
+    def test_create_generates_secret_when_none_supplied(self) -> None:
+        db = AsyncMock()
+        db.fetch_one.return_value = {"id": uuid4()}
+
+        response = _admin_client(db).post(
+            "/api/v1/integrations", json={"name": "Jira", "provider": "jira"}
+        )
+
+        secret = response.json()["signing_secret"]
+        assert response.status_code == 201
+        assert len(secret) == 64
+        assert secret in db.fetch_one.await_args.args
+
+    def test_update_replaces_secret_without_returning_it(self) -> None:
+        record = _integration_record()
+        db = AsyncMock()
+        db.fetch_one.side_effect = [{"id": record["id"]}, record]
+
+        response = _admin_client(db).patch(
+            f"/api/v1/integrations/{record['id']}", json={"signing_secret": PROVIDER_SECRET}
+        )
+
+        assert response.status_code == 200
+        assert "signing_secret" not in response.json()
+        update = db.fetch_one.await_args
+        assert "signing_secret = $" in update.args[0]
+        assert PROVIDER_SECRET in update.args
+
+    def test_create_rejects_short_secret(self) -> None:
+        with pytest.raises(ValueError):
+            IntegrationCreate(name="Slack", provider="slack", signing_secret="x" * 15)
+
+    def test_update_rejects_short_secret(self) -> None:
+        with pytest.raises(ValueError):
+            IntegrationUpdate(signing_secret="x" * 15)
+
+
+FORM = "application/x-www-form-urlencoded"
+# Slack sends interactive components form-encoded, as JSON in a payload field...
+SLACK_BLOCK_ACTION = {
+    "type": "block_actions",
+    "trigger_id": "13345224609.738474920.8088930838d88f008e0",
+    "user": {"id": "U123"},
+    "actions": [{"action_id": "flag_issue", "value": "orders"}],
+}
+# ...and slash commands as plain form fields.
+SLACK_SLASH_COMMAND = {
+    "command": "/dataing",
+    "text": "orders has nulls",
+    "user_id": "U123",
+    "channel_id": "C123",
+    "trigger_id": "13345224609.738474920.8088930838d88f008e1",
+    "response_url": "https://hooks.slack.com/commands/T123/1/abc",
+}
+
+
+def _post_raw(db: AsyncMock, provider: str, body: bytes, headers: dict[str, str]) -> Any:
+    app = FastAPI()
+    app.include_router(router, prefix="/api/v1")
+    app.dependency_overrides[get_app_db] = lambda: db
+    return TestClient(app).post(
+        f"/api/v1/integrations/{provider}/webhook",
+        params={"integration_id": str(uuid4())},
+        content=body,
+        headers=headers,
+    )
+
+
+def _processing_db(provider: str) -> AsyncMock:
+    """App DB that takes a signed webhook all the way to new issue #7."""
+    db = AsyncMock()
+    db.fetch_one.side_effect = [
+        _integration_row(provider, WEBHOOK_SECRET),
+        None,  # not delivered before
+        {"id": uuid4()},  # integration event recorded
+        {"num": 7},  # next issue number
+        {"id": uuid4(), "number": 7},  # issue created
+    ]
+    db.fetch_all.return_value = []
+    return db
+
+
+@pytest.fixture
+def no_auto_investigation(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Skip the policy evaluation that can start an investigation."""
+    monkeypatch.setattr(
+        "dataing_ee.entrypoints.api.routes.integrations._evaluate_and_start_investigation",
+        AsyncMock(return_value=None),
+    )
+
+
+@pytest.fixture
+def replies(monkeypatch: pytest.MonkeyPatch) -> AsyncMock:
+    """Capture the replies posted to providers after a webhook is handled."""
+    post_reply = AsyncMock()
+    monkeypatch.setattr("dataing_ee.entrypoints.api.routes.integrations._post_reply", post_reply)
+    return post_reply
+
+
+class TestFormEncodedWebhooks:
+    """Webhook bodies are decoded once authenticated, JSON or form-encoded."""
+
+    @pytest.mark.usefixtures("no_auto_investigation")
+    def test_processes_signed_block_action(self) -> None:
+        body = urlencode({"payload": json.dumps(SLACK_BLOCK_ACTION)}).encode()
+        db = _processing_db("slack")
+
+        headers = {"Content-Type": FORM, **_signed_body("slack", body)}
+        response = _post_raw(db, "slack", body, headers)
+
+        assert response.status_code == 200
+        assert response.json()["status"] == "processed"
+        assert "Slack Action: flag_issue = orders" in db.fetch_one.await_args.args
+
+    @pytest.mark.usefixtures("no_auto_investigation")
+    def test_slash_command_is_acknowledged_then_answered(self, replies: AsyncMock) -> None:
+        # Slack gives a slash command 3 seconds: acknowledge, then report back
+        body = urlencode(SLACK_SLASH_COMMAND).encode()
+        db = _processing_db("slack")
+
+        headers = {"Content-Type": FORM, **_signed_body("slack", body)}
+        response = _post_raw(db, "slack", body, headers)
+
+        ack = {"response_type": "ephemeral", "text": "Creating a dataing issue..."}
+        assert response.status_code == 200
+        assert response.json() == ack
+        assert "orders has nulls" in db.fetch_one.await_args.args
+        replies.assert_awaited_once_with(
+            SLACK_SLASH_COMMAND["response_url"],
+            {"response_type": "ephemeral", "text": "Created dataing issue #7."},
+        )
+
+    def test_slash_command_failure_is_reported(self, replies: AsyncMock) -> None:
+        body = urlencode(SLACK_SLASH_COMMAND).encode()
+        db = AsyncMock()
+        db.fetch_one.side_effect = [
+            _integration_row("slack", WEBHOOK_SECRET),
+            None,  # not delivered before
+            RuntimeError("database went away"),
+        ]
+
+        headers = {"Content-Type": FORM, **_signed_body("slack", body)}
+        response = _post_raw(db, "slack", body, headers)
+
+        assert response.status_code == 200
+        replies.assert_awaited_once_with(
+            SLACK_SLASH_COMMAND["response_url"],
+            {
+                "response_type": "ephemeral",
+                "text": "Couldn't create the dataing issue. Try again in a moment.",
+            },
+        )
+
+    @pytest.mark.usefixtures("no_auto_investigation")
+    def test_untrusted_response_url_is_never_posted_to(self, replies: AsyncMock) -> None:
+        command = {**SLACK_SLASH_COMMAND, "response_url": "https://attacker.example/hook"}
+        body = urlencode(command).encode()
+        db = _processing_db("slack")
+
+        headers = {"Content-Type": FORM, **_signed_body("slack", body)}
+        response = _post_raw(db, "slack", body, headers)
+
+        # Answered directly instead, once the issue exists
+        assert response.json()["text"] == "Created dataing issue #7."
+        replies.assert_not_awaited()
+
+    def test_slash_command_without_text_gets_usage_reply(self) -> None:
+        body = urlencode({**SLACK_SLASH_COMMAND, "text": ""}).encode()
+        db = _webhook_db(_integration_row("slack", WEBHOOK_SECRET))
+
+        headers = {"Content-Type": FORM, **_signed_body("slack", body)}
+        response = _post_raw(db, "slack", body, headers)
+
+        assert response.status_code == 200
+        assert response.json().get("text", "").startswith("Describe the problem")
+        assert not _recorded_event(db)
+
+    def test_rejects_malformed_body_after_authentication(self) -> None:
+        body = b"not json"
+        db = _webhook_db(_integration_row("jira", WEBHOOK_SECRET))
+
+        headers = {"Content-Type": "application/json", **_signed_body("jira", body)}
+        response = _post_raw(db, "jira", body, headers)
+
+        assert response.status_code == 400
+        assert not _recorded_event(db)
+
+
+class TestPostReply:
+    """Replies are posted as JSON, and a failed post is logged, not raised."""
+
+    async def test_posts_reply_as_json(self, respx_mock: respx.MockRouter) -> None:
+        url = SLACK_SLASH_COMMAND["response_url"]
+        route = respx_mock.post(url).mock(return_value=httpx.Response(200))
+
+        await _post_reply(url, {"text": "Created dataing issue #7."})
+
+        assert json.loads(route.calls.last.request.content) == {"text": "Created dataing issue #7."}
+
+    @pytest.mark.parametrize(
+        "outcome",
+        [{"return_value": httpx.Response(500)}, {"side_effect": httpx.ConnectError("down")}],
+        ids=["error_status", "unreachable"],
+    )
+    async def test_failed_reply_is_not_raised(
+        self, respx_mock: respx.MockRouter, outcome: dict[str, Any]
+    ) -> None:
+        url = SLACK_SLASH_COMMAND["response_url"]
+        route = respx_mock.post(url).mock(**outcome)
+
+        await _post_reply(url, {"text": "Created dataing issue #7."})
+
+        assert route.called

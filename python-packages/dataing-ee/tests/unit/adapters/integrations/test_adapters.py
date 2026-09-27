@@ -4,6 +4,8 @@ import hashlib
 import hmac
 import json
 import time
+from typing import Any
+from urllib.parse import urlencode
 
 import pytest
 from dataing_ee.adapters.integrations import (
@@ -39,6 +41,24 @@ def make_request(
 def sign_hmac_sha256(body: bytes, secret: str) -> str:
     """Sign body with HMAC-SHA256."""
     return hmac.new(secret.encode(), body, hashlib.sha256).hexdigest()
+
+
+def slash_command(
+    text: str, response_url: str = "https://hooks.slack.com/commands/T123/1/abc"
+) -> WebhookRequest:
+    """Create a Slack slash-command request, form-encoded as Slack sends it."""
+    fields = {
+        "command": "/dataing",
+        "text": text,
+        "token": "legacy-verification-token",
+        "response_url": response_url,
+        "channel_id": "C123",
+        "user_id": "U123",
+        "trigger_id": "13345224609.738474920.8088930838d88f008e1",
+    }
+    return make_request(
+        urlencode(fields).encode(), {"Content-Type": "application/x-www-form-urlencoded"}
+    )
 
 
 class TestAdapterRegistry:
@@ -549,6 +569,118 @@ class TestSlackAdapter:
             }
         )
         assert adapter.get_event_type(request) == "message"
+
+    def test_handshake_response_echoes_challenge(self, adapter: SlackAdapter) -> None:
+        """Test a url_verification request gets its challenge back."""
+        request = make_request({"type": "url_verification", "challenge": "3eZbrw1aB"})
+        assert adapter.handshake_response(request) == {"challenge": "3eZbrw1aB"}
+
+    def test_handshake_response_none_for_events(self, adapter: SlackAdapter) -> None:
+        """Test an ordinary event is not a handshake."""
+        request = make_request({"type": "event_callback", "event": {"type": "message"}})
+        assert adapter.handshake_response(request) is None
+
+    @pytest.mark.parametrize("provider", sorted(set(AdapterRegistry.list_providers()) - {"slack"}))
+    def test_other_providers_have_no_handshake(self, provider: str) -> None:
+        """Test only Slack answers a url_verification challenge."""
+        other = get_adapter(provider)
+        assert other is not None
+        request = make_request({"type": "url_verification", "challenge": "3eZbrw1aB"})
+        assert other.handshake_response(request) is None
+
+    def test_parse_slash_command(self, adapter: SlackAdapter) -> None:
+        """Test a slash command's text becomes the issue, without its credentials."""
+        issue_data = adapter.parse_payload(slash_command("orders has nulls\nsince 9am"))
+
+        assert issue_data.title == "orders has nulls"
+        assert issue_data.description == "orders has nulls\nsince 9am"
+        assert issue_data.labels == ["slack", "slash-command"]
+        assert issue_data.metadata["slack_channel"] == "C123"
+        assert "legacy-verification-token" not in str(issue_data)
+        assert "hooks.slack.com" not in str(issue_data)
+
+    @pytest.mark.parametrize(("text", "expected"), [("orders has nulls", True), ("  ", False)])
+    def test_should_process_slash_command(
+        self, adapter: SlackAdapter, text: str, expected: bool
+    ) -> None:
+        """Test a slash command is processed only when it describes a problem."""
+        assert adapter.should_process(slash_command(text)) is expected
+
+    def test_get_event_type_slash_command(self, adapter: SlackAdapter) -> None:
+        """Test slash commands have their own event type."""
+        assert adapter.get_event_type(slash_command("orders has nulls")) == "slash_command"
+
+    @pytest.mark.parametrize(
+        ("result", "reply"),
+        [
+            ({"status": "accepted"}, "Creating a dataing issue..."),
+            ({"status": "processed", "issue_number": 7}, "Created dataing issue #7."),
+            ({"status": "error"}, "Couldn't create the dataing issue. Try again in a moment."),
+            ({"status": "deduplicated"}, "This is already a dataing issue."),
+            (
+                {"status": "skipped", "reason": "integration_disabled"},
+                "The dataing Slack integration is disabled.",
+            ),
+            (
+                {"status": "skipped", "reason": "filtered_by_adapter"},
+                "Describe the problem after the command, like "
+                "`/dataing orders has null customer ids`.",
+            ),
+        ],
+        ids=["accepted", "processed", "error", "deduplicated", "disabled", "no_text"],
+    )
+    def test_format_response_replies_to_slash_command(
+        self, adapter: SlackAdapter, result: dict[str, Any], reply: str
+    ) -> None:
+        """Test a slash command gets a reply that only its sender sees."""
+        response = adapter.format_response(slash_command("orders has nulls"), result)
+        assert response == {"response_type": "ephemeral", "text": reply}
+
+    def test_format_response_keeps_other_results(self, adapter: SlackAdapter) -> None:
+        """Test the response to anything but a slash command is left alone."""
+        request = make_request({"type": "event_callback", "event": {"type": "message"}})
+        result = {"status": "processed", "issue_number": 7}
+        assert adapter.format_response(request, result) == result
+
+    @pytest.mark.parametrize("provider", sorted(set(AdapterRegistry.list_providers()) - {"slack"}))
+    def test_other_providers_keep_results(self, provider: str) -> None:
+        """Test only Slack reshapes the response."""
+        other = get_adapter(provider)
+        assert other is not None
+        result = {"status": "processed", "issue_number": 7}
+        assert other.format_response(slash_command("orders has nulls"), result) == result
+
+    def test_slash_command_is_answered_at_its_response_url(self, adapter: SlackAdapter) -> None:
+        """Test a slash command's outcome goes to its response_url, as Slack can't wait."""
+        request = slash_command("orders has nulls")
+        assert adapter.deferred_reply_url(request) == "https://hooks.slack.com/commands/T123/1/abc"
+
+    @pytest.mark.parametrize(
+        "response_url",
+        [
+            "https://attacker.example/commands/T123/1/abc",
+            "https://hooks.slack.com.attacker.example/commands/T123/1/abc",
+            "http://hooks.slack.com/commands/T123/1/abc",
+        ],
+    )
+    def test_only_slack_response_urls_are_answered(
+        self, adapter: SlackAdapter, response_url: str
+    ) -> None:
+        """Test dataing never posts a reply anywhere but Slack's hooks host."""
+        request = slash_command("orders has nulls", response_url=response_url)
+        assert adapter.deferred_reply_url(request) is None
+
+    def test_events_are_not_deferred(self, adapter: SlackAdapter) -> None:
+        """Test only slash commands are answered later."""
+        request = make_request({"type": "event_callback", "event": {"type": "message"}})
+        assert adapter.deferred_reply_url(request) is None
+
+    @pytest.mark.parametrize("provider", sorted(set(AdapterRegistry.list_providers()) - {"slack"}))
+    def test_other_providers_are_not_deferred(self, provider: str) -> None:
+        """Test other providers are answered once their webhook is handled."""
+        other = get_adapter(provider)
+        assert other is not None
+        assert other.deferred_reply_url(slash_command("orders has nulls")) is None
 
 
 class TestSodaAdapter:
@@ -1098,6 +1230,25 @@ class TestWebhookRequest:
         )
         with pytest.raises(json.JSONDecodeError):
             _ = request.body_json
+
+    def test_body_json_form_encoded_payload(self) -> None:
+        """Test a JSON document sent form-encoded in a payload field is decoded."""
+        body = urlencode({"payload": json.dumps({"type": "block_actions"})}).encode()
+        request = make_request(body, {"Content-Type": "application/x-www-form-urlencoded"})
+        assert request.body_json == {"type": "block_actions"}
+
+    def test_body_json_form_fields(self) -> None:
+        """Test a form without a payload field reads as its fields."""
+        request = make_request(
+            b"command=%2Fdataing&text=orders+has+nulls",
+            {"Content-Type": "application/x-www-form-urlencoded; charset=utf-8"},
+        )
+        assert request.body_json == {"command": "/dataing", "text": "orders has nulls"}
+
+    def test_body_json_not_an_object(self) -> None:
+        """Test a body that is not a JSON object is rejected."""
+        with pytest.raises(ValueError):
+            _ = make_request(b"[1, 2]").body_json
 
     def test_header_found_in_any_case(self) -> None:
         """Test a header is found whatever case it was sent or asked for in."""

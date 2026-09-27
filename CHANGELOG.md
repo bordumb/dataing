@@ -1,3 +1,10 @@
+## [1.20.2](https://github.com/bordumb/dataing/compare/v1.20.1...v1.20.2) (2026-09-27)
+
+
+### Bug Fixes
+
+* validate ad-hoc SQL by dialect; reject webhooks without a secret ([#148](https://github.com/bordumb/dataing/issues/148)) ([8080d4a](https://github.com/bordumb/dataing/commit/8080d4adf12b30428ba0a178f5323e780894711e))
+
 ## [1.20.1](https://github.com/bordumb/dataing/compare/v1.20.0...v1.20.1) (2026-09-27)
 
 

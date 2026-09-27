@@ -1,3 +1,10 @@
+## [1.24.6](https://github.com/bordumb/dataing/compare/v1.24.5...v1.24.6) (2026-09-27)
+
+
+### Bug Fixes
+
+* **core:** stop migration 008 re-creating the teams table ([#170](https://github.com/bordumb/dataing/issues/170)) ([5f77b3e](https://github.com/bordumb/dataing/commit/5f77b3ecfafb1adbdda3e728cddc6fc52cdb7cac))
+
 ## [1.24.5](https://github.com/bordumb/dataing/compare/v1.24.4...v1.24.5) (2026-09-27)
 
 

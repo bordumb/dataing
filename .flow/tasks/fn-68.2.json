@@ -1,0 +1,28 @@
+{
+  "assignee": "bordumbb@gmail.com",
+  "claim_note": "",
+  "claimed_at": "2026-09-26T02:36:59.227880Z",
+  "created_at": "2026-09-26T01:58:03.200572Z",
+  "depends_on": [],
+  "epic": "fn-68",
+  "evidence": {
+    "commits": [
+      "2be80fb0"
+    ],
+    "prs": [
+      "https://github.com/bordumb/dataing/pull/162"
+    ],
+    "tests": [
+      "prek run tsc|eslint|prettier --files frontend/app/src/App.tsx",
+      "prek run prettier --files <2 unformatted files> -> modified",
+      "prek run tsc with injected type error -> fails",
+      "prek run eslint with unused var -> fails"
+    ]
+  },
+  "id": "fn-68.2",
+  "priority": 2,
+  "spec_path": ".flow/tasks/fn-68.2.md",
+  "status": "done",
+  "title": "Point frontend pre-commit hooks at frontend/app",
+  "updated_at": "2026-09-27T14:28:31.540894Z"
+}

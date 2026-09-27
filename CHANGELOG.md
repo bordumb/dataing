@@ -1,3 +1,10 @@
+## [1.22.3](https://github.com/bordumb/dataing/compare/v1.22.2...v1.22.3) (2026-09-27)
+
+
+### Bug Fixes
+
+* **ee:** read integration webhook headers case-insensitively ([#173](https://github.com/bordumb/dataing/issues/173)) ([922bf95](https://github.com/bordumb/dataing/commit/922bf956053c983c5b6a578ae472a7ac4f425065))
+
 ## [1.22.2](https://github.com/bordumb/dataing/compare/v1.22.1...v1.22.2) (2026-09-27)
 
 

@@ -1,3 +1,10 @@
+## [1.24.8](https://github.com/bordumb/dataing/compare/v1.24.7...v1.24.8) (2026-09-27)
+
+
+### Bug Fixes
+
+* **core:** normalize datasource login key to username ([#179](https://github.com/bordumb/dataing/issues/179)) ([2895134](https://github.com/bordumb/dataing/commit/28951340bf4359388f2f1c3d81e433c96eaa98d9)), closes [#171](https://github.com/bordumb/dataing/issues/171)
+
 ## [1.24.7](https://github.com/bordumb/dataing/compare/v1.24.6...v1.24.7) (2026-09-27)
 
 

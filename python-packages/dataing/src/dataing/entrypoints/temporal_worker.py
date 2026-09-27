@@ -20,6 +20,7 @@ import asyncio
 import json
 import logging
 import os
+import sys
 from typing import Any
 from uuid import UUID
 
@@ -287,7 +288,9 @@ def main() -> None:
         logger.info("Worker interrupted by user")
     except Exception as e:
         logger.exception(f"Worker failed: {e}")
-        raise
+        # The log entry has the traceback. Re-raising would make the interpreter print it
+        # again, unformatted, on stderr.
+        sys.exit(1)
 
 
 if __name__ == "__main__":

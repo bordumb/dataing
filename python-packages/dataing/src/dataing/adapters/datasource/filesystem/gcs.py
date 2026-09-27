@@ -13,6 +13,7 @@ from dataing.adapters.datasource.errors import (
     AccessDeniedError,
     AuthenticationFailedError,
     ConnectionFailedError,
+    MissingRequiredFieldError,
     QuerySyntaxError,
     QueryTimeoutError,
     SchemaFetchFailedError,
@@ -61,12 +62,24 @@ GCS_CONFIG_SCHEMA = ConfigSchema(
             description="Optional path prefix to limit scope",
         ),
         ConfigField(
-            name="credentials_json",
-            label="Service Account JSON",
+            name="hmac_access_id",
+            label="HMAC Access ID",
+            type="string",
+            required=True,
+            group="auth",
+            placeholder="GOOG1E...",
+            description=(
+                "HMAC key of a service account that can read the bucket "
+                "(Cloud Storage > Settings > Interoperability)"
+            ),
+            help_url="https://cloud.google.com/storage/docs/authentication/managing-hmackeys",
+        ),
+        ConfigField(
+            name="hmac_secret",
+            label="HMAC Secret",
             type="secret",
             required=True,
             group="auth",
-            description="Service account credentials JSON content",
         ),
         ConfigField(
             name="file_format",
@@ -119,7 +132,8 @@ class GCSAdapter(FileSystemAdapter):
             config: Configuration dictionary with:
                 - bucket: GCS bucket name
                 - prefix: Optional path prefix
-                - credentials_json: Service account JSON credentials
+                - hmac_access_id: Access ID of a service account HMAC key
+                - hmac_secret: Secret of that HMAC key
                 - file_format: Default file format (auto, parquet, csv, json)
         """
         super().__init__(config)
@@ -151,6 +165,13 @@ class GCSAdapter(FileSystemAdapter):
 
     async def connect(self) -> None:
         """Establish connection to GCS via DuckDB."""
+        hmac_access_id = self._config.get("hmac_access_id", "")
+        hmac_secret = self._config.get("hmac_secret", "")
+        if not hmac_access_id:
+            raise MissingRequiredFieldError("hmac_access_id")
+        if not hmac_secret:
+            raise MissingRequiredFieldError("hmac_secret")
+
         try:
             import duckdb
         except ImportError as e:
@@ -165,26 +186,13 @@ class GCSAdapter(FileSystemAdapter):
             self._conn.execute("INSTALL httpfs")
             self._conn.execute("LOAD httpfs")
 
-            credentials_json = self._config.get("credentials_json", "")
-            if credentials_json:
-                import json
-                import os
-                import tempfile
-
-                creds = (
-                    json.loads(credentials_json)
-                    if isinstance(credentials_json, str)
-                    else credentials_json
-                )
-
-                with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
-                    json.dump(creds, f)
-                    creds_path = f.name
-
-                try:
-                    self._conn.execute(f"SET gcs_service_account_key_file = '{creds_path}'")
-                finally:
-                    os.unlink(creds_path)
+            # A scoped secret is only offered for this source's location, and unlike a
+            # SET option it cannot be read back with current_setting(). An HMAC key,
+            # unlike an access token, stays valid for as long as the adapter is cached.
+            self._conn.execute(
+                "CREATE SECRET (TYPE gcs, KEY_ID ?, SECRET ?, SCOPE ?)",
+                [hmac_access_id, hmac_secret, self._get_gcs_path()],
+            )
 
             self._connected = True
 

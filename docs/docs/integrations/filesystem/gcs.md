@@ -19,11 +19,14 @@ GCS integration enables:
 
 - Google Cloud project with GCS enabled
 - Service account with read access
+- HMAC key for that service account
 - Files in supported formats (Parquet, CSV, JSON)
 
 ### Service Account Setup
 
-Create a service account with minimal permissions:
+dataing reads GCS through DuckDB, which authenticates with an
+[HMAC key](https://cloud.google.com/storage/docs/authentication/managing-hmackeys).
+Create a service account with minimal permissions and an HMAC key for it:
 
 ```bash
 # Create service account
@@ -35,10 +38,12 @@ gsutil iam ch \
   serviceAccount:dataing-reader@PROJECT_ID.iam.gserviceaccount.com:objectViewer \
   gs://your-bucket
 
-# Download credentials
-gcloud iam service-accounts keys create credentials.json \
-  --iam-account=dataing-reader@PROJECT_ID.iam.gserviceaccount.com
+# Create an HMAC key (prints the access ID and secret; the secret is shown once)
+gcloud storage hmac create dataing-reader@PROJECT_ID.iam.gserviceaccount.com
 ```
+
+You can also create the key in the console under
+**Cloud Storage > Settings > Interoperability**.
 
 ---
 
@@ -50,7 +55,8 @@ gcloud iam service-accounts keys create credentials.json \
     export DATAING_DATASOURCE=gcs
     export DATAING_GCS_BUCKET=my-data-bucket
     export DATAING_GCS_PREFIX=data/warehouse/
-    export GOOGLE_APPLICATION_CREDENTIALS=/path/to/credentials.json
+    export DATAING_GCS_HMAC_ACCESS_ID=GOOG1E...
+    export DATAING_GCS_HMAC_SECRET=...
     ```
 
 === "Python SDK"
@@ -61,7 +67,8 @@ gcloud iam service-accounts keys create credentials.json \
     adapter = GCSAdapter({
         "bucket": "my-data-bucket",
         "prefix": "data/warehouse/",
-        "credentials_json": open("credentials.json").read(),
+        "hmac_access_id": "GOOG1E...",
+        "hmac_secret": "...",
         "file_format": "auto",
     })
     ```
@@ -72,8 +79,12 @@ gcloud iam service-accounts keys create credentials.json \
 |-------|----------|---------|-------------|
 | `bucket` | Yes | - | GCS bucket name |
 | `prefix` | No | - | Path prefix to limit scope |
-| `credentials_json` | Yes | - | Service account JSON content |
+| `hmac_access_id` | Yes | - | Access ID of the service account's HMAC key |
+| `hmac_secret` | Yes | - | Secret of that HMAC key |
 | `file_format` | No | auto | Default format for files |
+
+The key is stored as a DuckDB secret scoped to `gs://<bucket>/<prefix>/`, so it is
+only sent with requests for the source's own objects.
 
 ---
 
@@ -230,12 +241,10 @@ gsutil ls -b gs://your-bucket
 
 ### "Invalid credentials"
 
-Verify service account credentials:
+Check that the HMAC key exists and is active:
 
 ```bash
-# Test authentication
-gcloud auth activate-service-account --key-file=credentials.json
-gcloud storage ls gs://your-bucket
+gcloud storage hmac describe GOOG1E...
 ```
 
 ### "File format error"

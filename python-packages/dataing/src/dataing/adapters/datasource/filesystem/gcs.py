@@ -216,21 +216,15 @@ class GCSAdapter(FileSystemAdapter):
         self._connected = False
 
     async def test_connection(self) -> ConnectionTestResult:
-        """Test GCS connectivity."""
+        """Test GCS connectivity by listing the source's Parquet files."""
         start_time = time.time()
         try:
             if not self._connected:
                 await self.connect()
 
-            self._config.get("bucket", "")
-            self._config.get("prefix", "")
-
-            gcs_path = self._get_gcs_path()
-
-            try:
-                self._conn.execute(f"SELECT * FROM glob('{gcs_path}*.parquet') LIMIT 1")
-            except Exception:
-                pass
+            # An empty listing still proves the key works and the bucket exists
+            pattern = f"{self._get_gcs_path()}*.parquet"
+            self._conn.execute("SELECT * FROM glob(?) LIMIT 1", [pattern])
 
             latency_ms = int((time.time() - start_time) * 1000)
             return ConnectionTestResult(
@@ -242,20 +236,34 @@ class GCSAdapter(FileSystemAdapter):
 
         except Exception as e:
             latency_ms = int((time.time() - start_time) * 1000)
-            error_str = str(e).lower()
+            # duckdb.HTTPException carries the response status: an int, or a string in
+            # DuckDB 1.4.3. Other failures, such as an unreachable host, have none.
+            status = str(getattr(e, "status_code", ""))
 
-            if "accessdenied" in error_str or "forbidden" in error_str:
+            if status == "401":
                 return ConnectionTestResult(
                     success=False,
                     latency_ms=latency_ms,
-                    message="Access denied to GCS bucket",
+                    message="GCS rejected the HMAC key. Check the access ID and secret.",
+                    error_code="AUTHENTICATION_FAILED",
+                )
+            elif status == "403":
+                # GCS also answers 403 when the HMAC key itself is wrong or revoked
+                return ConnectionTestResult(
+                    success=False,
+                    latency_ms=latency_ms,
+                    message=(
+                        f"GCS denied access to {self._get_gcs_path()}. Check the HMAC access "
+                        "ID and secret, and that the key's service account can list objects "
+                        "in the bucket."
+                    ),
                     error_code="ACCESS_DENIED",
                 )
-            elif "nosuchbucket" in error_str or "not found" in error_str:
+            elif status == "404":
                 return ConnectionTestResult(
                     success=False,
                     latency_ms=latency_ms,
-                    message="GCS bucket not found",
+                    message=f"GCS bucket not found: {self._config.get('bucket', '')}",
                     error_code="CONNECTION_FAILED",
                 )
 

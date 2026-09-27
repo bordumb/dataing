@@ -2,7 +2,8 @@
 
 connect() installs DuckDB's httpfs extension, so the tests that connect skip when it
 cannot be downloaded. Reading objects needs a real bucket, so the tests check the
-secret the connection holds rather than fetching data.
+secret the connection holds rather than fetching data, and the connection-test tests
+replace the connection with a stub that fails the way DuckDB does.
 """
 
 from __future__ import annotations
@@ -136,3 +137,112 @@ class TestGCSAdapterCredentials:
             await GCSAdapter(config).connect()
 
         assert excinfo.value.details == {"field": field}
+
+
+# DuckDB 1.4.3 sets HTTPException.status_code as a string, 1.4.5 as an int
+STATUS_CODE_TYPES = pytest.mark.parametrize("status_type", [str, int], ids=["str", "int"])
+
+
+def http_error(status_code: int | str, reason: str) -> duckdb.HTTPException:
+    """The exception DuckDB raises when GCS answers the file listing with an error.
+
+    DuckDB sets ``status_code`` and ``reason`` after creating the exception.
+    """
+    error = duckdb.HTTPException(
+        "HTTP Error: HTTP GET error reading 'gs://acme-data/warehouse/acme-data/"
+        "?encoding-type=url&list-type=2&prefix=warehouse%2F' in region '' "
+        f"(HTTP {status_code} {reason})"
+    )
+    error.status_code = status_code  # type: ignore[assignment]
+    error.reason = reason
+    return error
+
+
+class ListingConnection:
+    """Stands in for the DuckDB connection: listing finds no files or raises ``error``."""
+
+    def __init__(self, error: Exception | None = None) -> None:
+        self.error = error
+        self.listed: list[Any] = []
+
+    def execute(self, sql: str, parameters: Any = None) -> ListingConnection:
+        """Record the listing and fail if the stub was given an error."""
+        self.listed.append(parameters)
+        if self.error is not None:
+            raise self.error
+        return self
+
+
+def listing_adapter(conn: ListingConnection) -> GCSAdapter:
+    """A connected adapter for gs://acme-data/warehouse/ that lists through ``conn``."""
+    gcs = GCSAdapter(gcs_config())
+    gcs._conn = conn
+    gcs._connected = True
+    return gcs
+
+
+class TestGCSAdapterTestConnection:
+    """test_connection() lists the source's files and reports why a listing fails."""
+
+    async def test_empty_listing_succeeds(self) -> None:
+        """A prefix without Parquet files still has a working connection."""
+        conn = ListingConnection()
+
+        result = await listing_adapter(conn).test_connection()
+
+        assert result.success
+        assert result.error_code is None
+        assert conn.listed == [["gs://acme-data/warehouse/*.parquet"]]
+
+    @STATUS_CODE_TYPES
+    async def test_rejected_key_fails_authentication(self, status_type: type) -> None:
+        """HTTP 401 means GCS did not accept the HMAC key."""
+        conn = ListingConnection(http_error(status_type(401), "Unauthorized"))
+
+        result = await listing_adapter(conn).test_connection()
+
+        assert not result.success
+        assert result.error_code == "AUTHENTICATION_FAILED"
+        assert "HMAC" in result.message
+
+    @STATUS_CODE_TYPES
+    async def test_forbidden_listing_is_access_denied(self, status_type: type) -> None:
+        """HTTP 403 comes from a wrong or revoked key as well as from missing permission."""
+        conn = ListingConnection(http_error(status_type(403), "Forbidden"))
+
+        result = await listing_adapter(conn).test_connection()
+
+        assert not result.success
+        assert result.error_code == "ACCESS_DENIED"
+        assert "gs://acme-data/warehouse/" in result.message
+        assert "HMAC" in result.message
+
+    @STATUS_CODE_TYPES
+    async def test_missing_bucket_fails_the_connection(self, status_type: type) -> None:
+        """HTTP 404 on the listing means the bucket does not exist."""
+        conn = ListingConnection(http_error(status_type(404), "Not Found"))
+
+        result = await listing_adapter(conn).test_connection()
+
+        assert not result.success
+        assert result.error_code == "CONNECTION_FAILED"
+        assert result.message == "GCS bucket not found: acme-data"
+
+    @pytest.mark.parametrize(
+        "error",
+        [
+            duckdb.IOException(
+                "IO Error: Could not establish connection error for HTTP GET to "
+                "'/acme-data/?encoding-type=url&list-type=2&prefix=warehouse%2F'"
+            ),
+            http_error(500, "Internal Server Error"),
+        ],
+        ids=["unreachable", "server-error"],
+    )
+    async def test_other_listing_errors_fail_with_their_message(self, error: Exception) -> None:
+        """Errors without a more specific meaning are reported as they were raised."""
+        result = await listing_adapter(ListingConnection(error)).test_connection()
+
+        assert not result.success
+        assert result.error_code == "CONNECTION_FAILED"
+        assert result.message == str(error)

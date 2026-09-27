@@ -658,55 +658,57 @@ async def provide_link_feedback(
     body: LinkFeedbackRequest,
 ) -> dict[str, str]:
     """Provide feedback on a runbook link."""
-    # Verify runbook exists. runbook_links has no tenant_id, so this check is
-    # what keeps the UPDATEs below inside the caller's tenant.
-    runbook = await db.fetch_one(
-        "SELECT id FROM runbooks WHERE id = $1 AND tenant_id = $2",
-        runbook_id,
-        auth.tenant_id,
-    )
-
-    if not runbook:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Runbook not found",
+    async with db.acquire() as conn, conn.transaction():
+        # runbook_links has no tenant_id, so this tenant-scoped lookup is what
+        # keeps the writes below inside the caller's tenant. Locking the row
+        # serializes concurrent feedback on the runbook, so the recount below
+        # sees every verdict committed before it.
+        runbook = await conn.fetchrow(
+            "SELECT id FROM runbooks WHERE id = $1 AND tenant_id = $2 FOR UPDATE",
+            runbook_id,
+            auth.tenant_id,
         )
 
-    result = await db.execute(
-        """
-        UPDATE runbook_links
-        SET was_helpful = $1, feedback_notes = $2
-        WHERE runbook_id = $3 AND issue_id = $4
-        """,
-        body.was_helpful,
-        body.feedback_notes,
-        runbook_id,
-        issue_id,
-    )
+        if not runbook:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Runbook not found",
+            )
 
-    if result == "UPDATE 0":
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Link not found",
-        )
-
-    # Update usefulness score on runbook based on feedback
-    if body.was_helpful:
-        await db.execute(
+        result = await conn.execute(
             """
-            UPDATE runbooks
-            SET usefulness_score = usefulness_score + 0.1
-            WHERE id = $1
+            UPDATE runbook_links
+            SET was_helpful = $1, feedback_notes = $2
+            WHERE runbook_id = $3 AND issue_id = $4
+            """,
+            body.was_helpful,
+            body.feedback_notes,
+            runbook_id,
+            issue_id,
+        )
+
+        if result == "UPDATE 0":
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Link not found",
+            )
+
+        # Derive the score from every link's current verdict instead of nudging
+        # it per request: re-posting a verdict leaves it unchanged, and flipping
+        # one moves it exactly once.
+        counts = await conn.fetchrow(
+            """
+            SELECT
+                COUNT(*) FILTER (WHERE was_helpful) AS helpful,
+                COUNT(*) FILTER (WHERE NOT was_helpful) AS not_helpful
+            FROM runbook_links
+            WHERE runbook_id = $1
             """,
             runbook_id,
         )
-    else:
-        await db.execute(
-            """
-            UPDATE runbooks
-            SET usefulness_score = GREATEST(0, usefulness_score - 0.05)
-            WHERE id = $1
-            """,
+        await conn.execute(
+            "UPDATE runbooks SET usefulness_score = $1 WHERE id = $2",
+            _usefulness_score(counts["helpful"], counts["not_helpful"]),
             runbook_id,
         )
 
@@ -716,6 +718,11 @@ async def provide_link_feedback(
 # ============================================================================
 # Helpers
 # ============================================================================
+
+
+def _usefulness_score(helpful: int, not_helpful: int) -> float:
+    """Score a runbook from its links' verdicts: +0.1 per helpful, -0.05 per not, floor 0."""
+    return max(0.0, 0.1 * helpful - 0.05 * not_helpful)
 
 
 def _row_to_response(row: dict[str, Any]) -> RunbookResponse:

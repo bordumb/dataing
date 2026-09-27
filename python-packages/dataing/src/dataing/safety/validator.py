@@ -96,7 +96,6 @@ def validate_query(
     sql: str,
     *,
     dialect: str,
-    require_select: bool = True,
     require_limit: bool = True,
 ) -> None:
     """Validate that a SQL query is safe to execute.
@@ -104,10 +103,13 @@ def validate_query(
     This function performs multiple layers of validation:
     0. Check for multi-statement queries (rejected)
     1. Parse with sqlglot to get AST
-    2. Check that it's a SELECT statement (if require_select=True)
+    2. Check that it's a SELECT statement, or UNION/INTERSECT/EXCEPT of SELECTs
     3. Check for forbidden statement types and functions in the AST
     4. Check for forbidden keywords as whole words
     5. Ensure LIMIT clause is present (if require_limit=True)
+
+    Step 2 has no opt-out: without it, validation is a denylist, and statements
+    missing from the lists (COPY, CALL, ...) get through.
 
     Args:
         sql: The SQL query to validate.
@@ -115,9 +117,6 @@ def validate_query(
             (e.g. "postgres", "mysql", "snowflake"). Statement boundaries,
             comments and quoting differ between dialects, so validating in
             the wrong one can let a second statement through.
-        require_select: If True (default), query must be a SELECT statement,
-            or UNION/INTERSECT/EXCEPT of SELECTs. Set to False for hypothesis
-            queries where other read-only statements might be acceptable.
         require_limit: If True (default), query must include a LIMIT clause.
 
     Raises:
@@ -148,10 +147,8 @@ def validate_query(
     except Exception as e:
         raise QueryValidationError(f"Failed to parse SQL: {e}") from e
 
-    # 2. Check statement type - must be SELECT or a set operation over SELECTs (if required)
-    if require_select and not isinstance(
-        parsed, exp.Select | exp.Union | exp.Intersect | exp.Except
-    ):
+    # 2. Check statement type - must be SELECT or a set operation over SELECTs
+    if not isinstance(parsed, exp.Select | exp.Union | exp.Intersect | exp.Except):
         raise QueryValidationError(f"Only SELECT statements allowed, got: {type(parsed).__name__}")
 
     # 3. Walk the AST and check for forbidden statement types and functions

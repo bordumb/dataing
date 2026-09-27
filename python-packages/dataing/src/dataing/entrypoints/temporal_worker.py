@@ -31,7 +31,6 @@ from temporalio.worker import Worker
 from dataing.adapters.context import ContextEngine
 from dataing.adapters.datasource import get_registry
 from dataing.adapters.datasource.base import BaseAdapter
-from dataing.adapters.datasource.types import QueryResult
 from dataing.adapters.db.app_db import AppDatabase
 from dataing.adapters.investigation.pattern_adapter import InMemoryPatternRepository
 from dataing.agents import AgentClient
@@ -58,27 +57,6 @@ logger = logging.getLogger(__name__)
 # Worker configuration
 MAX_CONCURRENT_ACTIVITIES = 10
 MAX_CONCURRENT_WORKFLOW_TASKS = 5
-
-
-class AdapterDatabase:
-    """Database wrapper that resolves adapter per-datasource for query execution.
-
-    Query failures raise. The execute_query activity turns them into an explicit
-    error result, so a failed query can never pass for one that returned no rows.
-    """
-
-    def __init__(self, get_adapter_fn: Any) -> None:
-        """Initialize with adapter resolver."""
-        self._get_adapter = get_adapter_fn
-
-    async def execute_query(self, sql: str, datasource_id: str | None = None) -> QueryResult:
-        """Execute a SQL query using the specified datasource adapter."""
-        if not datasource_id:
-            raise RuntimeError("No datasource_id provided to execute_query")
-
-        adapter = await self._get_adapter(datasource_id)
-        result: QueryResult = await adapter.execute_query(sql)
-        return result
 
 
 async def create_dependencies() -> dict[str, Any]:
@@ -197,8 +175,6 @@ def create_activities(deps: dict[str, Any]) -> list[Any]:
 
         return adapter
 
-    adapter_database = AdapterDatabase(get_adapter)
-
     activities = [
         # Snapshot capture (fire-and-forget)
         make_capture_snapshot_activity(snapshot_store=snapshot_store),
@@ -212,7 +188,7 @@ def create_activities(deps: dict[str, Any]) -> list[Any]:
         make_generate_hypotheses_activity(adapter=agent_adapter),
         # Query generation and execution
         make_generate_query_activity(adapter=agent_adapter),
-        make_execute_query_activity(database=adapter_database),
+        make_execute_query_activity(get_adapter=get_adapter),
         # Evidence interpretation
         make_interpret_evidence_activity(adapter=agent_adapter),
         # Synthesis and analysis

@@ -147,6 +147,39 @@ class TestValidateQuery:
         # Should not raise
         validate_query("SELECT updated_at FROM users LIMIT 10", dialect="postgres")
 
+    @pytest.mark.parametrize(
+        "sql",
+        [
+            "SELECT id, deleted_at FROM users WHERE deleted_at IS NULL LIMIT 100",
+            "SELECT * FROM update_log WHERE id = 1 LIMIT 100",
+            "SELECT id, created_by FROM records LIMIT 100",
+            "SELECT inserted_at FROM events LIMIT 100",
+        ],
+        ids=["deleted_at", "update_log", "created_by", "inserted_at"],
+    )
+    def test_identifiers_containing_keywords_ok(self, sql: str) -> None:
+        """Test that identifiers containing a forbidden keyword are not false positives."""
+        validate_query(sql, dialect="postgres")
+
+    @pytest.mark.parametrize("dialect", ["postgres", "duckdb"])
+    def test_copy_raises(self, dialect: str) -> None:
+        """Test that COPY is rejected even though it wraps a SELECT with a LIMIT."""
+        with pytest.raises(QueryValidationError):
+            validate_query("COPY (SELECT * FROM users LIMIT 10) TO '/tmp/out.csv'", dialect=dialect)
+
+    def test_select_requirement_cannot_be_disabled(self) -> None:
+        """Test that the SELECT-only check cannot be traded for a denylist.
+
+        With the check off, COPY (SELECT ... LIMIT n) TO ... passed: it has a
+        LIMIT and no forbidden keyword.
+        """
+        with pytest.raises(TypeError):
+            validate_query(
+                "COPY (SELECT * FROM users LIMIT 10) TO '/tmp/out.csv'",
+                dialect="postgres",
+                require_select=False,  # type: ignore[call-arg]
+            )
+
     def test_invalid_sql_raises(self) -> None:
         """Test that invalid SQL raises error."""
         with pytest.raises(QueryValidationError) as exc_info:

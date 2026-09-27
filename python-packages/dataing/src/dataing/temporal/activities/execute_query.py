@@ -1,41 +1,37 @@
 """Execute query activity for investigation workflow.
 
-Extracts business logic from ExecuteQueryStep into a Temporal activity factory.
+Every query is validated immediately before it runs, in the SQL dialect declared
+by the adapter that runs it. Statement boundaries, comments and quoting differ
+between dialects, so validating in any other dialect can let a second statement
+through. There is no default dialect: a query whose dialect is unknown is refused.
 """
 
 from __future__ import annotations
 
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any, Protocol
+from typing import TYPE_CHECKING, Any, Protocol, runtime_checkable
 
 from temporalio import activity
 
+from dataing.core.exceptions import QueryValidationError
 from dataing.core.json_utils import to_json_safe
+from dataing.safety.validator import validate_query
 
 if TYPE_CHECKING:
+    from dataing.adapters.datasource.base import BaseAdapter
     from dataing.adapters.datasource.types import QueryResult
 
 
+@runtime_checkable
 class DatabaseProtocol(Protocol):
-    """Protocol for database adapter used by execute_query activity."""
+    """Protocol for the data source adapter the execute_query activity runs SQL on."""
 
-    async def execute_query(self, sql: str, datasource_id: str | None = None) -> QueryResult:
+    async def execute_query(self, sql: str) -> QueryResult:
         """Execute SQL query and return results.
 
         Raises:
             Exception: If the query fails. Never return an empty result instead.
-        """
-        ...
-
-
-class SQLValidatorProtocol(Protocol):
-    """Protocol for SQL validation."""
-
-    def validate(self, sql: str) -> tuple[bool, str | None]:
-        """Validate SQL query for safety.
-
-        Returns:
-            Tuple of (is_safe, error_message).
         """
         ...
 
@@ -47,7 +43,7 @@ class ExecuteQueryInput:
     investigation_id: str
     query: str
     hypothesis_id: str
-    datasource_id: str | None = None
+    datasource_id: str
 
 
 @dataclass
@@ -68,14 +64,12 @@ class ExecuteQueryResult:
 
 
 def make_execute_query_activity(
-    database: DatabaseProtocol,
-    sql_validator: SQLValidatorProtocol | None = None,
+    get_adapter: Callable[[str], Awaitable[BaseAdapter]],
 ) -> Any:
     """Factory that creates execute_query activity with injected dependencies.
 
     Args:
-        database: Database adapter for executing queries.
-        sql_validator: Optional SQL validator for safety checks.
+        get_adapter: Async function returning the connected adapter for a datasource ID.
 
     Returns:
         The execute_query activity function.
@@ -86,36 +80,47 @@ def make_execute_query_activity(
         """Execute SQL query against the data source.
 
         This activity:
-        1. Validates the query for safety (if validator provided)
-        2. Executes the query via database adapter
-        3. Returns structured query result
-        """
-        # Safety check (if validator provided)
-        if sql_validator:
-            is_safe, error = sql_validator.validate(input.query)
-            if not is_safe:
-                return ExecuteQueryResult(
-                    rows=[],
-                    columns=[],
-                    row_count=0,
-                    hypothesis_id=input.hypothesis_id,
-                    error=f"Unsafe SQL: {error}",
-                )
+        1. Resolves the adapter for the data source
+        2. Validates the query in that adapter's SQL dialect
+        3. Executes the query on the same adapter
+        4. Returns structured query result
 
-        # Execute query
-        try:
-            result = await database.execute_query(input.query, input.datasource_id)
-            # Convert to JSON-safe types (handles date, datetime, UUID, etc.)
-            rows = to_json_safe(result.rows)
-            columns = to_json_safe(result.columns)
-        except Exception as e:
+        Every failure, including an unsafe query, becomes ExecuteQueryResult.error.
+        """
+
+        def failed(error: str) -> ExecuteQueryResult:
             return ExecuteQueryResult(
                 rows=[],
                 columns=[],
                 row_count=0,
                 hypothesis_id=input.hypothesis_id,
-                error=f"Query execution failed: {e}",
+                error=error,
             )
+
+        try:
+            adapter = await get_adapter(input.datasource_id)
+            dialect = adapter.capabilities.sql_dialect
+        except Exception as e:
+            return failed(f"Query execution failed: {e}")
+
+        if not dialect or not isinstance(adapter, DatabaseProtocol):
+            return failed(
+                f"Unsafe SQL: {type(adapter).__name__} declares no SQL dialect, "
+                "so the query cannot be validated"
+            )
+
+        try:
+            validate_query(input.query, dialect=dialect)
+        except QueryValidationError as e:
+            return failed(f"Unsafe SQL: {e}")
+
+        try:
+            result = await adapter.execute_query(input.query)
+            # Convert to JSON-safe types (handles date, datetime, UUID, etc.)
+            rows = to_json_safe(result.rows)
+            columns = to_json_safe(result.columns)
+        except Exception as e:
+            return failed(f"Query execution failed: {e}")
 
         return ExecuteQueryResult(
             rows=rows,

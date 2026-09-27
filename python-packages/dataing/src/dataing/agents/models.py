@@ -15,8 +15,6 @@ import sqlglot
 from pydantic import BaseModel, Field, field_validator, model_validator
 
 from dataing.core.domain_types import HypothesisCategory
-from dataing.core.exceptions import QueryValidationError
-from dataing.safety.validator import validate_query as _validate_query_safety
 
 # Fix type literals
 FixType = Literal["sql_ddl", "sql_dml", "dbt_patch", "python_patch", "manual_instruction"]
@@ -44,34 +42,26 @@ def _strip_markdown(query: str) -> str:
     return query
 
 
-def _validate_sql_query(
-    query: str,
-    *,
-    require_select: bool = False,
-    dialect: str = "postgres",
-) -> str:
-    """Validate SQL query using sqlglot. Returns stripped query.
+def _normalize_sql(query: str) -> str:
+    """Strip markdown code blocks and whitespace from LLM-generated SQL.
+
+    This does not judge whether the query is safe. A response model cannot know
+    which data source will run the query, and parsing SQL in a guessed dialect is
+    unsafe. The execute_query activity validates every query in the dialect of
+    the data source that runs it.
 
     Args:
         query: The SQL query (may include markdown code blocks).
-        require_select: If True, query must be a SELECT statement.
-        dialect: SQL dialect for parsing.
 
     Returns:
-        The stripped and validated query string.
+        The stripped query string.
 
     Raises:
-        ValueError: If query is invalid (Pydantic-compatible error).
+        ValueError: If nothing is left after stripping (Pydantic-compatible error).
     """
     stripped = _strip_markdown(query).strip()
     if not stripped:
         raise ValueError("Empty query after stripping markdown")
-
-    try:
-        _validate_query_safety(stripped, dialect=dialect, require_select=require_select)
-    except QueryValidationError as e:
-        raise ValueError(str(e)) from None
-
     return stripped
 
 
@@ -103,9 +93,9 @@ class HypothesisResponse(BaseModel):
 
     @field_validator("suggested_query")
     @classmethod
-    def validate_query_safety(cls, v: str) -> str:
-        """Validate query safety: strip markdown, require LIMIT, block mutations."""
-        return _validate_sql_query(v, require_select=False)
+    def normalize_suggested_query(cls, v: str) -> str:
+        """Strip markdown. Safety is enforced when a query is executed."""
+        return _normalize_sql(v)
 
 
 class HypothesesResponse(BaseModel):
@@ -129,9 +119,9 @@ class QueryResponse(BaseModel):
 
     @field_validator("query")
     @classmethod
-    def validate_query(cls, v: str) -> str:
-        """Validate the generated SQL."""
-        return _validate_sql_query(v, require_select=True)
+    def normalize_query(cls, v: str) -> str:
+        """Strip markdown. Safety is enforced when the query is executed."""
+        return _normalize_sql(v)
 
 
 class InterpretationResponse(BaseModel):

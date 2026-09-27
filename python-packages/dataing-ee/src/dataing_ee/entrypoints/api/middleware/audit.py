@@ -2,6 +2,7 @@
 
 import asyncio
 import json
+import re
 import uuid
 from typing import Any
 
@@ -12,11 +13,17 @@ from starlette.responses import Response
 from starlette.types import ASGIApp
 
 from dataing.adapters.audit import was_audited
+from dataing.safety.urls import redact_url
 
 logger = structlog.get_logger()
 
 # Fields to redact from request bodies
 SENSITIVE_FIELDS = {"password", "api_key", "secret", "token", "credential", "key"}
+
+# URLs inside string values; each is reduced to scheme://host. The lookbehind lets a
+# match start only where a run of scheme characters starts, which keeps the scan linear.
+# Without it, a long run of letters backtracks quadratically.
+URL_PATTERN = re.compile(r"(?<![a-z0-9+.-])[a-z][a-z0-9+.-]*://\S+", re.IGNORECASE)
 
 
 class AuditMiddleware(BaseHTTPMiddleware):
@@ -204,24 +211,26 @@ class AuditMiddleware(BaseHTTPMiddleware):
             return None
 
     def _redact_dict(self, data: dict[str, Any], depth: int = 0) -> dict[str, Any]:
-        """Recursively redact sensitive fields."""
-        if depth > 5:  # Prevent infinite recursion
-            return {"_redacted": True}
-
+        """Recursively redact sensitive fields and reduce URLs to scheme://host."""
         result: dict[str, Any] = {}
         for key, value in data.items():
             key_lower = key.lower()
 
             if any(field in key_lower for field in SENSITIVE_FIELDS):
                 result[key] = "[REDACTED]"
-            elif isinstance(value, dict):
-                result[key] = self._redact_dict(value, depth + 1)
-            elif isinstance(value, list):
-                result[key] = [
-                    self._redact_dict(item, depth + 1) if isinstance(item, dict) else item
-                    for item in value
-                ]
             else:
-                result[key] = value
+                result[key] = self._redact_value(value, depth + 1)
 
         return result
+
+    def _redact_value(self, value: Any, depth: int) -> Any:
+        """Redact a body value, recursing into containers and reducing URLs in strings."""
+        if isinstance(value, dict | list) and depth > 5:  # Prevent infinite recursion
+            return {"_redacted": True}
+        if isinstance(value, dict):
+            return self._redact_dict(value, depth)
+        if isinstance(value, list):
+            return [self._redact_value(item, depth + 1) for item in value]
+        if isinstance(value, str):
+            return URL_PATTERN.sub(lambda match: redact_url(match.group()), value)
+        return value

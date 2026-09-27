@@ -10,6 +10,7 @@ import httpx
 import structlog
 
 from dataing.core.json_utils import to_json_string
+from dataing.safety.urls import redact_url
 
 logger = structlog.get_logger()
 
@@ -75,7 +76,7 @@ class WebhookNotifier:
 
                 logger.info(
                     "webhook_sent",
-                    url=self.config.url,
+                    url=redact_url(self.config.url),
                     event_type=event_type,
                     status_code=response.status_code,
                     success=success,
@@ -86,7 +87,7 @@ class WebhookNotifier:
         except httpx.TimeoutException:
             logger.warning(
                 "webhook_timeout",
-                url=self.config.url,
+                url=redact_url(self.config.url),
                 event_type=event_type,
             )
             return False
@@ -94,7 +95,7 @@ class WebhookNotifier:
         except httpx.RequestError as e:
             logger.error(
                 "webhook_error",
-                url=self.config.url,
+                url=redact_url(self.config.url),
                 event_type=event_type,
                 error=str(e),
             )

@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+import json
+import time
+from typing import Any
 from unittest.mock import AsyncMock, MagicMock
 from uuid import uuid4
 
@@ -106,6 +109,84 @@ class TestAuditMiddleware:
         assert result["user"]["name"] == "test"
         assert result["user"]["api_key"] == "[REDACTED]"
 
+    @pytest.mark.parametrize(
+        ("url", "expected"),
+        [
+            ("https://hooks.slack.com/services/T000/B000/SECRETTOKEN", "https://hooks.slack.com"),
+            (
+                "https://example.webhook.office.com/webhookb2/G1@G2/IncomingWebhook/SECRETTOKEN/G3",
+                "https://example.webhook.office.com",
+            ),
+            ("https://discord.com/api/webhooks/123/SECRETTOKEN", "https://discord.com"),
+        ],
+        ids=["slack", "teams", "discord"],
+    )
+    def test_sanitize_body_reduces_webhook_url_to_scheme_and_host(
+        self,
+        middleware: AuditMiddleware,
+        url: str,
+        expected: str,
+    ) -> None:
+        """Test that a webhook URL loses the bearer secret embedded in its path."""
+        body = json.dumps({"url": url, "events": ["investigation.completed"]}).encode()
+
+        result = middleware._sanitize_body(body)
+
+        assert result == {"url": expected, "events": ["investigation.completed"]}
+
+    def test_sanitize_body_reduces_url_inside_text(self, middleware: AuditMiddleware) -> None:
+        """Test that a URL embedded in free text is reduced in place."""
+        body = json.dumps(
+            {"note": "Posting to https://hooks.slack.com/services/T000/B000/SECRETTOKEN now"}
+        ).encode()
+
+        result = middleware._sanitize_body(body)
+
+        assert result == {"note": "Posting to https://hooks.slack.com now"}
+
+    def test_sanitize_body_replaces_unparseable_url(self, middleware: AuditMiddleware) -> None:
+        """Test that a URL without a parseable host is replaced, never stored raw."""
+        body = json.dumps({"url": "https://[hooks.slack.com/services/T000/SECRETTOKEN"}).encode()
+
+        result = middleware._sanitize_body(body)
+
+        assert result == {"url": "<invalid url>"}
+
+    def test_sanitize_body_reduces_urls_inside_lists(self, middleware: AuditMiddleware) -> None:
+        """Test that URLs are reduced at any list nesting level."""
+        body = json.dumps(
+            {
+                "urls": ["https://hooks.slack.com/services/T000/B000/SECRETTOKEN"],
+                "matrix": [["https://discord.com/api/webhooks/123/SECRETTOKEN"]],
+            }
+        ).encode()
+
+        result = middleware._sanitize_body(body)
+
+        assert result == {
+            "urls": ["https://hooks.slack.com"],
+            "matrix": [["https://discord.com"]],
+        }
+
+    def test_sanitize_body_scans_long_strings_in_linear_time(
+        self,
+        middleware: AuditMiddleware,
+    ) -> None:
+        """Test that URL scanning stays fast on a long run of scheme characters.
+
+        Every POST, PUT and PATCH body is scanned on the event loop, authenticated or not.
+        A pattern that backtracks quadratically takes seconds on 50 KB of letters.
+        """
+        blob = "a" * 50_000
+        body = json.dumps({"blob": blob}).encode()
+
+        start = time.perf_counter()
+        result = middleware._sanitize_body(body)
+        elapsed = time.perf_counter() - start
+
+        assert result == {"blob": blob}
+        assert elapsed < 1.0
+
     def test_sanitize_body_invalid_json(self, middleware: AuditMiddleware) -> None:
         """Test handling invalid JSON body."""
         body = b"not valid json"
@@ -133,6 +214,17 @@ class TestAuditMiddleware:
 
         # Should not raise, should have depth limit
         assert result is not None
+
+    def test_redact_dict_caps_list_nesting(self, middleware: AuditMiddleware) -> None:
+        """Test that nested lists count toward the depth limit, like nested dicts."""
+        nested: list[Any] = ["leaf"]
+        for _ in range(10):
+            nested = [nested]
+
+        result = middleware._redact_dict({"nested": nested})
+
+        assert '{"_redacted": true}' in json.dumps(result)
+        assert "leaf" not in json.dumps(result)
 
     def test_redact_dict_handles_lists(self, middleware: AuditMiddleware) -> None:
         """Test that lists are handled."""

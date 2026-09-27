@@ -1,25 +1,23 @@
 /**
  * CRITICAL: DO NOT REMOVE THIS FILE
  *
- * Context provider for demo role state, allowing role-based UI rendering.
- * Used by the demo role toggle and sidebar navigation.
+ * Context for the demo role toggle: previews the UI as another org role.
+ *
+ * The role starts as the signed-in user's real role and a preview is stored
+ * as the JWT session's demo override, so it flows through useRole() like the
+ * real role does. Gate UI with useRole(), not this context. The API still
+ * authorizes the real role, and the toggle only renders outside production.
  */
 
-import {
-  createContext,
-  useContext,
-  useState,
-  useCallback,
-  type ReactNode,
-} from "react";
+import { createContext, useContext, useMemo, type ReactNode } from "react";
+import { useJwtAuth } from "./jwt-context";
 import type { OrgRole } from "./types";
 
 interface DemoRoleContextValue {
-  role: OrgRole;
+  /** The role the UI is rendered as; null while signed out. */
+  role: OrgRole | null;
+  /** Preview the UI as another role for the rest of this session. */
   setRole: (role: OrgRole) => void;
-  isAdmin: boolean;
-  isOwner: boolean;
-  canAccessAdmin: boolean;
 }
 
 const DemoRoleContext = createContext<DemoRoleContextValue | null>(null);
@@ -29,25 +27,20 @@ interface DemoRoleProviderProps {
 }
 
 /**
- * Provider for demo role state.
+ * Provider for the demo role toggle.
  *
- * CRITICAL: DO NOT REMOVE - Required for role-based UI visibility.
+ * CRITICAL: DO NOT REMOVE - The demo role toggle depends on it.
  */
 export function DemoRoleProvider({ children }: DemoRoleProviderProps) {
-  const [role, setRoleState] = useState<OrgRole>("admin");
+  const { effectiveRole, setDemoRole } = useJwtAuth();
 
-  const setRole = useCallback((newRole: OrgRole) => {
-    setRoleState(newRole);
-  }, []);
-
-  const isAdmin = role === "admin";
-  const isOwner = role === "owner";
-  const canAccessAdmin = isAdmin || isOwner;
+  const value = useMemo(
+    () => ({ role: effectiveRole, setRole: setDemoRole }),
+    [effectiveRole, setDemoRole],
+  );
 
   return (
-    <DemoRoleContext.Provider
-      value={{ role, setRole, isAdmin, isOwner, canAccessAdmin }}
-    >
+    <DemoRoleContext.Provider value={value}>
       {children}
     </DemoRoleContext.Provider>
   );

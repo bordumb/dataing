@@ -15,24 +15,28 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { fetchDashboardStats } from "@/lib/api/dashboard";
 import { RecentInvestigations } from "./recent-investigations";
 import { PageHeader } from "@/components/shared/page-header";
+import { useRole } from "@/lib/auth";
 
 export function DashboardPage() {
   const { data: stats, isLoading } = useQuery({
     queryKey: ["dashboard-stats"],
     queryFn: fetchDashboardStats,
   });
+  const { isMember } = useRole();
 
   return (
     <div className="space-y-6">
       <PageHeader
         title="Dashboard"
         action={
-          <Button asChild>
-            <Link to="/investigations/new">
-              <Plus className="mr-2 h-4 w-4" />
-              New Investigation
-            </Link>
-          </Button>
+          isMember ? (
+            <Button asChild>
+              <Link to="/investigations/new">
+                <Plus className="mr-2 h-4 w-4" />
+                New Investigation
+              </Link>
+            </Button>
+          ) : undefined
         }
       />
 

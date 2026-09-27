@@ -33,7 +33,7 @@ import { DatasetListPage, DatasetDetailPage } from "@/features/datasets";
 import { SettingsPage } from "@/features/settings/settings-page";
 import { UsagePage } from "@/features/usage/usage-page";
 import { NotificationsPage } from "@/features/notifications";
-import { AdminPage } from "@/features/admin";
+import { AdminRoute } from "@/features/admin";
 import { IssueList, IssueCreate, IssueWorkspace } from "@/features/issues";
 import { JwtLoginPage } from "@/features/auth/jwt-login-page";
 import { SSOLoginPage } from "@/features/auth/sso-login-page";
@@ -46,7 +46,11 @@ import {
   DemoRoleProvider,
   useDemoRoleContext,
 } from "@/lib/auth/demo-role-context";
-import { ImpersonationProvider, ImpersonateUserToggle } from "@/lib/auth";
+import {
+  ImpersonationProvider,
+  ImpersonateUserToggle,
+  RoleGuard,
+} from "@/lib/auth";
 
 // Notifications
 import { NotificationProvider } from "@/lib/notifications";
@@ -146,7 +150,12 @@ function AppWithEntitlements() {
                     path="investigations/new"
                     element={
                       <FeatureErrorBoundary feature="new investigation">
-                        <NewInvestigation />
+                        <RoleGuard
+                          minRole="member"
+                          redirectTo="/investigations"
+                        >
+                          <NewInvestigation />
+                        </RoleGuard>
                       </FeatureErrorBoundary>
                     }
                   />
@@ -178,7 +187,9 @@ function AppWithEntitlements() {
                     path="issues/new"
                     element={
                       <FeatureErrorBoundary feature="create issue">
-                        <IssueCreate />
+                        <RoleGuard minRole="member" redirectTo="/issues">
+                          <IssueCreate />
+                        </RoleGuard>
                       </FeatureErrorBoundary>
                     }
                   />
@@ -242,7 +253,7 @@ function AppWithEntitlements() {
                     path="admin"
                     element={
                       <FeatureErrorBoundary feature="admin">
-                        <AdminPage />
+                        <AdminRoute />
                       </FeatureErrorBoundary>
                     }
                   />
@@ -255,8 +266,8 @@ function AppWithEntitlements() {
       {/* CRITICAL: DO NOT REMOVE - Demo toggles for testing */}
       {/* Bottom-right: Plan tiers (free/pro/enterprise) */}
       <DemoToggle plan={plan} onPlanChange={setPlan} />
-      {/* Bottom-left: User roles (viewer/member/admin/owner) */}
-      <DemoRoleToggle currentRole={role} onRoleChange={setRole} />
+      {/* Bottom-left: User roles (viewer/member/admin/owner), once signed in */}
+      {role && <DemoRoleToggle currentRole={role} onRoleChange={setRole} />}
       <UpgradeRequiredModal
         error={upgradeError}
         onClose={handleCloseUpgradeModal}

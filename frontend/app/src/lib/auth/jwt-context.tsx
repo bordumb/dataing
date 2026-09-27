@@ -73,6 +73,14 @@ function decodeJwt(token: string): JwtPayload | null {
 }
 
 /**
+ * Read the org role from an access token. The token is what the server
+ * authorizes against, so the UI takes the role from it too.
+ */
+function roleFromToken(token: string): OrgRole | null {
+  return decodeJwt(token)?.role ?? null;
+}
+
+/**
  * Check if token is expired (with 60s buffer).
  */
 function isTokenExpired(token: string): boolean {
@@ -113,7 +121,7 @@ export function JwtAuthProvider({ children }: { children: React.ReactNode }) {
     const accessToken = localStorage.getItem(ACCESS_TOKEN_KEY);
     const userJson = localStorage.getItem(USER_KEY);
     const orgJson = localStorage.getItem(ORG_KEY);
-    const role = localStorage.getItem(ROLE_KEY) as OrgRole | null;
+    const storedRole = localStorage.getItem(ROLE_KEY) as OrgRole | null;
 
     if (accessToken && !isTokenExpired(accessToken) && userJson && orgJson) {
       try {
@@ -124,7 +132,7 @@ export function JwtAuthProvider({ children }: { children: React.ReactNode }) {
           isLoading: false,
           user,
           org,
-          role,
+          role: roleFromToken(accessToken) ?? storedRole,
           accessToken,
         });
       } catch {
@@ -135,19 +143,25 @@ export function JwtAuthProvider({ children }: { children: React.ReactNode }) {
     } else {
       // Try to refresh if we have a refresh token
       const refreshToken = localStorage.getItem(REFRESH_TOKEN_KEY);
-      const orgId = orgJson ? JSON.parse(orgJson).id : null;
+      const org = orgJson ? (JSON.parse(orgJson) as Organization) : null;
 
-      if (refreshToken && orgId) {
+      if (refreshToken && org?.id) {
         authApi
-          .refreshToken({ refresh_token: refreshToken, org_id: orgId })
+          .refreshToken({ refresh_token: refreshToken, org_id: org.id })
           .then((response) => {
+            const role = roleFromToken(response.access_token) ?? storedRole;
             localStorage.setItem(ACCESS_TOKEN_KEY, response.access_token);
-            setState((s) => ({
-              ...s,
+            if (role) {
+              localStorage.setItem(ROLE_KEY, role);
+            }
+            setState({
               isAuthenticated: true,
               isLoading: false,
+              user: userJson ? (JSON.parse(userJson) as User) : null,
+              org,
+              role,
               accessToken: response.access_token,
-            }));
+            });
           })
           .catch(() => {
             clearStorage();
@@ -222,6 +236,7 @@ export function JwtAuthProvider({ children }: { children: React.ReactNode }) {
 
   const logout = React.useCallback(() => {
     clearStorage();
+    setDemoRole(null);
     setState({
       isAuthenticated: false,
       isLoading: false,

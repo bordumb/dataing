@@ -22,6 +22,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { AsyncBoundary } from "@/components/async-boundary";
+import { useRole } from "@/lib/auth";
 import { formatDate } from "@/lib/utils";
 
 interface IssueFilters {
@@ -97,14 +98,18 @@ function IssueListContent({
   onPrevPage: () => void;
   hasPrevPage: boolean;
 }) {
+  const { isMember } = useRole();
+
   if (data.items.length === 0) {
     return (
       <Card>
         <CardContent className="py-12 text-center">
           <p className="text-muted-foreground">No issues found.</p>
-          <Link to="/issues/new">
-            <Button className="mt-4">Create your first issue</Button>
-          </Link>
+          {isMember && (
+            <Link to="/issues/new">
+              <Button className="mt-4">Create your first issue</Button>
+            </Link>
+          )}
         </CardContent>
       </Card>
     );
@@ -144,6 +149,7 @@ function IssueListContent({
 }
 
 export function IssueList() {
+  const { isMember } = useRole();
   const [filters, setFilters] = useState<IssueFilters>({});
   const [searchInput, setSearchInput] = useState("");
   const [cursorHistory, setCursorHistory] = useState<string[]>([]);
@@ -193,12 +199,14 @@ export function IssueList() {
     <div>
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-3xl font-bold">Issues</h1>
-        <Link to="/issues/new">
-          <Button>
-            <Plus className="h-4 w-4 mr-2" />
-            New Issue
-          </Button>
-        </Link>
+        {isMember && (
+          <Link to="/issues/new">
+            <Button>
+              <Plus className="h-4 w-4 mr-2" />
+              New Issue
+            </Button>
+          </Link>
+        )}
       </div>
 
       <div className="flex items-center gap-4 mb-6">

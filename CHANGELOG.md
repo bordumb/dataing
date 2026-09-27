@@ -1,3 +1,10 @@
+## [1.24.7](https://github.com/bordumb/dataing/compare/v1.24.6...v1.24.7) (2026-09-27)
+
+
+### Bug Fixes
+
+* **infra:** apply each database migration exactly once ([#181](https://github.com/bordumb/dataing/issues/181)) ([0346199](https://github.com/bordumb/dataing/commit/03461993e8870a5806f3c8b8d46122ede87cd105))
+
 ## [1.24.6](https://github.com/bordumb/dataing/compare/v1.24.5...v1.24.6) (2026-09-27)
 
 

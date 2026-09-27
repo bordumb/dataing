@@ -1,3 +1,10 @@
+## [1.23.5](https://github.com/bordumb/dataing/compare/v1.23.4...v1.23.5) (2026-09-27)
+
+
+### Bug Fixes
+
+* **core:** confine DuckDB-backed sources to their own location ([#176](https://github.com/bordumb/dataing/issues/176)) ([a119ad1](https://github.com/bordumb/dataing/commit/a119ad1df5543d8c78ec4ab9fbddd85bb07723d5))
+
 ## [1.23.4](https://github.com/bordumb/dataing/compare/v1.23.3...v1.23.4) (2026-09-27)
 
 

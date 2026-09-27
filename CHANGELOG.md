@@ -1,3 +1,10 @@
+## [1.22.2](https://github.com/bordumb/dataing/compare/v1.22.1...v1.22.2) (2026-09-27)
+
+
+### Bug Fixes
+
+* **safety:** reject COPY and other write-capable SQL statements ([#163](https://github.com/bordumb/dataing/issues/163)) ([3f4784c](https://github.com/bordumb/dataing/commit/3f4784c5ee91e2dfcdb0ec931eddc03e4c9b2c98))
+
 ## [1.22.1](https://github.com/bordumb/dataing/compare/v1.22.0...v1.22.1) (2026-09-27)
 
 

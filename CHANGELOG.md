@@ -1,3 +1,10 @@
+## [1.21.2](https://github.com/bordumb/dataing/compare/v1.21.1...v1.21.2) (2026-09-27)
+
+
+### Bug Fixes
+
+* **temporal:** configure worker logging and stop apps building each other on import ([#153](https://github.com/bordumb/dataing/issues/153)) ([29cfe72](https://github.com/bordumb/dataing/commit/29cfe722601fe5059624477e319a8e60d4cdacf5))
+
 ## [1.21.1](https://github.com/bordumb/dataing/compare/v1.21.0...v1.21.1) (2026-09-27)
 
 

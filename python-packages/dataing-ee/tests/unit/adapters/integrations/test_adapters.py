@@ -4,6 +4,7 @@ import hashlib
 import hmac
 import json
 import time
+from typing import Any
 from urllib.parse import urlencode
 
 import pytest
@@ -40,6 +41,22 @@ def make_request(
 def sign_hmac_sha256(body: bytes, secret: str) -> str:
     """Sign body with HMAC-SHA256."""
     return hmac.new(secret.encode(), body, hashlib.sha256).hexdigest()
+
+
+def slash_command(text: str) -> WebhookRequest:
+    """Create a Slack slash-command request, form-encoded as Slack sends it."""
+    fields = {
+        "command": "/dataing",
+        "text": text,
+        "token": "legacy-verification-token",
+        "response_url": "https://hooks.slack.com/commands/T123/1/abc",
+        "channel_id": "C123",
+        "user_id": "U123",
+        "trigger_id": "13345224609.738474920.8088930838d88f008e1",
+    }
+    return make_request(
+        urlencode(fields).encode(), {"Content-Type": "application/x-www-form-urlencoded"}
+    )
 
 
 class TestAdapterRegistry:
@@ -568,6 +585,66 @@ class TestSlackAdapter:
         assert other is not None
         request = make_request({"type": "url_verification", "challenge": "3eZbrw1aB"})
         assert other.handshake_response(request) is None
+
+    def test_parse_slash_command(self, adapter: SlackAdapter) -> None:
+        """Test a slash command's text becomes the issue, without its credentials."""
+        issue_data = adapter.parse_payload(slash_command("orders has nulls\nsince 9am"))
+
+        assert issue_data.title == "orders has nulls"
+        assert issue_data.description == "orders has nulls\nsince 9am"
+        assert issue_data.labels == ["slack", "slash-command"]
+        assert issue_data.metadata["slack_channel"] == "C123"
+        assert "legacy-verification-token" not in str(issue_data)
+        assert "hooks.slack.com" not in str(issue_data)
+
+    @pytest.mark.parametrize(("text", "expected"), [("orders has nulls", True), ("  ", False)])
+    def test_should_process_slash_command(
+        self, adapter: SlackAdapter, text: str, expected: bool
+    ) -> None:
+        """Test a slash command is processed only when it describes a problem."""
+        assert adapter.should_process(slash_command(text)) is expected
+
+    def test_get_event_type_slash_command(self, adapter: SlackAdapter) -> None:
+        """Test slash commands have their own event type."""
+        assert adapter.get_event_type(slash_command("orders has nulls")) == "slash_command"
+
+    @pytest.mark.parametrize(
+        ("result", "reply"),
+        [
+            ({"status": "processed", "issue_number": 7}, "Created dataing issue #7."),
+            ({"status": "deduplicated"}, "This is already a dataing issue."),
+            (
+                {"status": "skipped", "reason": "integration_disabled"},
+                "The dataing Slack integration is disabled.",
+            ),
+            (
+                {"status": "skipped", "reason": "filtered_by_adapter"},
+                "Describe the problem after the command, like "
+                "`/dataing orders has null customer ids`.",
+            ),
+        ],
+        ids=["processed", "deduplicated", "disabled", "no_text"],
+    )
+    def test_format_response_replies_to_slash_command(
+        self, adapter: SlackAdapter, result: dict[str, Any], reply: str
+    ) -> None:
+        """Test a slash command gets a reply that only its sender sees."""
+        response = adapter.format_response(slash_command("orders has nulls"), result)
+        assert response == {"response_type": "ephemeral", "text": reply}
+
+    def test_format_response_keeps_other_results(self, adapter: SlackAdapter) -> None:
+        """Test the response to anything but a slash command is left alone."""
+        request = make_request({"type": "event_callback", "event": {"type": "message"}})
+        result = {"status": "processed", "issue_number": 7}
+        assert adapter.format_response(request, result) == result
+
+    @pytest.mark.parametrize("provider", sorted(set(AdapterRegistry.list_providers()) - {"slack"}))
+    def test_other_providers_keep_results(self, provider: str) -> None:
+        """Test only Slack reshapes the response."""
+        other = get_adapter(provider)
+        assert other is not None
+        result = {"status": "processed", "issue_number": 7}
+        assert other.format_response(slash_command("orders has nulls"), result) == result
 
 
 class TestSodaAdapter:

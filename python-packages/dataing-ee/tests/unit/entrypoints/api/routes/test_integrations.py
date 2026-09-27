@@ -872,24 +872,36 @@ def _post_raw(db: AsyncMock, provider: str, body: bytes, headers: dict[str, str]
     )
 
 
+def _processing_db(provider: str) -> AsyncMock:
+    """App DB that takes a signed webhook all the way to new issue #7."""
+    db = AsyncMock()
+    db.fetch_one.side_effect = [
+        _integration_row(provider, WEBHOOK_SECRET),
+        None,  # not delivered before
+        {"id": uuid4()},  # integration event recorded
+        {"num": 7},  # next issue number
+        {"id": uuid4(), "number": 7},  # issue created
+    ]
+    db.fetch_all.return_value = []
+    return db
+
+
+@pytest.fixture
+def no_auto_investigation(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Skip the policy evaluation that can start an investigation."""
+    monkeypatch.setattr(
+        "dataing_ee.entrypoints.api.routes.integrations._evaluate_and_start_investigation",
+        AsyncMock(return_value=None),
+    )
+
+
 class TestFormEncodedWebhooks:
     """Webhook bodies are decoded once authenticated, JSON or form-encoded."""
 
-    def test_processes_signed_block_action(self, monkeypatch: pytest.MonkeyPatch) -> None:
+    @pytest.mark.usefixtures("no_auto_investigation")
+    def test_processes_signed_block_action(self) -> None:
         body = urlencode({"payload": json.dumps(SLACK_BLOCK_ACTION)}).encode()
-        db = AsyncMock()
-        db.fetch_one.side_effect = [
-            _integration_row("slack", WEBHOOK_SECRET),
-            None,  # not delivered before
-            {"id": uuid4()},  # integration event recorded
-            {"num": 7},  # next issue number
-            {"id": uuid4(), "number": 7},  # issue created
-        ]
-        db.fetch_all.return_value = []
-        monkeypatch.setattr(
-            "dataing_ee.entrypoints.api.routes.integrations._evaluate_and_start_investigation",
-            AsyncMock(return_value=None),
-        )
+        db = _processing_db("slack")
 
         headers = {"Content-Type": FORM, **_signed_body("slack", body)}
         response = _post_raw(db, "slack", body, headers)
@@ -898,15 +910,29 @@ class TestFormEncodedWebhooks:
         assert response.json()["status"] == "processed"
         assert "Slack Action: flag_issue = orders" in db.fetch_one.await_args.args
 
-    def test_acknowledges_signed_slash_command(self) -> None:
+    @pytest.mark.usefixtures("no_auto_investigation")
+    def test_slash_command_creates_issue_and_replies(self) -> None:
         body = urlencode(SLACK_SLASH_COMMAND).encode()
+        db = _processing_db("slack")
+
+        headers = {"Content-Type": FORM, **_signed_body("slack", body)}
+        response = _post_raw(db, "slack", body, headers)
+
+        reply = {"response_type": "ephemeral", "text": "Created dataing issue #7."}
+        assert response.status_code == 200
+        assert response.json() == reply
+        assert "orders has nulls" in db.fetch_one.await_args.args
+
+    def test_slash_command_without_text_gets_usage_reply(self) -> None:
+        body = urlencode({**SLACK_SLASH_COMMAND, "text": ""}).encode()
         db = _webhook_db(_integration_row("slack", WEBHOOK_SECRET))
 
         headers = {"Content-Type": FORM, **_signed_body("slack", body)}
         response = _post_raw(db, "slack", body, headers)
 
         assert response.status_code == 200
-        assert response.json() == {"status": "skipped", "reason": "filtered_by_adapter"}
+        assert response.json().get("text", "").startswith("Describe the problem")
+        assert not _recorded_event(db)
 
     def test_rejects_malformed_body_after_authentication(self) -> None:
         body = b"not json"

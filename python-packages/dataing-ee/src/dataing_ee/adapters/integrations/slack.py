@@ -104,6 +104,39 @@ class SlackAdapter(IntegrationAdapter):
             return {"challenge": challenge}
         return None
 
+    def format_response(
+        self,
+        request: WebhookRequest,
+        result: dict[str, Any],
+    ) -> dict[str, Any]:
+        """Reply to a slash command with a message that only its sender sees.
+
+        Slack shows the response to a slash command to the user who ran it.
+        """
+        payload = request.body_json
+        if not self._is_slash_command(payload):
+            return result
+        return {"response_type": "ephemeral", "text": self._slash_command_reply(payload, result)}
+
+    def _slash_command_reply(self, payload: dict[str, Any], result: dict[str, Any]) -> str:
+        """Tell the user who ran a slash command what came of it."""
+        if result.get("status") == "processed":
+            return f"Created dataing issue #{result['issue_number']}."
+        if result.get("status") == "deduplicated":
+            return "This is already a dataing issue."
+        if result.get("reason") == "integration_disabled":
+            return "The dataing Slack integration is disabled."
+        command = payload.get("command", "/dataing")
+        return (
+            "Describe the problem after the command, like "
+            f"`{command} orders has null customer ids`."
+        )
+
+    @staticmethod
+    def _is_slash_command(payload: dict[str, Any]) -> bool:
+        """Slash commands are the only Slack requests with a command and no type."""
+        return "command" in payload and "type" not in payload
+
     def parse_payload(
         self,
         request: WebhookRequest,
@@ -126,6 +159,8 @@ class SlackAdapter(IntegrationAdapter):
             issue_data = self._parse_shortcut(payload)
         elif payload_type in ("block_actions", "interactive_message"):
             issue_data = self._parse_interactive(payload)
+        elif self._is_slash_command(payload):
+            issue_data = self._parse_slash_command(payload)
         else:
             # Generic/unknown payload
             issue_data = IssueData(
@@ -283,6 +318,31 @@ class SlackAdapter(IntegrationAdapter):
             },
         )
 
+    def _parse_slash_command(
+        self,
+        payload: dict[str, Any],
+    ) -> IssueData:
+        """Parse a slash command, whose text describes the issue.
+
+        Leaves out the command's token and response_url: both act as credentials.
+        """
+        text = str(payload.get("text", "")).strip()
+        title = text.split("\n")[0][:100]
+
+        return IssueData(
+            title=title,
+            description=text if text != title else None,
+            labels=["slack", "slash-command"],
+            metadata={
+                "slack_command": payload.get("command"),
+                "slack_channel": payload.get("channel_id"),
+                "slack_channel_name": payload.get("channel_name"),
+                "slack_user": payload.get("user_id"),
+                "slack_username": payload.get("user_name"),
+                "slack_team": payload.get("team_id"),
+            },
+        )
+
     def _build_message_url(
         self,
         channel: str,
@@ -342,6 +402,9 @@ class SlackAdapter(IntegrationAdapter):
             event_type: str = event.get("type", "unknown")
             return event_type
 
+        if self._is_slash_command(payload):
+            return "slash_command"
+
         return str(payload_type) if payload_type else "unknown"
 
     def should_process(
@@ -371,6 +434,10 @@ class SlackAdapter(IntegrationAdapter):
                 return reaction in self.TRIGGER_REACTIONS
 
             return event_type in self.SUPPORTED_EVENTS
+
+        # A slash command's text describes the issue
+        if self._is_slash_command(payload):
+            return bool(str(payload.get("text", "")).strip())
 
         # Process shortcuts and interactive components
         return payload_type in ("shortcut", "message_action", "block_actions")

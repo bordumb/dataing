@@ -189,6 +189,26 @@ class IntegrationAdapter(ABC):
         _ = request  # Available for subclass overrides
         return None
 
+    def format_response(
+        self,
+        request: WebhookRequest,  # noqa: ARG002
+        result: dict[str, Any],
+    ) -> dict[str, Any]:
+        """Shape the response body once the webhook has been handled.
+
+        Override for providers that show the response to a user, such as the
+        reply to a Slack slash command.
+
+        Args:
+            request: The incoming webhook request
+            result: What handling the webhook produced, such as its status
+
+        Returns:
+            The response body to send back
+        """
+        _ = request  # Available for subclass overrides
+        return result
+
     # Helper methods for common signature verification patterns
 
     def _verify_hmac_sha256(

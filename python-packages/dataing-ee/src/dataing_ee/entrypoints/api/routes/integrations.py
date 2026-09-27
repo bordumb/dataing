@@ -481,8 +481,28 @@ async def receive_provider_webhook(
     anything else is done with it. Verification fails closed: an integration
     without a signing secret rejects every webhook.
     Uses adapter classes for MC/GX when available, falls back to inline logic otherwise.
-    Idempotency is enforced via the integration_events table.
+    Idempotency is enforced via the integration_events table. The adapter shapes
+    the response, such as the reply to a Slack slash command.
     """
+    result = await _handle_provider_webhook(provider, request, db, integration_id)
+    adapter = get_adapter(provider)
+    if adapter is None:
+        return result
+    webhook_request = WebhookRequest(
+        body=await request.body(),
+        headers=dict(request.headers),
+        query_params=dict(request.query_params),
+    )
+    return adapter.format_response(webhook_request, result)
+
+
+async def _handle_provider_webhook(
+    provider: str,
+    request: Request,
+    db: AppDatabase,
+    integration_id: UUID | None,
+) -> dict[str, Any]:
+    """Authenticate and handle a provider webhook for receive_provider_webhook."""
     if provider not in IntegrationProvider.all():
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -545,9 +565,6 @@ async def receive_provider_webhook(
             detail="Invalid webhook signature",
         )
 
-    if not integration["enabled"]:
-        return {"status": "skipped", "reason": "integration_disabled"}
-
     # Decode the body once it is trusted. Adapters also take form-encoded
     # bodies, which is how Slack sends interactive components and slash commands.
     try:
@@ -557,6 +574,9 @@ async def receive_provider_webhook(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Invalid webhook payload: {e}",
         ) from e
+
+    if not integration["enabled"]:
+        return {"status": "skipped", "reason": "integration_disabled"}
 
     # Answer endpoint-verification handshakes, such as Slack's url_verification
     if adapter and webhook_request:

@@ -1,5 +1,7 @@
 """Tests for the adapter registry."""
 
+import inspect
+
 import pytest
 import sqlglot
 
@@ -8,6 +10,16 @@ from dataing.adapters.datasource import (
     SourceType,
     get_registry,
 )
+
+# Registered adapters known to be abstract while their fix is in flight. strict=True
+# fails the run as soon as one turns concrete, so an entry cannot outlive its bug.
+_KNOWN_ABSTRACT = {
+    SourceType.REDSHIFT: pytest.mark.xfail(
+        strict=True,
+        reason="RedshiftAdapter does not implement _fetch_table_metadata yet; "
+        "remove this entry when it does",
+    ),
+}
 
 
 class TestAdapterRegistry:
@@ -59,6 +71,27 @@ class TestAdapterRegistry:
             assert type_def.category is not None
             assert type_def.capabilities is not None
             assert type_def.config_schema is not None
+
+    @pytest.mark.parametrize(
+        "source_type",
+        [
+            pytest.param(
+                type_def.type,
+                id=type_def.type.value,
+                marks=_KNOWN_ABSTRACT.get(type_def.type, ()),
+            )
+            for type_def in get_registry().list_types()
+        ],
+    )
+    def test_registered_adapter_is_concrete(self, source_type: SourceType):
+        """Every registered adapter implements all abstract methods, so create() works."""
+        adapter_class = get_registry().get_adapter_class(source_type)
+
+        assert adapter_class is not None
+        assert not inspect.isabstract(adapter_class), (
+            f"{adapter_class.__name__} is registered but abstract, missing: "
+            f"{sorted(adapter_class.__abstractmethods__)}"
+        )
 
     def test_get_definition(self):
         """Verify get_definition returns correct definition."""

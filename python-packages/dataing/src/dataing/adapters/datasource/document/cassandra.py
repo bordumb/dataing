@@ -19,7 +19,6 @@ from dataing.adapters.datasource.errors import (
     QueryTimeoutError,
     SchemaFetchFailedError,
 )
-from dataing.adapters.datasource.registry import register_adapter
 from dataing.adapters.datasource.types import (
     AdapterCapabilities,
     ConfigField,
@@ -31,7 +30,6 @@ from dataing.adapters.datasource.types import (
     QueryResult,
     SchemaFilter,
     SchemaResponse,
-    SourceCategory,
     SourceType,
 )
 
@@ -158,15 +156,10 @@ CASSANDRA_CAPABILITIES = AdapterCapabilities(
 )
 
 
-@register_adapter(
-    source_type=SourceType.CASSANDRA,
-    display_name="Apache Cassandra",
-    category=SourceCategory.DATABASE,
-    icon="cassandra",
-    description="Connect to Apache Cassandra or ScyllaDB clusters",
-    capabilities=CASSANDRA_CAPABILITIES,
-    config_schema=CASSANDRA_CONFIG_SCHEMA,
-)
+# Deliberately not registered: aggregate, count_documents and infer_schema are
+# unimplemented, so the class is abstract and the datasource picker must not offer it.
+# Restore @register_adapter (with CASSANDRA_CONFIG_SCHEMA) once they exist; the
+# concreteness guard in tests/unit/adapters/datasource/test_registry.py enforces this.
 class CassandraAdapter(DocumentAdapter):
     """Apache Cassandra adapter.
 

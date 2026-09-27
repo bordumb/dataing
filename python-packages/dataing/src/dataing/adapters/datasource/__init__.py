@@ -10,10 +10,8 @@ Note: Premium API adapters (Salesforce, HubSpot, Stripe) are available in Enterp
 """
 
 from dataing.adapters.datasource.base import BaseAdapter
-from dataing.adapters.datasource.document.cassandra import CassandraAdapter
-from dataing.adapters.datasource.document.dynamodb import DynamoDBAdapter
 
-# Document/NoSQL adapters
+# Document/NoSQL adapters (Cassandra and DynamoDB stay unregistered until complete)
 from dataing.adapters.datasource.document.mongodb import MongoDBAdapter
 from dataing.adapters.datasource.encryption import (
     decrypt_config,
@@ -96,8 +94,6 @@ __all__ = [
     "SQLiteAdapter",
     # Document/NoSQL Adapters
     "MongoDBAdapter",
-    "DynamoDBAdapter",
-    "CassandraAdapter",
     # Filesystem Adapters
     "S3Adapter",
     "GCSAdapter",

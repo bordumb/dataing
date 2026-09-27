@@ -1,3 +1,10 @@
+## [1.24.3](https://github.com/bordumb/dataing/compare/v1.24.2...v1.24.3) (2026-09-27)
+
+
+### Bug Fixes
+
+* **core:** keep webhook URLs out of httpx request logs ([#161](https://github.com/bordumb/dataing/issues/161)) ([15ca355](https://github.com/bordumb/dataing/commit/15ca355c159a6e3f7a14f1cf3ab52a125cde0597)), closes [#153](https://github.com/bordumb/dataing/issues/153)
+
 ## [1.24.2](https://github.com/bordumb/dataing/compare/v1.24.1...v1.24.2) (2026-09-27)
 
 

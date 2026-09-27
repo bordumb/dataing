@@ -1,3 +1,10 @@
+## [1.22.1](https://github.com/bordumb/dataing/compare/v1.22.0...v1.22.1) (2026-09-27)
+
+
+### Bug Fixes
+
+* **api:** confine tenant-supplied local paths to an operator root ([#168](https://github.com/bordumb/dataing/issues/168)) ([1809015](https://github.com/bordumb/dataing/commit/180901593e17a0f43d1d2c94f7dbb26886bc54b1)), closes [#164](https://github.com/bordumb/dataing/issues/164) [#148](https://github.com/bordumb/dataing/issues/148)
+
 # [1.22.0](https://github.com/bordumb/dataing/compare/v1.21.10...v1.22.0) (2026-09-27)
 
 

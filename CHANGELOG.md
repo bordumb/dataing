@@ -1,3 +1,10 @@
+## [1.23.2](https://github.com/bordumb/dataing/compare/v1.23.1...v1.23.2) (2026-09-27)
+
+
+### Bug Fixes
+
+* **datasets:** list dataset investigations from the alert JSONB ([#160](https://github.com/bordumb/dataing/issues/160)) ([22a1c2f](https://github.com/bordumb/dataing/commit/22a1c2fa52aee2bdba3055cbc1dd6d25e75d9741))
+
 ## [1.23.1](https://github.com/bordumb/dataing/compare/v1.23.0...v1.23.1) (2026-09-27)
 
 

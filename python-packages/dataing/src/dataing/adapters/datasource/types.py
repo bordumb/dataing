@@ -316,6 +316,8 @@ class ConfigField(BaseModel):
     show_if: dict[str, Any] | None = None
     description: str | None = None
     help_url: str | None = None
+    # Marks the field holding the database login, which per-user credentials replace
+    credential: Literal["username", "password"] | None = None
 
 
 class ConfigSchema(BaseModel):
@@ -325,6 +327,18 @@ class ConfigSchema(BaseModel):
 
     fields: list[ConfigField]
     field_groups: list[FieldGroup]
+
+    def credential_keys(self) -> tuple[str, str] | None:
+        """Get the config keys of the database login.
+
+        Returns:
+            (username key, password key), or None if the source has no
+            username/password login.
+        """
+        keys = {field.credential: field.name for field in self.fields if field.credential}
+        if "username" not in keys or "password" not in keys:
+            return None
+        return keys["username"], keys["password"]
 
 
 class SourceTypeDefinition(BaseModel):

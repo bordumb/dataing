@@ -86,6 +86,7 @@ TRINO_CONFIG_SCHEMA = ConfigSchema(
             required=True,
             group="auth",
             placeholder="trino",
+            credential="username",
         ),
         ConfigField(
             name="password",
@@ -94,6 +95,7 @@ TRINO_CONFIG_SCHEMA = ConfigSchema(
             required=False,
             group="auth",
             description="Password (if authentication is enabled)",
+            credential="password",
         ),
         ConfigField(
             name="http_scheme",

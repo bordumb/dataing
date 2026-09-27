@@ -15,10 +15,15 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
 from dataing.adapters.audit import audited
-from dataing.adapters.datasource import SourceType, get_registry
+from dataing.adapters.datasource import (
+    CredentialsNotSupportedError,
+    SourceType,
+    build_user_connection_config,
+    get_registry,
+)
 from dataing.adapters.datasource.encryption import decrypt_config, get_encryption_key
 from dataing.adapters.db.app_db import AppDatabase
-from dataing.core.credentials import CredentialsService
+from dataing.core.credentials import CredentialsService, DecryptedCredentials
 from dataing.entrypoints.api.deps import get_app_db
 from dataing.entrypoints.api.middleware.auth import (
     ApiKeyContext,
@@ -207,15 +212,16 @@ async def test_credentials(
         )
 
     # Build connection config with user credentials
-    connection_config = {
-        **base_config,
-        "user": body.username,
-        "password": body.password,
-    }
-    if body.role:
-        connection_config["role"] = body.role
-    if body.warehouse:
-        connection_config["warehouse"] = body.warehouse
+    credentials = DecryptedCredentials(
+        username=body.username,
+        password=body.password,
+        role=body.role,
+        warehouse=body.warehouse,
+    )
+    try:
+        connection_config = build_user_connection_config(source_type, base_config, credentials)
+    except CredentialsNotSupportedError as e:
+        raise HTTPException(status_code=400, detail=e.message) from e
 
     # Test connection
     try:

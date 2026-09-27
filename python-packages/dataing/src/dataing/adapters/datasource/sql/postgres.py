@@ -79,6 +79,7 @@ POSTGRES_CONFIG_SCHEMA = ConfigSchema(
             type="string",
             required=True,
             group="auth",
+            credential="username",
         ),
         ConfigField(
             name="password",
@@ -86,6 +87,7 @@ POSTGRES_CONFIG_SCHEMA = ConfigSchema(
             type="secret",
             required=True,
             group="auth",
+            credential="password",
         ),
         ConfigField(
             name="ssl_mode",

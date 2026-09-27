@@ -20,6 +20,7 @@ from dataing.adapters.datasource.encryption import decrypt_config, get_encryptio
 from dataing.adapters.datasource.errors import (
     CredentialsInvalidError,
     CredentialsNotConfiguredError,
+    CredentialsNotSupportedError,
 )
 from dataing.adapters.datasource.registry import get_registry
 from dataing.adapters.datasource.types import QueryResult, SourceType
@@ -50,6 +51,47 @@ class QueryContext:
 
     investigation_id: UUID | None = None
     source: str = "api"  # 'agent', 'api', 'preview', etc.
+
+
+def build_user_connection_config(
+    source_type: SourceType,
+    base_config: dict[str, Any],
+    credentials: DecryptedCredentials,
+) -> dict[str, Any]:
+    """Build a connection config that logs in as the user, not the service account.
+
+    Adapters name their login keys differently ("username" for PostgreSQL, "user"
+    for Snowflake), so each adapter's config schema marks which keys hold the login.
+
+    Args:
+        source_type: The datasource's source type.
+        base_config: The datasource's decrypted connection config.
+        credentials: The user's own database credentials.
+
+    Returns:
+        The connection config with the user's login in place of the stored one.
+
+    Raises:
+        CredentialsNotSupportedError: If the source type has no database login.
+    """
+    definition = get_registry().get_definition(source_type)
+    login_keys = definition.config_schema.credential_keys() if definition else None
+    if login_keys is None:
+        raise CredentialsNotSupportedError(source_type.value)
+    username_key, password_key = login_keys
+
+    connection_config = {
+        **base_config,
+        username_key: credentials.username,
+        password_key: credentials.password,
+    }
+    if credentials.role:
+        connection_config["role"] = credentials.role
+    if credentials.warehouse:
+        connection_config["warehouse"] = credentials.warehouse
+    if credentials.extra:
+        connection_config.update(credentials.extra)
+    return connection_config
 
 
 class QueryGateway:
@@ -200,6 +242,9 @@ class QueryGateway:
 
         Returns:
             A configured SQL adapter.
+
+        Raises:
+            CredentialsNotSupportedError: If the source type has no database login.
         """
         # Get datasource config (host, port, database, etc.)
         ds_info = await self._app_db.get_data_source(
@@ -215,23 +260,9 @@ class QueryGateway:
             self._encryption_key,
         )
 
-        # Merge user credentials into connection config
-        connection_config = {
-            **base_config,
-            "user": credentials.username,
-            "password": credentials.password,
-        }
-
-        # Add optional fields if present
-        if credentials.role:
-            connection_config["role"] = credentials.role
-        if credentials.warehouse:
-            connection_config["warehouse"] = credentials.warehouse
-        if credentials.extra:
-            connection_config.update(credentials.extra)
-
         # Create fresh adapter with user's credentials
         source_type = SourceType(ds_info["type"])
+        connection_config = build_user_connection_config(source_type, base_config, credentials)
         adapter = self._registry.create(source_type, connection_config)
 
         return adapter

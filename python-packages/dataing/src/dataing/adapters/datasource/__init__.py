@@ -28,6 +28,7 @@ from dataing.adapters.datasource.errors import (
     ConnectionTimeoutError,
     CredentialsInvalidError,
     CredentialsNotConfiguredError,
+    CredentialsNotSupportedError,
     DatasourceNotFoundError,
     QuerySyntaxError,
     QueryTimeoutError,
@@ -46,6 +47,7 @@ from dataing.adapters.datasource.gateway import (
     QueryContext,
     QueryGateway,
     QueryPrincipal,
+    build_user_connection_config,
 )
 from dataing.adapters.datasource.registry import AdapterRegistry, get_registry
 from dataing.adapters.datasource.sql.bigquery import BigQueryAdapter
@@ -135,6 +137,7 @@ __all__ = [
     "AccessDeniedError",
     "CredentialsNotConfiguredError",
     "CredentialsInvalidError",
+    "CredentialsNotSupportedError",
     "DatasourceNotFoundError",
     "QuerySyntaxError",
     "QueryTimeoutError",
@@ -145,4 +148,5 @@ __all__ = [
     "QueryGateway",
     "QueryPrincipal",
     "QueryContext",
+    "build_user_connection_config",
 ]

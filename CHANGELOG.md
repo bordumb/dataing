@@ -1,3 +1,10 @@
+## [1.20.4](https://github.com/bordumb/dataing/compare/v1.20.3...v1.20.4) (2026-09-27)
+
+
+### Bug Fixes
+
+* **api:** stop logging encryption key and decrypted datasource config ([#158](https://github.com/bordumb/dataing/issues/158)) ([8f44749](https://github.com/bordumb/dataing/commit/8f447490b234229c8445d4739d082d181a43b13c))
+
 ## [1.20.3](https://github.com/bordumb/dataing/compare/v1.20.2...v1.20.3) (2026-09-27)
 
 

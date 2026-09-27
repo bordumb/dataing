@@ -20,7 +20,7 @@ COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
 WORKDIR /build
 
 # Copy all necessary files for dependency resolution
-COPY pyproject.toml uv.lock README.md ./
+COPY pyproject.toml uv.lock ./
 COPY python-packages/dataing/ python-packages/dataing/
 COPY python-packages/dataing-ee/ python-packages/dataing-ee/
 
@@ -29,8 +29,10 @@ RUN uv venv /opt/venv
 ENV VIRTUAL_ENV=/opt/venv
 ENV PATH="/opt/venv/bin:$PATH"
 
-# Install the main package dependencies (not editable for production)
-RUN uv pip install --no-cache ./python-packages/dataing
+# Install the main package (not editable for production), pinning every
+# dependency to its uv.lock version so the image runs what the tests run
+RUN uv export --frozen --no-dev --no-emit-project --no-hashes --quiet -o /tmp/constraints.txt \
+    && uv pip install --no-cache -c /tmp/constraints.txt ./python-packages/dataing
 
 # =============================================================================
 # Stage 2: Runtime - Lean production image

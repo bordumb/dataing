@@ -1,3 +1,10 @@
+## [1.24.5](https://github.com/bordumb/dataing/compare/v1.24.4...v1.24.5) (2026-09-27)
+
+
+### Bug Fixes
+
+* **api:** enforce tenant isolation for investigations and worker datasources ([#149](https://github.com/bordumb/dataing/issues/149)) ([c0b457e](https://github.com/bordumb/dataing/commit/c0b457ec7373c4a23f3d50a30d8d586fd3ce54a8)), closes [#178](https://github.com/bordumb/dataing/issues/178)
+
 ## [1.24.4](https://github.com/bordumb/dataing/compare/v1.24.3...v1.24.4) (2026-09-27)
 
 

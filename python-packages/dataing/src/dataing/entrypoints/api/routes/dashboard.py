@@ -69,7 +69,7 @@ async def get_dashboard(
                 dataset_id=inv["dataset_id"],
                 metric_name=inv["metric_name"],
                 status=inv["status"],
-                severity=inv.get("severity"),
+                severity=inv["severity"],
                 created_at=inv["created_at"],
             )
             for inv in recent

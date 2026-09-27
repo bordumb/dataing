@@ -4,12 +4,16 @@ from __future__ import annotations
 
 import hashlib
 import hmac
+import json
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from datetime import date
 from typing import Any
+from urllib.parse import parse_qsl
 
 from dataing.core.domain_types import AnomalyAlert, MetricSpec
+
+FORM_CONTENT_TYPE = "application/x-www-form-urlencoded"
 
 
 @dataclass
@@ -34,10 +38,25 @@ class WebhookRequest:
 
     @property
     def body_json(self) -> dict[str, Any]:
-        """Parse body as JSON."""
-        import json
+        """Parse the body as a JSON object.
 
-        result: dict[str, Any] = json.loads(self.body)
+        Form-encoded bodies are decoded too, in the two shapes Slack sends: a
+        JSON document in a ``payload`` field (interactive components), or plain
+        fields (slash commands).
+
+        Raises:
+            ValueError: If the body is neither a JSON object nor such a form.
+        """
+        content_type = (self.header("Content-Type") or "").split(";")[0].strip().lower()
+        if content_type == FORM_CONTENT_TYPE:
+            fields: dict[str, Any] = dict(parse_qsl(self.body.decode(), keep_blank_values=True))
+            if "payload" not in fields:
+                return fields
+            result = json.loads(fields["payload"])
+        else:
+            result = json.loads(self.body)
+        if not isinstance(result, dict):
+            raise ValueError("Webhook body is not a JSON object")
         return result
 
 
@@ -276,8 +295,6 @@ class IntegrationAdapter(ABC):
 
     def _hash_payload(self, payload: dict[str, Any]) -> str:
         """Generate hash of payload for fallback fingerprinting."""
-        import json
-
         payload_str = json.dumps(payload, sort_keys=True)
         return hashlib.sha256(payload_str.encode()).hexdigest()[:16]
 

@@ -548,6 +548,16 @@ async def receive_provider_webhook(
     if not integration["enabled"]:
         return {"status": "skipped", "reason": "integration_disabled"}
 
+    # Decode the body once it is trusted. Adapters also take form-encoded
+    # bodies, which is how Slack sends interactive components and slash commands.
+    try:
+        payload = webhook_request.body_json if webhook_request else json.loads(body)
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Invalid webhook payload: {e}",
+        ) from e
+
     # Answer endpoint-verification handshakes, such as Slack's url_verification
     if adapter and webhook_request:
         handshake = adapter.handshake_response(webhook_request)
@@ -560,17 +570,6 @@ async def receive_provider_webhook(
             f"Webhook skipped by adapter: integration={integration_id}, provider={provider}"
         )
         return {"status": "skipped", "reason": "filtered_by_adapter"}
-
-    # Parse payload and compute idempotency key
-    import json
-
-    try:
-        payload = json.loads(body)
-    except json.JSONDecodeError as e:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Invalid JSON: {e}",
-        ) from e
 
     # Extract idempotency key and event type (provider-specific)
     if adapter and webhook_request:

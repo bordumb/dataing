@@ -7,6 +7,7 @@ import time
 from datetime import UTC, datetime
 from typing import Any
 from unittest.mock import AsyncMock
+from urllib.parse import urlencode
 from uuid import uuid4
 
 import pytest
@@ -567,7 +568,11 @@ def _signed_by(
     provider: str, payload: dict[str, Any], secret: str = WEBHOOK_SECRET
 ) -> dict[str, str]:
     """Sign ``payload`` the way ``provider`` does, under its own header names."""
-    body = json.dumps(payload).encode()
+    return _signed_body(provider, json.dumps(payload).encode(), secret)
+
+
+def _signed_body(provider: str, body: bytes, secret: str = WEBHOOK_SECRET) -> dict[str, str]:
+    """Sign a raw request ``body`` the way ``provider`` does."""
     if provider == "slack":
         timestamp = str(int(time.time()))
         digest = _hmac_hex(secret, f"v0:{timestamp}:{body.decode()}".encode())
@@ -834,3 +839,81 @@ class TestProviderSigningSecret:
     def test_update_rejects_short_secret(self) -> None:
         with pytest.raises(ValueError):
             IntegrationUpdate(signing_secret="x" * 15)
+
+
+FORM = "application/x-www-form-urlencoded"
+# Slack sends interactive components form-encoded, as JSON in a payload field...
+SLACK_BLOCK_ACTION = {
+    "type": "block_actions",
+    "trigger_id": "13345224609.738474920.8088930838d88f008e0",
+    "user": {"id": "U123"},
+    "actions": [{"action_id": "flag_issue", "value": "orders"}],
+}
+# ...and slash commands as plain form fields.
+SLACK_SLASH_COMMAND = {
+    "command": "/dataing",
+    "text": "orders has nulls",
+    "user_id": "U123",
+    "channel_id": "C123",
+    "trigger_id": "13345224609.738474920.8088930838d88f008e1",
+    "response_url": "https://hooks.slack.com/commands/T123/1/abc",
+}
+
+
+def _post_raw(db: AsyncMock, provider: str, body: bytes, headers: dict[str, str]) -> Any:
+    app = FastAPI()
+    app.include_router(router, prefix="/api/v1")
+    app.dependency_overrides[get_app_db] = lambda: db
+    return TestClient(app).post(
+        f"/api/v1/integrations/{provider}/webhook",
+        params={"integration_id": str(uuid4())},
+        content=body,
+        headers=headers,
+    )
+
+
+class TestFormEncodedWebhooks:
+    """Webhook bodies are decoded once authenticated, JSON or form-encoded."""
+
+    def test_processes_signed_block_action(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        body = urlencode({"payload": json.dumps(SLACK_BLOCK_ACTION)}).encode()
+        db = AsyncMock()
+        db.fetch_one.side_effect = [
+            _integration_row("slack", WEBHOOK_SECRET),
+            None,  # not delivered before
+            {"id": uuid4()},  # integration event recorded
+            {"num": 7},  # next issue number
+            {"id": uuid4(), "number": 7},  # issue created
+        ]
+        db.fetch_all.return_value = []
+        monkeypatch.setattr(
+            "dataing_ee.entrypoints.api.routes.integrations._evaluate_and_start_investigation",
+            AsyncMock(return_value=None),
+        )
+
+        headers = {"Content-Type": FORM, **_signed_body("slack", body)}
+        response = _post_raw(db, "slack", body, headers)
+
+        assert response.status_code == 200
+        assert response.json()["status"] == "processed"
+        assert "Slack Action: flag_issue = orders" in db.fetch_one.await_args.args
+
+    def test_acknowledges_signed_slash_command(self) -> None:
+        body = urlencode(SLACK_SLASH_COMMAND).encode()
+        db = _webhook_db(_integration_row("slack", WEBHOOK_SECRET))
+
+        headers = {"Content-Type": FORM, **_signed_body("slack", body)}
+        response = _post_raw(db, "slack", body, headers)
+
+        assert response.status_code == 200
+        assert response.json() == {"status": "skipped", "reason": "filtered_by_adapter"}
+
+    def test_rejects_malformed_body_after_authentication(self) -> None:
+        body = b"not json"
+        db = _webhook_db(_integration_row("jira", WEBHOOK_SECRET))
+
+        headers = {"Content-Type": "application/json", **_signed_body("jira", body)}
+        response = _post_raw(db, "jira", body, headers)
+
+        assert response.status_code == 400
+        assert not _recorded_event(db)

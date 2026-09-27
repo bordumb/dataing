@@ -4,6 +4,7 @@ import hashlib
 import hmac
 import json
 import time
+from urllib.parse import urlencode
 
 import pytest
 from dataing_ee.adapters.integrations import (
@@ -1116,6 +1117,25 @@ class TestWebhookRequest:
         )
         with pytest.raises(json.JSONDecodeError):
             _ = request.body_json
+
+    def test_body_json_form_encoded_payload(self) -> None:
+        """Test a JSON document sent form-encoded in a payload field is decoded."""
+        body = urlencode({"payload": json.dumps({"type": "block_actions"})}).encode()
+        request = make_request(body, {"Content-Type": "application/x-www-form-urlencoded"})
+        assert request.body_json == {"type": "block_actions"}
+
+    def test_body_json_form_fields(self) -> None:
+        """Test a form without a payload field reads as its fields."""
+        request = make_request(
+            b"command=%2Fdataing&text=orders+has+nulls",
+            {"Content-Type": "application/x-www-form-urlencoded; charset=utf-8"},
+        )
+        assert request.body_json == {"command": "/dataing", "text": "orders has nulls"}
+
+    def test_body_json_not_an_object(self) -> None:
+        """Test a body that is not a JSON object is rejected."""
+        with pytest.raises(ValueError):
+            _ = make_request(b"[1, 2]").body_json
 
     def test_header_found_in_any_case(self) -> None:
         """Test a header is found whatever case it was sent or asked for in."""

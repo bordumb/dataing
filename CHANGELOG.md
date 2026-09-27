@@ -1,3 +1,10 @@
+## [1.24.1](https://github.com/bordumb/dataing/compare/v1.24.0...v1.24.1) (2026-09-27)
+
+
+### Bug Fixes
+
+* **api:** stop writing pre-013 investigation columns and remove approvals ([#183](https://github.com/bordumb/dataing/issues/183)) ([bf18334](https://github.com/bordumb/dataing/commit/bf18334c2bb71322c10b5abaeafa9b02be5053ac)), closes [#162](https://github.com/bordumb/dataing/issues/162) [#150](https://github.com/bordumb/dataing/issues/150)
+
 # [1.24.0](https://github.com/bordumb/dataing/compare/v1.23.6...v1.24.0) (2026-09-27)
 
 

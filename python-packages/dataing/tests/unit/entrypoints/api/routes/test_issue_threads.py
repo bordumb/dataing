@@ -1,0 +1,495 @@
+"""Tests for the issue thread API (docs/specs/0001_issue_chat.md §7.1).
+
+Who may do what is decided in the handlers (thread kind, ownership, authorship,
+and the write scope for asking the agent), so these tests pin it down directly.
+"""
+
+from __future__ import annotations
+
+import uuid
+from datetime import UTC, datetime
+from typing import Any
+from unittest.mock import AsyncMock
+
+import pytest
+from fastapi import FastAPI
+from fastapi.testclient import TestClient
+
+from dataing.core.auth.jwt import create_access_token
+from dataing.core.auth.types import OrgRole
+from dataing.entrypoints.api.deps import get_app_db
+from dataing.entrypoints.api.routes.issue_threads import (
+    get_issue_thread_repository,
+    router,
+)
+
+TENANT_ID = uuid.uuid4()
+ISSUE_ID = uuid.uuid4()
+MAYA = uuid.uuid4()
+RAJ = uuid.uuid4()
+
+
+def _auth(role: OrgRole, user_id: uuid.UUID) -> dict[str, Any]:
+    """Return request kwargs with a JWT for a user of TENANT_ID."""
+    token = create_access_token(
+        user_id=str(user_id), org_id=str(TENANT_ID), role=role.value, teams=[]
+    )
+    return {"headers": {"Authorization": f"Bearer {token}"}}
+
+
+class FakeThreads:
+    """In-memory stand-in for IssueThreadRepository."""
+
+    def __init__(self) -> None:
+        """Initialize with one shared thread on ISSUE_ID."""
+        self.threads: dict[uuid.UUID, dict[str, Any]] = {}
+        self.messages: dict[uuid.UUID, dict[str, Any]] = {}
+        self.running: dict[uuid.UUID, int] = {}
+        self.shared = self._thread("shared", None)
+
+    def _thread(self, kind: str, owner: uuid.UUID | None) -> dict[str, Any]:
+        thread = {
+            "id": uuid.uuid4(),
+            "tenant_id": TENANT_ID,
+            "issue_id": ISSUE_ID,
+            "kind": kind,
+            "owner_user_id": owner,
+            "title": None,
+            "created_at": datetime.now(UTC),
+            "updated_at": datetime.now(UTC),
+        }
+        self.threads[thread["id"]] = thread
+        return thread
+
+    async def ensure_shared_thread(self, issue_id: uuid.UUID) -> dict[str, Any]:
+        return self.shared
+
+    async def create_scratch_thread(
+        self, tenant_id: uuid.UUID, issue_id: uuid.UUID, owner: uuid.UUID, title: str | None
+    ) -> dict[str, Any]:
+        thread = self._thread("scratch", owner)
+        thread["title"] = title
+        return thread
+
+    async def get_thread(self, thread_id: uuid.UUID) -> dict[str, Any] | None:
+        return self.threads.get(thread_id)
+
+    async def list_threads(self, issue_id: uuid.UUID, user_id: uuid.UUID | None) -> list[Any]:
+        return [
+            t
+            for t in self.threads.values()
+            if t["kind"] == "shared" or t["owner_user_id"] == user_id
+        ]
+
+    async def delete_thread(self, thread_id: uuid.UUID) -> None:
+        self.threads.pop(thread_id)
+
+    async def append_message(self, thread_id: uuid.UUID, **fields: Any) -> dict[str, Any]:
+        now = datetime.now(UTC)
+        seq = 1 + sum(1 for m in self.messages.values() if m["thread_id"] == thread_id)
+        message = {
+            "id": uuid.uuid4(),
+            "tenant_id": TENANT_ID,
+            "thread_id": thread_id,
+            "seq": seq,
+            "rev": seq,
+            "author_kind": fields["author_kind"],
+            "author_user_id": fields.get("author_user_id"),
+            "requested_by_user_id": fields.get("requested_by_user_id"),
+            "request_message_id": fields.get("request_message_id"),
+            "kind": fields["kind"],
+            "body_md": fields.get("body_md", ""),
+            "payload": fields.get("payload") or {},
+            "status": fields.get("status", "complete"),
+            "asks_agent": fields.get("asks_agent", False),
+            "reply_to_id": fields.get("reply_to_id"),
+            "created_at": now,
+            "updated_at": now,
+            "touched_at": now,
+            "edited_at": None,
+            "deleted_at": None,
+        }
+        self.messages[message["id"]] = message
+        return message
+
+    async def get_message(self, message_id: uuid.UUID) -> dict[str, Any] | None:
+        return self.messages.get(message_id)
+
+    async def update_message(self, message_id: uuid.UUID, **fields: Any) -> dict[str, Any]:
+        message = self.messages[message_id]
+        if fields.get("body_md") is not None:
+            message["body_md"] = fields["body_md"]
+        if fields.get("edited"):
+            message["edited_at"] = datetime.now(UTC)
+        return message
+
+    async def soft_delete_message(self, message_id: uuid.UUID) -> dict[str, Any]:
+        message = self.messages[message_id]
+        message["deleted_at"] = datetime.now(UTC)
+        message["body_md"] = ""
+        return message
+
+    async def list_messages(
+        self, thread_id: uuid.UUID, *, after_seq: int = 0, limit: int = 200
+    ) -> list[dict[str, Any]]:
+        rows = [
+            m
+            for m in self.messages.values()
+            if m["thread_id"] == thread_id and m["seq"] > after_seq
+        ]
+        return sorted(rows, key=lambda m: m["seq"])[:limit]
+
+    async def count_running_turns(self, user_id: uuid.UUID) -> int:
+        return self.running.get(user_id, 0)
+
+    async def append_event(self, *args: Any, **kwargs: Any) -> dict[str, Any]:
+        return {}
+
+
+@pytest.fixture
+def threads() -> FakeThreads:
+    """Return the fake repository."""
+    return FakeThreads()
+
+
+@pytest.fixture
+def client(threads: FakeThreads) -> TestClient:
+    """Return a client for the thread routes over the fake repository."""
+    db = AsyncMock()
+    db.fetch_one.return_value = {"id": ISSUE_ID, "tenant_id": TENANT_ID}
+    app = FastAPI()
+    app.include_router(router)
+    app.dependency_overrides[get_app_db] = lambda: db
+    app.dependency_overrides[get_issue_thread_repository] = lambda: threads
+    return TestClient(app)
+
+
+def _messages_url(thread_id: uuid.UUID) -> str:
+    return f"/issues/{ISSUE_ID}/threads/{thread_id}/messages"
+
+
+class TestSharedThread:
+    """Comments in the shared thread are open to viewers; asking the agent is not."""
+
+    def test_viewer_can_comment(self, client: TestClient, threads: FakeThreads) -> None:
+        """A viewer's comment is stored as a user comment."""
+        response = client.post(
+            _messages_url(threads.shared["id"]),
+            json={"body_md": "looks like app_v2"},
+            **_auth(OrgRole.VIEWER, RAJ),
+        )
+
+        assert response.status_code == 201
+        body = response.json()
+        assert (body["kind"], body["author_kind"], body["asks_agent"]) == (
+            "comment",
+            "user",
+            False,
+        )
+        assert body["author_user_id"] == str(RAJ)
+
+    def test_viewer_cannot_ask_the_agent(self, client: TestClient, threads: FakeThreads) -> None:
+        """Asking the agent runs queries, so it needs the write scope."""
+        response = client.post(
+            _messages_url(threads.shared["id"]),
+            json={"body_md": "@agent is it every region?", "ask_agent": True},
+            **_auth(OrgRole.VIEWER, RAJ),
+        )
+
+        assert response.status_code == 403
+        assert threads.messages == {}
+
+    def test_member_can_ask_the_agent(self, client: TestClient, threads: FakeThreads) -> None:
+        """A member's question is stored with asks_agent set."""
+        response = client.post(
+            _messages_url(threads.shared["id"]),
+            json={"body_md": "is it every region?", "ask_agent": True},
+            **_auth(OrgRole.MEMBER, MAYA),
+        )
+
+        assert response.status_code == 201
+        assert response.json()["asks_agent"] is True
+
+    def test_fourth_running_turn_is_rejected(
+        self, client: TestClient, threads: FakeThreads
+    ) -> None:
+        """A person may have at most three agent turns queued or streaming."""
+        threads.running[MAYA] = 3
+
+        response = client.post(
+            _messages_url(threads.shared["id"]),
+            json={"body_md": "one more", "ask_agent": True},
+            **_auth(OrgRole.MEMBER, MAYA),
+        )
+
+        assert response.status_code == 429
+
+    def test_shared_thread_cannot_be_deleted(
+        self, client: TestClient, threads: FakeThreads
+    ) -> None:
+        """Only scratch threads can be deleted."""
+        response = client.delete(
+            f"/issues/{ISSUE_ID}/threads/{threads.shared['id']}", **_auth(OrgRole.ADMIN, MAYA)
+        )
+
+        assert response.status_code == 400
+
+    def test_messages_list_in_order(self, client: TestClient, threads: FakeThreads) -> None:
+        """Messages page by seq."""
+        for text in ("a", "b", "c"):
+            client.post(
+                _messages_url(threads.shared["id"]),
+                json={"body_md": text},
+                **_auth(OrgRole.MEMBER, MAYA),
+            )
+
+        response = client.get(
+            _messages_url(threads.shared["id"]),
+            params={"after_seq": 1},
+            **_auth(OrgRole.VIEWER, RAJ),
+        )
+
+        assert response.status_code == 200
+        assert [m["body_md"] for m in response.json()["items"]] == ["b", "c"]
+
+
+class TestScratchThreads:
+    """Scratch threads are invisible to everyone but their owner."""
+
+    def test_member_creates_a_scratch_thread(self, client: TestClient) -> None:
+        """Creating one returns it, owned by the caller."""
+        response = client.post(
+            f"/issues/{ISSUE_ID}/threads",
+            json={"title": "enum check"},
+            **_auth(OrgRole.MEMBER, MAYA),
+        )
+
+        assert response.status_code == 201
+        assert response.json()["kind"] == "scratch"
+        assert response.json()["owner_user_id"] == str(MAYA)
+
+    def test_listing_shows_only_own_scratch_threads(
+        self, client: TestClient, threads: FakeThreads
+    ) -> None:
+        """Another person's scratch thread is not listed."""
+        threads._thread("scratch", RAJ)
+        mine = threads._thread("scratch", MAYA)
+
+        response = client.get(f"/issues/{ISSUE_ID}/threads", **_auth(OrgRole.MEMBER, MAYA))
+
+        ids = [t["id"] for t in response.json()["items"]]
+        assert ids == [str(threads.shared["id"]), str(mine["id"])]
+
+    @pytest.mark.parametrize(
+        ("method", "suffix"),
+        [("get", "/messages"), ("post", "/messages"), ("delete", "")],
+    )
+    def test_other_peoples_scratch_threads_are_not_found(
+        self, client: TestClient, threads: FakeThreads, method: str, suffix: str
+    ) -> None:
+        """Every route answers 404 for someone else's scratch thread, admins included."""
+        theirs = threads._thread("scratch", RAJ)
+        url = f"/issues/{ISSUE_ID}/threads/{theirs['id']}{suffix}"
+        kwargs: dict[str, Any] = {"json": {"body_md": "hi"}} if method == "post" else {}
+
+        response = getattr(client, method)(url, **kwargs, **_auth(OrgRole.ADMIN, MAYA))
+
+        assert response.status_code == 404
+
+    def test_owner_deletes_own_scratch_thread(
+        self, client: TestClient, threads: FakeThreads
+    ) -> None:
+        """The owner can delete their scratch thread."""
+        mine = threads._thread("scratch", MAYA)
+
+        response = client.delete(
+            f"/issues/{ISSUE_ID}/threads/{mine['id']}", **_auth(OrgRole.MEMBER, MAYA)
+        )
+
+        assert response.status_code == 204
+        assert mine["id"] not in threads.threads
+
+    def test_thread_from_another_issue_is_not_found(
+        self, client: TestClient, threads: FakeThreads
+    ) -> None:
+        """A thread id only works under its own issue."""
+        response = client.get(
+            f"/issues/{uuid.uuid4()}/threads/{threads.shared['id']}/messages",
+            **_auth(OrgRole.MEMBER, MAYA),
+        )
+
+        assert response.status_code == 404
+
+
+class TestEditingMessages:
+    """Only authors edit; authors or admins delete."""
+
+    def _comment(self, client: TestClient, threads: FakeThreads) -> str:
+        response = client.post(
+            _messages_url(threads.shared["id"]),
+            json={"body_md": "first draft"},
+            **_auth(OrgRole.MEMBER, MAYA),
+        )
+        message_id: str = response.json()["id"]
+        return message_id
+
+    def test_author_edits_own_comment(self, client: TestClient, threads: FakeThreads) -> None:
+        """The author's edit replaces the body and stamps edited_at."""
+        message_id = self._comment(client, threads)
+
+        response = client.patch(
+            f"{_messages_url(threads.shared['id'])}/{message_id}",
+            json={"body_md": "second draft"},
+            **_auth(OrgRole.MEMBER, MAYA),
+        )
+
+        assert response.status_code == 200
+        assert response.json()["body_md"] == "second draft"
+        assert response.json()["edited_at"] is not None
+
+    def test_others_cannot_edit(self, client: TestClient, threads: FakeThreads) -> None:
+        """Even an admin can't edit someone else's words."""
+        message_id = self._comment(client, threads)
+
+        response = client.patch(
+            f"{_messages_url(threads.shared['id'])}/{message_id}",
+            json={"body_md": "rewritten"},
+            **_auth(OrgRole.ADMIN, RAJ),
+        )
+
+        assert response.status_code == 403
+
+    def test_admin_can_delete(self, client: TestClient, threads: FakeThreads) -> None:
+        """An admin may remove any comment."""
+        message_id = self._comment(client, threads)
+
+        response = client.delete(
+            f"{_messages_url(threads.shared['id'])}/{message_id}", **_auth(OrgRole.ADMIN, RAJ)
+        )
+
+        assert response.status_code == 204
+        assert threads.messages[uuid.UUID(message_id)]["deleted_at"] is not None
+
+    def test_other_member_cannot_delete(self, client: TestClient, threads: FakeThreads) -> None:
+        """A member can't delete someone else's comment."""
+        message_id = self._comment(client, threads)
+
+        response = client.delete(
+            f"{_messages_url(threads.shared['id'])}/{message_id}", **_auth(OrgRole.MEMBER, RAJ)
+        )
+
+        assert response.status_code == 403
+
+
+class ScriptedChanges:
+    """changes_since that returns a scripted list of rows per poll."""
+
+    def __init__(self, polls: list[list[dict[str, Any]]]) -> None:
+        """Initialize with the rows each poll returns."""
+        self.polls = polls
+        self.cursors: list[int] = []
+
+    async def changes_since(
+        self, thread_id: uuid.UUID, *, after_rev: int, overlap_seconds: float = 5.0
+    ) -> list[dict[str, Any]]:
+        self.cursors.append(after_rev)
+        return self.polls.pop(0) if self.polls else []
+
+
+def _row(message_id: uuid.UUID, rev: int, body: str = "") -> dict[str, Any]:
+    now = datetime.now(UTC)
+    return {
+        "id": message_id,
+        "thread_id": uuid.uuid4(),
+        "seq": 1,
+        "rev": rev,
+        "author_kind": "agent",
+        "author_user_id": None,
+        "requested_by_user_id": None,
+        "request_message_id": None,
+        "kind": "agent_reply",
+        "body_md": body,
+        "payload": {},
+        "status": "streaming",
+        "asks_agent": False,
+        "reply_to_id": None,
+        "created_at": now,
+        "updated_at": now,
+        "edited_at": None,
+        "deleted_at": None,
+    }
+
+
+async def _collect(changes: ScriptedChanges, after_rev: int = 0, polls: int = 4) -> list[Any]:
+    from dataing.entrypoints.api.routes.issue_threads import thread_message_stream
+
+    async def connected() -> bool:
+        return False
+
+    return [
+        event
+        async for event in thread_message_stream(
+            changes,
+            uuid.uuid4(),
+            after_rev=after_rev,
+            is_disconnected=connected,
+            poll_interval=0,
+            heartbeat_every=3,
+            max_polls=polls,
+        )
+    ]
+
+
+class TestThreadStream:
+    """The stream sends each (id, rev) once and resumes from the highest rev."""
+
+    async def test_updates_are_sent_and_repeats_skipped(self) -> None:
+        """A row re-read in the overlap window is not sent twice; its update is."""
+        a, b = uuid.uuid4(), uuid.uuid4()
+        changes = ScriptedChanges(
+            [
+                [_row(a, 5, "par"), _row(b, 6)],
+                [_row(a, 5, "par"), _row(b, 6)],  # overlap re-read
+                [_row(a, 7, "partial")],  # update
+            ]
+        )
+
+        events = await _collect(changes)
+
+        messages = [e for e in events if e["event"] == "message"]
+        assert [e["id"] for e in messages] == ["5", "6", "7"]
+        assert changes.cursors == [0, 6, 6, 7]
+
+    async def test_late_commit_below_the_cursor_is_still_sent(self) -> None:
+        """A row whose rev is below the cursor but new to this stream is sent."""
+        a, late = uuid.uuid4(), uuid.uuid4()
+        changes = ScriptedChanges([[_row(a, 9)], [_row(late, 8), _row(a, 9)]])
+
+        events = await _collect(changes)
+
+        assert [e["id"] for e in events if e["event"] == "message"] == ["9", "8"]
+
+    async def test_heartbeat_and_timeout(self) -> None:
+        """Idle streams send heartbeats and end with a timeout event."""
+        events = await _collect(ScriptedChanges([]), polls=6)
+
+        assert [e["event"] for e in events] == ["heartbeat", "heartbeat", "timeout"]
+
+    async def test_stops_when_the_client_disconnects(self) -> None:
+        """Nothing is polled once the client is gone."""
+        from dataing.entrypoints.api.routes.issue_threads import thread_message_stream
+
+        changes = ScriptedChanges([[_row(uuid.uuid4(), 1)]])
+
+        async def gone() -> bool:
+            return True
+
+        events = [
+            e
+            async for e in thread_message_stream(
+                changes, uuid.uuid4(), after_rev=0, is_disconnected=gone, poll_interval=0
+            )
+        ]
+
+        assert events == []
+        assert changes.cursors == []

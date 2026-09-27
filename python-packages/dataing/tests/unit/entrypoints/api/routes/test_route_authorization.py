@@ -83,7 +83,13 @@ POLICY: dict[tuple[str, str], str] = {
     # issues.py: commenting and watching stay open to viewers
     ("POST", "/issues"): SCOPE_WRITE,
     ("PATCH", "/issues/{issue_id}"): SCOPE_WRITE,
-    ("POST", "/issues/{issue_id}/comments"): ANY_USER,
+    # issue_threads.py: kind, owner and author checks happen in the handlers
+    # (test_issue_threads.py); asking the agent needs write, checked there too
+    ("POST", "/issues/{issue_id}/threads"): SCOPE_WRITE,
+    ("DELETE", "/issues/{issue_id}/threads/{thread_id}"): ANY_USER,
+    ("POST", "/issues/{issue_id}/threads/{thread_id}/messages"): ANY_USER,
+    ("PATCH", "/issues/{issue_id}/threads/{thread_id}/messages/{message_id}"): ANY_USER,
+    ("DELETE", "/issues/{issue_id}/threads/{thread_id}/messages/{message_id}"): ANY_USER,
     ("POST", "/issues/{issue_id}/investigation-runs"): SCOPE_WRITE,
     ("DELETE", "/issues/{issue_id}/watch"): ANY_USER,
     ("POST", "/issues/{issue_id}/watch"): ANY_USER,

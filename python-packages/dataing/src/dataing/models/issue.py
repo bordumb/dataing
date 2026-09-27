@@ -99,9 +99,6 @@ class Issue(BaseModel):
     created_by_user: Mapped["User | None"] = relationship(
         "User", foreign_keys=[created_by_user_id], back_populates="created_issues"
     )
-    comments: Mapped[list["IssueComment"]] = relationship(
-        "IssueComment", back_populates="issue", cascade="all, delete-orphan"
-    )
     events: Mapped[list["IssueEvent"]] = relationship(
         "IssueEvent", back_populates="issue", cascade="all, delete-orphan"
     )
@@ -112,20 +109,6 @@ class Issue(BaseModel):
         "IssueInvestigationRun", back_populates="issue", cascade="all, delete-orphan"
     )
     sla_policy: Mapped["SLAPolicy | None"] = relationship("SLAPolicy", back_populates="issues")
-
-
-class IssueComment(BaseModel):
-    """Comment on an issue."""
-
-    __tablename__ = "issue_comments"
-
-    issue_id: Mapped[UUID] = mapped_column(ForeignKey("issues.id"), nullable=False)
-    author_user_id: Mapped[UUID] = mapped_column(ForeignKey("users.id"), nullable=False)
-    body: Mapped[str] = mapped_column(Text, nullable=False)
-
-    # Relationships
-    issue: Mapped["Issue"] = relationship("Issue", back_populates="comments")
-    author: Mapped["User"] = relationship("User")
 
 
 class IssueEventType(str, enum.Enum):

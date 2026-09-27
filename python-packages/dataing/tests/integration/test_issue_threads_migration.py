@@ -170,3 +170,64 @@ async def test_message_rev_increases_on_every_insert_and_update(
     assert updated is not None
     assert updated["rev"] > inserted["rev"]
     assert updated["touched_at"] >= inserted["touched_at"]
+
+
+async def test_comments_move_into_the_shared_thread_in_order(
+    tmp_path: Path, empty_dsn: str, migrate: Migrate
+) -> None:
+    """Migration 038 copies comments into the shared thread and drops issue_comments."""
+    before = _migrations_before(tmp_path / "migrations", "038_issue_comments_to_threads.sql")
+    assert migrate(empty_dsn, before).returncode == 0
+
+    db = AppDatabase(dsn=empty_dsn)
+    await db.connect()
+    try:
+        tenant_id, issue_id = await _new_issue(db)
+        user_id = uuid4()
+        await db.execute(
+            "INSERT INTO users (id, email) VALUES ($1, $2)", user_id, f"{user_id.hex}@x.com"
+        )
+        thread = await db.execute_returning(
+            "INSERT INTO issue_threads (tenant_id, issue_id, kind) "
+            "VALUES ($1, $2, 'shared') RETURNING id",
+            tenant_id,
+            issue_id,
+        )
+        assert thread is not None
+        # An event already in the thread keeps seq 1; comments follow it
+        await db.execute(
+            "INSERT INTO issue_thread_messages (tenant_id, thread_id, seq, author_kind, kind) "
+            "VALUES ($1, $2, 1, 'system', 'event')",
+            tenant_id,
+            thread["id"],
+        )
+        for i, minute in enumerate((5, 1, 3)):
+            await db.execute(
+                "INSERT INTO issue_comments (issue_id, author_user_id, body, created_at) "
+                "VALUES ($1, $2, $3, NOW() - make_interval(mins => $4))",
+                issue_id,
+                user_id,
+                f"comment {i}",
+                10 - minute,
+            )
+
+        upgraded = migrate(empty_dsn)
+        assert upgraded.returncode == 0, upgraded.stdout + upgraded.stderr
+
+        rows = await db.fetch_all(
+            "SELECT seq, author_kind, author_user_id, kind, body_md "
+            "FROM issue_thread_messages WHERE thread_id = $1 ORDER BY seq",
+            thread["id"],
+        )
+        assert [(r["seq"], r["kind"]) for r in rows] == [
+            (1, "event"),
+            (2, "comment"),
+            (3, "comment"),
+            (4, "comment"),
+        ]
+        assert [r["body_md"] for r in rows[1:]] == ["comment 1", "comment 2", "comment 0"]
+        assert all(r["author_user_id"] == user_id for r in rows[1:])
+        gone = await db.fetch_one("SELECT to_regclass('issue_comments') AS t")
+        assert gone is not None and gone["t"] is None
+    finally:
+        await db.close()

@@ -278,22 +278,23 @@ class TestPydanticSchemas:
             IssueUpdate(status="invalid_status")
 
 
-class TestCommentSchemas:
-    """Test comment Pydantic schemas."""
+class TestThreadMessageSchemas:
+    """Test the thread message Pydantic schemas that replaced comments."""
 
-    def test_issue_comment_create_valid(self) -> None:
-        """Test IssueCommentCreate with valid body."""
-        from dataing.entrypoints.api.routes.issues import IssueCommentCreate
+    def test_message_create_valid(self) -> None:
+        """MessageCreate accepts a body and defaults ask_agent to False."""
+        from dataing.entrypoints.api.routes.issue_threads import MessageCreate
 
-        data = IssueCommentCreate(body="This is a comment")
-        assert data.body == "This is a comment"
+        data = MessageCreate(body_md="This is a comment")
+        assert data.body_md == "This is a comment"
+        assert data.ask_agent is False
 
-    def test_issue_comment_create_empty_body_fails(self) -> None:
-        """Test IssueCommentCreate rejects empty body."""
-        from dataing.entrypoints.api.routes.issues import IssueCommentCreate
+    def test_message_create_empty_body_fails(self) -> None:
+        """MessageCreate rejects an empty body."""
+        from dataing.entrypoints.api.routes.issue_threads import MessageCreate
 
         with pytest.raises(ValueError):
-            IssueCommentCreate(body="")
+            MessageCreate(body_md="")
 
 
 class TestWatcherSchemas:

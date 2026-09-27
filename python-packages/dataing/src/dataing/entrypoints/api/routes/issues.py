@@ -19,6 +19,7 @@ from pydantic import BaseModel, Field
 from sse_starlette.sse import EventSourceResponse
 
 from dataing.adapters.db.app_db import AppDatabase
+from dataing.adapters.db.issue_threads import IssueThreadRepository
 from dataing.core.domain_types import AnomalyAlert, MetricSpec
 from dataing.core.json_utils import to_json_string
 from dataing.entrypoints.api.deps import (
@@ -240,6 +241,9 @@ async def _has_linked_investigation(db: AppDatabase, issue_id: UUID) -> bool:
     return row is not None
 
 
+THREAD_SILENT_EVENTS = frozenset({"comment_added"})
+
+
 async def _record_issue_event(
     db: AppDatabase,
     issue_id: UUID,
@@ -247,7 +251,11 @@ async def _record_issue_event(
     actor_user_id: UUID | None,
     payload: dict[str, Any] | None = None,
 ) -> None:
-    """Record an issue event."""
+    """Record an issue event and show it in the issue's shared thread.
+
+    A new comment is already a message in the thread, so comment_added is only
+    recorded in the event log.
+    """
     await db.execute(
         """
         INSERT INTO issue_events (issue_id, event_type, actor_user_id, payload)
@@ -258,6 +266,8 @@ async def _record_issue_event(
         actor_user_id,
         to_json_string(payload or {}),
     )
+    if event_type not in THREAD_SILENT_EVENTS:
+        await IssueThreadRepository(db).append_event(issue_id, event_type, actor_user_id, payload)
 
 
 # ============================================================================
@@ -727,35 +737,6 @@ async def update_issue(
 # ============================================================================
 
 
-class IssueCommentCreate(BaseModel):
-    """Request body for creating an issue comment."""
-
-    body: str = Field(..., min_length=1)
-
-
-class IssueCommentResponse(BaseModel):
-    """Response for an issue comment."""
-
-    id: UUID
-    issue_id: UUID
-    author_user_id: UUID
-    body: str
-    created_at: datetime
-    updated_at: datetime
-
-
-class IssueCommentListResponse(BaseModel):
-    """Paginated comment list response."""
-
-    items: list[IssueCommentResponse]
-    total: int
-
-
-# ============================================================================
-# Event Schemas
-# ============================================================================
-
-
 class IssueEventResponse(BaseModel):
     """Response for an issue event."""
 
@@ -817,103 +798,6 @@ async def _verify_issue_access(
         raise HTTPException(status_code=404, detail="Issue not found")
     result: dict[str, Any] = row
     return result
-
-
-# ============================================================================
-# Comment API Routes
-# ============================================================================
-
-
-@router.get("/{issue_id}/comments", response_model=IssueCommentListResponse)
-async def list_issue_comments(
-    issue_id: UUID,
-    auth: AuthDep,
-    db: AppDbDep,
-) -> IssueCommentListResponse:
-    """List comments for an issue."""
-    await _verify_issue_access(db, issue_id, auth.tenant_id)
-
-    rows = await db.fetch_all(
-        """
-        SELECT id, issue_id, author_user_id, body, created_at, updated_at
-        FROM issue_comments
-        WHERE issue_id = $1
-        ORDER BY created_at ASC
-        """,
-        issue_id,
-    )
-
-    items = [
-        IssueCommentResponse(
-            id=row["id"],
-            issue_id=row["issue_id"],
-            author_user_id=row["author_user_id"],
-            body=row["body"],
-            created_at=row["created_at"],
-            updated_at=row["updated_at"],
-        )
-        for row in rows
-    ]
-
-    return IssueCommentListResponse(items=items, total=len(items))
-
-
-@router.post("/{issue_id}/comments", response_model=IssueCommentResponse, status_code=201)
-async def create_issue_comment(
-    issue_id: UUID,
-    auth: AuthDep,
-    db: AppDbDep,
-    body: IssueCommentCreate,
-) -> IssueCommentResponse:
-    """Add a comment to an issue.
-
-    Requires user identity (JWT auth or user-scoped API key).
-    """
-    await _verify_issue_access(db, issue_id, auth.tenant_id)
-
-    if auth.user_id is None:
-        raise HTTPException(
-            status_code=403,
-            detail="User identity required to create comments",
-        )
-
-    row = await db.execute_returning(
-        """
-        INSERT INTO issue_comments (issue_id, author_user_id, body)
-        VALUES ($1, $2, $3)
-        RETURNING id, issue_id, author_user_id, body, created_at, updated_at
-        """,
-        issue_id,
-        auth.user_id,
-        body.body,
-    )
-
-    if not row:
-        raise HTTPException(status_code=500, detail="Failed to create comment")
-
-    # Record comment_added event
-    await _record_issue_event(
-        db,
-        issue_id,
-        "comment_added",
-        auth.user_id,
-        {"comment_id": str(row["id"])},
-    )
-
-    # Update issue updated_at timestamp
-    await db.execute(
-        "UPDATE issues SET updated_at = NOW() WHERE id = $1",
-        issue_id,
-    )
-
-    return IssueCommentResponse(
-        id=row["id"],
-        issue_id=row["issue_id"],
-        author_user_id=row["author_user_id"],
-        body=row["body"],
-        created_at=row["created_at"],
-        updated_at=row["updated_at"],
-    )
 
 
 # ============================================================================

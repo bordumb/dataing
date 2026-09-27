@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import functools
 import hashlib
 import hmac
 import logging
@@ -10,8 +11,10 @@ from unittest.mock import AsyncMock, patch
 
 import httpx
 import pytest
+import structlog
 
 from dataing.adapters.notifications.webhook import WebhookConfig, WebhookNotifier
+from dataing.telemetry.logging import configure_logging
 
 
 class TestWebhookNotifier:
@@ -183,6 +186,13 @@ class TestWebhookNotifierLogRedaction:
             mock_client_class.return_value = mock_client
             yield mock_client.post
 
+    @pytest.fixture
+    def restore_structlog_config(self) -> Iterator[None]:
+        """Restore the global structlog config, which configure_logging replaces."""
+        saved_config = structlog.get_config()
+        yield
+        structlog.configure(**saved_config)
+
     @staticmethod
     def _logged_output(capsys: pytest.CaptureFixture[str], caplog: pytest.LogCaptureFixture) -> str:
         """Return all log output, whether structlog printed it or routed it to stdlib."""
@@ -243,6 +253,34 @@ class TestWebhookNotifierLogRedaction:
         assert result is True
         assert "webhook_sent" in output
         assert "SECRETTOKEN" not in output
+
+    @pytest.mark.usefixtures("unset_http_client_log_levels", "restore_structlog_config")
+    async def test_real_send_under_app_logging_never_logs_url(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+        capsys: pytest.CaptureFixture[str],
+        caplog: pytest.LogCaptureFixture,
+    ) -> None:
+        """Test that httpx's own request log does not leak the URL under the app's logging.
+
+        httpx logs every request's full URL at INFO, so real httpx client code must run.
+        """
+        configure_logging(log_level="INFO")
+        # pytest's handlers on the root logger make basicConfig a no-op, so set the level
+        # it would have set.
+        caplog.set_level(logging.INFO)
+        transport = httpx.MockTransport(lambda request: httpx.Response(200))
+        monkeypatch.setattr(
+            httpx, "AsyncClient", functools.partial(httpx.AsyncClient, transport=transport)
+        )
+
+        result = await WebhookNotifier(WebhookConfig(url=self.SECRET_URL)).send("test.event", {})
+
+        output = self._logged_output(capsys, caplog)
+        assert result is True
+        assert "webhook_sent" in output
+        for secret in self.SECRET_PARTS:
+            assert secret not in output
 
 
 class TestWebhookConfig:

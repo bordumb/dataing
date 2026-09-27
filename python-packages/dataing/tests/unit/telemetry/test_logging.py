@@ -238,3 +238,15 @@ class TestConfigureLogging:
         configure_logging(log_level="debug", json_output=True)
 
         assert logging.getLogger().level == logging.DEBUG
+
+    @pytest.mark.parametrize("log_level", ["DEBUG", "INFO"])
+    @pytest.mark.usefixtures("unset_http_client_log_levels")
+    def test_http_client_loggers_stay_at_warning(self, log_level: str) -> None:
+        """HTTP client loggers stay at WARNING whatever the app log level.
+
+        httpx logs every request's full URL at INFO, and webhook URLs carry secrets.
+        """
+        configure_logging(log_level=log_level)
+
+        assert logging.getLogger("httpx").level == logging.WARNING
+        assert logging.getLogger("httpcore").level == logging.WARNING

@@ -1,3 +1,10 @@
+## [1.21.8](https://github.com/bordumb/dataing/compare/v1.21.7...v1.21.8) (2026-09-27)
+
+
+### Bug Fixes
+
+* **core:** make Redshift instantiable by deleting a dead adapter contract ([#175](https://github.com/bordumb/dataing/issues/175)) ([8b5cc5e](https://github.com/bordumb/dataing/commit/8b5cc5e16439d1cd04a2e35d7ba083e3009d5953))
+
 ## [1.21.7](https://github.com/bordumb/dataing/compare/v1.21.6...v1.21.7) (2026-09-27)
 
 

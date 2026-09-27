@@ -9,6 +9,7 @@ from uuid import UUID
 import structlog
 
 from dataing.adapters.db.app_db import AppDatabase
+from dataing.adapters.git.access_token import decrypt_access_token
 from dataing.adapters.git.provider import GitCommit, GitProvider
 from dataing.core.git_asset_parser import parse_affected_assets
 
@@ -81,9 +82,10 @@ class GitSyncService:
             )
 
             # 4. Fetch commits from provider
-            access_token = repo.get("access_token_encrypted", "")
-            if not access_token:
+            encrypted_token = repo.get("access_token_encrypted")
+            if not encrypted_token:
                 raise ValueError("Repository has no access token configured")
+            access_token = decrypt_access_token(encrypted_token)
 
             commits = await provider.fetch_commits(
                 repo_url=repo["url"],

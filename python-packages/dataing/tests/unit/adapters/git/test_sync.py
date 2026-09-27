@@ -9,8 +9,11 @@ from uuid import uuid4
 
 import pytest
 
+from dataing.adapters.git.access_token import encrypt_access_token
 from dataing.adapters.git.provider import GitCommit
 from dataing.adapters.git.sync import GitSyncService, _extract_commit_assets
+
+ACCESS_TOKEN = "ghp_test_token"
 
 
 @pytest.fixture
@@ -34,15 +37,15 @@ def sync_service(mock_db: AsyncMock, mock_provider: AsyncMock) -> GitSyncService
 
 
 @pytest.fixture
-def sample_repo() -> dict[str, Any]:
-    """Create a sample repository record."""
+def sample_repo(encryption_key: bytes) -> dict[str, Any]:
+    """Create a sample repository record, its token encrypted as stored."""
     return {
         "id": uuid4(),
         "tenant_id": uuid4(),
         "name": "test-repo",
         "url": "https://github.com/owner/repo",
         "provider": "github",
-        "access_token_encrypted": "test_token",
+        "access_token_encrypted": encrypt_access_token(ACCESS_TOKEN),
         "tracked_paths": None,
         "default_branch": "main",
         "sync_status": "pending",
@@ -93,7 +96,7 @@ class TestSyncRepository:
         mock_db.bulk_create_code_changes.assert_called_once()
         mock_provider.fetch_commits.assert_called_once_with(
             repo_url=sample_repo["url"],
-            access_token=sample_repo["access_token_encrypted"],
+            access_token=ACCESS_TOKEN,
             since_hash=None,
             branch="main",
             tracked_paths=None,
@@ -195,6 +198,26 @@ class TestSyncRepository:
         assert last_call[0][1] == "error"
         assert "error" in last_call[1]
         assert "API error" in last_call[1]["error"]
+
+    async def test_undecryptable_token_is_recorded_as_sync_error(
+        self,
+        sync_service: GitSyncService,
+        mock_db: AsyncMock,
+        mock_provider: AsyncMock,
+        sample_repo: dict[str, Any],
+    ) -> None:
+        """A token stored in plaintext (or under another key) is never sent to the provider."""
+        sample_repo["access_token_encrypted"] = ACCESS_TOKEN
+        mock_db.get_git_repository.return_value = sample_repo
+        mock_db.get_latest_commit_hash.return_value = None
+
+        with pytest.raises(ValueError, match="could not be decrypted"):
+            await sync_service.sync_repository(sample_repo["id"], sample_repo["tenant_id"])
+
+        mock_provider.fetch_commits.assert_not_called()
+        last_call = mock_db.update_git_repo_sync_status.call_args_list[-1]
+        assert last_call[0][1] == "error"
+        assert "could not be decrypted" in last_call[1]["error"]
 
     async def test_sets_last_sync_at(
         self,

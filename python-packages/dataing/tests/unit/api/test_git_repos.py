@@ -4,10 +4,17 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 from typing import Any
+from unittest.mock import AsyncMock
 from uuid import uuid4
 
 import pytest
+from fastapi import FastAPI
+from fastapi.testclient import TestClient
+from fixtures.route_authorization import jwt_request_kwargs
 
+from dataing.adapters.git.access_token import decrypt_access_token
+from dataing.core.auth.types import OrgRole
+from dataing.entrypoints.api.deps import get_app_db
 from dataing.entrypoints.api.routes.git_repos import (
     CodeChangeListResponse,
     CodeChangeResponse,
@@ -18,6 +25,7 @@ from dataing.entrypoints.api.routes.git_repos import (
     UpdateGitRepoRequest,
     _to_code_change_response,
     _to_repo_response,
+    router,
 )
 
 
@@ -347,6 +355,61 @@ class TestResponseNeverContainsSecrets:
         # Token updates should require a separate secure endpoint
         fields = UpdateGitRepoRequest.model_fields
         assert "access_token" not in fields
+
+
+class TestConnectStoresEncryptedToken:
+    """Connecting a repository never writes the access token in plaintext."""
+
+    @pytest.fixture
+    def db(self) -> AsyncMock:
+        """Return an app database that accepts any new repository."""
+        db = AsyncMock()
+        db.create_git_repository.return_value = {
+            "id": uuid4(),
+            "name": "analytics-dbt",
+            "url": "https://github.com/acme/analytics-dbt",
+            "provider": "github",
+            "created_at": datetime.now(UTC),
+        }
+        return db
+
+    @pytest.fixture
+    def client(self, db: AsyncMock, encryption_key: bytes) -> TestClient:
+        """Return a client for the git routes, signed in as an admin."""
+        app = FastAPI()
+        app.include_router(router)
+        app.dependency_overrides[get_app_db] = lambda: db
+        return TestClient(app)
+
+    def _connect(self, client: TestClient, **fields: Any) -> None:
+        response = client.post(
+            "/git/repos",
+            json={
+                "name": "analytics-dbt",
+                "url": "https://github.com/acme/analytics-dbt",
+                "provider": "github",
+                **fields,
+            },
+            **jwt_request_kwargs(OrgRole.ADMIN),
+        )
+        assert response.status_code == 200
+
+    def test_stores_ciphertext_that_decrypts_to_the_token(
+        self, client: TestClient, db: AsyncMock
+    ) -> None:
+        """The stored value hides the token and still yields it on decryption."""
+        self._connect(client, access_token="ghp_s3cr3tT0ken")
+
+        stored = db.create_git_repository.call_args.args[1]["access_token_encrypted"]
+        assert "ghp_s3cr3tT0ken" not in stored
+        assert decrypt_access_token(stored) == "ghp_s3cr3tT0ken"
+
+    def test_stores_nothing_when_no_token_is_given(self, client: TestClient, db: AsyncMock) -> None:
+        """A repository connected without a token has no stored token."""
+        self._connect(client)
+
+        stored = db.create_git_repository.call_args.args[1]["access_token_encrypted"]
+        assert stored is None
 
 
 class TestValidation:

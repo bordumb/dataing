@@ -12,7 +12,7 @@ from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
 
 from dataing.adapters.db.app_db import AppDatabase
-from dataing.adapters.git import GitHubProvider, GitSyncService
+from dataing.adapters.git import GitHubProvider, GitSyncService, encrypt_access_token
 from dataing.config import settings
 from dataing.entrypoints.api.deps import get_app_db
 from dataing.entrypoints.api.middleware.auth import (
@@ -169,7 +169,9 @@ async def connect_git_repo(
         "name": req.name,
         "url": req.url.rstrip("/"),
         "provider": req.provider,
-        "access_token_encrypted": req.access_token,  # TODO: encrypt before storage
+        "access_token_encrypted": (
+            encrypt_access_token(req.access_token) if req.access_token else None
+        ),
         "tracked_paths": req.tracked_paths,
         "default_branch": req.default_branch,
     }

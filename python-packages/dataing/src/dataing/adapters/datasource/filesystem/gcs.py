@@ -13,6 +13,7 @@ from dataing.adapters.datasource.errors import (
     AccessDeniedError,
     AuthenticationFailedError,
     ConnectionFailedError,
+    MissingRequiredFieldError,
     QuerySyntaxError,
     QueryTimeoutError,
     SchemaFetchFailedError,
@@ -61,12 +62,24 @@ GCS_CONFIG_SCHEMA = ConfigSchema(
             description="Optional path prefix to limit scope",
         ),
         ConfigField(
-            name="credentials_json",
-            label="Service Account JSON",
+            name="hmac_access_id",
+            label="HMAC Access ID",
+            type="string",
+            required=True,
+            group="auth",
+            placeholder="GOOG1E...",
+            description=(
+                "HMAC key of a service account that can read the bucket "
+                "(Cloud Storage > Settings > Interoperability)"
+            ),
+            help_url="https://cloud.google.com/storage/docs/authentication/managing-hmackeys",
+        ),
+        ConfigField(
+            name="hmac_secret",
+            label="HMAC Secret",
             type="secret",
             required=True,
             group="auth",
-            description="Service account credentials JSON content",
         ),
         ConfigField(
             name="file_format",
@@ -120,7 +133,8 @@ class GCSAdapter(FileSystemAdapter):
             config: Configuration dictionary with:
                 - bucket: GCS bucket name
                 - prefix: Optional path prefix
-                - credentials_json: Service account JSON credentials
+                - hmac_access_id: Access ID of a service account HMAC key
+                - hmac_secret: Secret of that HMAC key
                 - file_format: Default file format (auto, parquet, csv, json)
         """
         super().__init__(config)
@@ -152,6 +166,13 @@ class GCSAdapter(FileSystemAdapter):
 
     async def connect(self) -> None:
         """Establish connection to GCS via DuckDB."""
+        hmac_access_id = self._config.get("hmac_access_id", "")
+        hmac_secret = self._config.get("hmac_secret", "")
+        if not hmac_access_id:
+            raise MissingRequiredFieldError("hmac_access_id")
+        if not hmac_secret:
+            raise MissingRequiredFieldError("hmac_secret")
+
         try:
             import duckdb
         except ImportError as e:
@@ -166,26 +187,13 @@ class GCSAdapter(FileSystemAdapter):
             self._conn.execute("INSTALL httpfs")
             self._conn.execute("LOAD httpfs")
 
-            credentials_json = self._config.get("credentials_json", "")
-            if credentials_json:
-                import json
-                import os
-                import tempfile
-
-                creds = (
-                    json.loads(credentials_json)
-                    if isinstance(credentials_json, str)
-                    else credentials_json
-                )
-
-                with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
-                    json.dump(creds, f)
-                    creds_path = f.name
-
-                try:
-                    self._conn.execute(f"SET gcs_service_account_key_file = '{creds_path}'")
-                finally:
-                    os.unlink(creds_path)
+            # A scoped secret is only offered for this source's location, and unlike a
+            # SET option it cannot be read back with current_setting(). An HMAC key,
+            # unlike an access token, stays valid for as long as the adapter is cached.
+            self._conn.execute(
+                "CREATE SECRET (TYPE gcs, KEY_ID ?, SECRET ?, SCOPE ?)",
+                [hmac_access_id, hmac_secret, self._get_gcs_path()],
+            )
 
             self._connected = True
 
@@ -209,21 +217,15 @@ class GCSAdapter(FileSystemAdapter):
         self._connected = False
 
     async def test_connection(self) -> ConnectionTestResult:
-        """Test GCS connectivity."""
+        """Test GCS connectivity by listing the source's Parquet files."""
         start_time = time.time()
         try:
             if not self._connected:
                 await self.connect()
 
-            self._config.get("bucket", "")
-            self._config.get("prefix", "")
-
-            gcs_path = self._get_gcs_path()
-
-            try:
-                self._conn.execute(f"SELECT * FROM glob('{gcs_path}*.parquet') LIMIT 1")
-            except Exception:
-                pass
+            # An empty listing still proves the key works and the bucket exists
+            pattern = f"{self._get_gcs_path()}*.parquet"
+            self._conn.execute("SELECT * FROM glob(?) LIMIT 1", [pattern])
 
             latency_ms = int((time.time() - start_time) * 1000)
             return ConnectionTestResult(
@@ -235,20 +237,34 @@ class GCSAdapter(FileSystemAdapter):
 
         except Exception as e:
             latency_ms = int((time.time() - start_time) * 1000)
-            error_str = str(e).lower()
+            # duckdb.HTTPException carries the response status: an int, or a string in
+            # DuckDB 1.4.3. Other failures, such as an unreachable host, have none.
+            status = str(getattr(e, "status_code", ""))
 
-            if "accessdenied" in error_str or "forbidden" in error_str:
+            if status == "401":
                 return ConnectionTestResult(
                     success=False,
                     latency_ms=latency_ms,
-                    message="Access denied to GCS bucket",
+                    message="GCS rejected the HMAC key. Check the access ID and secret.",
+                    error_code="AUTHENTICATION_FAILED",
+                )
+            elif status == "403":
+                # GCS also answers 403 when the HMAC key itself is wrong or revoked
+                return ConnectionTestResult(
+                    success=False,
+                    latency_ms=latency_ms,
+                    message=(
+                        f"GCS denied access to {self._get_gcs_path()}. Check the HMAC access "
+                        "ID and secret, and that the key's service account can list objects "
+                        "in the bucket."
+                    ),
                     error_code="ACCESS_DENIED",
                 )
-            elif "nosuchbucket" in error_str or "not found" in error_str:
+            elif status == "404":
                 return ConnectionTestResult(
                     success=False,
                     latency_ms=latency_ms,
-                    message="GCS bucket not found",
+                    message=f"GCS bucket not found: {self._config.get('bucket', '')}",
                     error_code="CONNECTION_FAILED",
                 )
 

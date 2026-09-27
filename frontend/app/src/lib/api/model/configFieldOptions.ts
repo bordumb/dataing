@@ -5,6 +5,6 @@
  * Autonomous Data Quality Investigation
  * OpenAPI spec version: 2.0.0
  */
-import type { ConfigFieldOptionsAnyOfItem } from "./configFieldOptionsAnyOfItem";
+import type { ConfigFieldOption } from "./configFieldOption";
 
-export type ConfigFieldOptions = ConfigFieldOptionsAnyOfItem[] | null;
+export type ConfigFieldOptions = ConfigFieldOption[] | null;

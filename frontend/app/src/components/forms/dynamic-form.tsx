@@ -30,7 +30,7 @@ function initialValues(schema: ConfigSchema): FormValues {
 
 function isShown(field: ConfigField, values: FormValues): boolean {
   if (!field.show_if) return true;
-  return values[String(field.show_if.field)] === field.show_if.value;
+  return values[field.show_if.field] === field.show_if.value;
 }
 
 function fieldError(field: ConfigField, value: FieldValue): string | undefined {

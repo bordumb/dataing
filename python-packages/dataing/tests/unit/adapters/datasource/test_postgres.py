@@ -72,7 +72,7 @@ class TestPostgresAdapterConfig:
         assert fields["ssl_mode"].type == "enum"
         assert fields["ssl_mode"].default_value == "prefer"
 
-        options = [opt["value"] for opt in fields["ssl_mode"].options]
+        options = [opt.value for opt in fields["ssl_mode"].options]
         assert "disable" in options
         assert "require" in options
         assert "verify-full" in options

@@ -5,6 +5,6 @@
  * Autonomous Data Quality Investigation
  * OpenAPI spec version: 2.0.0
  */
-import type { ConfigFieldShowIfAnyOf } from "./configFieldShowIfAnyOf";
+import type { ShowIfCondition } from "./showIfCondition";
 
-export type ConfigFieldShowIf = ConfigFieldShowIfAnyOf | null;
+export type ConfigFieldShowIf = ShowIfCondition | null;

@@ -1,3 +1,10 @@
+## [1.21.7](https://github.com/bordumb/dataing/compare/v1.21.6...v1.21.7) (2026-09-27)
+
+
+### Bug Fixes
+
+* **api:** use dataset_ids consistently for investigation alerts ([#159](https://github.com/bordumb/dataing/issues/159)) ([a0aa32d](https://github.com/bordumb/dataing/commit/a0aa32d81db16ac7b83efd1da90f17ed3d659f7b))
+
 ## [1.21.6](https://github.com/bordumb/dataing/compare/v1.21.5...v1.21.6) (2026-09-27)
 
 

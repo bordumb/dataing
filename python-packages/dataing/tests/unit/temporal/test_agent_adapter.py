@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from typing import Any
 
+import pytest
+
 from dataing.agents.client import AgentClient, SynthesisResponse
 from dataing.temporal.adapters import TemporalAgentAdapter
 
@@ -33,11 +35,14 @@ INCONCLUSIVE = SynthesisResponse(
 )
 
 
-async def test_untested_hypotheses_reach_synthesis_prompt() -> None:
+async def test_untested_hypotheses_reach_synthesis_prompt(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     """Untested hypotheses from the workflow appear in the prompt sent to the LLM."""
-    client = AgentClient(api_key="test-key")
     synthesis_agent = RecordingAgent(INCONCLUSIVE)
-    client._synthesis_agent = synthesis_agent  # type: ignore[assignment]
+    # AgentClient builds a fresh BondAgent for every call, so record through that.
+    monkeypatch.setattr("dataing.agents.client.BondAgent", lambda **_: synthesis_agent)
+    client = AgentClient(api_key="test-key")
 
     result = await TemporalAgentAdapter(client).synthesize_findings_for_temporal(
         evidence=[],

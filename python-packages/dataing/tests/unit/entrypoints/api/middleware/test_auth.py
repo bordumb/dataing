@@ -9,13 +9,38 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 from fastapi import HTTPException
+from fastapi.security import HTTPAuthorizationCredentials
 
+from dataing.core.auth.jwt import create_access_token
+from dataing.core.auth.types import OrgRole
 from dataing.entrypoints.api.middleware.auth import (
     ApiKeyContext,
     optional_api_key,
     require_scope,
     verify_api_key,
 )
+
+
+def _issue_jwt(role: str) -> str:
+    """Issue an access token for a user holding the given org role."""
+    return create_access_token(
+        user_id=str(uuid.uuid4()),
+        org_id=str(uuid.uuid4()),
+        role=role,
+        teams=[],
+    )
+
+
+async def _verify_jwt(token: str, via: str) -> ApiKeyContext:
+    """Verify a JWT sent as a Bearer header or as the ?token= query param (SSE)."""
+    request = MagicMock()
+    request.app.state.app_db = AsyncMock()
+    if via == "bearer":
+        request.query_params = {}
+        bearer = HTTPAuthorizationCredentials(scheme="Bearer", credentials=token)
+        return await verify_api_key(request, api_key=None, bearer=bearer)
+    request.query_params = {"token": token}
+    return await verify_api_key(request, api_key=None, bearer=None)
 
 
 class TestVerifyApiKey:
@@ -152,6 +177,41 @@ class TestVerifyApiKey:
         # Should not raise
         result = await verify_api_key(mock_request, api_key=sample_api_key, bearer=None)
         assert result is not None
+
+
+@pytest.mark.parametrize("via", ["bearer", "query_param"])
+class TestVerifyApiKeyJwtScopes:
+    """JWT callers get scopes derived from their org role, on both JWT paths."""
+
+    async def test_viewer_gets_no_write_scope(self, via: str) -> None:
+        """A viewer JWT is read-only."""
+        context = await _verify_jwt(_issue_jwt(OrgRole.VIEWER.value), via)
+
+        assert "write" not in context.scopes
+        assert context.scopes == ["read"]
+
+    @pytest.mark.parametrize(
+        ("role", "expected_scopes"),
+        [
+            (OrgRole.MEMBER, ["read", "write"]),
+            (OrgRole.ADMIN, ["read", "write", "admin"]),
+            (OrgRole.OWNER, ["read", "write", "admin"]),
+        ],
+    )
+    async def test_writer_roles_keep_their_scopes(
+        self, via: str, role: OrgRole, expected_scopes: list[str]
+    ) -> None:
+        """Member, admin and owner JWT scopes are unchanged."""
+        context = await _verify_jwt(_issue_jwt(role.value), via)
+
+        assert context.scopes == expected_scopes
+
+    async def test_unknown_role_is_rejected(self, via: str) -> None:
+        """A JWT whose role is not an org role is not accepted."""
+        with pytest.raises(HTTPException) as exc_info:
+            await _verify_jwt(_issue_jwt("superuser"), via)
+
+        assert exc_info.value.status_code == 401
 
 
 class TestRequireScope:

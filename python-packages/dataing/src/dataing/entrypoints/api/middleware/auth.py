@@ -13,11 +13,20 @@ from fastapi import Depends, HTTPException, Request, Security
 from fastapi.security import APIKeyHeader, HTTPAuthorizationCredentials, HTTPBearer
 
 from dataing.core.auth.jwt import TokenError, decode_token
+from dataing.core.auth.types import OrgRole
 
 logger = structlog.get_logger()
 
 API_KEY_HEADER = APIKeyHeader(name="X-API-Key", auto_error=False)
 BEARER_SCHEME = HTTPBearer(auto_error=False)
+
+# Scopes granted to JWT callers, by org role
+_ROLE_SCOPES: dict[OrgRole, tuple[str, ...]] = {
+    OrgRole.VIEWER: ("read",),
+    OrgRole.MEMBER: ("read", "write"),
+    OrgRole.ADMIN: ("read", "write", "admin"),
+    OrgRole.OWNER: ("read", "write", "admin"),
+}
 
 
 @dataclass
@@ -30,6 +39,18 @@ class ApiKeyContext:
     tenant_name: str
     user_id: UUID | None
     scopes: list[str]
+
+
+def _scopes_for_role(role: str) -> list[str]:
+    """Return the API scopes granted to a JWT caller's org role.
+
+    Raises:
+        TokenError: If the role is not an org role, so the token is rejected.
+    """
+    try:
+        return list(_ROLE_SCOPES[OrgRole(role)])
+    except ValueError:
+        raise TokenError(f"Unknown role: {role!r}") from None
 
 
 async def verify_api_key(
@@ -49,9 +70,7 @@ async def verify_api_key(
         # Treat query param as JWT token
         try:
             payload = decode_token(token_param)
-            scopes = ["read", "write"]
-            if payload.role in ("admin", "owner"):
-                scopes.append("admin")
+            scopes = _scopes_for_role(payload.role)
             context = ApiKeyContext(
                 key_id=UUID("00000000-0000-0000-0000-000000000000"),
                 tenant_id=UUID(payload.org_id),
@@ -71,11 +90,7 @@ async def verify_api_key(
     if bearer:
         try:
             payload = decode_token(bearer.credentials)
-            # Build scopes based on user's role
-            # admin/owner roles get full access including admin operations
-            scopes = ["read", "write"]
-            if payload.role in ("admin", "owner"):
-                scopes.append("admin")
+            scopes = _scopes_for_role(payload.role)
             context = ApiKeyContext(
                 key_id=UUID("00000000-0000-0000-0000-000000000000"),  # Placeholder for JWT auth
                 tenant_id=UUID(payload.org_id),

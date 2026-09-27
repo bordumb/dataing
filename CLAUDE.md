@@ -148,7 +148,12 @@ React + Vite + TypeScript + Tailwind + shadcn/ui.
 - Tests: pytest-asyncio with `asyncio_mode = "auto"`
 - Frontend: TypeScript strict mode, ESLint, Prettier
 - Multi-tenancy: all operations scoped to tenant via API key or JWT auth
-- Migrations live in `python-packages/dataing/migrations/` and are append-only
+- Migrations live in `python-packages/dataing/migrations/` and are append-only.
+  `infra/init-app-db.sh` applies each file once per database (recorded in
+  `schema_migrations`), in its own transaction, stopping at the first error. So a
+  migration must not contain BEGIN/COMMIT or CREATE INDEX CONCURRENTLY, and must
+  never be edited, renamed or deleted once applied; add a new file instead. Seed
+  files are named `NNN_seed_*.sql` and apply after all schema migrations
 - When API shapes change, regenerate the frontend client with `just generate-client`
 
 ## Demo Fixtures

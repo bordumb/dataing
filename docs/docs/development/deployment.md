@@ -55,10 +55,14 @@ The PostgreSQL database needs tables created. Run migrations from your local mac
 export DATABASE_URL="postgresql://postgres:xxx@xxx.railway.app:5432/railway"  # pragma: allowlist secret
 
 # Run migrations
-./dataing/scripts/migrate-prod.sh
+./python-packages/dataing/scripts/migrate-prod.sh
 ```
 
-This runs all SQL files in `dataing/migrations/` to create tables for auth, tenants, investigations, etc.
+This applies each SQL file in `python-packages/dataing/migrations/` once and records it in
+`schema_migrations`, so re-running it only applies new migrations. Demo seed data is skipped
+unless you set `INCLUDE_SEEDS=true`. Use that for demo deployments only: it creates the
+`demo@dataing.io` login with a published password. Databases migrated by earlier versions of
+this script already have that login.
 
 ### 5. Add Required Env Vars
 
@@ -140,8 +144,9 @@ app_database_connected dsn=... attempt=1
 | `Connection refused` on startup | Postgres not ready | Retry logic handles this; check DB is provisioned |
 | `Distribution not found: bond` | Deploying from wrong root | Deploy from repo root, not `dataing/` |
 | TypeScript build errors | Missing generated files | Ensure `frontend/src/lib/api/generated/` is in git |
-| "No tables" in Railway Postgres | Migrations not run | Run `./dataing/scripts/migrate-prod.sh` |
-| Auth errors after deploy | Missing seed data | Migrations include demo seed data; re-run migrations |
+| "No tables" in Railway Postgres | Migrations not run | Run `./python-packages/dataing/scripts/migrate-prod.sh` |
+| Demo login missing on a demo deployment | Seed data is opt-in | Re-run migrations with `INCLUDE_SEEDS=true` (never on a real deployment) |
+| "has tables but no migration history" | Database was migrated before migrations were tracked | Recreate it, or re-run with `MIGRATIONS_BASELINE` set to the last migration it has (this keeps any damage from earlier re-runs) |
 
 ---
 
@@ -151,7 +156,7 @@ app_database_connected dsn=... attempt=1
 |------|---------|
 | `railway.json` | Railway build/deploy config |
 | `Procfile` | Heroku-style start command |
-| `dataing/scripts/migrate-prod.sh` | Run DB migrations against production |
-| `dataing/migrations/*.sql` | Database schema migrations |
+| `python-packages/dataing/scripts/migrate-prod.sh` | Run DB migrations against production |
+| `python-packages/dataing/migrations/*.sql` | Database schema migrations |
 | `frontend/vercel.json` | Vercel build config |
 | `frontend/.env.example` | Frontend env var template |

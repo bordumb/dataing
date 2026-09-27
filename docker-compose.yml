@@ -94,7 +94,7 @@ services:
     restart: unless-stopped
 
   # ===========================================================================
-  # Database Migrations (runs once on startup)
+  # Database Migrations (applies pending migrations on startup; see infra/init-app-db.sh)
   # ===========================================================================
   db-migrate:
     image: postgres:16-alpine
@@ -102,13 +102,13 @@ services:
       - ./python-packages/dataing/migrations:/migrations:ro
       - ./infra/init-app-db.sh:/init-app-db.sh:ro
     environment:
-      PGHOST: postgres
-      PGPORT: 5432
-      PGUSER: dataing
+      # Password via PGPASSWORD, not the URL: the runner passes the URL to psql as an argument
+      DATABASE_URL: postgresql://dataing@postgres:5432/dataing
       PGPASSWORD: ${POSTGRES_PASSWORD:-dataing}
-      PGDATABASE: dataing
       MIGRATIONS_DIR: /migrations
-    entrypoint: ["/bin/sh", "/init-app-db.sh"]
+      # Set on the host to adopt a database migrated before migrations were tracked
+      MIGRATIONS_BASELINE: ${MIGRATIONS_BASELINE:-}
+    entrypoint: ["bash", "/init-app-db.sh"]
     depends_on:
       postgres:
         condition: service_healthy

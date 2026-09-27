@@ -308,14 +308,8 @@ demo-infra:
 
     # Run migrations (skip seed files for clean dev environment)
     echo "Running migrations..."
-    for f in python-packages/dataing/migrations/*.sql; do
-        # Skip seed migrations - those are demo-only
-        if [[ "$f" == *"seed"* ]]; then
-            echo "  Skipping seed: $(basename $f)"
-            continue
-        fi
-        PGPASSWORD=dataing psql -h localhost -U dataing -d dataing_demo -f "$f" 2>&1 | grep -v "^NOTICE:" || true
-    done
+    DATABASE_URL=postgresql://dataing:dataing@localhost:5432/dataing_demo INCLUDE_SEEDS=false \
+        bash infra/init-app-db.sh
 
     echo ""
     echo "Infrastructure ready! Now run: just dev"

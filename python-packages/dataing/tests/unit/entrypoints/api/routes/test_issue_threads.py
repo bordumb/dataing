@@ -493,3 +493,32 @@ class TestThreadStream:
 
         assert events == []
         assert changes.cursors == []
+
+
+class TestEventDescriptions:
+    """Issue events read as short sentences in the thread."""
+
+    @pytest.mark.parametrize(
+        ("event_type", "payload", "text"),
+        [
+            (
+                "status_changed",
+                {"from": "open", "to": "triaged"},
+                "Status changed from open to triaged",
+            ),
+            ("priority_changed", {"from": "P2", "to": "P1"}, "Priority changed from P2 to P1"),
+            ("severity_changed", {"from": None, "to": "high"}, "Severity set to high"),
+            (
+                "field_changed",
+                {"field": "due_at", "from": "2026-10-01", "to": None},
+                "Due at cleared",
+            ),
+            ("label_added", {"label": "app_v2"}, "Label app_v2 added"),
+            ("acknowledged", {"to": "u1"}, "Acknowledged"),
+        ],
+    )
+    def test_describe_event(self, event_type: str, payload: dict[str, Any], text: str) -> None:
+        """Each event type has a readable description."""
+        from dataing.adapters.db.issue_threads import describe_event
+
+        assert describe_event(event_type, payload) == text

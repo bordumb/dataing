@@ -57,7 +57,29 @@ def describe_event(event_type: str, payload: dict[str, Any]) -> str:
     if event_type in ("label_added", "label_removed"):
         verb = "added" if event_type == "label_added" else "removed"
         return f"Label {payload.get('label', '')} {verb}".strip()
+    if event_type == "acknowledged":
+        return "Acknowledged" if payload.get("to") else "Acknowledgment cleared"
+    if event_type in ("priority_changed", "severity_changed"):
+        field = event_type.removesuffix("_changed").capitalize()
+        return _change_text(field, payload.get("from"), payload.get("to"))
+    if event_type == "field_changed":
+        field = str(payload.get("field", "field")).replace("_", " ").capitalize()
+        return _change_text(field, payload.get("from"), payload.get("to"))
     return event_type.replace("_", " ").capitalize()
+
+
+def _change_text(field: str, before: Any, after: Any) -> str:
+    """Describe a field change, keeping long values out of the timeline."""
+
+    def show(value: Any) -> str:
+        text = "none" if value in (None, "") else str(value)
+        return text if len(text) <= 40 else "a new value"
+
+    if after in (None, ""):
+        return f"{field} cleared"
+    if before in (None, ""):
+        return f"{field} set to {show(after)}"
+    return f"{field} changed from {show(before)} to {show(after)}"
 
 
 class IssueThreadRepository:

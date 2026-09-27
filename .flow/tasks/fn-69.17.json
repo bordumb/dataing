@@ -1,0 +1,19 @@
+{
+  "assignee": null,
+  "claim_note": "",
+  "claimed_at": null,
+  "created_at": "2026-09-27T15:11:20.384475Z",
+  "depends_on": [
+    "fn-69.6",
+    "fn-69.14",
+    "fn-69.15",
+    "fn-69.16"
+  ],
+  "epic": "fn-69",
+  "id": "fn-69.17",
+  "priority": 2,
+  "spec_path": ".flow/tasks/fn-69.17.md",
+  "status": "todo",
+  "title": "[M2] Check-triggered investigations run as AutomationPrincipal",
+  "updated_at": "2026-09-27T15:11:30.539302Z"
+}

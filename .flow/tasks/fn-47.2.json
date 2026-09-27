@@ -10,7 +10,7 @@
   "id": "fn-47.2",
   "priority": 2,
   "spec_path": ".flow/tasks/fn-47.2.md",
-  "status": "todo",
+  "status": "blocked",
   "title": "Create SQLAlchemy model and schedule repository",
-  "updated_at": "2026-01-28T03:52:09.912723Z"
+  "updated_at": "2026-09-27T15:11:36.116428Z"
 }

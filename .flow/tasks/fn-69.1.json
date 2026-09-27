@@ -1,0 +1,14 @@
+{
+  "assignee": null,
+  "claim_note": "",
+  "claimed_at": null,
+  "created_at": "2026-09-27T15:11:15.819649Z",
+  "depends_on": [],
+  "epic": "fn-69",
+  "id": "fn-69.1",
+  "priority": 1,
+  "spec_path": ".flow/tasks/fn-69.1.md",
+  "status": "todo",
+  "title": "[M1] Check spec models, JSON Schema and strict YAML loader",
+  "updated_at": "2026-09-27T15:11:15.967119Z"
+}

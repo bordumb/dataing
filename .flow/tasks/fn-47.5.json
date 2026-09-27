@@ -10,7 +10,7 @@
   "id": "fn-47.5",
   "priority": 5,
   "spec_path": ".flow/tasks/fn-47.5.md",
-  "status": "todo",
+  "status": "blocked",
   "title": "Add notification on completion (email, Slack, webhook)",
-  "updated_at": "2026-01-28T03:52:26.641381Z"
+  "updated_at": "2026-09-27T15:11:36.534635Z"
 }

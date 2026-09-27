@@ -10,7 +10,7 @@
   "id": "fn-47.6",
   "priority": 6,
   "spec_path": ".flow/tasks/fn-47.6.md",
-  "status": "todo",
+  "status": "blocked",
   "title": "Add CLI commands: schedule create, schedule list",
-  "updated_at": "2026-01-28T03:52:31.389887Z"
+  "updated_at": "2026-09-27T15:11:36.674412Z"
 }

@@ -1,0 +1,19 @@
+{
+  "assignee": null,
+  "claim_note": "",
+  "claimed_at": null,
+  "created_at": "2026-09-27T15:11:19.545583Z",
+  "depends_on": [
+    "fn-69.2",
+    "fn-69.3",
+    "fn-69.6",
+    "fn-69.31"
+  ],
+  "epic": "fn-69",
+  "id": "fn-69.14",
+  "priority": 2,
+  "spec_path": ".flow/tasks/fn-69.14.md",
+  "status": "todo",
+  "title": "[M2] Automation credential: API, settings UI and audit",
+  "updated_at": "2026-09-27T15:11:29.557376Z"
+}

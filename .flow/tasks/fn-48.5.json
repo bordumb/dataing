@@ -10,7 +10,7 @@
   "id": "fn-48.5",
   "priority": 5,
   "spec_path": ".flow/tasks/fn-48.5.md",
-  "status": "todo",
+  "status": "blocked",
   "title": "Implement auto-trigger investigation on breach with cooldown",
-  "updated_at": "2026-01-28T03:52:52.480278Z"
+  "updated_at": "2026-09-27T15:11:37.767828Z"
 }

@@ -10,7 +10,7 @@
   "id": "fn-48.6",
   "priority": 6,
   "spec_path": ".flow/tasks/fn-48.6.md",
-  "status": "todo",
+  "status": "blocked",
   "title": "Add hysteresis: sustained breach requirement before trigger",
-  "updated_at": "2026-01-28T03:52:57.398007Z"
+  "updated_at": "2026-09-27T15:11:37.903310Z"
 }

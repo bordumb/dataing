@@ -1,0 +1,18 @@
+{
+  "assignee": null,
+  "claim_note": "",
+  "claimed_at": null,
+  "created_at": "2026-09-27T15:11:24.892189Z",
+  "depends_on": [
+    "fn-69.1",
+    "fn-69.4",
+    "fn-69.18"
+  ],
+  "epic": "fn-69",
+  "id": "fn-69.33",
+  "priority": 2,
+  "spec_path": ".flow/tasks/fn-69.33.md",
+  "status": "todo",
+  "title": "[M2] Exports rebuilt from CheckSpec with explicit semantics",
+  "updated_at": "2026-09-27T15:11:35.282133Z"
+}

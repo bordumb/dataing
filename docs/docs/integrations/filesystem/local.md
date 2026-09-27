@@ -48,9 +48,17 @@ Local file integration enables:
 
 | Field | Required | Default | Description |
 |-------|----------|---------|-------------|
-| `path` | Yes | - | Directory containing data files |
+| `path` | Yes | - | Directory containing data files, inside `DATAING_LOCAL_DATA_ROOT` |
 | `recursive` | No | false | Include subdirectories |
 | `file_format` | No | auto | Default file format |
+
+### Allowed Directory
+
+Local file sources read the disk of the hosts that run the dataing API and worker, so
+the operator decides where they may look. Set `DATAING_LOCAL_DATA_ROOT` on both to the
+directory that holds the data. A source's `path` must resolve inside it, following
+symlinks, and a relative `path` is taken relative to it. While the variable is unset,
+the server refuses local file, DuckDB and SQLite sources.
 
 ---
 

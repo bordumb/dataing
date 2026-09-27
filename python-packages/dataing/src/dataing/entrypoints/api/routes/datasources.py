@@ -26,6 +26,7 @@ from dataing.adapters.datasource.encryption import (
     encrypt_config,
     get_encryption_key,
 )
+from dataing.adapters.datasource.errors import AdapterError
 from dataing.adapters.db.app_db import AppDatabase
 from dataing.core.entitlements.features import Feature
 from dataing.core.exceptions import QueryValidationError
@@ -217,6 +218,23 @@ class DatasourceDatasetsResponse(BaseModel):
     total: int
 
 
+def _check_config(source_type: SourceType, config: dict[str, Any]) -> None:
+    """Refuse a configuration this server does not permit, before anything connects to it.
+
+    Raises:
+        HTTPException: 400 if the source type is unavailable or refuses the configuration.
+    """
+    adapter_class = get_registry().get_adapter_class(source_type)
+    if adapter_class is None:
+        raise HTTPException(
+            status_code=400, detail=f"Source type not available: {source_type.value}"
+        )
+    try:
+        adapter_class.check_config(config)
+    except AdapterError as e:
+        raise HTTPException(status_code=400, detail=e.message) from e
+
+
 @router.get("/types", response_model=SourceTypesResponse)
 async def list_source_types() -> SourceTypesResponse:
     """List all supported data source types.
@@ -272,6 +290,8 @@ async def test_connection(
             detail=f"Source type not available: {body.type}",
         )
 
+    _check_config(source_type, body.config)
+
     try:
         adapter = registry.create(source_type, body.config)
         async with adapter:
@@ -318,6 +338,8 @@ async def create_datasource(
             status_code=400,
             detail=f"Source type not available: {body.type}",
         )
+
+    _check_config(source_type, body.config)
 
     # Test connection first
     try:

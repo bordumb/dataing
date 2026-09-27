@@ -21,10 +21,17 @@ from dataing.adapters.datasource.types import (
 )
 
 
+@pytest.fixture(autouse=True)
+def local_data_root(tmp_path, monkeypatch):
+    """Enable SQLite sources, with this test's tmp_path as the local data root."""
+    monkeypatch.setenv("DATAING_LOCAL_DATA_ROOT", str(tmp_path))
+    return tmp_path
+
+
 @pytest.fixture
-def sample_db():
+def sample_db(tmp_path):
     """Create a temporary SQLite database with sample data."""
-    with tempfile.NamedTemporaryFile(suffix=".sqlite", delete=False) as f:
+    with tempfile.NamedTemporaryFile(suffix=".sqlite", delete=False, dir=tmp_path) as f:
         db_path = f.name
 
     conn = sqlite3.connect(db_path)
@@ -115,11 +122,11 @@ class TestSQLiteAdapter:
         await adapter.disconnect()
         assert not adapter.is_connected
 
-    async def test_connect_file_not_found(self) -> None:
+    async def test_connect_file_not_found(self, tmp_path: Path) -> None:
         """Test connection failure when file doesn't exist."""
         from dataing.adapters.datasource.errors import ConnectionFailedError
 
-        adapter = SQLiteAdapter({"path": "/nonexistent/path.sqlite"})
+        adapter = SQLiteAdapter({"path": str(tmp_path / "nonexistent.sqlite")})
         with pytest.raises(ConnectionFailedError) as exc_info:
             await adapter.connect()
         assert "not found" in str(exc_info.value).lower()
@@ -321,27 +328,23 @@ class TestSQLiteAdapterURI:
     def test_build_uri_default(self) -> None:
         """Test URI with default values."""
         adapter = SQLiteAdapter({"path": "/tmp/test.sqlite"})
-        uri = adapter._build_uri()
+        uri = adapter._build_uri("/tmp/test.sqlite")
 
-        assert uri.startswith("file:")
-        assert "/tmp/test.sqlite" in uri
-        assert "mode=ro" in uri
+        assert uri == "file:/tmp/test.sqlite?mode=ro"
 
     def test_build_uri_read_write(self) -> None:
         """Test URI with read_only=False."""
         adapter = SQLiteAdapter({"path": "/tmp/test.sqlite", "read_only": False})
-        uri = adapter._build_uri()
+        uri = adapter._build_uri("/tmp/test.sqlite")
 
-        assert uri.startswith("file:")
-        assert "/tmp/test.sqlite" in uri
-        assert "mode=ro" not in uri
+        assert uri == "file:/tmp/test.sqlite"
 
-    def test_build_uri_already_file_uri(self) -> None:
-        """Test that existing file: URI is passed through."""
-        adapter = SQLiteAdapter({"path": "file:/tmp/test.sqlite?mode=rwc"})
-        uri = adapter._build_uri()
+    def test_build_uri_encodes_uri_characters_in_the_path(self) -> None:
+        """Test that ? and # in a file name cannot add URI parameters."""
+        adapter = SQLiteAdapter({"path": "/tmp/odd?mode=rwc#.sqlite"})
+        uri = adapter._build_uri("/tmp/odd?mode=rwc#.sqlite")
 
-        assert uri == "file:/tmp/test.sqlite?mode=rwc"
+        assert uri == "file:/tmp/odd%3Fmode%3Drwc%23.sqlite?mode=ro"
 
 
 class TestSQLiteAdapterSampling:

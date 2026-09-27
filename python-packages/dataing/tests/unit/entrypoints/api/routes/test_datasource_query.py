@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Any
 from unittest.mock import AsyncMock
 from uuid import uuid4
@@ -213,7 +214,14 @@ class TestExecuteQueryTimeout:
 class TestExecuteQueryOnDuckDB:
     """End to end through the real DuckDB adapter."""
 
-    def test_returns_rows(self, client: TestClient, use_datasource: Any) -> None:
+    def test_returns_rows(
+        self,
+        client: TestClient,
+        use_datasource: Any,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        monkeypatch.setenv("DATAING_LOCAL_DATA_ROOT", str(tmp_path))
         use_datasource("duckdb", {"path": ":memory:"})
 
         response = post_query(client, "SELECT 42 AS answer")

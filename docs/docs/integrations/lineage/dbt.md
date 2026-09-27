@@ -62,6 +62,13 @@ Add lineage upload to your dbt CI/CD pipeline:
     DATAING_API_KEY: ${{ secrets.DATAING_API_KEY }}
 ```
 
+### Manifest on the Server
+
+The `manifest_path` setting, and the `manifest_path` parameter of the lineage API, name a
+file on the hosts that run the dataing API and worker. That file must resolve inside
+`DATAING_LOCAL_DATA_ROOT`, following symlinks. While the variable is unset, the server
+refuses local manifests; dbt Cloud credentials still work.
+
 ---
 
 ## What's Extracted

@@ -43,21 +43,21 @@ SQLite is ideal for:
     })
     ```
 
-=== "URI Format"
-
-    ```python
-    # Using file: URI for advanced options
-    adapter = SQLiteAdapter({
-        "path": "file:database.sqlite?mode=ro&cache=shared",
-    })
-    ```
-
 ### Configuration Fields
 
 | Field | Required | Default | Description |
 |-------|----------|---------|-------------|
-| `path` | Yes | - | Path to SQLite file or file: URI |
+| `path` | Yes | - | Path to the SQLite file, inside `DATAING_LOCAL_DATA_ROOT` |
 | `read_only` | No | true | Open in read-only mode |
+
+### Allowed Directory
+
+SQLite sources read the disk of the hosts that run the dataing API and worker, so the
+operator decides where they may look. Set `DATAING_LOCAL_DATA_ROOT` on both to the
+directory that holds the databases. A source's `path` must resolve inside it, following
+symlinks, and a relative `path` is taken relative to it. `file:` URIs are refused, and
+queries cannot `ATTACH` other database files. While the variable is unset, the server
+refuses SQLite sources, `:memory:` ones included.
 
 ---
 
@@ -83,11 +83,6 @@ For investigations, read-only mode is recommended:
 adapter = SQLiteAdapter({
     "path": "/path/to/production.sqlite",
     "read_only": True,
-})
-
-# Or via URI
-adapter = SQLiteAdapter({
-    "path": "file:production.sqlite?mode=ro",
 })
 ```
 

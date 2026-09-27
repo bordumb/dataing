@@ -19,6 +19,7 @@ from pydantic import BaseModel, Field
 from sse_starlette.sse import EventSourceResponse
 
 from dataing.adapters.db.app_db import AppDatabase
+from dataing.core.domain_types import AnomalyAlert, MetricSpec
 from dataing.core.json_utils import to_json_string
 from dataing.entrypoints.api.deps import (
     get_app_db,
@@ -1112,7 +1113,7 @@ async def spawn_investigation(
     # Verify issue exists and get its data
     issue = await db.fetch_one(
         """
-        SELECT id, tenant_id, dataset_id, title, description
+        SELECT id, tenant_id, dataset_id, title, severity, created_at
         FROM issues
         WHERE id = $1 AND tenant_id = $2
         """,
@@ -1162,10 +1163,24 @@ async def spawn_investigation(
     if body.execution_profile == "deep":
         approval_status = "approved"  # Could be "queued" based on tenant settings
 
-    # Build alert data and summary from issue
+    # Build the alert from the issue. An issue has no measured metric, so the
+    # focus prompt is the free-text description the agents investigate.
+    alert = AnomalyAlert(
+        dataset_ids=[dataset_id],
+        metric_spec=MetricSpec(
+            metric_type="description",
+            expression=body.focus_prompt,
+            display_name=issue["title"],
+        ),
+        anomaly_type="custom",
+        expected_value=0.0,
+        actual_value=0.0,
+        deviation_pct=0.0,
+        anomaly_date=issue["created_at"].date().isoformat(),
+        severity=issue["severity"] or "medium",
+    )
     alert_data = {
-        "dataset_id": dataset_id,
-        "source": "issue_spawn",
+        **alert.model_dump(mode="json"),
         "issue_id": str(issue_id),
         "focus_prompt": body.focus_prompt,
     }

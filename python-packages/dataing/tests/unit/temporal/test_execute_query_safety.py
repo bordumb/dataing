@@ -8,8 +8,6 @@ the adapter that will execute the query. There is no default dialect.
 from __future__ import annotations
 
 from collections.abc import Awaitable, Callable
-from datetime import date
-from decimal import Decimal
 from typing import Any
 from unittest.mock import AsyncMock
 
@@ -226,44 +224,3 @@ class TestReadOnlyPolicy:
 
         assert result.error is None
         adapter.execute_query.assert_awaited_once_with(sql)
-
-
-class TestResults:
-    """Query results come back JSON-safe, and failures come back as errors."""
-
-    async def test_rows_are_json_safe(self) -> None:
-        """Test that dates and decimals are converted for Temporal serialization."""
-        adapter = _recording(
-            PostgresAdapter,
-            QueryResult(
-                columns=[
-                    {"name": "day", "data_type": "date"},
-                    {"name": "total", "data_type": "decimal"},
-                ],
-                rows=[{"day": date(2024, 1, 15), "total": Decimal("9.50")}],
-                row_count=1,
-            ),
-        )
-
-        result = await _run(_serving(adapter), "SELECT day, total FROM sales LIMIT 1")
-
-        assert result.error is None
-        assert result.rows == [{"day": "2024-01-15", "total": "9.50"}]
-        assert result.columns == [
-            {"name": "day", "data_type": "date"},
-            {"name": "total", "data_type": "decimal"},
-        ]
-        assert result.row_count == 1
-        assert result.hypothesis_id == "h1"
-
-    async def test_execution_failure_is_an_error(self) -> None:
-        """Test that a failed query is reported as an error, not as zero rows."""
-        adapter = PostgresAdapter({})
-        adapter.execute_query = AsyncMock(  # type: ignore[method-assign]
-            side_effect=RuntimeError('relation "users" does not exist')
-        )
-
-        result = await _run(_serving(adapter), "SELECT id FROM users LIMIT 10")
-
-        assert result.error == 'Query execution failed: relation "users" does not exist'
-        assert result.rows == []

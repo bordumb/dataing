@@ -282,7 +282,13 @@ class TestQueryGatewayUserAdapter:
 
         gateway = QueryGateway(mock_app_db)
         adapter = await gateway._create_user_adapter(query_principal, credentials)
+        with patch("asyncpg.create_pool", new_callable=AsyncMock) as create_pool:
+            await adapter.connect()
 
-        assert adapter._build_dsn() == (
-            "postgresql://alice:alice-secret@db.internal:5432/analytics?sslmode=prefer"
+        pool_kwargs = create_pool.call_args.kwargs
+        assert (pool_kwargs["user"], pool_kwargs["password"]) == ("alice", "alice-secret")
+        assert (pool_kwargs["host"], pool_kwargs["port"], pool_kwargs["database"]) == (
+            "db.internal",
+            5432,
+            "analytics",
         )

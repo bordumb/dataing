@@ -550,6 +550,24 @@ class TestSlackAdapter:
         )
         assert adapter.get_event_type(request) == "message"
 
+    def test_handshake_response_echoes_challenge(self, adapter: SlackAdapter) -> None:
+        """Test a url_verification request gets its challenge back."""
+        request = make_request({"type": "url_verification", "challenge": "3eZbrw1aB"})
+        assert adapter.handshake_response(request) == {"challenge": "3eZbrw1aB"}
+
+    def test_handshake_response_none_for_events(self, adapter: SlackAdapter) -> None:
+        """Test an ordinary event is not a handshake."""
+        request = make_request({"type": "event_callback", "event": {"type": "message"}})
+        assert adapter.handshake_response(request) is None
+
+    @pytest.mark.parametrize("provider", sorted(set(AdapterRegistry.list_providers()) - {"slack"}))
+    def test_other_providers_have_no_handshake(self, provider: str) -> None:
+        """Test only Slack answers a url_verification challenge."""
+        other = get_adapter(provider)
+        assert other is not None
+        request = make_request({"type": "url_verification", "challenge": "3eZbrw1aB"})
+        assert other.handshake_response(request) is None
+
 
 class TestSodaAdapter:
     """Test Soda Cloud adapter."""

@@ -89,6 +89,21 @@ class SlackAdapter(IntegrationAdapter):
         expected_signature = f"v0={calculated}"
         return hmac.compare_digest(signature, expected_signature)
 
+    def handshake_response(
+        self,
+        request: WebhookRequest,
+    ) -> dict[str, Any] | None:
+        """Echo the challenge of a url_verification request.
+
+        Slack checks an Events API request URL by sending a challenge that the
+        endpoint must send back.
+        """
+        payload = request.body_json
+        challenge = payload.get("challenge")
+        if payload.get("type") == "url_verification" and isinstance(challenge, str):
+            return {"challenge": challenge}
+        return None
+
     def parse_payload(
         self,
         request: WebhookRequest,

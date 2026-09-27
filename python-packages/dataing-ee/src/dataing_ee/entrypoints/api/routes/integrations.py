@@ -47,6 +47,10 @@ VALID_PROVIDERS = (
     "^(jira|linear|pagerduty|opsgenie|monte_carlo|great_expectations|soda|dbt|slack|custom)$"
 )
 
+# A signing secret issued by the provider, for providers that issue their own
+# (Slack, dbt Cloud)
+ProviderSigningSecret = Annotated[str, Field(min_length=16, max_length=512)]
+
 
 class IntegrationCreate(BaseModel):
     """Request to create an integration."""
@@ -55,6 +59,8 @@ class IntegrationCreate(BaseModel):
     provider: str = Field(..., pattern=VALID_PROVIDERS)
     config: dict[str, Any] | None = Field(default=None)
     rate_limit_per_minute: int = Field(default=60, ge=1, le=1000)
+    # Omit to have a signing secret generated
+    signing_secret: ProviderSigningSecret | None = None
 
 
 class IntegrationUpdate(BaseModel):
@@ -64,6 +70,8 @@ class IntegrationUpdate(BaseModel):
     enabled: bool | None = None
     config: dict[str, Any] | None = None
     rate_limit_per_minute: int | None = Field(default=None, ge=1, le=1000)
+    # Replaces the signing secret, e.g. after the provider rotates it
+    signing_secret: ProviderSigningSecret | None = None
 
 
 class IntegrationResponse(BaseModel):
@@ -260,9 +268,10 @@ async def create_integration(
 ) -> IntegrationSecretResponse:
     """Create a new integration.
 
-    Requires admin scope. Returns the signing secret (shown only once).
+    Requires admin scope. Uses the provider's signing secret when one is given,
+    otherwise generates one. Returns the signing secret (shown only once).
     """
-    signing_secret = _generate_signing_secret()
+    signing_secret = body.signing_secret or _generate_signing_secret()
 
     row = await db.fetch_one(
         """
@@ -365,6 +374,11 @@ async def update_integration(
         params.append(body.rate_limit_per_minute)
         param_idx += 1
 
+    if body.signing_secret is not None:
+        updates.append(f"signing_secret = ${param_idx}")
+        params.append(body.signing_secret)
+        param_idx += 1
+
     updates.append("updated_at = NOW()")
 
     if not updates:
@@ -383,6 +397,9 @@ async def update_integration(
     row = await db.fetch_one(query, *params)
     if not row:
         raise HTTPException(status_code=404, detail="Integration not found")
+
+    if body.signing_secret is not None:
+        logger.info(f"Integration secret replaced: id={integration_id}, tenant={auth.tenant_id}")
 
     return _row_to_response(row, request)
 
@@ -530,6 +547,12 @@ async def receive_provider_webhook(
 
     if not integration["enabled"]:
         return {"status": "skipped", "reason": "integration_disabled"}
+
+    # Answer endpoint-verification handshakes, such as Slack's url_verification
+    if adapter and webhook_request:
+        handshake = adapter.handshake_response(webhook_request)
+        if handshake is not None:
+            return handshake
 
     # Check if adapter wants to process this event
     if adapter and webhook_request and not adapter.should_process(webhook_request):

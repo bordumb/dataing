@@ -151,6 +151,25 @@ class IntegrationAdapter(ABC):
         _ = request  # Available for subclass overrides
         return True
 
+    def handshake_response(
+        self,
+        request: WebhookRequest,  # noqa: ARG002
+    ) -> dict[str, Any] | None:
+        """Answer the provider's endpoint-verification handshake, if this is one.
+
+        Override for providers that check a webhook URL by expecting a specific
+        response, such as Slack's url_verification challenge. Only called once
+        the request's signature has been verified.
+
+        Args:
+            request: The incoming webhook request
+
+        Returns:
+            The response body to send back, or None if the request is not a handshake
+        """
+        _ = request  # Available for subclass overrides
+        return None
+
     # Helper methods for common signature verification patterns
 
     def _verify_hmac_sha256(

@@ -30,6 +30,7 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 from dataing.entrypoints.api.deps import get_app_db
+from dataing.entrypoints.api.middleware.auth import ApiKeyContext, verify_api_key
 
 
 class TestIntegrationCreateSchema:
@@ -714,3 +715,122 @@ class TestProviderWebhookAuthentication:
 
     def test_signed_webhooks_cover_every_adapter(self) -> None:
         assert set(ADAPTER_WEBHOOKS) == set(AdapterRegistry.list_providers())
+
+
+SLACK_URL_VERIFICATION = {"type": "url_verification", "token": "legacy", "challenge": "3eZbrw1aB"}
+
+
+class TestProviderHandshake:
+    """Endpoint-verification handshakes are answered only once authenticated."""
+
+    def test_answers_signed_slack_url_verification(self) -> None:
+        payload = SLACK_URL_VERIFICATION
+        db = _webhook_db(_integration_row("slack", WEBHOOK_SECRET))
+
+        response = _post_webhook(db, "slack", payload, _signed_by("slack", payload))
+
+        assert response.status_code == 200
+        assert response.json() == {"challenge": "3eZbrw1aB"}
+        assert not _recorded_event(db)
+
+    def test_rejects_url_verification_with_bad_signature(self) -> None:
+        payload = SLACK_URL_VERIFICATION
+        db = _webhook_db(_integration_row("slack", WEBHOOK_SECRET))
+
+        response = _post_webhook(
+            db, "slack", payload, _signed_by("slack", payload, secret="another_secret")
+        )
+
+        assert response.status_code == 401
+        assert response.json() == {"detail": "Invalid webhook signature"}
+
+
+# Shaped like a Slack signing secret: 32 hex characters, issued by the provider.
+PROVIDER_SECRET = "0123456789abcdef" * 2
+
+
+def _admin_client(db: AsyncMock) -> TestClient:
+    app = FastAPI()
+    app.include_router(router, prefix="/api/v1")
+    app.dependency_overrides[get_app_db] = lambda: db
+    app.dependency_overrides[verify_api_key] = lambda: ApiKeyContext(
+        key_id=uuid4(),
+        tenant_id=uuid4(),
+        tenant_slug="test",
+        tenant_name="Test",
+        user_id=uuid4(),
+        scopes=["admin"],
+    )
+    return TestClient(app)
+
+
+def _integration_record() -> dict[str, Any]:
+    """An integrations row as the CRUD routes read it back."""
+    now = datetime.now(UTC)
+    return {
+        "id": uuid4(),
+        "tenant_id": uuid4(),
+        "name": "Slack",
+        "provider": "slack",
+        "enabled": True,
+        "config": {},
+        "rate_limit_per_minute": 60,
+        "last_webhook_at": None,
+        "webhook_count": 0,
+        "error_count": 0,
+        "created_at": now,
+        "updated_at": now,
+    }
+
+
+class TestProviderSigningSecret:
+    """Providers that issue their own signing secret (Slack, dbt Cloud) can supply it."""
+
+    def test_create_stores_supplied_secret(self) -> None:
+        db = AsyncMock()
+        db.fetch_one.return_value = {"id": uuid4()}
+
+        response = _admin_client(db).post(
+            "/api/v1/integrations",
+            json={"name": "Slack", "provider": "slack", "signing_secret": PROVIDER_SECRET},
+        )
+
+        assert response.status_code == 201
+        assert response.json()["signing_secret"] == PROVIDER_SECRET
+        assert PROVIDER_SECRET in db.fetch_one.await_args.args
+
+    def test_create_generates_secret_when_none_supplied(self) -> None:
+        db = AsyncMock()
+        db.fetch_one.return_value = {"id": uuid4()}
+
+        response = _admin_client(db).post(
+            "/api/v1/integrations", json={"name": "Jira", "provider": "jira"}
+        )
+
+        secret = response.json()["signing_secret"]
+        assert response.status_code == 201
+        assert len(secret) == 64
+        assert secret in db.fetch_one.await_args.args
+
+    def test_update_replaces_secret_without_returning_it(self) -> None:
+        record = _integration_record()
+        db = AsyncMock()
+        db.fetch_one.side_effect = [{"id": record["id"]}, record]
+
+        response = _admin_client(db).patch(
+            f"/api/v1/integrations/{record['id']}", json={"signing_secret": PROVIDER_SECRET}
+        )
+
+        assert response.status_code == 200
+        assert "signing_secret" not in response.json()
+        update = db.fetch_one.await_args
+        assert "signing_secret = $" in update.args[0]
+        assert PROVIDER_SECRET in update.args
+
+    def test_create_rejects_short_secret(self) -> None:
+        with pytest.raises(ValueError):
+            IntegrationCreate(name="Slack", provider="slack", signing_secret="x" * 15)
+
+    def test_update_rejects_short_secret(self) -> None:
+        with pytest.raises(ValueError):
+            IntegrationUpdate(signing_secret="x" * 15)

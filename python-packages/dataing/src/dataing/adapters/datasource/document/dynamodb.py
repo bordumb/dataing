@@ -17,7 +17,6 @@ from dataing.adapters.datasource.errors import (
     QueryTimeoutError,
     SchemaFetchFailedError,
 )
-from dataing.adapters.datasource.registry import register_adapter
 from dataing.adapters.datasource.types import (
     AdapterCapabilities,
     ConfigField,
@@ -29,7 +28,6 @@ from dataing.adapters.datasource.types import (
     QueryResult,
     SchemaFilter,
     SchemaResponse,
-    SourceCategory,
     SourceType,
 )
 
@@ -122,15 +120,10 @@ DYNAMODB_CAPABILITIES = AdapterCapabilities(
 )
 
 
-@register_adapter(
-    source_type=SourceType.DYNAMODB,
-    display_name="Amazon DynamoDB",
-    category=SourceCategory.DATABASE,
-    icon="dynamodb",
-    description="Connect to Amazon DynamoDB NoSQL tables",
-    capabilities=DYNAMODB_CAPABILITIES,
-    config_schema=DYNAMODB_CONFIG_SCHEMA,
-)
+# Deliberately not registered: aggregate, count_documents and infer_schema are
+# unimplemented, so the class is abstract and the datasource picker must not offer it.
+# Restore @register_adapter (with DYNAMODB_CONFIG_SCHEMA) once they exist; the
+# concreteness guard in tests/unit/adapters/datasource/test_registry.py enforces this.
 class DynamoDBAdapter(DocumentAdapter):
     """Amazon DynamoDB adapter.
 

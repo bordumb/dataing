@@ -1,5 +1,9 @@
 # Apache Cassandra Integration
 
+!!! warning "Not available yet"
+    Cassandra is not yet offered as a data source in dataing. This page describes the
+    planned integration.
+
 Connect dataing to Apache Cassandra for distributed NoSQL data quality investigations.
 
 ---

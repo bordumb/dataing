@@ -44,10 +44,9 @@ class TestAdapterRegistryContracts:
         assert SourceType.REDSHIFT in registered
         assert SourceType.DUCKDB in registered
 
-        # Document adapters
+        # Document adapters (DynamoDB and Cassandra stay unregistered until they
+        # implement the full DocumentAdapter contract)
         assert SourceType.MONGODB in registered
-        assert SourceType.DYNAMODB in registered
-        assert SourceType.CASSANDRA in registered
 
         # API adapters (EE-only, skip if not available)
         # Note: Salesforce, HubSpot, Stripe are EE-only adapters
@@ -156,8 +155,6 @@ class TestCapabilitiesContracts:
         registry = get_registry()
         doc_types = [
             SourceType.MONGODB,
-            SourceType.DYNAMODB,
-            SourceType.CASSANDRA,
         ]
 
         for source_type in doc_types:
@@ -313,8 +310,6 @@ class TestSourceCategoryContracts:
         registry = get_registry()
         doc_types = [
             SourceType.MONGODB,
-            SourceType.DYNAMODB,
-            SourceType.CASSANDRA,
         ]
 
         for source_type in doc_types:

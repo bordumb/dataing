@@ -1,5 +1,9 @@
 # Amazon DynamoDB Integration
 
+!!! warning "Not available yet"
+    DynamoDB is not yet offered as a data source in dataing. This page describes the
+    planned integration.
+
 Connect dataing to Amazon DynamoDB for NoSQL data quality investigations.
 
 ---

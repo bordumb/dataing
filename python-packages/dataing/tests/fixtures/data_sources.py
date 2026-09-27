@@ -6,6 +6,16 @@ import uuid
 from datetime import UTC, datetime
 
 import pytest
+from cryptography.fernet import Fernet
+
+
+@pytest.fixture
+def encryption_key(monkeypatch: pytest.MonkeyPatch) -> bytes:
+    """Install a fresh key for encrypting stored secrets and return it."""
+    key = Fernet.generate_key()
+    monkeypatch.delenv("DATADR_ENCRYPTION_KEY", raising=False)
+    monkeypatch.setenv("ENCRYPTION_KEY", key.decode())
+    return key
 
 
 @pytest.fixture

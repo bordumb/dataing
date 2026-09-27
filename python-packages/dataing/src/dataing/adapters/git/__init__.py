@@ -1,5 +1,6 @@
 """Git provider adapters for repository sync and commit parsing."""
 
+from dataing.adapters.git.access_token import decrypt_access_token, encrypt_access_token
 from dataing.adapters.git.github import GitHubProvider
 from dataing.adapters.git.pr_enrichment import PREnrichmentService, PRMetadata
 from dataing.adapters.git.provider import GitCommit, GitProvider
@@ -24,4 +25,6 @@ __all__ = [
     "build_best_link",
     "build_commit_url",
     "build_pr_url",
+    "decrypt_access_token",
+    "encrypt_access_token",
 ]

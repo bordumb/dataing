@@ -334,6 +334,20 @@ class TestConfigSchemaContracts:
                     field.group in group_ids
                 ), f"Field {field.name} references unknown group {field.group}"
 
+    @pytest.mark.parametrize("source_type", list(SourceType))
+    def test_login_field_is_username(self, source_type: SourceType):
+        """Adapters take their login as `username`, the key user credentials overlay."""
+        registry = get_registry()
+
+        definition = registry.get_definition(source_type)
+        if definition is None:
+            pytest.skip(f"Adapter for {source_type} not registered")
+
+        field_names = {field.name for field in definition.config_schema.fields}
+        assert "user" not in field_names
+        if "password" in field_names:
+            assert "username" in field_names
+
 
 class TestNormalizedTypeContracts:
     """Verify normalized type contracts."""

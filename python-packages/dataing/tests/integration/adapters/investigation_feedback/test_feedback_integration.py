@@ -1,7 +1,6 @@
 """Integration tests for feedback system with real database."""
 
-import os
-from collections.abc import AsyncGenerator
+from uuid import UUID
 
 import pytest
 
@@ -17,45 +16,14 @@ class TestInvestigationFeedbackIntegration:
     """Integration tests for investigation feedback with real database."""
 
     @pytest.fixture
-    async def db(self) -> AsyncGenerator[AppDatabase, None]:
-        """Create database connection."""
-        dsn = os.getenv("DATABASE_URL", "postgresql://dataing:dataing@localhost:5432/dataing_demo")
-        db = AppDatabase(dsn=dsn)
-        try:
-            await db.connect()
-        except Exception as e:
-            pytest.skip(f"Database not available: {e}")
-        yield db
-        await db.close()
-
-    @pytest.fixture
-    def adapter(self, db: AppDatabase) -> InvestigationFeedbackAdapter:
+    def adapter(self, migrated_db: AppDatabase) -> InvestigationFeedbackAdapter:
         """Create feedback adapter."""
-        return InvestigationFeedbackAdapter(db=db)
+        return InvestigationFeedbackAdapter(db=migrated_db)
 
     async def test_emit_and_retrieve_event(
-        self, adapter: InvestigationFeedbackAdapter, db: AppDatabase
+        self, adapter: InvestigationFeedbackAdapter, migrated_db: AppDatabase, tenant_id: UUID
     ) -> None:
         """Events can be emitted and retrieved."""
-        # Create a test tenant for this test
-        from uuid import uuid4
-
-        tenant_id = uuid4()
-        try:
-            await db.execute(
-                """
-                INSERT INTO tenants (id, name, slug)
-                VALUES ($1, $2, $3)
-                ON CONFLICT (slug) DO UPDATE SET name = EXCLUDED.name
-                RETURNING id
-                """,
-                tenant_id,
-                "Test Tenant",
-                f"test-tenant-{tenant_id.hex[:8]}",
-            )
-        except Exception as e:
-            pytest.skip(f"Database schema not available: {e}")
-
         # Emit an event
         event = await adapter.emit(
             tenant_id=tenant_id,
@@ -64,7 +32,7 @@ class TestInvestigationFeedbackIntegration:
         )
 
         # Retrieve events
-        events = await db.list_feedback_events(tenant_id=tenant_id)
+        events = await migrated_db.list_feedback_events(tenant_id=tenant_id)
 
         # Find our event
         our_event = next((e for e in events if e["id"] == event.id), None)

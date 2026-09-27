@@ -48,7 +48,8 @@ repos:
     hooks:
       - id: mypy
         name: mypy (python-packages)
-        entry: bash -c 'uv run mypy python-packages/dataing/src python-packages/dataing-ee/src'
+        # --frozen: never rewrite uv.lock from a commit hook; --extra dev: mypy lives there
+        entry: bash -c 'uv run --frozen --extra dev mypy python-packages/dataing/src python-packages/dataing-ee/src'
         language: system
         files: ^python-packages/.*\.py$
         pass_filenames: false
@@ -59,23 +60,25 @@ repos:
     hooks:
       - id: tsc
         name: tsc (frontend)
-        entry: bash -c 'cd frontend && pnpm tsc --noEmit'
+        entry: bash -c 'cd frontend/app && pnpm typecheck'
         language: system
-        files: ^frontend/src/.*\.(ts|tsx)$
+        files: ^frontend/app/src/.*\.(ts|tsx)$
         pass_filenames: false
 
       - id: eslint
         name: eslint (frontend)
-        entry: bash -c 'cd frontend && pnpm lint --fix'
+        entry: bash -c 'cd frontend/app && pnpm lint --fix'
         language: system
-        files: ^frontend/src/.*\.(ts|tsx|js|jsx)$
+        files: ^frontend/app/src/.*\.(ts|tsx|js|jsx)$
         pass_filenames: false
 
+      # Staged paths arrive as "$@" (the trailing -- is $0) relative to the repo
+      # root; strip the frontend/app/ prefix because prettier runs from there.
       - id: prettier
         name: prettier (frontend)
-        entry: bash -c 'cd frontend && pnpm exec prettier --write --ignore-unknown'
+        entry: bash -c 'cd frontend/app && pnpm exec prettier --write --ignore-unknown "${@#frontend/app/}"' --
         language: system
-        files: ^frontend/src/.*\.(ts|tsx|js|jsx|json|css|scss|md)$
+        files: ^frontend/app/src/.*\.(ts|tsx|js|jsx|json|css|scss|md)$
         pass_filenames: true
 
   # SQL formatting (optional - comment out if not using)

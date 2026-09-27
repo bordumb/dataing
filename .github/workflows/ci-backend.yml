@@ -22,9 +22,48 @@ jobs:
   test:
     runs-on: ubuntu-latest
 
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+        with:
+          version: "latest"
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.11'
+
+      # --locked fails the job when uv.lock is out of date with the pyproject files
+      - name: Install dependencies
+        run: uv sync --locked --all-extras
+
+      - name: Run Ruff
+        run: uv run ruff check python-packages/dataing/src python-packages/dataing-ee/src
+
+      - name: Run mypy
+        run: uv run mypy python-packages/dataing/src python-packages/dataing-ee/src
+
+      # Run tests per-package to avoid conftest.py module conflicts
+      - name: Run tests
+        run: |
+          uv run pytest python-packages/dataing/tests --cov=python-packages/dataing/src/dataing --cov-report=xml --cov-append
+          uv run pytest python-packages/dataing-ee/tests --cov=python-packages/dataing-ee/src/dataing_ee --cov-report=xml --cov-append
+
+      - name: Upload coverage
+        uses: codecov/codecov-action@v5
+        with:
+          files: coverage.xml
+          fail_ci_if_error: false
+
+  integration:
+    runs-on: ubuntu-latest
+
     services:
       postgres:
-        image: postgres:15
+        # pgvector image: migration 012_agent_memories.sql needs the vector extension
+        image: pgvector/pgvector:pg16
         env:
           POSTGRES_USER: test
           POSTGRES_PASSWORD: test
@@ -51,34 +90,11 @@ jobs:
           python-version: '3.11'
 
       - name: Install dependencies
-        run: uv sync --all-extras
+        run: uv sync --locked --extra dev
 
-      - name: Run Ruff
-        run: uv run ruff check python-packages/dataing/src python-packages/dataing-ee/src
-
-      - name: Run mypy
-        run: uv run mypy python-packages/dataing/src python-packages/dataing-ee/src
-
-      # Run database migrations for integration tests
-      - name: Run migrations
-        run: |
-          for f in python-packages/dataing/migrations/*.sql; do
-            echo "Running $f..."
-            psql -h localhost -U test -d test -f "$f" 2>&1 | grep -v "^NOTICE:" || true
-          done
-        env:
-          PGPASSWORD: test
-
-      # Run tests per-package to avoid conftest.py module conflicts
-      - name: Run tests
-        run: |
-          uv run pytest python-packages/dataing/tests --cov=python-packages/dataing/src/dataing --cov-report=xml --cov-append
-          uv run pytest python-packages/dataing-ee/tests --cov=python-packages/dataing-ee/src/dataing_ee --cov-report=xml --cov-append
+      # The migrated_db fixture (tests/integration/conftest.py) creates a throwaway
+      # database on this server and applies every migration to it with psql.
+      - name: Run integration tests
+        run: uv run pytest python-packages/dataing/tests/integration -m integration --no-cov
         env:
           DATABASE_URL: postgresql://test:test@localhost:5432/test
-
-      - name: Upload coverage
-        uses: codecov/codecov-action@v5
-        with:
-          files: coverage.xml
-          fail_ci_if_error: false

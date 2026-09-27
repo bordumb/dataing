@@ -657,6 +657,20 @@ async def provide_link_feedback(
     body: LinkFeedbackRequest,
 ) -> dict[str, str]:
     """Provide feedback on a runbook link."""
+    # Verify runbook exists. runbook_links has no tenant_id, so this check is
+    # what keeps the UPDATEs below inside the caller's tenant.
+    runbook = await db.fetch_one(
+        "SELECT id FROM runbooks WHERE id = $1 AND tenant_id = $2",
+        runbook_id,
+        auth.tenant_id,
+    )
+
+    if not runbook:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Runbook not found",
+        )
+
     result = await db.execute(
         """
         UPDATE runbook_links

@@ -8,20 +8,19 @@ from __future__ import annotations
 
 from typing import Annotated, Any
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from pydantic import BaseModel, Field
 
-from dataing.adapters.datasource.errors import AdapterError
-from dataing.adapters.datasource.local_paths import resolve_local_path
 from dataing.adapters.lineage import (
     DatasetId,
+    LineageAdapter,
     get_lineage_registry,
 )
 from dataing.adapters.lineage.exceptions import (
     ColumnLineageNotSupportedError,
     DatasetNotFoundError,
-    LineageProviderNotFoundError,
 )
+from dataing.entrypoints.api.deps import get_tenant_lineage_adapter
 from dataing.entrypoints.api.middleware.auth import (
     ApiKeyContext,
     verify_api_key,
@@ -31,6 +30,28 @@ router = APIRouter(prefix="/lineage", tags=["lineage"])
 
 # Annotated types for dependency injection
 AuthDep = Annotated[ApiKeyContext, Depends(verify_api_key)]
+
+
+async def _tenant_lineage_adapter(request: Request, auth: AuthDep) -> LineageAdapter:
+    """Get the lineage adapter the caller's organization has configured.
+
+    Provider connection details (manifest paths, API base URLs) come only from
+    organization settings, never from the request: a caller-supplied URL or path
+    would let any user make the server fetch any URL or read any file it can reach.
+
+    Raises:
+        HTTPException: 404 if the organization has no lineage provider configured.
+    """
+    adapter = await get_tenant_lineage_adapter(request, auth.tenant_id)
+    if adapter is None:
+        raise HTTPException(
+            status_code=404,
+            detail="No lineage provider is configured for this organization.",
+        )
+    return adapter
+
+
+LineageAdapterDep = Annotated[LineageAdapter, Depends(_tenant_lineage_adapter)]
 
 
 # --- Request/Response Models ---
@@ -162,26 +183,6 @@ class SearchResultsResponse(BaseModel):
 # --- Helper functions ---
 
 
-def _get_adapter(provider: str, config: dict[str, Any]) -> Any:
-    """Get a lineage adapter from the registry.
-
-    Args:
-        provider: Provider type.
-        config: Provider configuration.
-
-    Returns:
-        Lineage adapter instance.
-
-    Raises:
-        HTTPException: If provider not found.
-    """
-    registry = get_lineage_registry()
-    try:
-        return registry.create(provider, config)
-    except LineageProviderNotFoundError as e:
-        raise HTTPException(status_code=400, detail=str(e)) from e
-
-
 def _dataset_to_response(dataset: Any) -> DatasetResponse:
     """Convert Dataset to API response.
 
@@ -264,21 +265,14 @@ async def list_providers() -> LineageProvidersResponse:
 
 @router.get("/upstream", response_model=UpstreamResponse)
 async def get_upstream(
-    auth: AuthDep,
+    adapter: LineageAdapterDep,
     dataset: str = Query(..., description="Dataset identifier (platform://name)"),
     depth: int = Query(1, ge=1, le=10, description="Depth of lineage traversal"),
-    provider: str = Query("dbt", description="Lineage provider to use"),
-    manifest_path: str | None = Query(None, description="Path to dbt manifest.json"),
-    base_url: str | None = Query(None, description="Base URL for API-based providers"),
 ) -> UpstreamResponse:
     """Get upstream (parent) datasets.
 
     Returns datasets that feed into the specified dataset.
     """
-    # Build config based on provider
-    config = _build_provider_config(provider, manifest_path, base_url)
-
-    adapter = _get_adapter(provider, config)
     dataset_id = DatasetId.from_urn(dataset)
 
     try:
@@ -295,20 +289,14 @@ async def get_upstream(
 
 @router.get("/downstream", response_model=DownstreamResponse)
 async def get_downstream(
-    auth: AuthDep,
+    adapter: LineageAdapterDep,
     dataset: str = Query(..., description="Dataset identifier (platform://name)"),
     depth: int = Query(1, ge=1, le=10, description="Depth of lineage traversal"),
-    provider: str = Query("dbt", description="Lineage provider to use"),
-    manifest_path: str | None = Query(None, description="Path to dbt manifest.json"),
-    base_url: str | None = Query(None, description="Base URL for API-based providers"),
 ) -> DownstreamResponse:
     """Get downstream (child) datasets.
 
     Returns datasets that depend on the specified dataset.
     """
-    config = _build_provider_config(provider, manifest_path, base_url)
-
-    adapter = _get_adapter(provider, config)
     dataset_id = DatasetId.from_urn(dataset)
 
     try:
@@ -325,21 +313,15 @@ async def get_downstream(
 
 @router.get("/graph", response_model=LineageGraphResponse)
 async def get_lineage_graph(
-    auth: AuthDep,
+    adapter: LineageAdapterDep,
     dataset: str = Query(..., description="Dataset identifier (platform://name)"),
     upstream_depth: int = Query(3, ge=0, le=10, description="Upstream traversal depth"),
     downstream_depth: int = Query(3, ge=0, le=10, description="Downstream traversal depth"),
-    provider: str = Query("dbt", description="Lineage provider to use"),
-    manifest_path: str | None = Query(None, description="Path to dbt manifest.json"),
-    base_url: str | None = Query(None, description="Base URL for API-based providers"),
 ) -> LineageGraphResponse:
     """Get full lineage graph around a dataset.
 
     Returns a graph structure with datasets, edges, and jobs.
     """
-    config = _build_provider_config(provider, manifest_path, base_url)
-
-    adapter = _get_adapter(provider, config)
     dataset_id = DatasetId.from_urn(dataset)
 
     try:
@@ -382,21 +364,15 @@ async def get_lineage_graph(
 
 @router.get("/column-lineage", response_model=ColumnLineageListResponse)
 async def get_column_lineage(
-    auth: AuthDep,
+    adapter: LineageAdapterDep,
     dataset: str = Query(..., description="Dataset identifier (platform://name)"),
     column: str = Query(..., description="Column name to trace"),
-    provider: str = Query("dbt", description="Lineage provider to use"),
-    manifest_path: str | None = Query(None, description="Path to dbt manifest.json"),
-    base_url: str | None = Query(None, description="Base URL for API-based providers"),
 ) -> ColumnLineageListResponse:
     """Get column-level lineage.
 
     Returns the source columns that feed into the specified column.
     Not all providers support column lineage.
     """
-    config = _build_provider_config(provider, manifest_path, base_url)
-
-    adapter = _get_adapter(provider, config)
     dataset_id = DatasetId.from_urn(dataset)
 
     try:
@@ -426,17 +402,11 @@ async def get_column_lineage(
 async def get_job(
     job_id: str,
     auth: AuthDep,
-    provider: str = Query("dbt", description="Lineage provider to use"),
-    manifest_path: str | None = Query(None, description="Path to dbt manifest.json"),
-    base_url: str | None = Query(None, description="Base URL for API-based providers"),
 ) -> JobResponse:
     """Get job details.
 
     Returns information about a job that produces or consumes datasets.
     """
-    # Note: These parameters would be used once fully implemented
-    _ = (job_id, provider, manifest_path, base_url)  # Silence unused variable warnings
-
     # For now, we need to search for the job
     # This is a simplified implementation
     raise HTTPException(
@@ -448,20 +418,13 @@ async def get_job(
 @router.get("/job/{job_id}/runs", response_model=JobRunsResponse)
 async def get_job_runs(
     job_id: str,
-    auth: AuthDep,
+    adapter: LineageAdapterDep,
     limit: int = Query(10, ge=1, le=100, description="Maximum runs to return"),
-    provider: str = Query("dbt", description="Lineage provider to use"),
-    manifest_path: str | None = Query(None, description="Path to dbt manifest.json"),
-    base_url: str | None = Query(None, description="Base URL for API-based providers"),
 ) -> JobRunsResponse:
     """Get recent runs of a job.
 
     Returns execution history for the specified job.
     """
-    config = _build_provider_config(provider, manifest_path, base_url)
-
-    adapter = _get_adapter(provider, config)
-
     try:
         runs = await adapter.get_recent_runs(job_id, limit=limit)
         return JobRunsResponse(
@@ -486,21 +449,14 @@ async def get_job_runs(
 
 @router.get("/search", response_model=SearchResultsResponse)
 async def search_datasets(
-    auth: AuthDep,
+    adapter: LineageAdapterDep,
     q: str = Query(..., min_length=1, description="Search query"),
     limit: int = Query(20, ge=1, le=100, description="Maximum results"),
-    provider: str = Query("dbt", description="Lineage provider to use"),
-    manifest_path: str | None = Query(None, description="Path to dbt manifest.json"),
-    base_url: str | None = Query(None, description="Base URL for API-based providers"),
 ) -> SearchResultsResponse:
     """Search for datasets by name or description.
 
     Returns datasets matching the search query.
     """
-    config = _build_provider_config(provider, manifest_path, base_url)
-
-    adapter = _get_adapter(provider, config)
-
     try:
         datasets = await adapter.search_datasets(q, limit=limit)
         return SearchResultsResponse(
@@ -513,23 +469,16 @@ async def search_datasets(
 
 @router.get("/datasets", response_model=SearchResultsResponse)
 async def list_datasets(
-    auth: AuthDep,
+    adapter: LineageAdapterDep,
     platform: str | None = Query(None, description="Filter by platform"),
     database: str | None = Query(None, description="Filter by database"),
     schema_name: str | None = Query(None, alias="schema", description="Filter by schema"),
     limit: int = Query(100, ge=1, le=1000, description="Maximum results"),
-    provider: str = Query("dbt", description="Lineage provider to use"),
-    manifest_path: str | None = Query(None, description="Path to dbt manifest.json"),
-    base_url: str | None = Query(None, description="Base URL for API-based providers"),
 ) -> SearchResultsResponse:
     """List datasets with optional filters.
 
     Returns datasets from the lineage provider.
     """
-    config = _build_provider_config(provider, manifest_path, base_url)
-
-    adapter = _get_adapter(provider, config)
-
     try:
         datasets = await adapter.list_datasets(
             platform=platform,
@@ -548,18 +497,12 @@ async def list_datasets(
 @router.get("/dataset/{dataset_id:path}", response_model=DatasetResponse)
 async def get_dataset(
     dataset_id: str,
-    auth: AuthDep,
-    provider: str = Query("dbt", description="Lineage provider to use"),
-    manifest_path: str | None = Query(None, description="Path to dbt manifest.json"),
-    base_url: str | None = Query(None, description="Base URL for API-based providers"),
+    adapter: LineageAdapterDep,
 ) -> DatasetResponse:
     """Get dataset details.
 
     Returns metadata for a specific dataset.
     """
-    config = _build_provider_config(provider, manifest_path, base_url)
-
-    adapter = _get_adapter(provider, config)
     ds_id = DatasetId.from_urn(dataset_id)
 
     try:
@@ -571,40 +514,3 @@ async def get_dataset(
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e)) from e
-
-
-def _build_provider_config(
-    provider: str,
-    manifest_path: str | None,
-    base_url: str | None,
-) -> dict[str, Any]:
-    """Build provider configuration from query parameters.
-
-    Args:
-        provider: Provider type.
-        manifest_path: Path to manifest file (for dbt).
-        base_url: Base URL (for API-based providers).
-
-    Returns:
-        Configuration dictionary.
-
-    Raises:
-        HTTPException: 400 if the manifest path is outside the local data root.
-    """
-    config: dict[str, Any] = {}
-
-    if provider == "dbt":
-        if manifest_path:
-            try:
-                resolve_local_path(manifest_path)
-            except AdapterError as e:
-                raise HTTPException(status_code=400, detail=e.message) from e
-            config["manifest_path"] = manifest_path
-        config["target_platform"] = "snowflake"  # Default, should be configurable
-    elif provider in ("openlineage", "airflow", "dagster", "datahub"):
-        if base_url:
-            config["base_url"] = base_url
-        if provider == "openlineage":
-            config["namespace"] = "default"
-
-    return config

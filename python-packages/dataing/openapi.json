@@ -4635,54 +4635,6 @@
               "title": "Depth"
             },
             "description": "Depth of lineage traversal"
-          },
-          {
-            "name": "provider",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "string",
-              "description": "Lineage provider to use",
-              "default": "dbt",
-              "title": "Provider"
-            },
-            "description": "Lineage provider to use"
-          },
-          {
-            "name": "manifest_path",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "description": "Path to dbt manifest.json",
-              "title": "Manifest Path"
-            },
-            "description": "Path to dbt manifest.json"
-          },
-          {
-            "name": "base_url",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "description": "Base URL for API-based providers",
-              "title": "Base Url"
-            },
-            "description": "Base URL for API-based providers"
           }
         ],
         "responses": {
@@ -4750,54 +4702,6 @@
               "title": "Depth"
             },
             "description": "Depth of lineage traversal"
-          },
-          {
-            "name": "provider",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "string",
-              "description": "Lineage provider to use",
-              "default": "dbt",
-              "title": "Provider"
-            },
-            "description": "Lineage provider to use"
-          },
-          {
-            "name": "manifest_path",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "description": "Path to dbt manifest.json",
-              "title": "Manifest Path"
-            },
-            "description": "Path to dbt manifest.json"
-          },
-          {
-            "name": "base_url",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "description": "Base URL for API-based providers",
-              "title": "Base Url"
-            },
-            "description": "Base URL for API-based providers"
           }
         ],
         "responses": {
@@ -4879,54 +4783,6 @@
               "title": "Downstream Depth"
             },
             "description": "Downstream traversal depth"
-          },
-          {
-            "name": "provider",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "string",
-              "description": "Lineage provider to use",
-              "default": "dbt",
-              "title": "Provider"
-            },
-            "description": "Lineage provider to use"
-          },
-          {
-            "name": "manifest_path",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "description": "Path to dbt manifest.json",
-              "title": "Manifest Path"
-            },
-            "description": "Path to dbt manifest.json"
-          },
-          {
-            "name": "base_url",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "description": "Base URL for API-based providers",
-              "title": "Base Url"
-            },
-            "description": "Base URL for API-based providers"
           }
         ],
         "responses": {
@@ -4991,54 +4847,6 @@
               "title": "Column"
             },
             "description": "Column name to trace"
-          },
-          {
-            "name": "provider",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "string",
-              "description": "Lineage provider to use",
-              "default": "dbt",
-              "title": "Provider"
-            },
-            "description": "Lineage provider to use"
-          },
-          {
-            "name": "manifest_path",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "description": "Path to dbt manifest.json",
-              "title": "Manifest Path"
-            },
-            "description": "Path to dbt manifest.json"
-          },
-          {
-            "name": "base_url",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "description": "Base URL for API-based providers",
-              "title": "Base Url"
-            },
-            "description": "Base URL for API-based providers"
           }
         ],
         "responses": {
@@ -5090,54 +4898,6 @@
               "type": "string",
               "title": "Job Id"
             }
-          },
-          {
-            "name": "provider",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "string",
-              "description": "Lineage provider to use",
-              "default": "dbt",
-              "title": "Provider"
-            },
-            "description": "Lineage provider to use"
-          },
-          {
-            "name": "manifest_path",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "description": "Path to dbt manifest.json",
-              "title": "Manifest Path"
-            },
-            "description": "Path to dbt manifest.json"
-          },
-          {
-            "name": "base_url",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "description": "Base URL for API-based providers",
-              "title": "Base Url"
-            },
-            "description": "Base URL for API-based providers"
           }
         ],
         "responses": {
@@ -5203,54 +4963,6 @@
               "title": "Limit"
             },
             "description": "Maximum runs to return"
-          },
-          {
-            "name": "provider",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "string",
-              "description": "Lineage provider to use",
-              "default": "dbt",
-              "title": "Provider"
-            },
-            "description": "Lineage provider to use"
-          },
-          {
-            "name": "manifest_path",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "description": "Path to dbt manifest.json",
-              "title": "Manifest Path"
-            },
-            "description": "Path to dbt manifest.json"
-          },
-          {
-            "name": "base_url",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "description": "Base URL for API-based providers",
-              "title": "Base Url"
-            },
-            "description": "Base URL for API-based providers"
           }
         ],
         "responses": {
@@ -5319,54 +5031,6 @@
               "title": "Limit"
             },
             "description": "Maximum results"
-          },
-          {
-            "name": "provider",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "string",
-              "description": "Lineage provider to use",
-              "default": "dbt",
-              "title": "Provider"
-            },
-            "description": "Lineage provider to use"
-          },
-          {
-            "name": "manifest_path",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "description": "Path to dbt manifest.json",
-              "title": "Manifest Path"
-            },
-            "description": "Path to dbt manifest.json"
-          },
-          {
-            "name": "base_url",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "description": "Base URL for API-based providers",
-              "title": "Base Url"
-            },
-            "description": "Base URL for API-based providers"
           }
         ],
         "responses": {
@@ -5477,54 +5141,6 @@
               "title": "Limit"
             },
             "description": "Maximum results"
-          },
-          {
-            "name": "provider",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "string",
-              "description": "Lineage provider to use",
-              "default": "dbt",
-              "title": "Provider"
-            },
-            "description": "Lineage provider to use"
-          },
-          {
-            "name": "manifest_path",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "description": "Path to dbt manifest.json",
-              "title": "Manifest Path"
-            },
-            "description": "Path to dbt manifest.json"
-          },
-          {
-            "name": "base_url",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "description": "Base URL for API-based providers",
-              "title": "Base Url"
-            },
-            "description": "Base URL for API-based providers"
           }
         ],
         "responses": {
@@ -5576,54 +5192,6 @@
               "type": "string",
               "title": "Dataset Id"
             }
-          },
-          {
-            "name": "provider",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "string",
-              "description": "Lineage provider to use",
-              "default": "dbt",
-              "title": "Provider"
-            },
-            "description": "Lineage provider to use"
-          },
-          {
-            "name": "manifest_path",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "description": "Path to dbt manifest.json",
-              "title": "Manifest Path"
-            },
-            "description": "Path to dbt manifest.json"
-          },
-          {
-            "name": "base_url",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "description": "Base URL for API-based providers",
-              "title": "Base Url"
-            },
-            "description": "Base URL for API-based providers"
           }
         ],
         "responses": {

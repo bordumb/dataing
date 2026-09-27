@@ -10,6 +10,7 @@ from dataing_ee.adapters.integrations import (
     AdapterRegistry,
     DbtAdapter,
     GreatExpectationsAdapter,
+    IntegrationAdapter,
     IssueData,
     JiraAdapter,
     MonteCarloAdapter,
@@ -1097,3 +1098,34 @@ class TestWebhookRequest:
         )
         with pytest.raises(json.JSONDecodeError):
             _ = request.body_json
+
+    def test_header_found_in_any_case(self) -> None:
+        """Test a header is found whatever case it was sent or asked for in."""
+        request = make_request({}, {"x-hub-signature": "sha256=abc", "X-Request-Id": "req-1"})
+
+        assert request.header("X-Hub-Signature") == "sha256=abc"
+        assert request.header("x-request-id") == "req-1"
+
+    def test_header_missing(self) -> None:
+        """Test a header that was not sent is None."""
+        assert make_request({}).header("X-Hub-Signature") is None
+
+
+class TestLowercaseHeaders:
+    """ASGI servers deliver header names in lowercase; adapters must still find them."""
+
+    @pytest.mark.parametrize(
+        ("adapter", "headers", "fingerprint"),
+        [
+            (JiraAdapter(), {"x-atlassian-webhook-id": "wh-1"}, "jira_webhook_wh-1"),
+            (MonteCarloAdapter(), {"x-request-id": "req-1"}, "mc_req-1"),
+            (SodaAdapter(), {"x-request-id": "req-1"}, "soda_req-1"),
+            (DbtAdapter(), {"x-dbt-cloud-webhook-id": "wh-1"}, "dbt_wh-1"),
+        ],
+        ids=["jira", "monte_carlo", "soda", "dbt"],
+    )
+    def test_fingerprint_header(
+        self, adapter: IntegrationAdapter, headers: dict[str, str], fingerprint: str
+    ) -> None:
+        """Test fingerprint headers are read from their lowercase names."""
+        assert adapter.get_fingerprint(make_request({}, headers)) == fingerprint

@@ -55,7 +55,7 @@ class DbtAdapter(IntegrationAdapter):
         dbt Cloud uses HMAC-SHA256 signature in the Authorization header.
         Format varies by dbt Cloud version - support both Bearer token and raw signature.
         """
-        auth_header = request.headers.get(self.signature_header)
+        auth_header = request.header(self.signature_header)
         if not auth_header:
             return False
 
@@ -327,7 +327,7 @@ class DbtAdapter(IntegrationAdapter):
             return f"dbt_{event_id}"
 
         # Check for webhook ID header
-        webhook_id = request.headers.get("X-dbt-Cloud-Webhook-Id")
+        webhook_id = request.header("X-dbt-Cloud-Webhook-Id")
         if webhook_id:
             return f"dbt_{webhook_id}"
 

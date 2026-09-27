@@ -30,6 +30,7 @@ from temporalio.worker import Worker
 from dataing.adapters.context import ContextEngine
 from dataing.adapters.datasource import get_registry
 from dataing.adapters.datasource.base import BaseAdapter
+from dataing.adapters.datasource.types import QueryResult
 from dataing.adapters.db.app_db import AppDatabase
 from dataing.adapters.investigation.pattern_adapter import InMemoryPatternRepository
 from dataing.agents import AgentClient
@@ -56,6 +57,27 @@ logger = logging.getLogger(__name__)
 # Worker configuration
 MAX_CONCURRENT_ACTIVITIES = 10
 MAX_CONCURRENT_WORKFLOW_TASKS = 5
+
+
+class AdapterDatabase:
+    """Database wrapper that resolves adapter per-datasource for query execution.
+
+    Query failures raise. The execute_query activity turns them into an explicit
+    error result, so a failed query can never pass for one that returned no rows.
+    """
+
+    def __init__(self, get_adapter_fn: Any) -> None:
+        """Initialize with adapter resolver."""
+        self._get_adapter = get_adapter_fn
+
+    async def execute_query(self, sql: str, datasource_id: str | None = None) -> QueryResult:
+        """Execute a SQL query using the specified datasource adapter."""
+        if not datasource_id:
+            raise RuntimeError("No datasource_id provided to execute_query")
+
+        adapter = await self._get_adapter(datasource_id)
+        result: QueryResult = await adapter.execute_query(sql)
+        return result
 
 
 async def create_dependencies() -> dict[str, Any]:
@@ -173,40 +195,6 @@ def create_activities(deps: dict[str, Any]) -> list[Any]:
         logger.info(f"Created adapter: type={ds_type}, name={ds.get('name')}, id={datasource_id}")
 
         return adapter
-
-    # Create a database wrapper that uses the adapter for query execution
-    class AdapterDatabase:
-        """Database wrapper that resolves adapter per-datasource for query execution."""
-
-        def __init__(self, get_adapter_fn: Any) -> None:
-            """Initialize with adapter resolver."""
-            self._get_adapter = get_adapter_fn
-
-        async def execute_query(self, sql: str, datasource_id: str | None = None) -> dict[str, Any]:
-            """Execute a SQL query using the specified datasource adapter."""
-            from dataing.core.json_utils import to_json_safe
-
-            if not datasource_id:
-                raise RuntimeError("No datasource_id provided to execute_query")
-
-            adapter = await self._get_adapter(datasource_id)
-
-            # Execute query through adapter
-            try:
-                result = await adapter.execute_query(sql)
-                rows = result.rows if hasattr(result, "rows") else []
-                columns = result.columns if hasattr(result, "columns") else []
-
-                # Convert rows to JSON-safe types (handles date, datetime, UUID, etc.)
-                safe_rows = to_json_safe(rows)
-
-                return {
-                    "columns": columns,
-                    "rows": safe_rows,
-                    "row_count": len(rows),
-                }
-            except Exception as e:
-                return {"error": str(e), "columns": [], "rows": [], "row_count": 0}
 
     adapter_database = AdapterDatabase(get_adapter)
 

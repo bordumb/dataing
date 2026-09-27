@@ -36,6 +36,7 @@ from dataing.core.domain_types import (
     LineageContext,
     MetricSpec,
     RelevantCodeChange,
+    UntestedHypothesis,
 )
 
 
@@ -102,6 +103,7 @@ class TemporalAgentAdapter:
         evidence: list[dict[str, Any]],
         hypotheses: list[dict[str, Any]],
         alert_summary: str,
+        untested_hypotheses: list[dict[str, Any]],
         code_changes: list[dict[str, Any]] | None = None,
     ) -> dict[str, Any]:
         """Synthesize findings from dict inputs.
@@ -110,17 +112,22 @@ class TemporalAgentAdapter:
             evidence: List of evidence dicts.
             hypotheses: List of hypothesis dicts (unused but kept for API compat).
             alert_summary: Summary of the alert.
+            untested_hypotheses: Hypotheses whose evaluation failed, as dicts.
             code_changes: Optional list of code changes related to the investigation.
 
         Returns:
             Synthesis result as dict.
         """
         evidence_objs = [self._to_evidence(e) for e in evidence]
+        untested_objs = [UntestedHypothesis.model_validate(u) for u in untested_hypotheses]
         alert_obj = self._to_alert(None, alert_summary)
         code_changes_obj = self._to_code_changes(code_changes)
 
         result = await self._client.synthesize_findings_raw(
-            alert_obj, evidence_objs, code_changes=code_changes_obj
+            alert_obj,
+            evidence_objs,
+            code_changes=code_changes_obj,
+            untested_hypotheses=untested_objs,
         )
 
         return {

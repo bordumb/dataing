@@ -162,6 +162,22 @@ class Evidence(BaseModel):
     commit_refs: list[str] | None = None
 
 
+class UntestedHypothesis(BaseModel):
+    """A hypothesis whose evaluation failed, so it is neither supported nor refuted.
+
+    Attributes:
+        hypothesis_id: ID of the hypothesis.
+        title: Short description of the hypothesis.
+        error: Why the evaluation failed, e.g. the query error.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    hypothesis_id: str
+    title: str
+    error: str
+
+
 class Finding(BaseModel):
     """The final output of an investigation.
 

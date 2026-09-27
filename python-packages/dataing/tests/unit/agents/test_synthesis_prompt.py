@@ -12,6 +12,7 @@ from dataing.core.domain_types import (
     Evidence,
     MetricSpec,
     RelevantCodeChange,
+    UntestedHypothesis,
 )
 
 
@@ -229,6 +230,63 @@ class TestBuildUser:
 
         assert findings_pos < changes_pos < synthesize_pos
 
+    def test_prompt_lists_untested_hypotheses(
+        self, sample_alert: AnomalyAlert, sample_evidence: list[Evidence]
+    ) -> None:
+        """Test that hypotheses whose evaluation failed are listed with the error."""
+        untested = [
+            UntestedHypothesis(
+                hypothesis_id="h2",
+                title="Schema change renamed amount",
+                error='Query execution failed: column "amount" does not exist',
+            )
+        ]
+
+        result = synthesis.build_user(sample_alert, sample_evidence, untested_hypotheses=untested)
+
+        assert (
+            '- h2 (Schema change renamed amount): Query execution failed: column "amount" '
+            "does not exist"
+        ) in result
+        findings_pos = result.find("## Investigation Findings")
+        untested_pos = result.find("## Untested Hypotheses")
+        synthesize_pos = result.find("Synthesize these findings")
+        assert findings_pos < untested_pos < synthesize_pos
+
+    def test_prompt_without_untested_hypotheses(
+        self, sample_alert: AnomalyAlert, sample_evidence: list[Evidence]
+    ) -> None:
+        """Test that no untested section is added when every hypothesis was tested."""
+        for untested in (None, []):
+            result = synthesis.build_user(
+                sample_alert, sample_evidence, untested_hypotheses=untested
+            )
+
+            assert "## Untested Hypotheses" not in result
+
+    def test_untested_errors_are_one_bounded_line(
+        self, sample_alert: AnomalyAlert, sample_evidence: list[Evidence]
+    ) -> None:
+        """Test that multi-line errors are flattened and long errors truncated."""
+        untested = [
+            UntestedHypothesis(
+                hypothesis_id="h2", title="Multi-line", error="syntax error\n  at line 3"
+            ),
+            UntestedHypothesis(hypothesis_id="h3", title="Long", error="x" * 500),
+        ]
+
+        result = synthesis.build_user(sample_alert, sample_evidence, untested_hypotheses=untested)
+
+        assert "- h2 (Multi-line): syntax error at line 3" in result
+        assert "x" * 300 in result
+        assert "x" * 301 not in result
+
+    def test_prompt_without_evidence_says_so(self, sample_alert: AnomalyAlert) -> None:
+        """Test that an empty evidence list is stated, not left blank."""
+        result = synthesis.build_user(sample_alert, [])
+
+        assert "No evidence was collected." in result
+
 
 class TestBuildSystem:
     """Tests for build_system function."""
@@ -240,6 +298,15 @@ class TestBuildSystem:
         assert "CODE CHANGES" in result
         assert "commit hash" in result.lower()
         assert "revert commit" in result.lower()
+
+    def test_includes_untested_hypothesis_guidance(self) -> None:
+        """Test that untested hypotheses are neither refuted nor ignored in confidence."""
+        result = synthesis.build_system()
+
+        assert "UNTESTED HYPOTHESES" in result
+        assert "never treat an untested hypothesis as refuted" in result
+        assert "remain possible explanations" in result
+        assert 'set estimated_onset to "unknown"' in result
 
     def test_includes_fix_proposal_guidance(self) -> None:
         """Test that system prompt includes guidance for fix proposals."""

@@ -8,7 +8,12 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from dataing.core.domain_types import AnomalyAlert, Evidence, RelevantCodeChange
+    from dataing.core.domain_types import (
+        AnomalyAlert,
+        Evidence,
+        RelevantCodeChange,
+        UntestedHypothesis,
+    )
 
 # Import for metric context helper
 from .hypothesis import _build_metric_context
@@ -19,6 +24,16 @@ CRITICAL: Your root cause MUST directly explain the specific metric anomaly.
 - If the anomaly is "null_count", root cause must explain what caused NULL values
 - If the anomaly is "row_count", root cause must explain missing/extra records
 - Do NOT suggest unrelated issues as root cause
+
+UNTESTED HYPOTHESES:
+Hypotheses listed under "Untested Hypotheses" could not be tested because their
+evaluation failed (for example, their query or its interpretation failed). A failed
+evaluation is not evidence: never treat an untested hypothesis as refuted or ruled out.
+Untested hypotheses remain possible explanations, so lower confidence accordingly.
+If no hypothesis was tested, the investigation is inconclusive: set root_cause to null,
+keep confidence below 0.5, use causal_chain and supporting_evidence to state what could
+not be tested and why, set estimated_onset to "unknown", and recommend fixing what made
+the evaluations fail.
 
 REQUIRED FIELDS:
 
@@ -146,10 +161,31 @@ def _build_code_changes_section(changes: list[RelevantCodeChange]) -> str:
     return "\n".join(lines)
 
 
+def _build_untested_section(untested: list[UntestedHypothesis]) -> str:
+    """Build a section listing hypotheses whose evaluation failed.
+
+    Args:
+        untested: Hypotheses that could not be tested.
+
+    Returns:
+        Formatted string for inclusion in the prompt.
+    """
+    lines = ["## Untested Hypotheses"]
+    lines.append("These could not be tested, so they are neither supported nor refuted:")
+    lines.append("")
+
+    for hypothesis in untested:
+        error = " ".join(hypothesis.error.split())[:300]  # One bounded line for synthesis
+        lines.append(f"- {hypothesis.hypothesis_id} ({hypothesis.title}): {error}")
+
+    return "\n".join(lines)
+
+
 def build_user(
     alert: AnomalyAlert,
     evidence: list[Evidence],
     code_changes: list[RelevantCodeChange] | None = None,
+    untested_hypotheses: list[UntestedHypothesis] | None = None,
 ) -> str:
     """Build synthesis user prompt.
 
@@ -157,6 +193,7 @@ def build_user(
         alert: The original anomaly alert.
         evidence: All collected evidence.
         code_changes: Optional list of recent code changes related to the investigation.
+        untested_hypotheses: Optional hypotheses whose evaluation failed.
 
     Returns:
         Formatted user prompt.
@@ -171,8 +208,14 @@ def build_user(
             for e in evidence
         ]
     )
+    if not evidence:
+        evidence_text = "No evidence was collected."
 
     metric_context = _build_metric_context(alert)
+
+    untested_section = ""
+    if untested_hypotheses:
+        untested_section = f"\n{_build_untested_section(untested_hypotheses)}\n"
 
     code_changes_section = ""
     if code_changes:
@@ -191,5 +234,5 @@ def build_user(
 
 ## Investigation Findings
 {evidence_text}
-{code_changes_section}
+{untested_section}{code_changes_section}
 Synthesize these findings into a root cause determination."""

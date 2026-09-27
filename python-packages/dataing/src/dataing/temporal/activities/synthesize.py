@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
 from temporalio import activity
@@ -21,13 +21,15 @@ class SynthesizeInput:
     alert_summary: str
     confidence_threshold: float = 0.85
     code_changes: list[dict[str, Any]] | None = None
+    # Hypotheses whose evaluation failed: {"hypothesis_id", "title", "error"}
+    untested_hypotheses: list[dict[str, Any]] = field(default_factory=list)
 
 
 @dataclass
 class SynthesizeResult:
     """Result from synthesize activity."""
 
-    root_cause: str
+    root_cause: str | None  # None when the LLM finds the investigation inconclusive
     confidence: float
     recommendations: list[str]
     supporting_evidence: list[str]
@@ -57,6 +59,7 @@ def make_synthesize_activity(
                 evidence=input.evidence,
                 hypotheses=input.hypotheses,
                 alert_summary=input.alert_summary,
+                untested_hypotheses=input.untested_hypotheses,
                 code_changes=input.code_changes,
             )
         except Exception as e:

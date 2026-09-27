@@ -23,10 +23,14 @@ class InterpretEvidenceInput:
 
 @dataclass
 class InterpretEvidenceResult:
-    """Result from interpret_evidence activity."""
+    """Result from interpret_evidence activity.
+
+    `error` is set when interpretation failed. A failed interpretation has no
+    verdict, so `supports_hypothesis` is None: False would read as refuted.
+    """
 
     hypothesis_id: str
-    supports_hypothesis: bool
+    supports_hypothesis: bool | None
     confidence: float
     interpretation: str
     key_findings: list[str]
@@ -57,7 +61,7 @@ def make_interpret_evidence_activity(adapter: TemporalAgentAdapter) -> Any:
         except Exception as e:
             return InterpretEvidenceResult(
                 hypothesis_id=hypothesis_id,
-                supports_hypothesis=False,
+                supports_hypothesis=None,
                 confidence=0.0,
                 interpretation="",
                 key_findings=[],

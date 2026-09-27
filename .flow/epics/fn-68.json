@@ -9,5 +9,5 @@
   "spec_path": ".flow/specs/fn-68.md",
   "status": "open",
   "title": "CI hygiene: run integration tests, fix frontend pre-commit hooks, stop uv.lock drift",
-  "updated_at": "2026-09-27T14:28:30.921532Z"
+  "updated_at": "2026-09-27T17:02:00.543038Z"
 }

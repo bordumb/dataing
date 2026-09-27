@@ -440,7 +440,7 @@ async def get_team_policy(
 
 
 @router.put("/{team_id}/policy", response_model=TeamPolicyResponse)
-@audited(action="team.policy_update", resource_type="team")
+@audited(action="team.policy_update", resource_type="team", resource_id_param="team_id")
 async def update_team_policy(
     request: Request,
     team_id: UUID,
@@ -502,7 +502,7 @@ async def update_team_policy(
 
 
 @router.post("/{team_id}/policy/overrides", response_model=TeamPolicyOverrideResponse)
-@audited(action="team.policy_override_create", resource_type="team")
+@audited(action="team.policy_override_create", resource_type="team_policy_override")
 async def create_policy_override(
     request: Request,
     team_id: UUID,
@@ -552,7 +552,11 @@ async def create_policy_override(
 
 
 @router.put("/{team_id}/policy/overrides/{override_id}", response_model=TeamPolicyOverrideResponse)
-@audited(action="team.policy_override_update", resource_type="team")
+@audited(
+    action="team.policy_override_update",
+    resource_type="team_policy_override",
+    resource_id_param="override_id",
+)
 async def update_policy_override(
     request: Request,
     team_id: UUID,
@@ -599,7 +603,11 @@ async def update_policy_override(
     status_code=status.HTTP_204_NO_CONTENT,
     response_class=Response,
 )
-@audited(action="team.policy_override_delete", resource_type="team")
+@audited(
+    action="team.policy_override_delete",
+    resource_type="team_policy_override",
+    resource_id_param="override_id",
+)
 async def delete_policy_override(
     request: Request,
     team_id: UUID,
@@ -623,7 +631,7 @@ async def delete_policy_override(
 
 
 @router.put("/{team_id}/policy/queue-limits", response_model=TeamQueueLimitsResponse)
-@audited(action="team.queue_limits_update", resource_type="team")
+@audited(action="team.queue_limits_update", resource_type="team", resource_id_param="team_id")
 async def update_queue_limits(
     request: Request,
     team_id: UUID,

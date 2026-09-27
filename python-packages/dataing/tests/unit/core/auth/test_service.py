@@ -1,6 +1,6 @@
 """Tests for auth service."""
 
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from unittest.mock import AsyncMock, MagicMock
 from uuid import uuid4
 
@@ -187,3 +187,139 @@ class TestAuthServiceRegister:
             )
 
         assert "already exists" in str(exc_info.value).lower()
+
+
+def _user(is_active: bool = True) -> User:
+    """Create a password user."""
+    return User(
+        id=uuid4(),
+        email="test@example.com",
+        name="Test",
+        password_hash="hash",  # pragma: allowlist secret
+        is_active=is_active,
+        created_at=datetime.now(UTC),
+    )
+
+
+def _org() -> Organization:
+    """Create an organization."""
+    return Organization(id=uuid4(), name="Org", slug="org", created_at=datetime.now(UTC))
+
+
+class TestAuthServicePasswordReset:
+    """Test password reset functionality."""
+
+    @pytest.fixture
+    def mock_repo(self) -> MagicMock:
+        """Create mock repository."""
+        return MagicMock()
+
+    @pytest.fixture
+    def service(self, mock_repo: MagicMock) -> AuthService:
+        """Create service with mock repo."""
+        return AuthService(mock_repo)
+
+    @pytest.mark.asyncio
+    async def test_request_returns_user_a_link_was_issued_for(
+        self, service: AuthService, mock_repo: MagicMock
+    ) -> None:
+        """Should return the user so the caller can audit the request."""
+        user = _user()
+        mock_repo.get_user_by_email = AsyncMock(return_value=user)
+        mock_repo.delete_user_reset_tokens = AsyncMock(return_value=0)
+        mock_repo.create_password_reset_token = AsyncMock()
+        recovery_adapter = MagicMock()
+        recovery_adapter.initiate_recovery = AsyncMock(return_value=True)
+
+        result = await service.request_password_reset(
+            email=user.email,
+            recovery_adapter=recovery_adapter,
+            frontend_url="https://app.example.com",
+        )
+
+        assert result == user
+        recovery_adapter.initiate_recovery.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("user", [None, _user(is_active=False)], ids=["unknown", "inactive"])
+    async def test_request_returns_none_when_no_link_is_issued(
+        self, service: AuthService, mock_repo: MagicMock, user: User | None
+    ) -> None:
+        """Should return None for unknown emails and inactive users."""
+        mock_repo.get_user_by_email = AsyncMock(return_value=user)
+        recovery_adapter = MagicMock()
+        recovery_adapter.initiate_recovery = AsyncMock(return_value=True)
+
+        result = await service.request_password_reset(
+            email="nobody@example.com",
+            recovery_adapter=recovery_adapter,
+            frontend_url="https://app.example.com",
+        )
+
+        assert result is None
+        recovery_adapter.initiate_recovery.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    async def test_reset_password_returns_user(
+        self, service: AuthService, mock_repo: MagicMock
+    ) -> None:
+        """Should return the user whose password was reset."""
+        user = _user()
+        mock_repo.get_password_reset_token = AsyncMock(
+            return_value={
+                "id": uuid4(),
+                "user_id": user.id,
+                "used_at": None,
+                "expires_at": datetime.now(UTC) + timedelta(hours=1),
+            }
+        )
+        mock_repo.get_user_by_id = AsyncMock(return_value=user)
+        mock_repo.update_user = AsyncMock()
+        mock_repo.mark_token_used = AsyncMock()
+        mock_repo.delete_user_reset_tokens = AsyncMock(return_value=0)
+
+        result = await service.reset_password(
+            token="reset-token",
+            new_password="new-password-123",  # pragma: allowlist secret
+        )
+
+        assert result == user
+        mock_repo.update_user.assert_awaited_once()
+
+
+class TestAuthServiceOrgLookups:
+    """Test organization lookups used to attribute auth events."""
+
+    @pytest.fixture
+    def mock_repo(self) -> MagicMock:
+        """Create mock repository."""
+        return MagicMock()
+
+    @pytest.fixture
+    def service(self, mock_repo: MagicMock) -> AuthService:
+        """Create service with mock repo."""
+        return AuthService(mock_repo)
+
+    @pytest.mark.asyncio
+    async def test_get_user_org_ids(self, service: AuthService, mock_repo: MagicMock) -> None:
+        """Should return the ID of every org the user belongs to."""
+        org_a, org_b = _org(), _org()
+        mock_repo.get_user_orgs = AsyncMock(
+            return_value=[(org_a, OrgRole.ADMIN), (org_b, OrgRole.MEMBER)]
+        )
+
+        assert await service.get_user_org_ids(uuid4()) == [org_a.id, org_b.id]
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize(("org", "expected"), [(_org(), True), (None, False)])
+    async def test_org_exists(
+        self,
+        service: AuthService,
+        mock_repo: MagicMock,
+        org: Organization | None,
+        expected: bool,
+    ) -> None:
+        """Should report whether an org ID refers to an existing org."""
+        mock_repo.get_org_by_id = AsyncMock(return_value=org)
+
+        assert await service.org_exists(uuid4()) is expected

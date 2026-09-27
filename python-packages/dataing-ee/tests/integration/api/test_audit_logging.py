@@ -178,6 +178,115 @@ class TestAuditLoggingIntegration:
                 resource_id,
             )
 
+    async def test_repository_records_json_columns(
+        self,
+        db: AppDatabase,
+        tenant_id: UUID,
+    ) -> None:
+        """Verify the EE AuditRepository can store changes and metadata.
+
+        The pool has no JSONB codec, so asyncpg rejects dicts for those
+        columns. Entries that carry them (e.g. auth.login_failed) would be lost.
+        """
+        import json
+        from uuid import uuid4
+
+        from dataing_ee.adapters.audit import AuditRepository
+
+        from dataing.adapters.audit import AuditLogCreate
+
+        assert db.pool is not None
+        resource_id = uuid4()
+        repo = AuditRepository(pool=db.pool)
+
+        try:
+            await repo.record(
+                AuditLogCreate(
+                    tenant_id=tenant_id,
+                    action="test.json_columns",
+                    resource_id=resource_id,
+                    changes={"name": "Engineering"},
+                    metadata={"reason": "Invalid email or password"},
+                )
+            )
+
+            row = await db.fetch_one(
+                "SELECT changes, metadata FROM audit_logs"
+                " WHERE tenant_id = $1 AND resource_id = $2",
+                tenant_id,
+                resource_id,
+            )
+            assert row is not None, "Audit log entry should exist"
+            assert json.loads(row["changes"]) == {"name": "Engineering"}
+            assert json.loads(row["metadata"]) == {"reason": "Invalid email or password"}
+        finally:
+            await db.execute(
+                "DELETE FROM audit_logs WHERE tenant_id = $1 AND resource_id = $2",
+                tenant_id,
+                resource_id,
+            )
+
+    async def test_repository_records_json_columns_with_a_strict_json_codec(
+        self,
+        db: AppDatabase,
+        tenant_id: UUID,
+    ) -> None:
+        """Verify the repository also works on pools with a json/jsonb codec.
+
+        A codec that takes Python objects and refuses JSON text (as a pool may
+        register) must not break recording.
+        """
+        import json
+        from typing import Any
+        from uuid import uuid4
+
+        import asyncpg
+        from dataing_ee.adapters.audit import AuditRepository
+
+        from dataing.adapters.audit import AuditLogCreate
+
+        def encode(value: Any) -> str:
+            if isinstance(value, str):
+                raise TypeError("json/jsonb parameters take Python objects")
+            return json.dumps(value)
+
+        async def register_codecs(conn: asyncpg.Connection) -> None:
+            for type_name in ("json", "jsonb"):
+                await conn.set_type_codec(
+                    type_name, encoder=encode, decoder=json.loads, schema="pg_catalog"
+                )
+
+        dsn = os.environ.get("DATABASE_URL", "postgresql://localhost/dataing")
+        pool = await asyncpg.create_pool(dsn, min_size=1, max_size=1, init=register_codecs)
+        resource_id = uuid4()
+
+        try:
+            await AuditRepository(pool=pool).record(
+                AuditLogCreate(
+                    tenant_id=tenant_id,
+                    action="test.json_columns_codec",
+                    resource_id=resource_id,
+                    metadata={"reason": "Invalid email or password"},
+                )
+            )
+
+            row = await db.fetch_one(
+                "SELECT jsonb_typeof(metadata) AS kind, metadata FROM audit_logs"
+                " WHERE tenant_id = $1 AND resource_id = $2",
+                tenant_id,
+                resource_id,
+            )
+            assert row is not None, "Audit log entry should exist"
+            assert row["kind"] == "object"
+            assert json.loads(row["metadata"]) == {"reason": "Invalid email or password"}
+        finally:
+            await pool.close()
+            await db.execute(
+                "DELETE FROM audit_logs WHERE tenant_id = $1 AND resource_id = $2",
+                tenant_id,
+                resource_id,
+            )
+
     async def test_audit_middleware_is_registered(self) -> None:
         """Verify AuditMiddleware is registered in the EE app.
 

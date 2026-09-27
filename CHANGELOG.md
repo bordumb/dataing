@@ -1,3 +1,10 @@
+## [1.21.6](https://github.com/bordumb/dataing/compare/v1.21.5...v1.21.6) (2026-09-27)
+
+
+### Bug Fixes
+
+* **ee:** scope runbook link feedback to the caller's tenant ([#166](https://github.com/bordumb/dataing/issues/166)) ([d88c701](https://github.com/bordumb/dataing/commit/d88c701086d83fedc687bfdcec772742bcf66082))
+
 ## [1.21.5](https://github.com/bordumb/dataing/compare/v1.21.4...v1.21.5) (2026-09-27)
 
 

@@ -1,6 +1,6 @@
 [project]
 name = "dataing-ee"
-version = "1.21.5"
+version = "1.21.6"
 description = "Autonomous Data Quality Investigation - Enterprise Edition"
 requires-python = ">=3.11"
 license = { text = "Proprietary" }

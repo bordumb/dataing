@@ -1,3 +1,10 @@
+## [1.24.2](https://github.com/bordumb/dataing/compare/v1.24.1...v1.24.2) (2026-09-27)
+
+
+### Bug Fixes
+
+* **temporal:** validate investigation SQL in the executing datasource's dialect ([#178](https://github.com/bordumb/dataing/issues/178)) ([e473e5a](https://github.com/bordumb/dataing/commit/e473e5aecbf14a6396fce23bc0d62719411feb10)), closes [#163](https://github.com/bordumb/dataing/issues/163) [#163](https://github.com/bordumb/dataing/issues/163)
+
 ## [1.24.1](https://github.com/bordumb/dataing/compare/v1.24.0...v1.24.1) (2026-09-27)
 
 

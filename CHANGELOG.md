@@ -1,3 +1,10 @@
+## [1.23.1](https://github.com/bordumb/dataing/compare/v1.23.0...v1.23.1) (2026-09-27)
+
+
+### Bug Fixes
+
+* **core:** render stdlib logs through structlog's processors ([#154](https://github.com/bordumb/dataing/issues/154)) ([c916e3c](https://github.com/bordumb/dataing/commit/c916e3c1727e4b5392b03b7dd2e5ec2ea790c685))
+
 # [1.23.0](https://github.com/bordumb/dataing/compare/v1.22.7...v1.23.0) (2026-09-27)
 
 

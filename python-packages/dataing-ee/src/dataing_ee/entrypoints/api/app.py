@@ -8,8 +8,9 @@ from __future__ import annotations
 import logging
 
 from fastapi import FastAPI
+from fastapi.routing import APIRoute
 
-from dataing.entrypoints.api.app import create_app as create_ce_app
+from dataing.entrypoints.api.factory import create_app as create_ce_app
 from dataing_ee.adapters.audit import AuditRepository
 from dataing_ee.entrypoints.api.middleware.audit import AuditMiddleware
 from dataing_ee.entrypoints.api.routes.audit import router as audit_router
@@ -29,6 +30,9 @@ def create_ee_app() -> FastAPI:
     Returns:
         Configured FastAPI application with EE features.
     """
+    # Import the EE datasource adapters to register them
+    from dataing_ee.adapters import datasource as _datasource  # noqa: F401
+
     # Start with CE app (includes lifespan, routes, middleware)
     app = create_ce_app()
 
@@ -65,8 +69,15 @@ def create_ee_app() -> FastAPI:
     app.include_router(automation_router, prefix="/api/v1")
     app.include_router(runbooks_router, prefix="/api/v1")
 
-    # Override health check to indicate EE
-    @app.get("/health", include_in_schema=False)
+    # Replace CE's health check with one that reports the edition. Routes match in
+    # registration order, so a second /health route would never be reached.
+    app.router.routes = [
+        route
+        for route in app.router.routes
+        if not (isinstance(route, APIRoute) and route.path == "/health")
+    ]
+
+    @app.get("/health")
     async def health_check() -> dict[str, str]:
         """Health check endpoint."""
         return {"status": "healthy", "edition": "enterprise"}

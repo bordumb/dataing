@@ -15,16 +15,4 @@ export type GetColumnLineageApiV1LineageColumnLineageGetParams = {
    * Column name to trace
    */
   column: string;
-  /**
-   * Lineage provider to use
-   */
-  provider?: string;
-  /**
-   * Path to dbt manifest.json
-   */
-  manifest_path?: string | null;
-  /**
-   * Base URL for API-based providers
-   */
-  base_url?: string | null;
 };

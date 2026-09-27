@@ -9,6 +9,7 @@ import { EmptyState } from "@/components/shared/empty-state";
 import { DataTable } from "@/components/data-table/data-table";
 import { useDatasets, useSyncDatasource } from "@/lib/api/datasets";
 import { useDataSource } from "@/lib/api/datasources";
+import { useRole } from "@/lib/auth";
 import { datasetColumns } from "./dataset-columns";
 
 export function DatasetListPage() {
@@ -21,6 +22,7 @@ export function DatasetListPage() {
   } = useDatasets(datasourceId ?? null);
   const { data: datasource } = useDataSource(datasourceId ?? "");
   const syncMutation = useSyncDatasource();
+  const { isMember } = useRole();
 
   const datasets = datasetsResponse?.datasets ?? [];
 
@@ -85,23 +87,25 @@ export function DatasetListPage() {
         title={`Datasets in ${datasource?.name ?? "Datasource"}`}
         description="Browse and manage datasets from this data source."
         action={
-          <Button
-            onClick={handleSync}
-            disabled={syncMutation.isPending}
-            variant="outline"
-          >
-            {syncMutation.isPending ? (
-              <>
-                <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
-                Syncing...
-              </>
-            ) : (
-              <>
-                <RefreshCw className="mr-2 h-4 w-4" />
-                Sync Schema
-              </>
-            )}
-          </Button>
+          isMember ? (
+            <Button
+              onClick={handleSync}
+              disabled={syncMutation.isPending}
+              variant="outline"
+            >
+              {syncMutation.isPending ? (
+                <>
+                  <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
+                  Syncing...
+                </>
+              ) : (
+                <>
+                  <RefreshCw className="mr-2 h-4 w-4" />
+                  Sync Schema
+                </>
+              )}
+            </Button>
+          ) : undefined
         }
       />
 
@@ -111,10 +115,12 @@ export function DatasetListPage() {
           title="No datasets found"
           description="Sync the datasource schema to discover datasets, or check that your connection has access to tables."
           action={
-            <Button onClick={handleSync} disabled={syncMutation.isPending}>
-              <RefreshCw className="mr-2 h-4 w-4" />
-              Sync Schema
-            </Button>
+            isMember ? (
+              <Button onClick={handleSync} disabled={syncMutation.isPending}>
+                <RefreshCw className="mr-2 h-4 w-4" />
+                Sync Schema
+              </Button>
+            ) : undefined
           }
         />
       ) : (

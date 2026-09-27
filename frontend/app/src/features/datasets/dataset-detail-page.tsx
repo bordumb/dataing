@@ -29,6 +29,7 @@ import { LoadingSpinner } from "@/components/shared/loading-spinner";
 import { EmptyState } from "@/components/shared/empty-state";
 import { useDataset, useDatasetInvestigations } from "@/lib/api/datasets";
 import { useSchemaComments } from "@/lib/api/schema-comments";
+import { useRole } from "@/lib/auth";
 import { formatNumber, formatRelativeTime } from "@/lib/utils";
 import { LineagePanel } from "@/features/investigation/components/lineage-panel";
 import { SchemaCommentIndicator } from "./components/schema-comment-indicator";
@@ -75,6 +76,7 @@ export function DatasetDetailPage() {
   } = useDataset(datasetId ?? null);
   const { data: investigationsResponse, isLoading: investigationsLoading } =
     useDatasetInvestigations(datasetId ?? null);
+  const { isMember } = useRole();
   const [selectedField, setSelectedField] = useState<string | null>(null);
 
   // Fetch all comments for the dataset once (no fieldName filter) to avoid N+1 queries
@@ -331,12 +333,14 @@ export function DatasetDetailPage() {
               title="No investigations"
               description="No investigations have been run on this dataset yet."
               action={
-                <Link to="/investigations/new">
-                  <Button>
-                    <Search className="mr-2 h-4 w-4" />
-                    Start Investigation
-                  </Button>
-                </Link>
+                isMember ? (
+                  <Link to="/investigations/new">
+                    <Button>
+                      <Search className="mr-2 h-4 w-4" />
+                      Start Investigation
+                    </Button>
+                  </Link>
+                ) : undefined
               }
             />
           ) : (
@@ -348,7 +352,6 @@ export function DatasetDetailPage() {
                     <TableHead>Status</TableHead>
                     <TableHead>Severity</TableHead>
                     <TableHead>Created</TableHead>
-                    <TableHead>Completed</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -384,11 +387,6 @@ export function DatasetDetailPage() {
                       </TableCell>
                       <TableCell className="text-muted-foreground">
                         {formatRelativeTime(investigation.created_at)}
-                      </TableCell>
-                      <TableCell className="text-muted-foreground">
-                        {investigation.completed_at
-                          ? formatRelativeTime(investigation.completed_at)
-                          : "-"}
                       </TableCell>
                     </TableRow>
                   ))}

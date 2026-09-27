@@ -1,6 +1,7 @@
 """Temporal worker entrypoint with full dependency injection.
 
 This module creates a production-ready Temporal worker that:
+- Configures logging from LOG_LEVEL and LOG_FORMAT, like the API
 - Connects to Temporal using settings from environment
 - Wires all 8 activities with factory closures capturing dependencies
 - Registers both InvestigationWorkflow and EvaluateHypothesisWorkflow
@@ -19,6 +20,7 @@ import asyncio
 import json
 import logging
 import os
+import sys
 from typing import Any
 from uuid import UUID
 
@@ -32,8 +34,9 @@ from dataing.adapters.datasource.base import BaseAdapter
 from dataing.adapters.db.app_db import AppDatabase
 from dataing.adapters.investigation.pattern_adapter import InMemoryPatternRepository
 from dataing.agents import AgentClient
+from dataing.config import settings
 from dataing.core.snapshot_store import LocalSnapshotStore
-from dataing.entrypoints.api.deps import settings
+from dataing.telemetry import configure_logging
 from dataing.temporal.activities import (
     make_capture_snapshot_activity,
     make_check_patterns_activity,
@@ -49,10 +52,6 @@ from dataing.temporal.activities import (
 from dataing.temporal.adapters import TemporalAgentAdapter
 from dataing.temporal.workflows import EvaluateHypothesisWorkflow, InvestigationWorkflow
 
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-)
 logger = logging.getLogger(__name__)
 
 # Worker configuration
@@ -102,59 +101,65 @@ async def create_dependencies() -> dict[str, Any]:
     }
 
 
-def create_activities(deps: dict[str, Any]) -> list[Any]:
-    """Create all activity functions with injected dependencies.
+class TenantAdapterCache:
+    """Datasource adapters for worker activities, scoped and cached per tenant.
 
-    Args:
-        deps: Dictionary of initialized dependencies.
-
-    Returns:
-        List of activity functions ready for registration.
+    Datasources are looked up by (tenant_id, datasource_id) and adapters are
+    cached under the same key, so an investigation can only reach datasources
+    owned by its tenant, and one tenant's cached adapter is never served to
+    another tenant that names the same datasource ID.
     """
-    agent_adapter = deps["agent_adapter"]
-    context_engine = deps["context_engine"]
-    pattern_repository = deps["pattern_repository"]
-    app_db = deps["app_db"]
-    snapshot_store = deps["snapshot_store"]
 
-    # Cache for adapters to avoid recreating them
-    adapter_cache: dict[str, BaseAdapter] = {}
+    def __init__(self, app_db: AppDatabase, encryption_key: str | None) -> None:
+        """Initialize the cache.
 
-    # Get encryption key from environment
-    encryption_key = os.getenv("DATADR_ENCRYPTION_KEY") or os.getenv("ENCRYPTION_KEY")
+        Args:
+            app_db: Application database holding datasource configs.
+            encryption_key: Fernet key for decrypting connection configs.
+        """
+        self._app_db = app_db
+        self._encryption_key = encryption_key
+        self._adapters: dict[tuple[UUID, UUID], BaseAdapter] = {}
 
-    async def get_adapter(datasource_id: str) -> BaseAdapter:
-        """Get adapter for a datasource ID from database config.
+    async def get_adapter(self, *, tenant_id: str, datasource_id: str) -> BaseAdapter:
+        """Get a connected adapter for a datasource owned by the tenant.
 
         Looks up the datasource configuration, decrypts connection details,
         and creates the appropriate adapter.
+
+        Args:
+            tenant_id: Tenant the investigation runs for.
+            datasource_id: Datasource to connect to.
+
+        Returns:
+            A connected adapter for the datasource.
+
+        Raises:
+            ValueError: If the tenant has no active datasource with this ID.
+            RuntimeError: If decryption or connection fails.
         """
-        # Check cache first
-        if datasource_id in adapter_cache:
-            return adapter_cache[datasource_id]
+        key = (UUID(tenant_id), UUID(datasource_id))
+        if key in self._adapters:
+            return self._adapters[key]
 
-        # Look up datasource config from database
-        ds = await app_db.fetch_one(
-            """
-            SELECT id, type, connection_config_encrypted, name
-            FROM data_sources
-            WHERE id = $1 AND is_active = true
-            """,
-            UUID(datasource_id),
+        tenant_uuid, datasource_uuid = key
+        ds = await self._app_db.get_data_source(
+            data_source_id=datasource_uuid, tenant_id=tenant_uuid
         )
-
-        if not ds:
-            raise ValueError(f"Datasource {datasource_id} not found or inactive")
+        if not ds or not ds.get("is_active"):
+            raise ValueError(
+                f"Datasource {datasource_id} not found or inactive for tenant {tenant_id}"
+            )
 
         # Decrypt connection config
-        if not encryption_key:
+        if not self._encryption_key:
             raise RuntimeError(
                 "ENCRYPTION_KEY not set - check DATADR_ENCRYPTION_KEY or ENCRYPTION_KEY env vars"
             )
 
         encrypted_config = ds.get("connection_config_encrypted", "")
         try:
-            f = Fernet(encryption_key.encode())
+            f = Fernet(self._encryption_key.encode())
             decrypted = f.decrypt(encrypted_config.encode()).decode()
             config: dict[str, Any] = json.loads(decrypted)
         except Exception as e:
@@ -171,46 +176,33 @@ def create_activities(deps: dict[str, Any]) -> list[Any]:
             raise RuntimeError(f"Failed to create/connect adapter for {ds_type}: {e}") from e
 
         # Cache for reuse
-        adapter_cache[datasource_id] = adapter
-        logger.info(f"Created adapter: type={ds_type}, name={ds.get('name')}, id={datasource_id}")
+        self._adapters[key] = adapter
+        logger.info(
+            f"Created adapter: type={ds_type}, name={ds.get('name')}, "
+            f"tenant={tenant_id}, id={datasource_id}"
+        )
 
         return adapter
 
-    # Create a database wrapper that uses the adapter for query execution
-    class AdapterDatabase:
-        """Database wrapper that resolves adapter per-datasource for query execution."""
 
-        def __init__(self, get_adapter_fn: Any) -> None:
-            """Initialize with adapter resolver."""
-            self._get_adapter = get_adapter_fn
+def create_activities(deps: dict[str, Any]) -> list[Any]:
+    """Create all activity functions with injected dependencies.
 
-        async def execute_query(self, sql: str, datasource_id: str | None = None) -> dict[str, Any]:
-            """Execute a SQL query using the specified datasource adapter."""
-            from dataing.core.json_utils import to_json_safe
+    Args:
+        deps: Dictionary of initialized dependencies.
 
-            if not datasource_id:
-                raise RuntimeError("No datasource_id provided to execute_query")
+    Returns:
+        List of activity functions ready for registration.
+    """
+    agent_adapter = deps["agent_adapter"]
+    context_engine = deps["context_engine"]
+    pattern_repository = deps["pattern_repository"]
+    app_db = deps["app_db"]
+    snapshot_store = deps["snapshot_store"]
 
-            adapter = await self._get_adapter(datasource_id)
-
-            # Execute query through adapter
-            try:
-                result = await adapter.execute_query(sql)
-                rows = result.rows if hasattr(result, "rows") else []
-                columns = result.columns if hasattr(result, "columns") else []
-
-                # Convert rows to JSON-safe types (handles date, datetime, UUID, etc.)
-                safe_rows = to_json_safe(rows)
-
-                return {
-                    "columns": columns,
-                    "rows": safe_rows,
-                    "row_count": len(rows),
-                }
-            except Exception as e:
-                return {"error": str(e), "columns": [], "rows": [], "row_count": 0}
-
-    adapter_database = AdapterDatabase(get_adapter)
+    # Get encryption key from environment
+    encryption_key = os.getenv("DATADR_ENCRYPTION_KEY") or os.getenv("ENCRYPTION_KEY")
+    datasources = TenantAdapterCache(app_db, encryption_key)
 
     activities = [
         # Snapshot capture (fire-and-forget)
@@ -218,14 +210,14 @@ def create_activities(deps: dict[str, Any]) -> list[Any]:
         # Context and pattern activities
         make_gather_context_activity(
             context_engine=context_engine,
-            get_adapter=get_adapter,
+            get_adapter=datasources.get_adapter,
         ),
         make_check_patterns_activity(pattern_repository=pattern_repository),
         # Hypothesis generation (uses adapter for dict↔domain conversion)
         make_generate_hypotheses_activity(adapter=agent_adapter),
         # Query generation and execution
         make_generate_query_activity(adapter=agent_adapter),
-        make_execute_query_activity(database=adapter_database),
+        make_execute_query_activity(get_adapter=datasources.get_adapter),
         # Evidence interpretation
         make_interpret_evidence_activity(adapter=agent_adapter),
         # Synthesis and analysis
@@ -288,13 +280,22 @@ async def run_worker() -> None:
 
 def main() -> None:
     """Main entry point for the Temporal worker."""
+    # Nothing else configures logging in the worker process. Unconfigured, structlog's
+    # default renderer prints traceback frame locals, such as the encryption key and
+    # decrypted connection configs in get_adapter().
+    configure_logging(
+        log_level=os.getenv("LOG_LEVEL", "INFO"),
+        json_output=os.getenv("LOG_FORMAT", "json").lower() == "json",
+    )
     try:
         asyncio.run(run_worker())
     except KeyboardInterrupt:
         logger.info("Worker interrupted by user")
     except Exception as e:
         logger.exception(f"Worker failed: {e}")
-        raise
+        # The log entry has the traceback. Re-raising would make the interpreter print it
+        # again, unformatted, on stderr.
+        sys.exit(1)
 
 
 if __name__ == "__main__":

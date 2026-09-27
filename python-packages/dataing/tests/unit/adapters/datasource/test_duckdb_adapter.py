@@ -8,6 +8,13 @@ import pytest
 from dataing.adapters.datasource import DuckDBAdapter, SourceType
 
 
+@pytest.fixture(autouse=True)
+def local_data_root(tmp_path, monkeypatch):
+    """Enable DuckDB sources, with this test's tmp_path as the local data root."""
+    monkeypatch.setenv("DATAING_LOCAL_DATA_ROOT", str(tmp_path))
+    return tmp_path
+
+
 @pytest.fixture
 def memory_adapter():
     """Create a DuckDB adapter with in-memory database."""
@@ -133,10 +140,10 @@ class TestDuckDBDirectoryMode:
     """Tests for DuckDB directory mode."""
 
     @pytest.mark.asyncio
-    async def test_directory_mode_with_parquet(self):
+    async def test_directory_mode_with_parquet(self, tmp_path):
         """Test reading parquet files from directory."""
         # Create a temporary directory with a parquet file
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with tempfile.TemporaryDirectory(dir=tmp_path) as tmpdir:
             # Create a parquet file using DuckDB
             import duckdb
 
@@ -161,9 +168,9 @@ class TestDuckDBDirectoryMode:
                 assert len(schema.catalogs) >= 1
 
     @pytest.mark.asyncio
-    async def test_directory_mode_with_csv(self):
+    async def test_directory_mode_with_csv(self, tmp_path):
         """Test reading CSV files from directory."""
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with tempfile.TemporaryDirectory(dir=tmp_path) as tmpdir:
             # Create a CSV file
             csv_path = os.path.join(tmpdir, "data.csv")
             with open(csv_path, "w") as f:
@@ -185,13 +192,13 @@ class TestDuckDBAdapterErrors:
     """Tests for DuckDB adapter error handling."""
 
     @pytest.mark.asyncio
-    async def test_connect_file_not_found(self):
+    async def test_connect_file_not_found(self, tmp_path):
         """Test connect raises error for non-existent database file."""
         from dataing.adapters.datasource.errors import ConnectionFailedError
 
         adapter = DuckDBAdapter(
             {
-                "path": "/nonexistent/path/to/db.duckdb",
+                "path": str(tmp_path / "nonexistent" / "db.duckdb"),
                 "source_type": "database",
             }
         )
@@ -317,3 +324,55 @@ class TestDuckDBAdapterQueryLimit:
         # DuckDB still returns column info even for empty results
         assert len(result.columns) >= 1
         assert result.rows == []
+
+
+class TestDuckDBAdapterFileAccess:
+    """Queries reach the configured database or directory and no other host files."""
+
+    @pytest.mark.asyncio
+    async def test_directory_mode_queries_own_files(self, tmp_path):
+        """Views over the directory's files still run."""
+        (tmp_path / "orders.csv").write_text("id,amount\n1,10\n2,20\n")
+        adapter = DuckDBAdapter({"path": str(tmp_path), "source_type": "directory"})
+
+        async with adapter:
+            result = await adapter.execute_query("SELECT id FROM orders ORDER BY id LIMIT 10")
+
+        assert result.rows == [{"id": 1}, {"id": 2}]
+
+    @pytest.mark.asyncio
+    async def test_directory_mode_cannot_read_etc_passwd(self, tmp_path):
+        """A validated SELECT cannot read host files outside the directory."""
+        import duckdb
+
+        (tmp_path / "orders.csv").write_text("id\n1\n")
+        adapter = DuckDBAdapter({"path": str(tmp_path), "source_type": "directory"})
+
+        async with adapter:
+            with pytest.raises(duckdb.PermissionException):
+                await adapter.execute_query("SELECT * FROM read_csv('/etc/passwd') LIMIT 10")
+
+    @pytest.mark.asyncio
+    async def test_database_mode_queries_tables_but_not_files(self, tmp_path):
+        """A database file source reads its own tables and no host files."""
+        import duckdb
+
+        db_path = tmp_path / "source.duckdb"
+        setup = duckdb.connect(str(db_path))
+        setup.execute("CREATE TABLE orders AS SELECT 42 AS id")
+        setup.close()
+        adapter = DuckDBAdapter({"path": str(db_path), "source_type": "database"})
+
+        async with adapter:
+            result = await adapter.execute_query("SELECT id FROM orders LIMIT 10")
+            assert result.rows == [{"id": 42}]
+            with pytest.raises(duckdb.PermissionException):
+                await adapter.execute_query("SELECT * FROM read_text('/etc/passwd') LIMIT 10")
+
+    @pytest.mark.asyncio
+    async def test_memory_mode_cannot_read_files(self, connected_adapter):
+        """An in-memory source has no files of its own to read."""
+        import duckdb
+
+        with pytest.raises(duckdb.PermissionException):
+            await connected_adapter.execute_query("SELECT * FROM read_text('/etc/passwd') LIMIT 10")

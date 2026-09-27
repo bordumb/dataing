@@ -117,7 +117,7 @@ async def _fetch_columns_from_datasource(
         return []
 
 
-class DatasetResponse(BaseModel):
+class DatasetBaseResponse(BaseModel):
     """Response for a dataset."""
 
     id: str
@@ -138,11 +138,11 @@ class DatasetResponse(BaseModel):
 class DatasetListResponse(BaseModel):
     """Response for listing datasets."""
 
-    datasets: list[DatasetResponse]
+    datasets: list[DatasetBaseResponse]
     total: int
 
 
-class DatasetDetailResponse(DatasetResponse):
+class DatasetDetailResponse(DatasetBaseResponse):
     """Detailed dataset response with columns."""
 
     columns: list[dict[str, Any]] = Field(default_factory=list)
@@ -152,12 +152,10 @@ class InvestigationSummary(BaseModel):
     """Summary of an investigation for dataset detail."""
 
     id: str
-    dataset_id: str
     metric_name: str
     status: str
     severity: str | None = None
     created_at: str
-    completed_at: str | None = None
 
 
 class DatasetInvestigationsResponse(BaseModel):
@@ -167,9 +165,9 @@ class DatasetInvestigationsResponse(BaseModel):
     total: int
 
 
-def _format_dataset(ds: dict[str, Any]) -> DatasetResponse:
+def _format_dataset(ds: dict[str, Any]) -> DatasetBaseResponse:
     """Format dataset record for response."""
-    return DatasetResponse(
+    return DatasetBaseResponse(
         id=str(ds["id"]),
         datasource_id=str(ds["datasource_id"]),
         datasource_name=ds.get("datasource_name"),
@@ -228,19 +226,17 @@ async def get_dataset_investigations(
 
     investigations = await app_db.list_investigations_for_dataset(
         auth.tenant_id,
-        ds["native_path"],
+        dataset_id,
         limit=limit,
     )
 
     summaries = [
         InvestigationSummary(
             id=str(inv["id"]),
-            dataset_id=inv["dataset_id"],
             metric_name=inv["metric_name"],
             status=inv["status"],
-            severity=inv.get("severity"),
+            severity=inv["severity"],
             created_at=inv["created_at"].isoformat(),
-            completed_at=(inv["completed_at"].isoformat() if inv.get("completed_at") else None),
         )
         for inv in investigations
     ]

@@ -16,6 +16,7 @@ from pydantic import BaseModel, Field
 
 from dataing.adapters.audit import audited
 from dataing.adapters.datasource import (
+    ConfigSchema,
     SchemaFilter,
     SourceType,
     get_registry,
@@ -25,8 +26,10 @@ from dataing.adapters.datasource.encryption import (
     encrypt_config,
     get_encryption_key,
 )
+from dataing.adapters.datasource.errors import AdapterError
 from dataing.adapters.db.app_db import AppDatabase
 from dataing.core.entitlements.features import Feature
+from dataing.core.exceptions import QueryValidationError
 from dataing.entrypoints.api.deps import get_app_db
 from dataing.entrypoints.api.middleware.auth import (
     ApiKeyContext,
@@ -34,6 +37,7 @@ from dataing.entrypoints.api.middleware.auth import (
     verify_api_key,
 )
 from dataing.entrypoints.api.middleware.entitlements import require_under_limit
+from dataing.safety.validator import validate_query
 
 logger = structlog.get_logger(__name__)
 
@@ -43,6 +47,11 @@ router = APIRouter(prefix="/datasources", tags=["datasources"])
 AppDbDep = Annotated[AppDatabase, Depends(get_app_db)]
 AuthDep = Annotated[ApiKeyContext, Depends(verify_api_key)]
 WriteScopeDep = Annotated[ApiKeyContext, Depends(require_scope("write"))]
+AdminScopeDep = Annotated[ApiKeyContext, Depends(require_scope("admin"))]
+
+# Upper bound for caller-supplied query timeouts. The lower bound (1) matters too:
+# a timeout of 0 disables the statement timeout on Postgres, MySQL and Snowflake.
+MAX_QUERY_TIMEOUT_SECONDS = 120
 
 
 # Request/Response Models
@@ -111,7 +120,7 @@ class SourceTypeResponse(BaseModel):
     icon: str
     description: str
     capabilities: dict[str, Any]
-    config_schema: dict[str, Any]
+    config_schema: ConfigSchema
 
 
 class SourceTypesResponse(BaseModel):
@@ -147,10 +156,10 @@ class SchemaResponseModel(BaseModel):
 
 
 class QueryRequest(BaseModel):
-    """Request to execute a query."""
+    """Request to execute a read-only SQL query."""
 
     query: str
-    timeout_seconds: int = 30
+    timeout_seconds: int = Field(default=30, ge=1, le=MAX_QUERY_TIMEOUT_SECONDS)
 
 
 class QueryResponse(BaseModel):
@@ -209,6 +218,23 @@ class DatasourceDatasetsResponse(BaseModel):
     total: int
 
 
+def _check_config(source_type: SourceType, config: dict[str, Any]) -> None:
+    """Refuse a configuration this server does not permit, before anything connects to it.
+
+    Raises:
+        HTTPException: 400 if the source type is unavailable or refuses the configuration.
+    """
+    adapter_class = get_registry().get_adapter_class(source_type)
+    if adapter_class is None:
+        raise HTTPException(
+            status_code=400, detail=f"Source type not available: {source_type.value}"
+        )
+    try:
+        adapter_class.check_config(config)
+    except AdapterError as e:
+        raise HTTPException(status_code=400, detail=e.message) from e
+
+
 @router.get("/types", response_model=SourceTypesResponse)
 async def list_source_types() -> SourceTypesResponse:
     """List all supported data source types.
@@ -228,7 +254,7 @@ async def list_source_types() -> SourceTypesResponse:
                 icon=type_def.icon,
                 description=type_def.description,
                 capabilities=type_def.capabilities.model_dump(),
-                config_schema=type_def.config_schema.model_dump(),
+                config_schema=type_def.config_schema,
             )
         )
 
@@ -240,11 +266,13 @@ async def list_source_types() -> SourceTypesResponse:
 async def test_connection(
     request: Request,
     body: TestConnectionRequest,
+    auth: AdminScopeDep,
 ) -> TestConnectionResponse:
     """Test a connection without saving it.
 
     Use this endpoint to validate connection settings before creating
-    a data source.
+    a data source. Admin-only, like creating one: it opens a connection
+    to whatever host the caller supplies.
     """
     registry = get_registry()
 
@@ -261,6 +289,8 @@ async def test_connection(
             status_code=400,
             detail=f"Source type not available: {body.type}",
         )
+
+    _check_config(source_type, body.config)
 
     try:
         adapter = registry.create(source_type, body.config)
@@ -286,7 +316,7 @@ async def test_connection(
 async def create_datasource(
     request: Request,
     body: CreateDataSourceRequest,
-    auth: WriteScopeDep,
+    auth: AdminScopeDep,
     app_db: AppDbDep,
 ) -> DataSourceResponse:
     """Create a new data source.
@@ -308,6 +338,8 @@ async def create_datasource(
             status_code=400,
             detail=f"Source type not available: {body.type}",
         )
+
+    _check_config(source_type, body.config)
 
     # Test connection first
     try:
@@ -488,7 +520,7 @@ async def get_datasource(
 async def delete_datasource(
     http_request: Request,
     datasource_id: UUID,
-    auth: WriteScopeDep,
+    auth: AdminScopeDep,
     app_db: AppDbDep,
 ) -> Response:
     """Delete a data source (soft delete)."""
@@ -505,7 +537,7 @@ async def delete_datasource(
 async def test_datasource_connection(
     http_request: Request,
     datasource_id: UUID,
-    auth: AuthDep,
+    auth: WriteScopeDep,
     app_db: AppDbDep,
 ) -> TestConnectionResponse:
     """Test connectivity for an existing data source."""
@@ -654,12 +686,14 @@ async def get_datasource_schema(
 async def execute_query(
     datasource_id: UUID,
     request: QueryRequest,
-    auth: AuthDep,
+    auth: AdminScopeDep,
     app_db: AppDbDep,
 ) -> QueryResponse:
-    """Execute a query against a data source.
+    """Execute a read-only SQL query against a data source.
 
-    Only works for sources that support SQL or similar query languages.
+    Requires admin scope: the query runs with the data source's stored
+    credentials. Only a single SELECT (or UNION/INTERSECT/EXCEPT of SELECTs)
+    is accepted, validated in the data source's own SQL dialect.
     """
     ds = await app_db.get_data_source(datasource_id, auth.tenant_id)
 
@@ -677,11 +711,17 @@ async def execute_query(
         ) from None
 
     type_def = registry.get_definition(source_type)
-    if not type_def or not type_def.capabilities.supports_sql:
+    dialect = type_def.capabilities.sql_dialect if type_def else None
+    if not type_def or not type_def.capabilities.supports_sql or not dialect:
         raise HTTPException(
             status_code=400,
             detail=f"Source type {ds['type']} does not support SQL queries",
         )
+
+    try:
+        validate_query(request.query, dialect=dialect, require_limit=False)
+    except QueryValidationError as e:
+        raise HTTPException(status_code=400, detail=f"Query rejected: {e}") from e
 
     # Decrypt config
     encryption_key = get_encryption_key()
@@ -812,7 +852,7 @@ async def get_column_stats(
 async def sync_datasource_schema(
     http_request: Request,
     datasource_id: UUID,
-    auth: AuthDep,
+    auth: WriteScopeDep,
     app_db: AppDbDep,
 ) -> SyncResponse:
     """Sync schema and register/update datasets.

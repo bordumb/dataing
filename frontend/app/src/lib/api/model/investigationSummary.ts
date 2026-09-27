@@ -5,16 +5,13 @@
  * Autonomous Data Quality Investigation
  * OpenAPI spec version: 2.0.0
  */
-import type { InvestigationSummaryCompletedAt } from "./investigationSummaryCompletedAt";
 import type { InvestigationSummarySeverity } from "./investigationSummarySeverity";
 
 /**
  * Summary of an investigation for dataset detail.
  */
 export interface InvestigationSummary {
-  completed_at?: InvestigationSummaryCompletedAt;
   created_at: string;
-  dataset_id: string;
   id: string;
   metric_name: string;
   severity?: InvestigationSummarySeverity;

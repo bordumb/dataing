@@ -1,12 +1,9 @@
 /**
  * NotificationCard component for displaying individual notifications.
- *
- * Supports polymorphic rendering based on notification type.
  */
 
 import { Link } from "react-router-dom";
 import { Card } from "@/components/ui/Card";
-import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
 import { CheckCircle, XCircle, AlertTriangle, Info } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -80,45 +77,6 @@ export function NotificationCard({
       onMarkRead(notification.id);
     }
   };
-
-  // Polymorphic rendering for approval_required type
-  if (notification.type === "approval_required") {
-    // For approval notifications, the resource_id is the approval_request_id
-    const approvalLink = notification.resource_id
-      ? `/approvals/${notification.resource_id}`
-      : resourceLink;
-
-    return (
-      <Card className={cn("p-4", isUnread && "border-l-4 border-l-primary")}>
-        <div className="flex items-start gap-3">
-          <AlertTriangle className="size-5 mt-0.5 text-yellow-500" />
-          <div className="flex-1 space-y-2">
-            <div className="flex items-center justify-between gap-2">
-              <h4 className="font-semibold">{notification.title}</h4>
-              <Badge variant="destructive">Action Required</Badge>
-            </div>
-            {notification.body && (
-              <p className="text-sm text-muted-foreground">
-                {notification.body}
-              </p>
-            )}
-            <div className="flex gap-2 mt-3">
-              {approvalLink && (
-                <Button size="sm" asChild>
-                  <Link to={approvalLink} onClick={handleClick}>
-                    Review Context
-                  </Link>
-                </Button>
-              )}
-            </div>
-            <p className="text-xs text-muted-foreground">
-              {formatTimestamp(notification.created_at)}
-            </p>
-          </div>
-        </div>
-      </Card>
-    );
-  }
 
   // Default card for investigation_completed/failed
   const cardContent = (

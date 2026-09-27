@@ -1,11 +1,15 @@
 """Tests for data source type definitions."""
 
+import pytest
+from pydantic import ValidationError
+
 from dataing.adapters.datasource.types import (
     AdapterCapabilities,
     Catalog,
     Column,
     ColumnStats,
     ConfigField,
+    ConfigFieldOption,
     ConfigSchema,
     ConnectionTestResult,
     FieldGroup,
@@ -14,6 +18,7 @@ from dataing.adapters.datasource.types import (
     QueryResult,
     Schema,
     SchemaResponse,
+    ShowIfCondition,
     SourceCategory,
     SourceType,
     Table,
@@ -262,6 +267,77 @@ class TestConfigSchema:
         assert len(schema.fields) == 2
         assert schema.fields[0].type == "string"
         assert schema.fields[1].type == "secret"
+
+
+class TestConfigField:
+    """Tests for ConfigField options and show_if conditions."""
+
+    def test_options_load_from_dicts(self):
+        """Adapters write options as dicts; they load as typed options."""
+        field = ConfigField(
+            name="ssl_mode",
+            label="SSL Mode",
+            type="enum",
+            required=False,
+            group="ssl",
+            options=[{"value": "require", "label": "Require"}],
+        )
+
+        assert field.options == [ConfigFieldOption(value="require", label="Require")]
+
+    def test_show_if_loads_from_a_dict(self):
+        """Adapters write show_if as a dict; it loads as a typed condition."""
+        field = ConfigField(
+            name="kerberos_principal",
+            label="Kerberos Principal",
+            type="string",
+            required=False,
+            group="auth",
+            show_if={"field": "kerberos_enabled", "value": True},
+        )
+
+        assert field.show_if == ShowIfCondition(field="kerberos_enabled", value=True)
+
+    def test_option_needs_a_label(self):
+        """An option without a label is rejected when the adapter loads."""
+        with pytest.raises(ValidationError):
+            ConfigField(
+                name="ssl_mode",
+                label="SSL Mode",
+                type="enum",
+                required=False,
+                group="ssl",
+                options=[{"value": "require"}],
+            )
+
+    def test_show_if_needs_a_value(self):
+        """A show_if condition without a value is rejected when the adapter loads."""
+        with pytest.raises(ValidationError):
+            ConfigField(
+                name="kerberos_principal",
+                label="Kerberos Principal",
+                type="string",
+                required=False,
+                group="auth",
+                show_if={"field": "kerberos_enabled"},
+            )
+
+    def test_options_and_conditions_are_frozen(self):
+        """Loaded options and conditions cannot be changed in place."""
+        option = ConfigFieldOption(value="require", label="Require")
+        condition = ShowIfCondition(field="kerberos_enabled", value=True)
+
+        with pytest.raises(ValidationError):
+            option.value = "disable"
+        with pytest.raises(ValidationError):
+            condition.value = False
+
+    def test_json_schema_names_option_and_condition_types(self):
+        """Clients generate named option and condition types, not free-form dicts."""
+        properties = ConfigField.model_json_schema()["properties"]
+
+        assert properties["options"]["anyOf"][0]["items"] == {"$ref": "#/$defs/ConfigFieldOption"}
+        assert properties["show_if"]["anyOf"][0] == {"$ref": "#/$defs/ShowIfCondition"}
 
 
 class TestAdapterCapabilities:

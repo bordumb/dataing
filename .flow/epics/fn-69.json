@@ -1,0 +1,13 @@
+{
+  "branch_name": "feat/fn-69-checks-as-code",
+  "created_at": "2026-09-27T15:11:15.263112Z",
+  "depends_on_epics": [],
+  "id": "fn-69",
+  "next_task": 1,
+  "plan_review_status": "ship",
+  "plan_reviewed_at": "2026-09-27T15:11:35.418695Z",
+  "spec_path": ".flow/specs/fn-69.md",
+  "status": "open",
+  "title": "Checks as Code",
+  "updated_at": "2026-09-27T15:11:35.418910Z"
+}

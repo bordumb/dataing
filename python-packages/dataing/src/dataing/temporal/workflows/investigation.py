@@ -6,7 +6,7 @@ from datetime import timedelta
 from typing import Any
 
 from temporalio import workflow
-from temporalio.exceptions import CancelledError
+from temporalio.exceptions import ActivityError, CancelledError, ChildWorkflowError
 
 with workflow.unsafe.imports_passed_through():
     from dataing.temporal.activities import (
@@ -278,6 +278,7 @@ class InvestigationWorkflow:
         try:
             gather_input = GatherContextInput(
                 investigation_id=input.investigation_id,
+                tenant_id=input.tenant_id,
                 datasource_id=input.datasource_id,
                 alert=input.alert_data,
             )
@@ -398,11 +399,12 @@ class InvestigationWorkflow:
 
         # Step 4: Evaluate hypotheses in parallel via child workflows
         self._current_step = "evaluate_hypotheses"
-        evidence = await self._evaluate_hypotheses_parallel(
+        evidence, untested_hypotheses = await self._evaluate_hypotheses_parallel(
             investigation_id=input.investigation_id,
             hypotheses=hypotheses,
             schema_info=context.get("schema", {}),
             alert_summary=alert_summary,
+            tenant_id=input.tenant_id,
             datasource_id=input.datasource_id,
             alert=input.alert_data,
         )
@@ -428,6 +430,7 @@ class InvestigationWorkflow:
                 hypotheses=hypotheses,
                 alert_summary=alert_summary,
                 confidence_threshold=input.confidence_threshold,
+                untested_hypotheses=untested_hypotheses,
             )
             synthesize_result = await workflow.execute_activity(
                 "synthesize",
@@ -571,9 +574,10 @@ class InvestigationWorkflow:
         hypotheses: list[dict[str, Any]],
         schema_info: dict[str, Any],
         alert_summary: str,
+        tenant_id: str,
         datasource_id: str,
         alert: dict[str, Any] | None = None,
-    ) -> list[dict[str, Any]]:
+    ) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
         """Evaluate hypotheses in parallel using child workflows.
 
         Args:
@@ -581,14 +585,17 @@ class InvestigationWorkflow:
             hypotheses: List of hypothesis dictionaries.
             schema_info: Schema information for query generation.
             alert_summary: Summary of the alert being investigated.
+            tenant_id: ID of the tenant that owns the investigation and datasource.
             datasource_id: ID of the datasource to query.
             alert: Optional full alert data.
 
         Returns:
-            List of evidence dictionaries from all successful evaluations.
+            Tuple of (evidence from successful evaluations, untested hypotheses).
+            A hypothesis is untested when its evaluation failed; synthesis must not
+            read that as the hypothesis being refuted.
         """
         if not hypotheses:
-            return []
+            return [], []
 
         # Clear previous handles
         self._child_handles = []
@@ -606,6 +613,7 @@ class InvestigationWorkflow:
                 hypothesis=hypothesis,
                 schema_info=schema_info,
                 alert_summary=alert_summary,
+                tenant_id=tenant_id,
                 datasource_id=datasource_id,
                 alert=alert,
             )
@@ -619,17 +627,20 @@ class InvestigationWorkflow:
         # If cancelled during child workflow creation, cancel all and return
         if self._cancelled:
             await self._cancel_children()
-            return []
+            return [], []
 
         # Wait for all children to complete (don't crash on individual failures)
         results = await asyncio.gather(*self._child_handles, return_exceptions=True)
 
-        # Aggregate evidence from successful evaluations
+        # Aggregate evidence; a failed evaluation leaves its hypothesis untested
         all_evidence: list[dict[str, Any]] = []
+        untested: list[dict[str, Any]] = []
         evaluated_count = 0
-        for result in results:
+        for i, (hypothesis, result) in enumerate(zip(hypotheses, results, strict=True)):
             if isinstance(result, BaseException):
-                workflow.logger.warning(f"Child workflow failed: {result}")
+                reason = _describe_failure(result)
+                workflow.logger.warning(f"Child workflow failed: {reason}")
+                untested.append(_untested(hypothesis, i, f"Evaluation failed: {reason}"))
                 continue
             # result is now narrowed to EvaluateHypothesisResult
             evaluated_count += 1
@@ -638,7 +649,27 @@ class InvestigationWorkflow:
                 workflow.logger.warning(
                     f"Hypothesis {result.hypothesis_id} evaluation error: {result.error}"
                 )
+                untested.append(_untested(hypothesis, i, result.error))
             else:
                 all_evidence.extend(result.evidence)
 
-        return all_evidence
+        return all_evidence, untested
+
+
+def _untested(hypothesis: dict[str, Any], index: int, error: str) -> dict[str, Any]:
+    """Describe a hypothesis whose evaluation failed, for synthesis."""
+    return {
+        "hypothesis_id": hypothesis.get("id", f"h-{index}"),
+        "title": hypothesis.get("title", ""),
+        "error": error,
+    }
+
+
+def _describe_failure(error: BaseException) -> str:
+    """Describe why a child evaluation failed, without Temporal's wrapper errors."""
+    while isinstance(error, ChildWorkflowError | ActivityError):
+        cause = error.cause
+        if cause is None:
+            break
+        error = cause
+    return str(error) or type(error).__name__

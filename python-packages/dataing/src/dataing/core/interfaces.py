@@ -13,6 +13,8 @@ from typing import TYPE_CHECKING, Any, Protocol, runtime_checkable
 from uuid import UUID
 
 if TYPE_CHECKING:
+    from collections.abc import Sequence
+
     from bond import StreamHandlers
 
     from dataing.adapters.datasource.base import BaseAdapter
@@ -42,7 +44,7 @@ class DatabaseAdapter(Protocol):
     async def execute_query(
         self,
         sql: str,
-        params: dict[str, object] | None = None,
+        params: Sequence[object] | None = None,
         timeout_seconds: int = 30,
         limit: int | None = None,
     ) -> QueryResult:
@@ -50,7 +52,8 @@ class DatabaseAdapter(Protocol):
 
         Args:
             sql: The SQL query to execute (must be SELECT).
-            params: Optional query parameters.
+            params: Values bound to the query's placeholders, in order, using the
+                driver's placeholder style (see SQLAdapter.execute_query).
             timeout_seconds: Maximum time to wait for query completion.
             limit: Optional row limit.
 

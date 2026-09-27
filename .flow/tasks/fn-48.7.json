@@ -10,7 +10,7 @@
   "id": "fn-48.7",
   "priority": 7,
   "spec_path": ".flow/tasks/fn-48.7.md",
-  "status": "todo",
+  "status": "blocked",
   "title": "Add CLI commands: threshold create, threshold list",
-  "updated_at": "2026-01-28T03:53:01.637097Z"
+  "updated_at": "2026-09-27T15:11:38.065754Z"
 }

@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import logging
 import sys
+from collections.abc import Iterator
 from pathlib import Path
 
 import pytest
@@ -24,7 +26,42 @@ from fixtures.domain_objects import *  # noqa: F401, F403, E402
 from fixtures.mocks import *  # noqa: F401, F403, E402
 
 
+@pytest.fixture(autouse=True)
+def restore_root_logger() -> Iterator[None]:
+    """Restore the root logger's handlers and level after each test.
+
+    configure_logging() (create_app(), the worker's main()) binds its root handler to
+    the current sys.stdout. Inside a test that can be capsys's stream, which is closed
+    once the test ends. pytest's own handlers are kept.
+    """
+    root = logging.getLogger()
+    handlers, level = root.handlers[:], root.level
+    yield
+    for handler in root.handlers[:]:
+        if handler not in handlers:
+            root.removeHandler(handler)
+    for handler in handlers:
+        if handler not in root.handlers:
+            root.addHandler(handler)
+    root.setLevel(level)
+
+
 @pytest.fixture
 def anyio_backend() -> str:
     """Configure anyio to use asyncio backend."""
     return "asyncio"
+
+
+@pytest.fixture
+def unset_http_client_log_levels() -> Iterator[None]:
+    """Unset the httpx and httpcore logger levels, as in a fresh process.
+
+    Logger levels are process-global, so the original levels are restored afterwards.
+    """
+    loggers = [logging.getLogger(name) for name in ("httpx", "httpcore")]
+    original_levels = [http_logger.level for http_logger in loggers]
+    for http_logger in loggers:
+        http_logger.setLevel(logging.NOTSET)
+    yield
+    for http_logger, level in zip(loggers, original_levels, strict=True):
+        http_logger.setLevel(level)

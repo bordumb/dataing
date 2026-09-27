@@ -64,8 +64,8 @@ class Integration(BaseModel):
     # Provider-specific configuration (encrypted in storage)
     config: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict)
 
-    # Signing secret for webhook verification
-    signing_secret: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # Signing secret for webhook verification; webhooks are rejected without one
+    signing_secret: Mapped[str] = mapped_column(Text, nullable=False)
 
     # Rate limiting
     rate_limit_per_minute: Mapped[int] = mapped_column(Integer, default=60)

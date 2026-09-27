@@ -10,14 +10,18 @@ import logging
 import re
 import sqlite3
 import time
+from collections.abc import Sequence
 from pathlib import Path
 from typing import Any
+from urllib.parse import quote
 
 from dataing.adapters.datasource.errors import (
     ConnectionFailedError,
+    InvalidConfigError,
     QuerySyntaxError,
     SchemaFetchFailedError,
 )
+from dataing.adapters.datasource.local_paths import require_local_data_root, resolve_local_path
 from dataing.adapters.datasource.registry import register_adapter
 from dataing.adapters.datasource.sql.base import SQLAdapter
 from dataing.adapters.datasource.type_mapping import normalize_type
@@ -53,7 +57,7 @@ SQLITE_CONFIG_SCHEMA = ConfigSchema(
             required=True,
             group="connection",
             placeholder="/path/to/database.sqlite",
-            description="Path to SQLite file, or file: URI (e.g., file:db.sqlite?mode=ro)",
+            description="Path to the SQLite database file, inside the server's local data root",
         ),
         ConfigField(
             name="read_only",
@@ -75,6 +79,7 @@ SQLITE_CAPABILITIES = AdapterCapabilities(
     supports_preview=True,
     supports_write=False,
     query_language=QueryLanguage.SQL,
+    sql_dialect="sqlite",
     max_concurrent_queries=1,
 )
 
@@ -101,7 +106,7 @@ class SQLiteAdapter(SQLAdapter):
 
         Args:
             config: Configuration dictionary with:
-                - path: Path to SQLite file or file: URI
+                - path: Path to the SQLite database file, or :memory:
                 - read_only: Open in read-only mode (default True)
         """
         super().__init__(config)
@@ -118,33 +123,54 @@ class SQLiteAdapter(SQLAdapter):
         """Get the capabilities of this adapter."""
         return SQLITE_CAPABILITIES
 
-    def _build_uri(self) -> str:
-        """Build SQLite URI from config."""
-        path: str = self._config.get("path", "")
-        read_only = self._config.get("read_only", True)
+    @classmethod
+    def check_config(cls, config: dict[str, Any]) -> None:
+        """Refuse a path outside the local data root."""
+        cls(config)._resolve_path()
 
-        if path.startswith("file:"):
-            return path
+    def _resolve_path(self) -> str:
+        """Resolve the configured path inside the local data root.
 
-        uri = f"file:{path}"
-        if read_only:
+        An in-memory database has no path, but it is a local source all the same. A
+        ``file:`` URI is refused: it could name any file and pick its own open mode.
+        """
+        path = self._config.get("path")
+        if path == ":memory:":
+            require_local_data_root()
+            return ":memory:"
+        if isinstance(path, str) and path.startswith("file:"):
+            raise InvalidConfigError(
+                message="Give the SQLite database as a file path, not a file: URI.",
+                field="path",
+            )
+        return resolve_local_path(path)
+
+    def _build_uri(self, path: str) -> str:
+        """Build the SQLite URI for a resolved path.
+
+        The path is percent-encoded, so a ``?`` or ``#`` in a file name cannot add
+        URI parameters such as a read-write mode.
+        """
+        uri = "file::memory:" if path == ":memory:" else f"file:{quote(path)}"
+        if self._config.get("read_only", True):
             uri += "?mode=ro"
         return uri
 
     async def connect(self) -> None:
         """Establish connection to SQLite database."""
-        path = self._config.get("path", "")
+        path = self._resolve_path()
 
-        if not path.startswith("file:") and not path.startswith(":memory:"):
-            if not Path(path).exists():
-                raise ConnectionFailedError(
-                    message=f"SQLite database file not found: {path}",
-                    details={"path": path},
-                )
+        if path != ":memory:" and not Path(path).exists():
+            raise ConnectionFailedError(
+                message=f"SQLite database file not found: {path}",
+                details={"path": path},
+            )
 
         try:
-            uri = self._build_uri()
+            uri = self._build_uri(path)
             self._conn = sqlite3.connect(uri, uri=True, check_same_thread=False)
+            # Queries read this database only: ATTACH could open any file on the host.
+            self._conn.setlimit(sqlite3.SQLITE_LIMIT_ATTACHED, 0)
             self._conn.row_factory = sqlite3.Row
             self._connected = True
         except sqlite3.OperationalError as e:
@@ -194,11 +220,11 @@ class SQLiteAdapter(SQLAdapter):
     async def execute_query(
         self,
         sql: str,
-        params: dict[str, Any] | None = None,
+        params: Sequence[Any] | None = None,
         timeout_seconds: int = 30,
         limit: int | None = None,
     ) -> QueryResult:
-        """Execute a SQL query against SQLite."""
+        """Execute a SQL query against SQLite, binding params to its ? placeholders."""
         if not self._connected or not self._conn:
             raise ConnectionFailedError(message="Not connected to SQLite")
 
@@ -208,7 +234,7 @@ class SQLiteAdapter(SQLAdapter):
             # execution time. SQLite does not support query-level timeouts natively.
             self._conn.execute(f"PRAGMA busy_timeout = {timeout_seconds * 1000}")
 
-            cursor = self._conn.execute(sql)
+            cursor = self._conn.execute(sql, tuple(params or ()))
             rows = cursor.fetchall()
 
             execution_time_ms = int((time.time() - start_time) * 1000)
@@ -250,28 +276,6 @@ class SQLiteAdapter(SQLAdapter):
                     query=sql[:200],
                 ) from e
             raise
-
-    async def _fetch_table_metadata(self) -> list[dict[str, Any]]:
-        """Fetch table metadata from SQLite."""
-        if not self._conn:
-            raise ConnectionFailedError(message="Not connected to SQLite")
-
-        cursor = self._conn.execute(
-            "SELECT name, type FROM sqlite_master "
-            "WHERE type IN ('table', 'view') AND name NOT LIKE 'sqlite_%'"
-        )
-        tables = []
-        for row in cursor:
-            tables.append(
-                {
-                    "table_catalog": DEFAULT_CATALOG,
-                    "table_schema": DEFAULT_SCHEMA,
-                    "table_name": row["name"],
-                    "table_type": row["type"].upper(),
-                }
-            )
-        cursor.close()
-        return tables
 
     async def get_schema(
         self,

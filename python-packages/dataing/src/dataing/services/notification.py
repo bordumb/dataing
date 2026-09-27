@@ -157,23 +157,3 @@ class NotificationService:
                 },
             )
         )
-
-    async def notify_approval_required(
-        self,
-        tenant_id: UUID,
-        investigation_id: UUID,
-        approval_request_id: UUID,
-        context: dict[str, Any],
-    ) -> dict[str, Any]:
-        """Convenience method for approval request notifications."""
-        return await self.notify(
-            NotificationEvent(
-                event_type="approval.required",
-                tenant_id=tenant_id,
-                payload={
-                    "investigation_id": str(investigation_id),
-                    "approval_request_id": str(approval_request_id),
-                    "context": context,
-                },
-            )
-        )

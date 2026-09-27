@@ -5,9 +5,10 @@ Uses BondAgent for type-safe, validated LLM responses with optional streaming.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, TypeVar
 
 from bond import BondAgent, StreamHandlers
+from pydantic import BaseModel
 from pydantic_ai.models.anthropic import AnthropicModel
 from pydantic_ai.output import PromptedOutput
 from pydantic_ai.providers.anthropic import AnthropicProvider
@@ -18,9 +19,8 @@ from dataing.core.domain_types import (
     Finding,
     Hypothesis,
     InvestigationContext,
-    LineageContext,
-    MetricSpec,
     RelevantCodeChange,
+    UntestedHypothesis,
 )
 from dataing.core.exceptions import LLMError
 
@@ -39,12 +39,17 @@ from .prompts import counter_analysis, hypothesis, interpretation, query, reflex
 if TYPE_CHECKING:
     from dataing.adapters.datasource.types import QueryResult, SchemaResponse
 
+OutputT = TypeVar("OutputT", bound=BaseModel)
+
 
 class AgentClient:
     """LLM client facade for investigation agents.
 
     Uses BondAgent for type-safe, validated LLM responses with optional streaming.
     Prompts are modular and live in the prompts/ package.
+
+    One instance serves every investigation in a process, across tenants, so every
+    LLM call runs on a fresh BondAgent and starts from an empty message history.
     """
 
     def __init__(
@@ -62,44 +67,48 @@ class AgentClient:
         """
         provider = AnthropicProvider(api_key=api_key)
         self._model = AnthropicModel(model, provider=provider)
+        self._max_retries = max_retries
 
+    async def _ask(
+        self,
+        name: str,
+        output_type: type[OutputT],
+        prompt: str,
+        *,
+        instructions: str,
+        handlers: StreamHandlers | None = None,
+    ) -> OutputT:
+        """Run one LLM call on a fresh BondAgent.
+
+        BondAgent keeps every message it has seen and replays them on each ask().
+        Never hold a BondAgent across calls: its history would carry one
+        investigation's schemas, alerts and query rows into the next prompt.
+
+        Args:
+            name: Agent name.
+            output_type: Response model the LLM output is validated against.
+            prompt: User prompt.
+            instructions: System prompt for this call.
+            handlers: Optional streaming handlers for real-time updates.
+
+        Returns:
+            The validated response.
+        """
         # Empty base instructions: all prompting via dynamic_instructions at runtime.
         # This ensures PromptedOutput gets the full detailed prompt without conflicts.
-        self._hypothesis_agent: BondAgent[HypothesesResponse, None] = BondAgent(
-            name="hypothesis-generator",
+        agent: BondAgent[OutputT, None] = BondAgent(
+            name=name,
             instructions="",
             model=self._model,
-            output_type=PromptedOutput(HypothesesResponse),
-            max_retries=max_retries,
+            output_type=PromptedOutput(output_type),
+            max_retries=self._max_retries,
         )
-        self._interpretation_agent: BondAgent[InterpretationResponse, None] = BondAgent(
-            name="evidence-interpreter",
-            instructions="",
-            model=self._model,
-            output_type=PromptedOutput(InterpretationResponse),
-            max_retries=max_retries,
+        result: OutputT = await agent.ask(
+            prompt,
+            dynamic_instructions=instructions,
+            handlers=handlers,
         )
-        self._synthesis_agent: BondAgent[SynthesisResponse, None] = BondAgent(
-            name="finding-synthesizer",
-            instructions="",
-            model=self._model,
-            output_type=PromptedOutput(SynthesisResponse),
-            max_retries=max_retries,
-        )
-        self._query_agent: BondAgent[QueryResponse, None] = BondAgent(
-            name="sql-generator",
-            instructions="",
-            model=self._model,
-            output_type=PromptedOutput(QueryResponse),
-            max_retries=max_retries,
-        )
-        self._counter_analysis_agent: BondAgent[CounterAnalysisResponse, None] = BondAgent(
-            name="counter-analyst",
-            instructions="",
-            model=self._model,
-            output_type=PromptedOutput(CounterAnalysisResponse),
-            max_retries=max_retries,
-        )
+        return result
 
     async def generate_hypotheses(
         self,
@@ -128,9 +137,11 @@ class AgentClient:
         user_prompt = hypothesis.build_user(alert=alert, context=context, code_changes=code_changes)
 
         try:
-            result = await self._hypothesis_agent.ask(
+            result = await self._ask(
+                "hypothesis-generator",
+                HypothesesResponse,
                 user_prompt,
-                dynamic_instructions=system_prompt,
+                instructions=system_prompt,
                 handlers=handlers,
             )
 
@@ -182,9 +193,11 @@ class AgentClient:
             system = query.build_system(schema=schema, alert=alert)
 
         try:
-            result = await self._query_agent.ask(
+            result = await self._ask(
+                "sql-generator",
+                QueryResponse,
                 prompt,
-                dynamic_instructions=system,
+                instructions=system,
                 handlers=handlers,
             )
             sql_query: str = result.query
@@ -218,9 +231,11 @@ class AgentClient:
         system = interpretation.build_system()
 
         try:
-            result = await self._interpretation_agent.ask(
+            result = await self._ask(
+                "evidence-interpreter",
+                InterpretationResponse,
                 prompt,
-                dynamic_instructions=system,
+                instructions=system,
                 handlers=handlers,
             )
 
@@ -283,6 +298,7 @@ class AgentClient:
         evidence: list[Evidence],
         handlers: StreamHandlers | None = None,
         code_changes: list[RelevantCodeChange] | None = None,
+        untested_hypotheses: list[UntestedHypothesis] | None = None,
     ) -> SynthesisResponse:
         """Synthesize all evidence into a root cause finding (raw response).
 
@@ -291,6 +307,7 @@ class AgentClient:
             evidence: All collected evidence.
             handlers: Optional streaming handlers for real-time updates.
             code_changes: Optional list of code changes related to the investigation.
+            untested_hypotheses: Optional hypotheses whose evaluation failed.
 
         Returns:
             Raw SynthesisResponse with all fields from LLM.
@@ -298,113 +315,28 @@ class AgentClient:
         Raises:
             LLMError: If synthesis fails.
         """
-        prompt = synthesis.build_user(alert=alert, evidence=evidence, code_changes=code_changes)
+        prompt = synthesis.build_user(
+            alert=alert,
+            evidence=evidence,
+            code_changes=code_changes,
+            untested_hypotheses=untested_hypotheses,
+        )
         system = synthesis.build_system()
 
         try:
-            result: SynthesisResponse = await self._synthesis_agent.ask(
+            return await self._ask(
+                "finding-synthesizer",
+                SynthesisResponse,
                 prompt,
-                dynamic_instructions=system,
+                instructions=system,
                 handlers=handlers,
             )
-            return result
 
         except Exception as e:
             raise LLMError(
                 f"Synthesis failed: {e}",
                 retryable=False,
             ) from e
-
-    # -------------------------------------------------------------------------
-    # Dict-based methods for Temporal activities
-    # These accept raw dicts and convert to domain types internally
-    # -------------------------------------------------------------------------
-
-    async def generate_hypotheses_for_temporal(
-        self,
-        *,
-        alert_summary: str,
-        alert: dict[str, Any] | None,
-        schema_info: dict[str, Any] | None,
-        lineage_info: dict[str, Any] | None,
-        num_hypotheses: int = 5,
-        pattern_hints: list[str] | None = None,
-    ) -> list[Hypothesis]:
-        """Generate hypotheses from dict inputs (for Temporal activities).
-
-        Args:
-            alert_summary: Summary of the alert.
-            alert: Alert data as dict.
-            schema_info: Schema info as dict.
-            lineage_info: Lineage info as dict.
-            num_hypotheses: Target number of hypotheses.
-            pattern_hints: Optional hints from pattern matching.
-
-        Returns:
-            List of Hypothesis objects.
-        """
-        # Convert alert dict to AnomalyAlert
-        alert_obj = self._dict_to_alert(alert, alert_summary)
-
-        # Convert schema dict to SchemaResponse
-        schema_obj = self._dict_to_schema(schema_info)
-
-        # Convert lineage dict to LineageContext
-        lineage_obj = None
-        if lineage_info:
-            lineage_obj = LineageContext(
-                target=lineage_info.get("target", ""),
-                upstream=tuple(lineage_info.get("upstream", [])),
-                downstream=tuple(lineage_info.get("downstream", [])),
-            )
-
-        context = InvestigationContext(schema=schema_obj, lineage=lineage_obj)
-        return await self.generate_hypotheses(alert_obj, context, num_hypotheses)
-
-    async def synthesize_findings_for_temporal(
-        self,
-        *,
-        evidence: list[dict[str, Any]],
-        hypotheses: list[dict[str, Any]],
-        alert_summary: str,
-    ) -> dict[str, Any]:
-        """Synthesize findings from dict inputs (for Temporal activities).
-
-        Args:
-            evidence: List of evidence dicts.
-            hypotheses: List of hypothesis dicts.
-            alert_summary: Summary of the alert.
-
-        Returns:
-            Synthesis result as dict.
-        """
-        # Convert evidence dicts to Evidence objects
-        evidence_objs = [
-            Evidence(
-                hypothesis_id=e.get("hypothesis_id", "unknown"),
-                query=e.get("query", ""),
-                result_summary=e.get("result_summary", ""),
-                row_count=e.get("row_count", 0),
-                supports_hypothesis=e.get("supports_hypothesis"),
-                confidence=e.get("confidence", 0.0),
-                interpretation=e.get("interpretation", ""),
-            )
-            for e in evidence
-        ]
-
-        # Create a minimal alert for synthesis
-        alert_obj = self._dict_to_alert(None, alert_summary)
-
-        result = await self.synthesize_findings_raw(alert_obj, evidence_objs)
-        return {
-            "root_cause": result.root_cause,
-            "confidence": result.confidence,
-            "recommendations": result.recommendations,
-            "supporting_evidence": result.supporting_evidence,
-            "causal_chain": result.causal_chain,
-            "estimated_onset": result.estimated_onset,
-            "affected_scope": result.affected_scope,
-        }
 
     async def counter_analyze(
         self,
@@ -431,9 +363,11 @@ class AgentClient:
         system = counter_analysis.build_system()
 
         try:
-            result = await self._counter_analysis_agent.ask(
+            result = await self._ask(
+                "counter-analyst",
+                CounterAnalysisResponse,
                 prompt,
-                dynamic_instructions=system,
+                instructions=system,
             )
             return {
                 "alternative_explanations": result.alternative_explanations,
@@ -447,121 +381,3 @@ class AgentClient:
                 f"Counter-analysis failed: {e}",
                 retryable=False,
             ) from e
-
-    def _dict_to_schema(self, schema_info: dict[str, Any] | None) -> SchemaResponse:
-        """Convert schema dict to SchemaResponse domain object.
-
-        Args:
-            schema_info: Schema data as dict, or None.
-
-        Returns:
-            SchemaResponse object.
-        """
-        from datetime import datetime
-
-        from dataing.adapters.datasource.types import (
-            Catalog,
-            Column,
-            NormalizedType,
-            Schema,
-            SchemaResponse,
-            SourceCategory,
-            SourceType,
-            Table,
-        )
-
-        if not schema_info:
-            return SchemaResponse(
-                source_id="unknown",
-                source_type=SourceType.POSTGRESQL,
-                source_category=SourceCategory.DATABASE,
-                fetched_at=datetime.now(),
-                catalogs=[],
-            )
-
-        # Try to reconstruct from nested structure
-        catalogs = []
-        for cat_data in schema_info.get("catalogs", []):
-            schemas = []
-            for sch_data in cat_data.get("schemas", []):
-                tables = []
-                for tbl_data in sch_data.get("tables", []):
-                    columns = []
-                    for col_data in tbl_data.get("columns", []):
-                        columns.append(
-                            Column(
-                                name=col_data.get("name", "unknown"),
-                                data_type=NormalizedType(col_data.get("data_type", "unknown")),
-                                native_type=col_data.get("native_type", "unknown"),
-                                nullable=col_data.get("nullable", True),
-                            )
-                        )
-                    tables.append(
-                        Table(
-                            name=tbl_data.get("name", "unknown"),
-                            table_type=tbl_data.get("table_type", "table"),
-                            native_type=tbl_data.get("native_type", "TABLE"),
-                            native_path=tbl_data.get(
-                                "native_path", tbl_data.get("name", "unknown")
-                            ),
-                            columns=columns,
-                        )
-                    )
-                schemas.append(Schema(name=sch_data.get("name", "default"), tables=tables))
-            catalogs.append(Catalog(name=cat_data.get("name", "default"), schemas=schemas))
-
-        return SchemaResponse(
-            source_id=schema_info.get("source_id", "unknown"),
-            source_type=SourceType(schema_info.get("source_type", "postgresql")),
-            source_category=SourceCategory(schema_info.get("source_category", "database")),
-            fetched_at=datetime.now(),
-            catalogs=catalogs,
-        )
-
-    def _dict_to_alert(self, alert: dict[str, Any] | None, alert_summary: str) -> AnomalyAlert:
-        """Convert alert dict to AnomalyAlert domain object.
-
-        Args:
-            alert: Alert data as dict, or None.
-            alert_summary: Summary string as fallback.
-
-        Returns:
-            AnomalyAlert object.
-        """
-        if alert:
-            # Extract metric_spec from alert if present
-            metric_spec_data = alert.get("metric_spec", {})
-            metric_spec = MetricSpec(
-                metric_type=metric_spec_data.get("metric_type", "description"),
-                expression=metric_spec_data.get("expression", alert_summary),
-                display_name=metric_spec_data.get("display_name", "Unknown Metric"),
-                columns_referenced=metric_spec_data.get("columns_referenced", []),
-            )
-
-            return AnomalyAlert(
-                dataset_ids=alert.get("dataset_ids", ["unknown"]),
-                metric_spec=metric_spec,
-                anomaly_type=alert.get("anomaly_type", "unknown"),
-                expected_value=alert.get("expected_value", 0.0),
-                actual_value=alert.get("actual_value", 0.0),
-                deviation_pct=alert.get("deviation_pct", 0.0),
-                anomaly_date=alert.get("anomaly_date", "unknown"),
-                severity=alert.get("severity", "medium"),
-                source_system=alert.get("source_system"),
-            )
-        else:
-            # Create minimal alert from summary
-            return AnomalyAlert(
-                dataset_ids=["unknown"],
-                metric_spec=MetricSpec(
-                    metric_type="description",
-                    expression=alert_summary,
-                    display_name="Alert",
-                ),
-                anomaly_type="unknown",
-                expected_value=0.0,
-                actual_value=0.0,
-                deviation_pct=0.0,
-                anomaly_date="unknown",
-                severity="medium",
-            )

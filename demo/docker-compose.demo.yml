@@ -21,8 +21,9 @@ services:
     ports:
       - "5433:5432"
     volumes:
-      - ./fixtures/null_spike:/data:ro
-      - ./init-pgduckdb.sql:/docker-entrypoint-initdb.d/init.sql:ro
+      # Relative to the project directory (the repo root), not this file
+      - ./demo/fixtures/null_spike:/data:ro
+      - ./demo/init-pgduckdb.sql:/docker-entrypoint-initdb.d/init.sql:ro
       - demo-duckdb-data:/var/lib/postgresql/data
     environment:
       POSTGRES_USER: demo

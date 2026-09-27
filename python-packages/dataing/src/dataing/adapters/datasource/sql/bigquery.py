@@ -7,6 +7,7 @@ data source interface with full schema discovery and query capabilities.
 from __future__ import annotations
 
 import time
+from collections.abc import Sequence
 from typing import Any
 
 from dataing.adapters.datasource.errors import (
@@ -104,6 +105,7 @@ BIGQUERY_CAPABILITIES = AdapterCapabilities(
     supports_preview=True,
     supports_write=False,
     query_language=QueryLanguage.SQL,
+    sql_dialect="bigquery",
     max_concurrent_queries=5,
 )
 
@@ -242,11 +244,11 @@ class BigQueryAdapter(SQLAdapter):
     async def execute_query(
         self,
         sql: str,
-        params: dict[str, Any] | None = None,
+        params: Sequence[Any] | None = None,
         timeout_seconds: int = 30,
         limit: int | None = None,
     ) -> QueryResult:
-        """Execute a SQL query against BigQuery."""
+        """Execute a SQL query against BigQuery, binding params to its ? placeholders."""
         if not self._connected or not self._client:
             raise ConnectionFailedError(message="Not connected to BigQuery")
 
@@ -256,6 +258,11 @@ class BigQueryAdapter(SQLAdapter):
 
             job_config = bigquery.QueryJobConfig()
             job_config.timeout_ms = timeout_seconds * 1000
+            if params:
+                job_config.query_parameters = [
+                    bigquery.ScalarQueryParameter(None, self._query_param_type(value), value)
+                    for value in params
+                ]
 
             # Set default dataset if configured
             dataset = self._config.get("dataset")
@@ -336,32 +343,14 @@ class BigQueryAdapter(SQLAdapter):
         result: str = normalize_type(bq_type, SourceType.BIGQUERY).value
         return result
 
-    async def _fetch_table_metadata(self) -> list[dict[str, Any]]:
-        """Fetch table metadata from BigQuery."""
-        project_id = self._config.get("project_id", "")
-        dataset = self._config.get("dataset", "")
-
-        if dataset:
-            sql = f"""
-                SELECT
-                    '{project_id}' as table_catalog,
-                    table_schema,
-                    table_name,
-                    table_type
-                FROM `{project_id}.{dataset}.INFORMATION_SCHEMA.TABLES`
-                ORDER BY table_name
-            """
-        else:
-            sql = f"""
-                SELECT
-                    '{project_id}' as table_catalog,
-                    schema_name as table_schema,
-                    '' as table_name,
-                    'SCHEMA' as table_type
-                FROM `{project_id}.INFORMATION_SCHEMA.SCHEMATA`
-            """
-        result = await self.execute_query(sql)
-        return list(result.rows)
+    @staticmethod
+    def _query_param_type(value: Any) -> str:
+        """Get the BigQuery type of a positional query parameter value."""
+        param_types = {bool: "BOOL", int: "INT64", float: "FLOAT64", str: "STRING"}
+        type_name = param_types.get(type(value))
+        if type_name is None:
+            raise TypeError(f"Unsupported BigQuery query parameter type: {type(value).__name__}")
+        return type_name
 
     async def get_schema(
         self,
@@ -372,15 +361,16 @@ class BigQueryAdapter(SQLAdapter):
             raise ConnectionFailedError(message="Not connected to BigQuery")
 
         try:
+            schema_filter = filter or SchemaFilter()
             project_id = self._config.get("project_id", "")
             dataset = self._config.get("dataset", "")
 
             # If dataset specified, get tables from that dataset
             if dataset:
-                return await self._get_dataset_schema(project_id, dataset, filter)
+                return await self._get_dataset_schema(project_id, dataset, schema_filter)
             else:
                 # List all datasets and their tables
-                return await self._get_project_schema(project_id, filter)
+                return await self._get_project_schema(project_id, schema_filter)
 
         except Exception as e:
             raise SchemaFetchFailedError(
@@ -392,19 +382,18 @@ class BigQueryAdapter(SQLAdapter):
         self,
         project_id: str,
         dataset: str,
-        filter: SchemaFilter | None,
+        schema_filter: SchemaFilter,
     ) -> SchemaResponse:
         """Get schema for a specific dataset."""
-        # Build filter conditions
-        conditions = []
-        if filter:
-            if filter.table_pattern:
-                conditions.append(f"table_name LIKE '{filter.table_pattern}'")
-            if not filter.include_views:
-                conditions.append("table_type = 'BASE TABLE'")
-
-        where_clause = f"WHERE {' AND '.join(conditions)}" if conditions else ""
-        limit_clause = f"LIMIT {filter.max_tables}" if filter else "LIMIT 1000"
+        # Values are bound as ? parameters, never spliced into the SQL text.
+        conditions = ["TRUE"]
+        params: list[Any] = []
+        if schema_filter.table_pattern:
+            conditions.append("table_name LIKE ?")
+            params.append(schema_filter.table_pattern)
+        name_filter = " AND ".join(conditions)
+        # INFORMATION_SCHEMA.COLUMNS has no table_type, so only tables filter on it
+        type_filter = "" if schema_filter.include_views else "AND table_type = 'BASE TABLE'"
 
         # Get tables
         tables_sql = f"""
@@ -413,11 +402,11 @@ class BigQueryAdapter(SQLAdapter):
                 table_name,
                 table_type
             FROM `{project_id}.{dataset}.INFORMATION_SCHEMA.TABLES`
-            {where_clause}
+            WHERE {name_filter} {type_filter}
             ORDER BY table_name
-            {limit_clause}
+            LIMIT {int(schema_filter.max_tables)}
         """
-        tables_result = await self.execute_query(tables_sql)
+        tables_result = await self.execute_query(tables_sql, params)
 
         # Get columns
         columns_sql = f"""
@@ -429,10 +418,10 @@ class BigQueryAdapter(SQLAdapter):
                 is_nullable,
                 ordinal_position
             FROM `{project_id}.{dataset}.INFORMATION_SCHEMA.COLUMNS`
-            {where_clause}
+            WHERE {name_filter}
             ORDER BY table_name, ordinal_position
         """
-        columns_result = await self.execute_query(columns_sql)
+        columns_result = await self.execute_query(columns_sql, params)
 
         # Organize into schema response
         schema_map: dict[str, dict[str, dict[str, Any]]] = {}
@@ -490,7 +479,7 @@ class BigQueryAdapter(SQLAdapter):
     async def _get_project_schema(
         self,
         project_id: str,
-        filter: SchemaFilter | None,
+        schema_filter: SchemaFilter,
     ) -> SchemaResponse:
         """Get schema for entire project (all datasets)."""
         # List all datasets
@@ -502,9 +491,8 @@ class BigQueryAdapter(SQLAdapter):
             dataset_id = ds.dataset_id
 
             # Skip if filter doesn't match
-            if filter and filter.schema_pattern:
-                if filter.schema_pattern not in dataset_id:
-                    continue
+            if schema_filter.schema_pattern and schema_filter.schema_pattern not in dataset_id:
+                continue
 
             try:
                 # Get tables for this dataset

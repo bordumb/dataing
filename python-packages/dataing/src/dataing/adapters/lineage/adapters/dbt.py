@@ -19,6 +19,7 @@ from typing import Any
 
 import httpx
 
+from dataing.adapters.datasource.local_paths import resolve_local_path
 from dataing.adapters.lineage.base import BaseLineageAdapter
 from dataing.adapters.lineage.exceptions import LineageParseError
 from dataing.adapters.lineage.registry import (
@@ -60,7 +61,7 @@ from dataing.adapters.lineage.types import (
                 type="string",
                 required=False,
                 group="local",
-                description="Path to local manifest.json file",
+                description="Path to manifest.json, inside the server's local data root",
             ),
             LineageConfigField(
                 name="account_id",
@@ -167,14 +168,15 @@ class DbtAdapter(BaseLineageAdapter):
             The dbt manifest dictionary.
 
         Raises:
+            InvalidConfigError: If the manifest path is outside the local data root.
             LineageParseError: If manifest cannot be loaded.
         """
         if self._manifest:
             return self._manifest
 
         if self._manifest_path:
+            path = Path(resolve_local_path(self._manifest_path))
             try:
-                path = Path(self._manifest_path)
                 self._manifest = json.loads(path.read_text())
             except (json.JSONDecodeError, OSError) as e:
                 raise LineageParseError(self._manifest_path, f"Failed to read manifest: {e}") from e

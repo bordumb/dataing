@@ -57,7 +57,7 @@ class CredentialsStatusResponse(BaseModel):
     created_at: datetime | None = None
 
 
-class TestConnectionResponse(BaseModel):
+class CredentialsTestResponse(BaseModel):
     """Response for testing credentials."""
 
     success: bool
@@ -168,15 +168,15 @@ async def delete_credentials(
     return DeleteCredentialsResponse(deleted=deleted)
 
 
-@router.post("/test", response_model=TestConnectionResponse)
+@router.post("/test", response_model=CredentialsTestResponse)
 @audited(action="credentials.test", resource_type="credentials", resource_id_param="datasource_id")
 async def test_credentials(
     http_request: Request,
     datasource_id: UUID,
     body: SaveCredentialsRequest,
-    auth: AuthDep,
+    auth: WriteScopeDep,
     app_db: AppDbDep,
-) -> TestConnectionResponse:
+) -> CredentialsTestResponse:
     """Test credentials without saving them.
 
     Validates that the provided credentials can connect to the
@@ -208,7 +208,7 @@ async def test_credentials(
     try:
         base_config = decrypt_config(ds["connection_config_encrypted"], encryption_key)
     except Exception as e:
-        return TestConnectionResponse(
+        return CredentialsTestResponse(
             success=False,
             error=f"Failed to decrypt datasource configuration: {e!s}",
         )
@@ -230,7 +230,7 @@ async def test_credentials(
         async with adapter:
             result = await adapter.test_connection()
             if not result.success:
-                return TestConnectionResponse(
+                return CredentialsTestResponse(
                     success=False,
                     error=result.message,
                 )
@@ -246,12 +246,12 @@ async def test_credentials(
                 except Exception:
                     pass  # Not critical if we can't count tables
 
-            return TestConnectionResponse(
+            return CredentialsTestResponse(
                 success=True,
                 tables_accessible=tables_accessible,
             )
     except Exception as e:
-        return TestConnectionResponse(
+        return CredentialsTestResponse(
             success=False,
             error=str(e),
         )

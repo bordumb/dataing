@@ -4,14 +4,43 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass, field
-from typing import Any
+from typing import TYPE_CHECKING, Any
 from uuid import UUID
 
 from dataing.adapters.db.app_db import AppDatabase
+from dataing.core.domain_types import AnomalyAlert, MetricSpec
 from dataing.core.json_utils import to_json_string
 from dataing_ee.models.automation import ActionType
 
+if TYPE_CHECKING:
+    from dataing.services.investigation import InvestigationStarterService
+
 logger = logging.getLogger(__name__)
+
+
+def _issue_alert(issue_data: dict[str, Any], dataset_id: str) -> AnomalyAlert:
+    """Describe an issue as the AnomalyAlert its investigation runs on.
+
+    Issues carry no metric values, so the alert is a description-type metric
+    with zeroed values, dated when the issue was filed.
+    """
+    return AnomalyAlert(
+        dataset_ids=[dataset_id],
+        metric_spec=MetricSpec(
+            metric_type="description",
+            expression=issue_data.get("description") or issue_data["title"],
+            display_name=issue_data["title"],
+        ),
+        anomaly_type="custom",
+        expected_value=0.0,
+        actual_value=0.0,
+        deviation_pct=0.0,
+        anomaly_date=issue_data["created_at"].date().isoformat(),
+        severity=issue_data.get("severity") or "medium",
+        source_system=issue_data.get("source_provider"),
+        source_alert_id=issue_data.get("source_external_id"),
+        source_url=issue_data.get("source_external_url"),
+    )
 
 
 @dataclass
@@ -32,6 +61,7 @@ class ExecutionContext:
     tenant_id: UUID
     issue_id: UUID
     rule_id: UUID
+    investigation_starter: InvestigationStarterService
     dry_run: bool = False
 
 
@@ -352,9 +382,14 @@ class ActionExecutor:
         """Spawn an investigation for the issue."""
         profile = params.get("profile", "standard")
 
-        # Check if investigation already exists
+        # Check if the issue already has an investigation
         existing = await ctx.db.fetch_one(
-            "SELECT id FROM investigations WHERE issue_id = $1 LIMIT 1",
+            """
+            SELECT investigation_id FROM issue_investigation_runs
+            WHERE issue_id = $1
+            ORDER BY created_at DESC
+            LIMIT 1
+            """,
             ctx.issue_id,
         )
 
@@ -363,43 +398,77 @@ class ActionExecutor:
                 action_type=ActionType.SPAWN_INVESTIGATION,
                 success=True,
                 result={
-                    "investigation_id": str(existing["id"]),
+                    "investigation_id": str(existing["investigation_id"]),
                     "already_exists": True,
                 },
             )
 
-        # Create investigation
-        row = await ctx.db.fetch_one(
-            """
-            INSERT INTO investigations (
-                tenant_id, issue_id, status, source, metadata
-            )
-            VALUES ($1, $2, 'pending', 'automation', $3)
-            RETURNING id
-            """,
-            ctx.tenant_id,
-            ctx.issue_id,
-            to_json_string({"profile": profile, "rule_id": str(ctx.rule_id)}),
-        )
-
-        if not row:
+        dataset_id = issue_data.get("dataset_id")
+        if not dataset_id:
             return ActionResult(
                 action_type=ActionType.SPAWN_INVESTIGATION,
                 success=False,
-                error="Failed to create investigation",
+                error="Issue has no dataset_id to investigate",
             )
+
+        datasource_id = await self._resolve_datasource_id(params, ctx)
+        if datasource_id is None:
+            return ActionResult(
+                action_type=ActionType.SPAWN_INVESTIGATION,
+                success=False,
+                error="No single datasource to investigate; set the datasource_id param",
+            )
+
+        alert = _issue_alert(issue_data, dataset_id)
+        started = await ctx.investigation_starter.start_investigation(
+            tenant_id=ctx.tenant_id,
+            datasource_id=datasource_id,
+            alert_data=alert.model_dump(mode="json"),
+            alert_summary=f"Issue #{issue_data['number']} on {dataset_id}: {issue_data['title']}",
+        )
+
+        await ctx.db.execute(
+            """
+            INSERT INTO issue_investigation_runs (
+                issue_id, investigation_id, trigger_type, trigger_ref, execution_profile
+            )
+            VALUES ($1, $2, 'rule', $3, $4)
+            """,
+            ctx.issue_id,
+            started.investigation_id,
+            to_json_string({"rule_id": str(ctx.rule_id)}),
+            profile,
+        )
 
         await self._record_event(
             ctx,
             "investigation_started",
-            {"investigation_id": str(row["id"]), "source": "automation"},
+            {"investigation_id": str(started.investigation_id), "source": "automation"},
         )
 
         return ActionResult(
             action_type=ActionType.SPAWN_INVESTIGATION,
             success=True,
-            result={"investigation_id": str(row["id"])},
+            result={"investigation_id": str(started.investigation_id)},
         )
+
+    async def _resolve_datasource_id(
+        self,
+        params: dict[str, Any],
+        ctx: ExecutionContext,
+    ) -> UUID | None:
+        """Datasource named by the action params, else the tenant's only active one."""
+        if params.get("datasource_id"):
+            named_id = UUID(str(params["datasource_id"]))
+            if await ctx.db.get_data_source(named_id, ctx.tenant_id) is None:
+                return None
+            return named_id
+
+        active = await ctx.db.list_data_sources(ctx.tenant_id)
+        if len(active) != 1:
+            return None
+        only_id: UUID = active[0]["id"]
+        return only_id
 
     async def _notify(
         self,

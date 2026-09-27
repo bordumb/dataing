@@ -16,6 +16,7 @@ from dataing.adapters.datasource import (
     SourceType,
     get_registry,
 )
+from dataing.adapters.datasource.sql.base import SQLAdapter
 from dataing.adapters.datasource.types import (
     Catalog,
     Column,
@@ -44,10 +45,9 @@ class TestAdapterRegistryContracts:
         assert SourceType.REDSHIFT in registered
         assert SourceType.DUCKDB in registered
 
-        # Document adapters
+        # Document adapters (DynamoDB and Cassandra stay unregistered until they
+        # implement the full DocumentAdapter contract)
         assert SourceType.MONGODB in registered
-        assert SourceType.DYNAMODB in registered
-        assert SourceType.CASSANDRA in registered
 
         # API adapters (EE-only, skip if not available)
         # Note: Salesforce, HubSpot, Stripe are EE-only adapters
@@ -66,6 +66,19 @@ class TestAdapterRegistryContracts:
             definition = registry.get_definition(source_type)
             assert definition is not None
             assert isinstance(definition, SourceTypeDefinition)
+
+    def test_registered_sql_adapters_are_concrete(self):
+        """Registered SQL adapters implement every abstract method, so create() works."""
+        registry = get_registry()
+        adapter_classes = [registry.get_adapter_class(t) for t in registry.registered_types]
+
+        still_abstract = {
+            cls.__name__: sorted(cls.__abstractmethods__)
+            for cls in adapter_classes
+            if issubclass(cls, SQLAdapter) and cls.__abstractmethods__
+        }
+
+        assert still_abstract == {}
 
     @pytest.mark.parametrize("source_type", list(SourceType))
     def test_type_definition_has_required_fields(self, source_type: SourceType):
@@ -156,8 +169,6 @@ class TestCapabilitiesContracts:
         registry = get_registry()
         doc_types = [
             SourceType.MONGODB,
-            SourceType.DYNAMODB,
-            SourceType.CASSANDRA,
         ]
 
         for source_type in doc_types:
@@ -233,8 +244,71 @@ class TestConfigSchemaContracts:
                 assert field.options is not None
                 assert len(field.options) > 0
                 for option in field.options:
-                    assert "value" in option
-                    assert "label" in option
+                    assert option.value
+                    assert option.label
+
+    @pytest.mark.parametrize("source_type", list(SourceType))
+    def test_enum_defaults_are_options(self, source_type: SourceType):
+        """An enum field's default must be one of its options."""
+        registry = get_registry()
+
+        definition = registry.get_definition(source_type)
+        if definition is None:
+            pytest.skip(f"Adapter for {source_type} not registered")
+
+        for field in definition.config_schema.fields:
+            if field.type == "enum" and field.default_value is not None:
+                values = {option.value for option in field.options or []}
+                assert field.default_value in values, field.name
+
+    @pytest.mark.parametrize("source_type", list(SourceType))
+    def test_integer_defaults_are_within_bounds(self, source_type: SourceType):
+        """An integer field's default must lie within its min and max values."""
+        registry = get_registry()
+
+        definition = registry.get_definition(source_type)
+        if definition is None:
+            pytest.skip(f"Adapter for {source_type} not registered")
+
+        for field in definition.config_schema.fields:
+            default = field.default_value
+            if field.type != "integer" or default is None:
+                continue
+            assert isinstance(default, int) and not isinstance(default, bool), field.name
+            if field.min_value is not None:
+                assert default >= field.min_value, field.name
+            if field.max_value is not None:
+                assert default <= field.max_value, field.name
+
+    @pytest.mark.parametrize("source_type", list(SourceType))
+    def test_show_if_names_a_field_in_the_same_schema(self, source_type: SourceType):
+        """A field can only depend on another field of its own schema."""
+        registry = get_registry()
+
+        definition = registry.get_definition(source_type)
+        if definition is None:
+            pytest.skip(f"Adapter for {source_type} not registered")
+
+        fields = definition.config_schema.fields
+        names = {field.name for field in fields}
+        for field in fields:
+            if field.show_if is not None:
+                assert field.show_if.field in names, field.name
+
+    @pytest.mark.parametrize("source_type", list(SourceType))
+    def test_required_fields_without_defaults_are_not_collapsed(self, source_type: SourceType):
+        """A field the user must fill in cannot start hidden in a collapsed group."""
+        registry = get_registry()
+
+        definition = registry.get_definition(source_type)
+        if definition is None:
+            pytest.skip(f"Adapter for {source_type} not registered")
+
+        schema = definition.config_schema
+        collapsed = {group.id for group in schema.field_groups if group.collapsed_by_default}
+        for field in schema.fields:
+            if field.required and field.default_value is None:
+                assert field.group not in collapsed, field.name
 
     @pytest.mark.parametrize("source_type", list(SourceType))
     def test_field_groups_are_valid(self, source_type: SourceType):
@@ -313,8 +387,6 @@ class TestSourceCategoryContracts:
         registry = get_registry()
         doc_types = [
             SourceType.MONGODB,
-            SourceType.DYNAMODB,
-            SourceType.CASSANDRA,
         ]
 
         for source_type in doc_types:

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import logging
 from datetime import datetime
 from typing import Annotated, Any
@@ -27,6 +28,7 @@ router = APIRouter(prefix="/runbooks", tags=["runbooks"])
 
 # Dependencies
 AuthDep = Annotated[ApiKeyContext, Depends(verify_api_key)]
+WriteScopeDep = Annotated[ApiKeyContext, Depends(require_scope("write"))]
 AdminScopeDep = Annotated[ApiKeyContext, Depends(require_scope("admin"))]
 AppDbDep = Annotated[AppDatabase, Depends(get_app_db)]
 
@@ -222,7 +224,7 @@ async def list_runbooks(
 
 @router.post("", response_model=RunbookResponse, status_code=status.HTTP_201_CREATED)
 async def create_runbook(
-    auth: AuthDep,
+    auth: WriteScopeDep,
     db: AppDbDep,
     body: RunbookCreate,
 ) -> RunbookResponse:
@@ -295,7 +297,7 @@ async def get_runbook(
 
 @router.patch("/{runbook_id}", response_model=RunbookResponse)
 async def update_runbook(
-    auth: AuthDep,
+    auth: WriteScopeDep,
     db: AppDbDep,
     runbook_id: UUID,
     body: RunbookUpdate,
@@ -446,7 +448,7 @@ async def delete_runbook(
     status_code=status.HTTP_201_CREATED,
 )
 async def generate_runbook_from_issue(
-    auth: AuthDep,
+    auth: WriteScopeDep,
     db: AppDbDep,
     issue_id: UUID,
     body: GenerateRunbookRequest,
@@ -487,13 +489,6 @@ async def generate_runbook_from_issue(
             detail="Could not generate runbook from issue",
         )
 
-    # Get investigation ID if exists
-    inv_row = await db.fetch_one(
-        "SELECT id FROM investigations WHERE issue_id = $1 ORDER BY created_at DESC LIMIT 1",
-        issue_id,
-    )
-    investigation_id = inv_row["id"] if inv_row else None
-
     # Insert runbook
     row = await db.fetch_one(
         """
@@ -520,7 +515,7 @@ async def generate_runbook_from_issue(
         generated.prevention_notes,
         body.publish,
         issue_id,
-        investigation_id,
+        generated.investigation_id,
         auth.user_id,
     )
 
@@ -586,7 +581,7 @@ async def get_suggested_runbooks(
     status_code=status.HTTP_201_CREATED,
 )
 async def link_runbook_to_issue(
-    auth: AuthDep,
+    auth: WriteScopeDep,
     db: AppDbDep,
     runbook_id: UUID,
     issue_id: UUID,
@@ -657,41 +652,57 @@ async def provide_link_feedback(
     body: LinkFeedbackRequest,
 ) -> dict[str, str]:
     """Provide feedback on a runbook link."""
-    result = await db.execute(
-        """
-        UPDATE runbook_links
-        SET was_helpful = $1, feedback_notes = $2
-        WHERE runbook_id = $3 AND issue_id = $4
-        """,
-        body.was_helpful,
-        body.feedback_notes,
-        runbook_id,
-        issue_id,
-    )
-
-    if result == "UPDATE 0":
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Link not found",
+    async with db.acquire() as conn, conn.transaction():
+        # runbook_links has no tenant_id, so this tenant-scoped lookup is what
+        # keeps the writes below inside the caller's tenant. Locking the row
+        # serializes concurrent feedback on the runbook, so the recount below
+        # sees every verdict committed before it.
+        runbook = await conn.fetchrow(
+            "SELECT id FROM runbooks WHERE id = $1 AND tenant_id = $2 FOR UPDATE",
+            runbook_id,
+            auth.tenant_id,
         )
 
-    # Update usefulness score on runbook based on feedback
-    if body.was_helpful:
-        await db.execute(
+        if not runbook:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Runbook not found",
+            )
+
+        result = await conn.execute(
             """
-            UPDATE runbooks
-            SET usefulness_score = usefulness_score + 0.1
-            WHERE id = $1
+            UPDATE runbook_links
+            SET was_helpful = $1, feedback_notes = $2
+            WHERE runbook_id = $3 AND issue_id = $4
+            """,
+            body.was_helpful,
+            body.feedback_notes,
+            runbook_id,
+            issue_id,
+        )
+
+        if result == "UPDATE 0":
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Link not found",
+            )
+
+        # Derive the score from every link's current verdict instead of nudging
+        # it per request: re-posting a verdict leaves it unchanged, and flipping
+        # one moves it exactly once.
+        counts = await conn.fetchrow(
+            """
+            SELECT
+                COUNT(*) FILTER (WHERE was_helpful) AS helpful,
+                COUNT(*) FILTER (WHERE NOT was_helpful) AS not_helpful
+            FROM runbook_links
+            WHERE runbook_id = $1
             """,
             runbook_id,
         )
-    else:
-        await db.execute(
-            """
-            UPDATE runbooks
-            SET usefulness_score = GREATEST(0, usefulness_score - 0.05)
-            WHERE id = $1
-            """,
+        await conn.execute(
+            "UPDATE runbooks SET usefulness_score = $1 WHERE id = $2",
+            _usefulness_score(counts["helpful"], counts["not_helpful"]),
             runbook_id,
         )
 
@@ -701,6 +712,19 @@ async def provide_link_feedback(
 # ============================================================================
 # Helpers
 # ============================================================================
+
+
+def _usefulness_score(helpful: int, not_helpful: int) -> float:
+    """Score a runbook from its links' verdicts: +0.1 per helpful, -0.05 per not, floor 0."""
+    return max(0.0, 0.1 * helpful - 0.05 * not_helpful)
+
+
+def _json_list(value: Any) -> list[dict[str, Any]]:
+    """A JSONB array column value as a list (AppDatabase returns JSONB as text)."""
+    if isinstance(value, str):
+        value = json.loads(value)
+    result: list[dict[str, Any]] = value or []
+    return result
 
 
 def _row_to_response(row: dict[str, Any]) -> RunbookResponse:
@@ -713,10 +737,10 @@ def _row_to_response(row: dict[str, Any]) -> RunbookResponse:
         summary=row.get("summary"),
         dataset_id=row.get("dataset_id"),
         labels=row.get("labels") or [],
-        symptoms=row.get("symptoms") or [],
+        symptoms=_json_list(row.get("symptoms")),
         root_cause=row.get("root_cause"),
-        verification_steps=row.get("verification_steps") or [],
-        fix_steps=row.get("fix_steps") or [],
+        verification_steps=_json_list(row.get("verification_steps")),
+        fix_steps=_json_list(row.get("fix_steps")),
         prevention_notes=row.get("prevention_notes"),
         is_published=row["is_published"],
         view_count=row["view_count"],

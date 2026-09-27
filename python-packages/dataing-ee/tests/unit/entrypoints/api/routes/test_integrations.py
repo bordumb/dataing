@@ -2,10 +2,18 @@
 
 import hashlib
 import hmac
+import json
+import time
 from datetime import UTC, datetime
-from uuid import uuid4
+from typing import Any
+from unittest.mock import AsyncMock, MagicMock, patch
+from urllib.parse import urlencode
+from uuid import UUID, uuid4
 
+import httpx
 import pytest
+import respx
+from dataing_ee.adapters.integrations.registry import AdapterRegistry
 from dataing_ee.entrypoints.api.routes.integrations import (
     FieldMappingCreate,
     IntegrationCreate,
@@ -17,9 +25,18 @@ from dataing_ee.entrypoints.api.routes.integrations import (
     _get_default_description,
     _get_default_title,
     _get_nested_value,
+    _post_reply,
     _verify_provider_signature,
+    router,
 )
-from dataing_ee.models.integration import IntegrationProvider
+from dataing_ee.models.integration import Integration, IntegrationProvider
+from fastapi import FastAPI
+from fastapi.testclient import TestClient
+
+from dataing.entrypoints.api.deps import get_app_db
+from dataing.entrypoints.api.middleware.auth import ApiKeyContext, verify_api_key
+
+TENANT_ID = UUID("5f0c2a9e-0000-0000-0000-000000000001")
 
 
 class TestIntegrationCreateSchema:
@@ -145,6 +162,14 @@ class TestFieldMappingCreateSchema:
         for target in ["title", "description", "severity", "priority", "dataset_id", "labels"]:
             mapping = FieldMappingCreate(source_field="test.field", target_field=target)
             assert mapping.target_field == target
+
+
+class TestIntegrationModel:
+    """Test the Integration ORM model matches the schema."""
+
+    def test_signing_secret_is_required(self) -> None:
+        """Test signing_secret is NOT NULL, as in migration 035."""
+        assert Integration.__table__.c.signing_secret.nullable is False
 
 
 class TestVerifyProviderSignature:
@@ -492,3 +517,585 @@ class TestAdapterDelegation:
             query_params={},
         )
         assert adapter.should_process(request) is False
+
+
+WEBHOOK_SECRET = "whsec_test"
+WRONG_SIGNATURE = "sha256=" + "0" * 64
+
+
+def _integration_row(
+    provider: str, signing_secret: str | None, *, enabled: bool = True
+) -> dict[str, Any]:
+    return {
+        "id": uuid4(),
+        "tenant_id": uuid4(),
+        "provider": provider,
+        "enabled": enabled,
+        "signing_secret": signing_secret,
+        "rate_limit_per_minute": 60,
+    }
+
+
+def _webhook_db(integration: dict[str, Any]) -> AsyncMock:
+    """App DB holding one integration; accepts the writes of a skipped webhook."""
+    db = AsyncMock()
+    db.fetch_one.side_effect = [integration, None, {"id": uuid4()}]
+    db.fetch_all.return_value = []
+    return db
+
+
+def _post_webhook(
+    db: AsyncMock, provider: str, payload: dict[str, Any], headers: dict[str, str] | None = None
+) -> Any:
+    app = FastAPI()
+    app.include_router(router, prefix="/api/v1")
+    app.dependency_overrides[get_app_db] = lambda: db
+    return TestClient(app).post(
+        f"/api/v1/integrations/{provider}/webhook",
+        params={"integration_id": str(uuid4())},
+        content=json.dumps(payload).encode(),
+        headers={"Content-Type": "application/json", **(headers or {})},
+    )
+
+
+def _signed(payload: dict[str, Any], header: str) -> dict[str, str]:
+    digest = hmac.new(
+        WEBHOOK_SECRET.encode(), json.dumps(payload).encode(), hashlib.sha256
+    ).hexdigest()
+    return {header: f"sha256={digest}"}
+
+
+def _hmac_hex(secret: str, message: bytes) -> str:
+    return hmac.new(secret.encode(), message, hashlib.sha256).hexdigest()
+
+
+def _signed_by(
+    provider: str, payload: dict[str, Any], secret: str = WEBHOOK_SECRET
+) -> dict[str, str]:
+    """Sign ``payload`` the way ``provider`` does, under its own header names."""
+    return _signed_body(provider, json.dumps(payload).encode(), secret)
+
+
+def _signed_body(provider: str, body: bytes, secret: str = WEBHOOK_SECRET) -> dict[str, str]:
+    """Sign a raw request ``body`` the way ``provider`` does."""
+    if provider == "slack":
+        timestamp = str(int(time.time()))
+        digest = _hmac_hex(secret, f"v0:{timestamp}:{body.decode()}".encode())
+        return {"X-Slack-Signature": f"v0={digest}", "X-Slack-Request-Timestamp": timestamp}
+    digest = _hmac_hex(secret, body)
+    if provider == "monte_carlo":
+        return {"X-MC-Signature": digest}
+    if provider == "dbt":
+        return {"Authorization": digest}
+    header = {
+        "jira": "X-Hub-Signature",
+        "great_expectations": "X-GE-Signature",
+        "soda": "X-Soda-Signature",
+    }[provider]
+    return {header: f"sha256={digest}"}
+
+
+# A webhook for each provider that has an adapter, and the response it gets once its
+# signature checks out: the adapter either filters it or records it and finds no title.
+ADAPTER_WEBHOOKS: dict[str, tuple[dict[str, Any], dict[str, str]]] = {
+    "jira": (
+        {"webhookEvent": "jira:issue_created", "issue": {"id": "1", "fields": {}}},
+        {"status": "skipped", "reason": "no_title"},
+    ),
+    "monte_carlo": (
+        {"event_type": "incident_created"},
+        {"status": "skipped", "reason": "no_title"},
+    ),
+    "great_expectations": (
+        {"result": {"success": True}},
+        {"status": "skipped", "reason": "filtered_by_adapter"},
+    ),
+    "dbt": (
+        {"eventType": "job.run.completed", "data": {"runStatus": "Success"}},
+        {"status": "skipped", "reason": "filtered_by_adapter"},
+    ),
+    "slack": (
+        {"type": "event_callback", "event": {"type": "reaction_added", "reaction": "eyes"}},
+        {"status": "skipped", "reason": "filtered_by_adapter"},
+    ),
+    "soda": (
+        {"event_type": "check.passed"},
+        {"status": "skipped", "reason": "filtered_by_adapter"},
+    ),
+}
+
+
+def _recorded_event(db: AsyncMock) -> bool:
+    return any(
+        "INSERT INTO integration_events" in call.args[0] for call in db.fetch_one.await_args_list
+    )
+
+
+class TestProviderWebhookAuthentication:
+    """Webhooks are authenticated before any processing, and fail closed."""
+
+    @pytest.mark.parametrize("signing_secret", [None, ""])
+    @pytest.mark.parametrize(
+        ("provider", "payload"),
+        [
+            # No adapter: inline signature check
+            ("custom", {"event": "ping"}),
+            # Adapter-based signature check
+            ("jira", {"webhookEvent": "jira:issue_created", "issue": {"id": "1", "fields": {}}}),
+        ],
+    )
+    def test_rejects_webhook_when_no_signing_secret(
+        self, provider: str, payload: dict[str, Any], signing_secret: str | None
+    ) -> None:
+        db = _webhook_db(_integration_row(provider, signing_secret))
+
+        response = _post_webhook(db, provider, payload)
+
+        assert response.status_code == 401
+        assert not _recorded_event(db)
+
+    @pytest.mark.parametrize(
+        ("signing_secret", "headers"),
+        [(None, {}), (WEBHOOK_SECRET, {"X-GE-Signature": WRONG_SIGNATURE})],
+    )
+    def test_rejects_unauthenticated_webhook_before_adapter_filtering(
+        self, signing_secret: str | None, headers: dict[str, str]
+    ) -> None:
+        # Great Expectations skips successful validations; that must not bypass auth.
+        db = _webhook_db(_integration_row("great_expectations", signing_secret))
+
+        response = _post_webhook(db, "great_expectations", {"result": {"success": True}}, headers)
+
+        assert response.status_code == 401
+
+    @pytest.mark.parametrize(
+        ("signing_secret", "headers"),
+        [(None, {}), (WEBHOOK_SECRET, {"X-Webhook-Signature": WRONG_SIGNATURE})],
+    )
+    def test_rejects_unauthenticated_webhook_for_disabled_integration(
+        self, signing_secret: str | None, headers: dict[str, str]
+    ) -> None:
+        db = _webhook_db(_integration_row("custom", signing_secret, enabled=False))
+
+        response = _post_webhook(db, "custom", {"event": "ping"}, headers)
+
+        assert response.status_code == 401
+
+    def test_processes_webhook_with_valid_signature(self) -> None:
+        payload = {"event": "ping"}
+        db = _webhook_db(_integration_row("custom", WEBHOOK_SECRET))
+
+        response = _post_webhook(db, "custom", payload, _signed(payload, "X-Webhook-Signature"))
+
+        assert response.status_code == 200
+        assert response.json() == {"status": "skipped", "reason": "no_title"}
+        assert _recorded_event(db)
+
+    def test_acknowledges_signed_webhook_for_disabled_integration(self) -> None:
+        payload = {"event": "ping"}
+        db = _webhook_db(_integration_row("custom", WEBHOOK_SECRET, enabled=False))
+
+        response = _post_webhook(db, "custom", payload, _signed(payload, "X-Webhook-Signature"))
+
+        assert response.status_code == 200
+        assert response.json() == {"status": "skipped", "reason": "integration_disabled"}
+
+    @pytest.mark.parametrize("provider", list(ADAPTER_WEBHOOKS))
+    def test_accepts_webhook_signed_by_provider(self, provider: str) -> None:
+        # The server hands the adapter lowercase header names, whatever case was sent.
+        payload, expected = ADAPTER_WEBHOOKS[provider]
+        db = _webhook_db(_integration_row(provider, WEBHOOK_SECRET))
+
+        response = _post_webhook(db, provider, payload, _signed_by(provider, payload))
+
+        assert response.status_code == 200
+        assert response.json() == expected
+
+    @pytest.mark.parametrize("provider", list(ADAPTER_WEBHOOKS))
+    def test_rejects_webhook_signed_with_another_secret(self, provider: str) -> None:
+        payload, _ = ADAPTER_WEBHOOKS[provider]
+        db = _webhook_db(_integration_row(provider, WEBHOOK_SECRET))
+
+        response = _post_webhook(
+            db, provider, payload, _signed_by(provider, payload, secret="another_secret")
+        )
+
+        assert response.status_code == 401
+        assert not _recorded_event(db)
+
+    def test_signed_webhooks_cover_every_adapter(self) -> None:
+        assert set(ADAPTER_WEBHOOKS) == set(AdapterRegistry.list_providers())
+
+
+SLACK_URL_VERIFICATION = {"type": "url_verification", "token": "legacy", "challenge": "3eZbrw1aB"}
+
+
+class TestProviderHandshake:
+    """Endpoint-verification handshakes are answered only once authenticated."""
+
+    def test_answers_signed_slack_url_verification(self) -> None:
+        payload = SLACK_URL_VERIFICATION
+        db = _webhook_db(_integration_row("slack", WEBHOOK_SECRET))
+
+        response = _post_webhook(db, "slack", payload, _signed_by("slack", payload))
+
+        assert response.status_code == 200
+        assert response.json() == {"challenge": "3eZbrw1aB"}
+        assert not _recorded_event(db)
+
+    def test_rejects_url_verification_with_bad_signature(self) -> None:
+        payload = SLACK_URL_VERIFICATION
+        db = _webhook_db(_integration_row("slack", WEBHOOK_SECRET))
+
+        response = _post_webhook(
+            db, "slack", payload, _signed_by("slack", payload, secret="another_secret")
+        )
+
+        assert response.status_code == 401
+        assert response.json() == {"detail": "Invalid webhook signature"}
+
+
+# Shaped like a Slack signing secret: 32 hex characters, issued by the provider.
+PROVIDER_SECRET = "0123456789abcdef" * 2
+
+
+def _admin_client(db: AsyncMock) -> TestClient:
+    app = FastAPI()
+    app.include_router(router, prefix="/api/v1")
+    app.dependency_overrides[get_app_db] = lambda: db
+    app.dependency_overrides[verify_api_key] = lambda: ApiKeyContext(
+        key_id=uuid4(),
+        tenant_id=uuid4(),
+        tenant_slug="test",
+        tenant_name="Test",
+        user_id=uuid4(),
+        scopes=["admin"],
+    )
+    return TestClient(app)
+
+
+def _integration_record() -> dict[str, Any]:
+    """An integrations row as the CRUD routes read it back."""
+    now = datetime.now(UTC)
+    return {
+        "id": uuid4(),
+        "tenant_id": uuid4(),
+        "name": "Slack",
+        "provider": "slack",
+        "enabled": True,
+        "config": {},
+        "rate_limit_per_minute": 60,
+        "last_webhook_at": None,
+        "webhook_count": 0,
+        "error_count": 0,
+        "created_at": now,
+        "updated_at": now,
+    }
+
+
+class TestProviderSigningSecret:
+    """Providers that issue their own signing secret (Slack, dbt Cloud) can supply it."""
+
+    def test_create_stores_supplied_secret(self) -> None:
+        db = AsyncMock()
+        db.fetch_one.return_value = {"id": uuid4()}
+
+        response = _admin_client(db).post(
+            "/api/v1/integrations",
+            json={"name": "Slack", "provider": "slack", "signing_secret": PROVIDER_SECRET},
+        )
+
+        assert response.status_code == 201
+        assert response.json()["signing_secret"] == PROVIDER_SECRET
+        assert PROVIDER_SECRET in db.fetch_one.await_args.args
+
+    def test_create_generates_secret_when_none_supplied(self) -> None:
+        db = AsyncMock()
+        db.fetch_one.return_value = {"id": uuid4()}
+
+        response = _admin_client(db).post(
+            "/api/v1/integrations", json={"name": "Jira", "provider": "jira"}
+        )
+
+        secret = response.json()["signing_secret"]
+        assert response.status_code == 201
+        assert len(secret) == 64
+        assert secret in db.fetch_one.await_args.args
+
+    def test_update_replaces_secret_without_returning_it(self) -> None:
+        record = _integration_record()
+        db = AsyncMock()
+        db.fetch_one.side_effect = [{"id": record["id"]}, record]
+
+        response = _admin_client(db).patch(
+            f"/api/v1/integrations/{record['id']}", json={"signing_secret": PROVIDER_SECRET}
+        )
+
+        assert response.status_code == 200
+        assert "signing_secret" not in response.json()
+        update = db.fetch_one.await_args
+        assert "signing_secret = $" in update.args[0]
+        assert PROVIDER_SECRET in update.args
+
+    def test_create_rejects_short_secret(self) -> None:
+        with pytest.raises(ValueError):
+            IntegrationCreate(name="Slack", provider="slack", signing_secret="x" * 15)
+
+    def test_update_rejects_short_secret(self) -> None:
+        with pytest.raises(ValueError):
+            IntegrationUpdate(signing_secret="x" * 15)
+
+
+FORM = "application/x-www-form-urlencoded"
+# Slack sends interactive components form-encoded, as JSON in a payload field...
+SLACK_BLOCK_ACTION = {
+    "type": "block_actions",
+    "trigger_id": "13345224609.738474920.8088930838d88f008e0",
+    "user": {"id": "U123"},
+    "actions": [{"action_id": "flag_issue", "value": "orders"}],
+}
+# ...and slash commands as plain form fields.
+SLACK_SLASH_COMMAND = {
+    "command": "/dataing",
+    "text": "orders has nulls",
+    "user_id": "U123",
+    "channel_id": "C123",
+    "trigger_id": "13345224609.738474920.8088930838d88f008e1",
+    "response_url": "https://hooks.slack.com/commands/T123/1/abc",
+}
+
+
+def _post_raw(db: AsyncMock, provider: str, body: bytes, headers: dict[str, str]) -> Any:
+    app = FastAPI()
+    app.include_router(router, prefix="/api/v1")
+    app.dependency_overrides[get_app_db] = lambda: db
+    return TestClient(app).post(
+        f"/api/v1/integrations/{provider}/webhook",
+        params={"integration_id": str(uuid4())},
+        content=body,
+        headers=headers,
+    )
+
+
+def _processing_db(provider: str) -> AsyncMock:
+    """App DB that takes a signed webhook all the way to new issue #7."""
+    db = AsyncMock()
+    db.fetch_one.side_effect = [
+        _integration_row(provider, WEBHOOK_SECRET),
+        None,  # not delivered before
+        {"id": uuid4()},  # integration event recorded
+        {"num": 7},  # next issue number
+        {"id": uuid4(), "number": 7},  # issue created
+    ]
+    db.fetch_all.return_value = []
+    return db
+
+
+@pytest.fixture
+def no_auto_investigation(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Skip the policy evaluation that can start an investigation."""
+    monkeypatch.setattr(
+        "dataing_ee.entrypoints.api.routes.integrations._evaluate_and_start_investigation",
+        AsyncMock(return_value=None),
+    )
+
+
+@pytest.fixture
+def replies(monkeypatch: pytest.MonkeyPatch) -> AsyncMock:
+    """Capture the replies posted to providers after a webhook is handled."""
+    post_reply = AsyncMock()
+    monkeypatch.setattr("dataing_ee.entrypoints.api.routes.integrations._post_reply", post_reply)
+    return post_reply
+
+
+class TestFormEncodedWebhooks:
+    """Webhook bodies are decoded once authenticated, JSON or form-encoded."""
+
+    @pytest.mark.usefixtures("no_auto_investigation")
+    def test_processes_signed_block_action(self) -> None:
+        body = urlencode({"payload": json.dumps(SLACK_BLOCK_ACTION)}).encode()
+        db = _processing_db("slack")
+
+        headers = {"Content-Type": FORM, **_signed_body("slack", body)}
+        response = _post_raw(db, "slack", body, headers)
+
+        assert response.status_code == 200
+        assert response.json()["status"] == "processed"
+        assert "Slack Action: flag_issue = orders" in db.fetch_one.await_args.args
+
+    @pytest.mark.usefixtures("no_auto_investigation")
+    def test_slash_command_is_acknowledged_then_answered(self, replies: AsyncMock) -> None:
+        # Slack gives a slash command 3 seconds: acknowledge, then report back
+        body = urlencode(SLACK_SLASH_COMMAND).encode()
+        db = _processing_db("slack")
+
+        headers = {"Content-Type": FORM, **_signed_body("slack", body)}
+        response = _post_raw(db, "slack", body, headers)
+
+        ack = {"response_type": "ephemeral", "text": "Creating a dataing issue..."}
+        assert response.status_code == 200
+        assert response.json() == ack
+        assert "orders has nulls" in db.fetch_one.await_args.args
+        replies.assert_awaited_once_with(
+            SLACK_SLASH_COMMAND["response_url"],
+            {"response_type": "ephemeral", "text": "Created dataing issue #7."},
+        )
+
+    def test_slash_command_failure_is_reported(self, replies: AsyncMock) -> None:
+        body = urlencode(SLACK_SLASH_COMMAND).encode()
+        db = AsyncMock()
+        db.fetch_one.side_effect = [
+            _integration_row("slack", WEBHOOK_SECRET),
+            None,  # not delivered before
+            RuntimeError("database went away"),
+        ]
+
+        headers = {"Content-Type": FORM, **_signed_body("slack", body)}
+        response = _post_raw(db, "slack", body, headers)
+
+        assert response.status_code == 200
+        replies.assert_awaited_once_with(
+            SLACK_SLASH_COMMAND["response_url"],
+            {
+                "response_type": "ephemeral",
+                "text": "Couldn't create the dataing issue. Try again in a moment.",
+            },
+        )
+
+    @pytest.mark.usefixtures("no_auto_investigation")
+    def test_untrusted_response_url_is_never_posted_to(self, replies: AsyncMock) -> None:
+        command = {**SLACK_SLASH_COMMAND, "response_url": "https://attacker.example/hook"}
+        body = urlencode(command).encode()
+        db = _processing_db("slack")
+
+        headers = {"Content-Type": FORM, **_signed_body("slack", body)}
+        response = _post_raw(db, "slack", body, headers)
+
+        # Answered directly instead, once the issue exists
+        assert response.json()["text"] == "Created dataing issue #7."
+        replies.assert_not_awaited()
+
+    def test_slash_command_without_text_gets_usage_reply(self) -> None:
+        body = urlencode({**SLACK_SLASH_COMMAND, "text": ""}).encode()
+        db = _webhook_db(_integration_row("slack", WEBHOOK_SECRET))
+
+        headers = {"Content-Type": FORM, **_signed_body("slack", body)}
+        response = _post_raw(db, "slack", body, headers)
+
+        assert response.status_code == 200
+        assert response.json().get("text", "").startswith("Describe the problem")
+        assert not _recorded_event(db)
+
+    def test_rejects_malformed_body_after_authentication(self) -> None:
+        body = b"not json"
+        db = _webhook_db(_integration_row("jira", WEBHOOK_SECRET))
+
+        headers = {"Content-Type": "application/json", **_signed_body("jira", body)}
+        response = _post_raw(db, "jira", body, headers)
+
+        assert response.status_code == 400
+        assert not _recorded_event(db)
+
+
+class TestPostReply:
+    """Replies are posted as JSON, and a failed post is logged, not raised."""
+
+    async def test_posts_reply_as_json(self, respx_mock: respx.MockRouter) -> None:
+        url = SLACK_SLASH_COMMAND["response_url"]
+        route = respx_mock.post(url).mock(return_value=httpx.Response(200))
+
+        await _post_reply(url, {"text": "Created dataing issue #7."})
+
+        assert json.loads(route.calls.last.request.content) == {"text": "Created dataing issue #7."}
+
+    @pytest.mark.parametrize(
+        "outcome",
+        [{"return_value": httpx.Response(500)}, {"side_effect": httpx.ConnectError("down")}],
+        ids=["error_status", "unreachable"],
+    )
+    async def test_failed_reply_is_not_raised(
+        self, respx_mock: respx.MockRouter, outcome: dict[str, Any]
+    ) -> None:
+        url = SLACK_SLASH_COMMAND["response_url"]
+        route = respx_mock.post(url).mock(**outcome)
+
+        await _post_reply(url, {"text": "Created dataing issue #7."})
+
+        assert route.called
+
+
+class TestEvaluateAndStartInvestigation:
+    """Auto-investigations only run against the tenant's own datasource."""
+
+    MODULE = "dataing_ee.entrypoints.api.routes.integrations"
+
+    async def _run(self, resolve_datasource: AsyncMock) -> tuple[object, AsyncMock, AsyncMock]:
+        from dataing_ee.entrypoints.api.routes.integrations import (
+            _evaluate_and_start_investigation,
+        )
+
+        from dataing.adapters.db.team_policy_repository import PolicyAction
+        from dataing.services.policy import PolicyResult, QueueConfig
+
+        team_id = uuid4()
+        db = AsyncMock()
+        temporal = AsyncMock()
+        request = MagicMock()
+        request.app.state.temporal_client = temporal
+
+        with (
+            patch(f"{self.MODULE}.TeamPolicyRepository") as repo,
+            patch(f"{self.MODULE}.PolicyService") as policy_service,
+            patch(f"{self.MODULE}.resolve_datasource_id", resolve_datasource),
+        ):
+            repo.return_value.get_default_team_for_tenant = AsyncMock(return_value=team_id)
+            policy_service.return_value.evaluate = AsyncMock(
+                return_value=PolicyResult(
+                    action=PolicyAction.AUTO,
+                    queue_config=QueueConfig(),
+                    source="team_default",
+                    team_id=team_id,
+                )
+            )
+            investigation_id = await _evaluate_and_start_investigation(
+                request=request,
+                db=db,
+                tenant_id=TENANT_ID,
+                issue_id=uuid4(),
+                issue_data={"title": "orders volume drop", "severity": "high"},
+                adapter=None,
+                webhook_request=None,
+                idempotency_key="jira_1_created",
+                provider="jira",
+            )
+        return investigation_id, db, temporal
+
+    async def test_starts_investigation_on_tenant_datasource(self) -> None:
+        """The resolved tenant datasource is what the workflow receives."""
+        datasource_id = uuid4()
+
+        investigation_id, _, temporal = await self._run(AsyncMock(return_value=datasource_id))
+
+        assert investigation_id is not None
+        temporal.start_investigation.assert_awaited_once()
+        kwargs = temporal.start_investigation.await_args.kwargs
+        assert kwargs["tenant_id"] == str(TENANT_ID)
+        assert kwargs["datasource_id"] == str(datasource_id)
+
+    @pytest.mark.parametrize(
+        "resolve_error",
+        [
+            "No active datasources found for tenant",
+            "ambiguous_datasource:Multiple datasources available.",
+        ],
+    )
+    async def test_unresolvable_datasource_skips_investigation(self, resolve_error: str) -> None:
+        """No datasource of the tenant's own means no investigation (no fallback ID)."""
+        investigation_id, db, temporal = await self._run(
+            AsyncMock(side_effect=ValueError(resolve_error))
+        )
+
+        assert investigation_id is None
+        temporal.start_investigation.assert_not_called()
+        executed_sql = [call.args[0] for call in db.execute.call_args_list]
+        assert not any("INSERT INTO investigations" in sql for sql in executed_sql)

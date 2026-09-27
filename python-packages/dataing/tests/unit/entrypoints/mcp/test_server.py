@@ -125,7 +125,7 @@ class TestMCPServer:
         from dataing.safety.validator import validate_query
 
         # Should not raise for valid query
-        validate_query(args["sql"])
+        validate_query(args["sql"], dialect="postgres")
 
     async def test_query_dataset_rejects_unsafe(self) -> None:
         """Test that query_dataset rejects unsafe SQL."""
@@ -141,7 +141,7 @@ class TestMCPServer:
 
         for query in unsafe_queries:
             with pytest.raises(QueryValidationError):
-                validate_query(query)
+                validate_query(query, dialect="postgres")
 
     async def test_get_table_schema_returns_info(
         self,

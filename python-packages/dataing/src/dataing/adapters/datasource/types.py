@@ -284,6 +284,8 @@ class AdapterCapabilities(BaseModel):
     rate_limit_requests_per_minute: int | None = None
     max_concurrent_queries: int = 1
     query_language: QueryLanguage = QueryLanguage.SCAN_ONLY
+    # sqlglot dialect used to parse and validate SQL sent to this source
+    sql_dialect: str | None = None
 
 
 class FieldGroup(BaseModel):
@@ -295,6 +297,24 @@ class FieldGroup(BaseModel):
     label: str
     description: str | None = None
     collapsed_by_default: bool = False
+
+
+class ConfigFieldOption(BaseModel):
+    """One choice of an enum configuration field."""
+
+    model_config = ConfigDict(frozen=True)
+
+    value: str
+    label: str
+
+
+class ShowIfCondition(BaseModel):
+    """Shows a configuration field only while another field holds a value."""
+
+    model_config = ConfigDict(frozen=True)
+
+    field: str
+    value: Any
 
 
 class ConfigField(BaseModel):
@@ -312,8 +332,8 @@ class ConfigField(BaseModel):
     min_value: int | None = None
     max_value: int | None = None
     pattern: str | None = None
-    options: list[dict[str, str]] | None = None
-    show_if: dict[str, Any] | None = None
+    options: list[ConfigFieldOption] | None = None
+    show_if: ShowIfCondition | None = None
     description: str | None = None
     help_url: str | None = None
 

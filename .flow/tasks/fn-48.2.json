@@ -10,7 +10,7 @@
   "id": "fn-48.2",
   "priority": 2,
   "spec_path": ".flow/tasks/fn-48.2.md",
-  "status": "todo",
+  "status": "blocked",
   "title": "Create SQLAlchemy model and threshold repository",
-  "updated_at": "2026-01-28T03:52:40.024961Z"
+  "updated_at": "2026-09-27T15:11:37.374614Z"
 }

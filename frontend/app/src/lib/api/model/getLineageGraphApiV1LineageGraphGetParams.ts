@@ -19,16 +19,4 @@ export type GetLineageGraphApiV1LineageGraphGetParams = {
    * Downstream traversal depth
    */
   downstream_depth?: number;
-  /**
-   * Lineage provider to use
-   */
-  provider?: string;
-  /**
-   * Path to dbt manifest.json
-   */
-  manifest_path?: string | null;
-  /**
-   * Base URL for API-based providers
-   */
-  base_url?: string | null;
 };

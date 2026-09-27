@@ -6,16 +6,19 @@ and provider-specific webhook endpoints.
 
 from __future__ import annotations
 
+import functools
 import hashlib
 import hmac
 import json
 import logging
 import secrets
+from collections.abc import Awaitable, Callable
 from datetime import UTC, datetime
 from typing import Annotated, Any
 from uuid import UUID, uuid4
 
-from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
+import httpx
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request, Response, status
 from pydantic import BaseModel, Field
 
 from dataing.adapters.db.app_db import AppDatabase
@@ -24,7 +27,7 @@ from dataing.core.json_utils import to_json_string
 from dataing.entrypoints.api.deps import get_app_db, resolve_datasource_id
 from dataing.entrypoints.api.middleware.auth import ApiKeyContext, require_scope, verify_api_key
 from dataing.services.policy import IssueContext, PolicyService
-from dataing_ee.adapters.integrations.base import IssueData, WebhookRequest
+from dataing_ee.adapters.integrations.base import IntegrationAdapter, IssueData, WebhookRequest
 from dataing_ee.adapters.integrations.registry import get_adapter
 from dataing_ee.models.integration import IntegrationEventStatus, IntegrationProvider
 
@@ -47,6 +50,10 @@ VALID_PROVIDERS = (
     "^(jira|linear|pagerduty|opsgenie|monte_carlo|great_expectations|soda|dbt|slack|custom)$"
 )
 
+# A signing secret issued by the provider, for providers that issue their own
+# (Slack, dbt Cloud)
+ProviderSigningSecret = Annotated[str, Field(min_length=16, max_length=512)]
+
 
 class IntegrationCreate(BaseModel):
     """Request to create an integration."""
@@ -55,6 +62,8 @@ class IntegrationCreate(BaseModel):
     provider: str = Field(..., pattern=VALID_PROVIDERS)
     config: dict[str, Any] | None = Field(default=None)
     rate_limit_per_minute: int = Field(default=60, ge=1, le=1000)
+    # Omit to have a signing secret generated
+    signing_secret: ProviderSigningSecret | None = None
 
 
 class IntegrationUpdate(BaseModel):
@@ -64,6 +73,8 @@ class IntegrationUpdate(BaseModel):
     enabled: bool | None = None
     config: dict[str, Any] | None = None
     rate_limit_per_minute: int | None = Field(default=None, ge=1, le=1000)
+    # Replaces the signing secret, e.g. after the provider rotates it
+    signing_secret: ProviderSigningSecret | None = None
 
 
 class IntegrationResponse(BaseModel):
@@ -260,9 +271,10 @@ async def create_integration(
 ) -> IntegrationSecretResponse:
     """Create a new integration.
 
-    Requires admin scope. Returns the signing secret (shown only once).
+    Requires admin scope. Uses the provider's signing secret when one is given,
+    otherwise generates one. Returns the signing secret (shown only once).
     """
-    signing_secret = _generate_signing_secret()
+    signing_secret = body.signing_secret or _generate_signing_secret()
 
     row = await db.fetch_one(
         """
@@ -365,6 +377,11 @@ async def update_integration(
         params.append(body.rate_limit_per_minute)
         param_idx += 1
 
+    if body.signing_secret is not None:
+        updates.append(f"signing_secret = ${param_idx}")
+        params.append(body.signing_secret)
+        param_idx += 1
+
     updates.append("updated_at = NOW()")
 
     if not updates:
@@ -383,6 +400,9 @@ async def update_integration(
     row = await db.fetch_one(query, *params)
     if not row:
         raise HTTPException(status_code=404, detail="Integration not found")
+
+    if body.signing_secret is not None:
+        logger.info(f"Integration secret replaced: id={integration_id}, tenant={auth.tenant_id}")
 
     return _row_to_response(row, request)
 
@@ -456,14 +476,39 @@ async def receive_provider_webhook(
     provider: str,
     request: Request,
     db: AppDbDep,
+    background_tasks: BackgroundTasks,
     integration_id: UUID | None = None,
 ) -> dict[str, Any]:
     """Receive a webhook from an integration provider.
 
-    The webhook is verified using the provider-specific signature scheme.
+    The webhook is verified using the provider-specific signature scheme before
+    anything else is done with it. Verification fails closed: an integration
+    without a signing secret rejects every webhook.
     Uses adapter classes for MC/GX when available, falls back to inline logic otherwise.
-    Idempotency is enforced via the integration_events table.
+    Idempotency is enforced via the integration_events table. The adapter shapes
+    the response, such as the reply to a Slack slash command, and can have the
+    webhook handled after replying when the provider can't wait for the outcome.
     """
+    result = await _handle_provider_webhook(provider, request, db, integration_id, background_tasks)
+    adapter = get_adapter(provider)
+    if adapter is None:
+        return result
+    webhook_request = WebhookRequest(
+        body=await request.body(),
+        headers=dict(request.headers),
+        query_params=dict(request.query_params),
+    )
+    return adapter.format_response(webhook_request, result)
+
+
+async def _handle_provider_webhook(
+    provider: str,
+    request: Request,
+    db: AppDatabase,
+    integration_id: UUID | None,
+    background_tasks: BackgroundTasks,
+) -> dict[str, Any]:
+    """Authenticate and handle a provider webhook for receive_provider_webhook."""
     if provider not in IntegrationProvider.all():
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -490,9 +535,6 @@ async def receive_provider_webhook(
     if not integration:
         raise HTTPException(status_code=404, detail="Integration not found")
 
-    if not integration["enabled"]:
-        return {"status": "skipped", "reason": "integration_disabled"}
-
     # Read body
     body = await request.body()
 
@@ -508,51 +550,88 @@ async def receive_provider_webhook(
             query_params=dict(request.query_params),
         )
 
-        # Check if adapter wants to process this event
-        if not adapter.should_process(webhook_request):
-            logger.info(
-                f"Webhook skipped by adapter: integration={integration_id}, provider={provider}"
-            )
-            return {"status": "skipped", "reason": "filtered_by_adapter"}
+    # Verify signature before anything else. Fail closed: without a signing
+    # secret no webhook can be verified, so none is accepted.
+    signing_secret = integration["signing_secret"]
+    if not signing_secret:
+        authenticated = False
+    elif adapter and webhook_request:
+        authenticated = adapter.verify_signature(webhook_request, signing_secret)
+    else:
+        signature = request.headers.get(_get_signature_header_name(provider))
+        authenticated = _verify_provider_signature(body, signature, signing_secret, provider)
 
-    # Verify signature
-    if integration["signing_secret"]:
-        if adapter and webhook_request:
-            # Use adapter for signature verification
-            if not adapter.verify_signature(webhook_request, integration["signing_secret"]):
-                logger.warning(
-                    f"Webhook signature invalid: integration={integration_id}, provider={provider}"
-                )
-                raise HTTPException(
-                    status_code=status.HTTP_401_UNAUTHORIZED,
-                    detail="Invalid webhook signature",
-                )
-        else:
-            # Fallback to inline verification
-            sig_header_name = _get_signature_header_name(provider)
-            signature = request.headers.get(sig_header_name)
-            if not _verify_provider_signature(
-                body, signature, integration["signing_secret"], provider
-            ):
-                logger.warning(
-                    f"Webhook signature invalid: integration={integration_id}, provider={provider}"
-                )
-                raise HTTPException(
-                    status_code=status.HTTP_401_UNAUTHORIZED,
-                    detail="Invalid webhook signature",
-                )
+    if not authenticated:
+        reason = "invalid signature" if signing_secret else "no signing secret configured"
+        logger.warning(
+            f"Webhook rejected ({reason}): integration={integration_id}, provider={provider}"
+        )
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid webhook signature",
+        )
 
-    # Parse payload and compute idempotency key
-    import json
-
+    # Decode the body once it is trusted. Adapters also take form-encoded
+    # bodies, which is how Slack sends interactive components and slash commands.
     try:
-        payload = json.loads(body)
-    except json.JSONDecodeError as e:
+        payload = webhook_request.body_json if webhook_request else json.loads(body)
+    except ValueError as e:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Invalid JSON: {e}",
+            detail=f"Invalid webhook payload: {e}",
         ) from e
 
+    if not integration["enabled"]:
+        return {"status": "skipped", "reason": "integration_disabled"}
+
+    # Answer endpoint-verification handshakes, such as Slack's url_verification
+    if adapter and webhook_request:
+        handshake = adapter.handshake_response(webhook_request)
+        if handshake is not None:
+            return handshake
+
+    # Check if adapter wants to process this event
+    if adapter and webhook_request and not adapter.should_process(webhook_request):
+        logger.info(
+            f"Webhook skipped by adapter: integration={integration_id}, provider={provider}"
+        )
+        return {"status": "skipped", "reason": "filtered_by_adapter"}
+
+    process = functools.partial(
+        _process_webhook_event,
+        request=request,
+        db=db,
+        integration=integration,
+        integration_id=integration_id,
+        provider=provider,
+        adapter=adapter,
+        webhook_request=webhook_request,
+        payload=payload,
+        body=body,
+    )
+
+    # A provider that can't wait, like Slack for a slash command, is answered at
+    # once and sent the outcome when the event has been handled
+    reply_url = adapter.deferred_reply_url(webhook_request) if adapter and webhook_request else None
+    if reply_url and adapter and webhook_request:
+        background_tasks.add_task(_process_then_reply, process, adapter, webhook_request, reply_url)
+        return {"status": "accepted"}
+
+    return await process()
+
+
+async def _process_webhook_event(
+    request: Request,
+    db: AppDatabase,
+    integration: dict[str, Any],
+    integration_id: UUID,
+    provider: str,
+    adapter: IntegrationAdapter | None,
+    webhook_request: WebhookRequest | None,
+    payload: dict[str, Any],
+    body: bytes,
+) -> dict[str, Any]:
+    """Record an authenticated webhook event and create an issue from it."""
     # Extract idempotency key and event type (provider-specific)
     if adapter and webhook_request:
         # Use adapter for fingerprinting and event type
@@ -763,6 +842,31 @@ async def receive_provider_webhook(
     return result
 
 
+async def _process_then_reply(
+    process: Callable[[], Awaitable[dict[str, Any]]],
+    adapter: IntegrationAdapter,
+    webhook_request: WebhookRequest,
+    reply_url: str,
+) -> None:
+    """Handle a webhook event after replying to it, then post the outcome."""
+    try:
+        result = await process()
+    except Exception:
+        logger.exception(f"Deferred webhook handling failed: provider={adapter.provider}")
+        result = {"status": "error"}
+    await _post_reply(reply_url, adapter.format_response(webhook_request, result))
+
+
+async def _post_reply(url: str, body: dict[str, Any]) -> None:
+    """Post a reply to a provider, logging rather than raising if that fails."""
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            response = await client.post(url, json=body)
+            response.raise_for_status()
+    except httpx.HTTPError as e:
+        logger.warning(f"Webhook reply to provider failed: {e}")
+
+
 async def _evaluate_and_start_investigation(
     request: Request,
     db: AppDatabase,
@@ -877,12 +981,16 @@ async def _evaluate_and_start_investigation(
 
     investigation_id = uuid4()
 
-    # Resolve datasource
+    # Resolve the tenant's own datasource. There is no fallback ID: a fixed ID
+    # would point the investigation at a datasource owned by another tenant.
     try:
         datasource_id = await resolve_datasource_id(request, tenant_id, explicit_id=None)
     except ValueError:
-        # No default datasource, use placeholder
-        datasource_id = UUID("00000000-0000-0000-0000-000000000003")
+        logger.warning(
+            f"Skipping auto investigation for issue={issue_id}: "
+            f"no single active datasource for tenant={tenant_id}"
+        )
+        return None
 
     # Add issue_id to alert data for back-linking
     alert_data["issue_id"] = str(issue_id)

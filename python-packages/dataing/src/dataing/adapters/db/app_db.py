@@ -559,43 +559,6 @@ class AppDatabase:
         return result["count"] if result else 0
 
     # Investigation operations
-    async def create_investigation(
-        self,
-        tenant_id: UUID,
-        dataset_id: str,
-        metric_name: str,
-        data_source_id: UUID | None = None,
-        created_by: UUID | None = None,
-        expected_value: float | None = None,
-        actual_value: float | None = None,
-        deviation_pct: float | None = None,
-        anomaly_date: str | None = None,
-        severity: str | None = None,
-        metadata: dict[str, Any] | None = None,
-    ) -> dict[str, Any]:
-        """Create a new investigation."""
-        result = await self.execute_returning(
-            """INSERT INTO investigations
-               (tenant_id, data_source_id, created_by, dataset_id, metric_name,
-                expected_value, actual_value, deviation_pct, anomaly_date, severity, metadata)
-               VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
-               RETURNING *""",
-            tenant_id,
-            data_source_id,
-            created_by,
-            dataset_id,
-            metric_name,
-            expected_value,
-            actual_value,
-            deviation_pct,
-            anomaly_date,
-            severity,
-            to_json_string(metadata or {}),
-        )
-        if result is None:
-            raise RuntimeError("Failed to create investigation")
-        return result
-
     async def get_investigation(
         self, investigation_id: UUID, tenant_id: UUID
     ) -> dict[str, Any] | None:
@@ -609,24 +572,24 @@ class AppDatabase:
     async def list_investigations(
         self,
         tenant_id: UUID,
-        status: str | None = None,
         limit: int = 50,
         offset: int = 0,
     ) -> list[dict[str, Any]]:
-        """List investigations for a tenant."""
-        if status:
-            return await self.fetch_all(
-                """SELECT * FROM investigations
-                   WHERE tenant_id = $1 AND status = $2
-                   ORDER BY created_at DESC
-                   LIMIT $3 OFFSET $4""",
-                tenant_id,
-                status,
-                limit,
-                offset,
-            )
+        """List investigation summaries for a tenant, newest first.
+
+        Summaries come from the alert JSONB: the primary dataset, the metric's
+        display name (else the anomaly type) and the severity. Alerts that are not
+        an AnomalyAlert, such as imported replays, report "unknown".
+        """
         return await self.fetch_all(
-            """SELECT * FROM investigations
+            """SELECT id,
+                      COALESCE(alert->'dataset_ids'->>0, 'unknown') AS dataset_id,
+                      COALESCE(NULLIF(alert #>> '{metric_spec,display_name}', ''),
+                               alert->>'anomaly_type', 'unknown') AS metric_name,
+                      COALESCE(outcome->>'status', status) AS status,
+                      alert->>'severity' AS severity,
+                      created_at
+               FROM investigations
                WHERE tenant_id = $1
                ORDER BY created_at DESC
                LIMIT $2 OFFSET $3""",
@@ -638,73 +601,47 @@ class AppDatabase:
     async def list_investigations_for_dataset(
         self,
         tenant_id: UUID,
-        dataset_native_path: str,
+        dataset_id: UUID,
         limit: int = 50,
     ) -> list[dict[str, Any]]:
-        """List investigations that reference a dataset.
+        """List investigations whose alert references a dataset.
+
+        The alert JSONB holds an AnomalyAlert plus the datasource it ran against.
+        An investigation references the dataset when it ran against the dataset's
+        datasource and any of its alert dataset_ids (primary or reference context)
+        equals the dataset's native_path or table name, ignoring case - the rule
+        SchemaLookupAdapter uses to resolve those ids to tables.
 
         Args:
             tenant_id: The tenant ID.
-            dataset_native_path: The native path of the dataset.
+            dataset_id: The dataset ID.
             limit: Maximum number of investigations to return.
 
         Returns:
-            List of investigation dictionaries.
+            Newest first: id, metric_name, severity, status and created_at.
         """
         query = """
-            SELECT id, dataset_id, metric_name, status, severity,
-                   created_at, completed_at
-            FROM investigations
-            WHERE tenant_id = $1 AND dataset_id = $2
-            ORDER BY created_at DESC
+            SELECT i.id,
+                   COALESCE(NULLIF(i.alert #>> '{metric_spec,display_name}', ''),
+                            i.alert ->> 'anomaly_type') AS metric_name,
+                   i.alert ->> 'severity' AS severity,
+                   COALESCE(i.outcome ->> 'status', i.status) AS status,
+                   i.created_at
+            FROM datasets d
+            JOIN investigations i
+              ON i.tenant_id = d.tenant_id
+             AND i.alert ->> 'datasource_id' = d.datasource_id::text
+            WHERE d.tenant_id = $1
+              AND d.id = $2
+              AND EXISTS (
+                  SELECT 1
+                  FROM jsonb_array_elements_text(i.alert -> 'dataset_ids') AS ref(dataset_ref)
+                  WHERE lower(ref.dataset_ref) IN (lower(d.native_path), lower(d.name))
+              )
+            ORDER BY i.created_at DESC
             LIMIT $3
         """
-        return await self.fetch_all(query, tenant_id, dataset_native_path, limit)
-
-    async def update_investigation_status(
-        self,
-        investigation_id: UUID,
-        status: str,
-        events: list[Any] | None = None,
-        finding: dict[str, Any] | None = None,
-        started_at: Any = None,
-        completed_at: Any = None,
-        duration_seconds: float | None = None,
-    ) -> dict[str, Any] | None:
-        """Update investigation status and optionally other fields."""
-        updates = ["status = $2"]
-        args: list[Any] = [investigation_id, status]
-        idx = 3
-
-        if events is not None:
-            updates.append(f"events = ${idx}")
-            args.append(to_json_string(events))
-            idx += 1
-
-        if finding is not None:
-            updates.append(f"finding = ${idx}")
-            args.append(to_json_string(finding))
-            idx += 1
-
-        if started_at is not None:
-            updates.append(f"started_at = ${idx}")
-            args.append(started_at)
-            idx += 1
-
-        if completed_at is not None:
-            updates.append(f"completed_at = ${idx}")
-            args.append(completed_at)
-            idx += 1
-
-        if duration_seconds is not None:
-            updates.append(f"duration_seconds = ${idx}")
-            args.append(duration_seconds)
-            idx += 1
-
-        query = f"""UPDATE investigations SET {", ".join(updates)}
-                    WHERE id = $1 RETURNING *"""
-
-        return await self.execute_returning(query, *args)
+        return await self.fetch_all(query, tenant_id, dataset_id, limit)
 
     # Audit log operations
     async def create_audit_log(
@@ -853,81 +790,20 @@ class AppDatabase:
             month,
         )
 
-    # Approval requests
-    async def create_approval_request(
-        self,
-        investigation_id: UUID,
-        tenant_id: UUID,
-        request_type: str,
-        context: dict[str, Any],
-        requested_by: str = "system",
-    ) -> dict[str, Any]:
-        """Create an approval request."""
-        result = await self.execute_returning(
-            """INSERT INTO approval_requests
-                (investigation_id, tenant_id, request_type, context, requested_by)
-               VALUES ($1, $2, $3, $4, $5)
-               RETURNING *""",
-            investigation_id,
-            tenant_id,
-            request_type,
-            to_json_string(context),
-            requested_by,
-        )
-        if result is None:
-            raise RuntimeError("Failed to create approval request")
-        return result
-
-    async def get_pending_approvals(self, tenant_id: UUID) -> list[dict[str, Any]]:
-        """Get all pending approval requests for a tenant."""
-        return await self.fetch_all(
-            """SELECT ar.*, i.dataset_id, i.metric_name, i.severity
-               FROM approval_requests ar
-               JOIN investigations i ON i.id = ar.investigation_id
-               WHERE ar.tenant_id = $1 AND ar.decision IS NULL
-               ORDER BY ar.requested_at DESC""",
-            tenant_id,
-        )
-
-    async def make_approval_decision(
-        self,
-        approval_id: UUID,
-        tenant_id: UUID,
-        decision: str,
-        decided_by: UUID,
-        comment: str | None = None,
-        modifications: dict[str, Any] | None = None,
-    ) -> dict[str, Any] | None:
-        """Record an approval decision."""
-        return await self.execute_returning(
-            """UPDATE approval_requests
-               SET decision = $3, decided_by = $4, decided_at = NOW(),
-                   comment = $5, modifications = $6
-               WHERE id = $1 AND tenant_id = $2
-               RETURNING *""",
-            approval_id,
-            tenant_id,
-            decision,
-            decided_by,
-            comment,
-            to_json_string(modifications) if modifications else None,
-        )
-
     # Dashboard stats
     async def get_dashboard_stats(self, tenant_id: UUID) -> dict[str, Any]:
         """Get dashboard statistics for a tenant."""
-        # Active investigations
+        # Active investigations (no outcome yet)
         active_result = await self.fetch_one(
             """SELECT COUNT(*) as count FROM investigations
-               WHERE tenant_id = $1 AND status IN ('pending', 'in_progress')""",
+               WHERE tenant_id = $1 AND status = 'active'""",
             tenant_id,
         )
 
-        # Completed today
+        # Completed today (outcome set today, whatever it says)
         completed_result = await self.fetch_one(
             """SELECT COUNT(*) as count FROM investigations
-               WHERE tenant_id = $1 AND status = 'completed'
-                 AND completed_at >= CURRENT_DATE""",
+               WHERE tenant_id = $1 AND completed_at >= CURRENT_DATE""",
             tenant_id,
         )
 
@@ -938,18 +814,10 @@ class AppDatabase:
             tenant_id,
         )
 
-        # Pending approvals
-        approvals_result = await self.fetch_one(
-            """SELECT COUNT(*) as count FROM approval_requests
-               WHERE tenant_id = $1 AND decision IS NULL""",
-            tenant_id,
-        )
-
         return {
             "activeInvestigations": active_result["count"] if active_result else 0,
             "completedToday": completed_result["count"] if completed_result else 0,
             "dataSources": ds_result["count"] if ds_result else 0,
-            "pendingApprovals": approvals_result["count"] if approvals_result else 0,
         }
 
     # Feedback event operations

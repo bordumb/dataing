@@ -54,6 +54,22 @@ class BaseAdapter(ABC):
         """Get the capabilities of this adapter."""
         ...
 
+    @classmethod
+    def check_config(cls, config: dict[str, Any]) -> None:
+        """Refuse a configuration this server does not permit.
+
+        Routes call this before they save or test a source, so nothing connects to a
+        refused configuration. Adapters that read from this host override it and check
+        again when they connect. The default permits every configuration.
+
+        Args:
+            config: Configuration dictionary a tenant supplied for the adapter.
+
+        Raises:
+            AdapterError: If this server does not permit the configuration.
+        """
+        return None
+
     @abstractmethod
     async def connect(self) -> None:
         """Establish connection to the data source.
@@ -126,7 +142,8 @@ class BaseAdapter(ABC):
 
         Args:
             source_id: ID of the data source.
-            catalogs: List of catalog dictionaries.
+            catalogs: List of catalog dictionaries. Each table in them may be
+                a dictionary or an already-built Table.
 
         Returns:
             Properly formatted SchemaResponse.
@@ -144,6 +161,9 @@ class BaseAdapter(ABC):
             for schema_data in cat_data.get("schemas", []):
                 tables = []
                 for table_data in schema_data.get("tables", []):
+                    if isinstance(table_data, Table):
+                        tables.append(table_data)
+                        continue
                     columns = [Column(**col_data) for col_data in table_data.get("columns", [])]
                     tables.append(
                         Table(

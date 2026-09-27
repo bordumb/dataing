@@ -12,10 +12,12 @@ from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
 
 from dataing.adapters.db.app_db import AppDatabase
-from dataing.adapters.git import GitHubProvider, GitSyncService
-from dataing.entrypoints.api.deps import get_app_db, settings
+from dataing.adapters.git import GitHubProvider, GitSyncService, encrypt_access_token
+from dataing.config import settings
+from dataing.entrypoints.api.deps import get_app_db
 from dataing.entrypoints.api.middleware.auth import (
     ApiKeyContext,
+    require_scope,
     verify_api_key,
 )
 
@@ -25,6 +27,8 @@ router = APIRouter(prefix="/git", tags=["git"])
 
 AppDbDep = Annotated[AppDatabase, Depends(get_app_db)]
 AuthDep = Annotated[ApiKeyContext, Depends(verify_api_key)]
+WriteScopeDep = Annotated[ApiKeyContext, Depends(require_scope("write"))]
+AdminScopeDep = Annotated[ApiKeyContext, Depends(require_scope("admin"))]
 
 
 # --- Pydantic schemas ---
@@ -157,7 +161,7 @@ def _get_sync_service(db: AppDatabase) -> GitSyncService:
 @router.post("/repos")
 async def connect_git_repo(
     req: ConnectGitRepoRequest,
-    auth: AuthDep,
+    auth: AdminScopeDep,
     db: AppDbDep,
 ) -> GitRepoResponse:
     """Connect a new git repository for pipeline change tracking."""
@@ -165,7 +169,9 @@ async def connect_git_repo(
         "name": req.name,
         "url": req.url.rstrip("/"),
         "provider": req.provider,
-        "access_token_encrypted": req.access_token,  # TODO: encrypt before storage
+        "access_token_encrypted": (
+            encrypt_access_token(req.access_token) if req.access_token else None
+        ),
         "tracked_paths": req.tracked_paths,
         "default_branch": req.default_branch,
     }
@@ -225,7 +231,7 @@ async def get_git_repo(
 async def update_git_repo(
     repo_id: UUID,
     req: UpdateGitRepoRequest,
-    auth: AuthDep,
+    auth: AdminScopeDep,
     db: AppDbDep,
 ) -> GitRepoResponse:
     """Update a git repository's settings."""
@@ -251,7 +257,7 @@ async def update_git_repo(
 @router.delete("/repos/{repo_id}")
 async def delete_git_repo(
     repo_id: UUID,
-    auth: AuthDep,
+    auth: AdminScopeDep,
     db: AppDbDep,
 ) -> dict[str, bool]:
     """Disconnect a git repository (cascades to code_changes)."""
@@ -285,7 +291,7 @@ async def _run_sync(db: AppDatabase, repo_id: UUID, tenant_id: UUID) -> None:
 @router.post("/repos/{repo_id}/sync", status_code=202)
 async def trigger_sync(
     repo_id: UUID,
-    auth: AuthDep,
+    auth: WriteScopeDep,
     db: AppDbDep,
     background_tasks: BackgroundTasks,
 ) -> SyncTriggerResponse:

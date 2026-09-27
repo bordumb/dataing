@@ -27,7 +27,7 @@ from dataing.adapters.db.app_db import AppDatabase
 from dataing.adapters.db.team_policy_repository import PolicyAction, TeamPolicyRepository
 from dataing.core.json_utils import to_json_string
 from dataing.entrypoints.api.deps import get_app_db
-from dataing.entrypoints.api.middleware.auth import ApiKeyContext, verify_api_key
+from dataing.entrypoints.api.middleware.auth import ApiKeyContext, require_scope
 from dataing.services.notification import NotificationEvent, NotificationService
 from dataing.services.policy import IssueContext, PolicyService
 
@@ -36,7 +36,7 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/integrations", tags=["integrations"])
 
 # Annotated types for dependency injection
-AuthDep = Annotated[ApiKeyContext, Depends(verify_api_key)]
+WriteScopeDep = Annotated[ApiKeyContext, Depends(require_scope("write"))]
 AppDbDep = Annotated[AppDatabase, Depends(get_app_db)]
 
 
@@ -217,7 +217,7 @@ def validate_payload_against_schema(
 )
 async def receive_generic_webhook(
     request: Request,
-    auth: AuthDep,
+    auth: WriteScopeDep,
     db: AppDbDep,
     x_webhook_signature: str | None = Header(default=None),
     x_json_schema: str | None = Header(default=None, description="Base64-encoded JSON Schema"),
@@ -511,12 +511,16 @@ async def _start_auto_investigation(
     investigation_id = uuid4()
     now = datetime.now(UTC)
 
-    # Resolve datasource
+    # Resolve the tenant's own datasource. There is no fallback ID: a fixed ID
+    # would point the investigation at a datasource owned by another tenant.
     try:
         datasource_id = await resolve_datasource_id(request, auth.tenant_id, explicit_id=None)
     except ValueError:
-        # No default datasource, use placeholder
-        datasource_id = UUID("00000000-0000-0000-0000-000000000003")
+        logger.warning(
+            f"Skipping auto investigation for issue={issue_id}: "
+            f"no single active datasource for tenant={auth.tenant_id}"
+        )
+        return None
 
     # Build alert data
     alert_data: dict[str, Any] = {

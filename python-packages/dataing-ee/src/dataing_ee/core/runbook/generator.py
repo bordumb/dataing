@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import logging
 from dataclasses import dataclass
 from typing import Any
@@ -26,6 +27,15 @@ class GeneratedRunbook:
     prevention_notes: str | None
     dataset_id: str | None
     labels: list[str]
+    investigation_id: UUID | None = None
+
+
+def _json_object(value: Any) -> dict[str, Any]:
+    """A JSONB object column value as a dict (AppDatabase returns JSONB as text)."""
+    if isinstance(value, str):
+        value = json.loads(value)
+    result: dict[str, Any] = value or {}
+    return result
 
 
 class RunbookGenerator:
@@ -47,25 +57,28 @@ class RunbookGenerator:
         Returns:
             GeneratedRunbook or None if issue not suitable
         """
-        # Fetch issue with investigation
+        # Fetch the issue with the outcome of its most recently spawned investigation
         issue = await db.fetch_one(
             """
             SELECT
-                i.id,
                 i.title,
                 i.description,
-                i.status,
-                i.resolution,
+                i.resolution_note,
                 i.dataset_id,
-                i.metadata,
-                inv.id as investigation_id,
-                inv.synthesis,
-                inv.metadata as inv_metadata
+                ARRAY(
+                    SELECT label FROM issue_labels WHERE issue_id = i.id ORDER BY label
+                ) AS labels,
+                run.investigation_id,
+                inv.outcome
             FROM issues i
-            LEFT JOIN investigations inv ON inv.issue_id = i.id
+            LEFT JOIN LATERAL (
+                SELECT investigation_id FROM issue_investigation_runs
+                WHERE issue_id = i.id
+                ORDER BY created_at DESC
+                LIMIT 1
+            ) run ON true
+            LEFT JOIN investigations inv ON inv.id = run.investigation_id
             WHERE i.id = $1 AND i.tenant_id = $2
-            ORDER BY inv.created_at DESC
-            LIMIT 1
             """,
             issue_id,
             tenant_id,
@@ -78,10 +91,10 @@ class RunbookGenerator:
         # Extract data
         title = issue.get("title", "Untitled Issue")
         description = issue.get("description", "")
-        resolution = issue.get("resolution", "")
-        synthesis = issue.get("synthesis") or {}
+        resolution = issue.get("resolution_note") or ""
+        synthesis = _json_object(issue.get("outcome"))
         dataset_id = issue.get("dataset_id")
-        metadata = issue.get("metadata") or {}
+        metadata = {"labels": issue.get("labels") or []}
 
         # Build runbook content
         symptoms = self._extract_symptoms(description, synthesis)
@@ -117,6 +130,7 @@ class RunbookGenerator:
             prevention_notes=prevention_notes,
             dataset_id=dataset_id,
             labels=labels,
+            investigation_id=issue.get("investigation_id"),
         )
 
     def _extract_symptoms(

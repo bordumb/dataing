@@ -131,25 +131,6 @@ class TestEmailNotifier:
             assert "Investigation Completed" in msg_str
             assert "inv-123" in msg_str
 
-    def test_send_approval_required(self, notifier: EmailNotifier) -> None:
-        """Test sending approval required email."""
-        mock_server = MagicMock()
-
-        with patch("smtplib.SMTP") as mock_smtp:
-            mock_smtp.return_value.__enter__.return_value = mock_server
-
-            result = notifier.send_approval_required(
-                to_emails=["admin@example.com"],
-                investigation_id="inv-456",
-                approval_url="https://app.example.com/approve/req-123",
-                context={"query": "SELECT 1"},
-            )
-
-            assert result is True
-            call_args = mock_server.sendmail.call_args
-            msg_str = call_args[0][2]
-            assert "Approval Required" in msg_str
-
 
 class TestEmailConfig:
     """Tests for EmailConfig."""

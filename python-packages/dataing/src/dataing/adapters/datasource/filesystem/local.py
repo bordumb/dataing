@@ -10,6 +10,7 @@ import os
 import time
 from typing import Any
 
+from dataing.adapters.datasource import duckdb_sandbox
 from dataing.adapters.datasource.errors import (
     ConnectionFailedError,
     QuerySyntaxError,
@@ -17,6 +18,7 @@ from dataing.adapters.datasource.errors import (
     SchemaFetchFailedError,
 )
 from dataing.adapters.datasource.filesystem.base import FileInfo, FileSystemAdapter
+from dataing.adapters.datasource.local_paths import resolve_local_path
 from dataing.adapters.datasource.registry import register_adapter
 from dataing.adapters.datasource.type_mapping import normalize_type
 from dataing.adapters.datasource.types import (
@@ -84,6 +86,7 @@ LOCAL_FILE_CAPABILITIES = AdapterCapabilities(
     supports_preview=True,
     supports_write=False,
     query_language=QueryLanguage.SQL,
+    sql_dialect="duckdb",
     max_concurrent_queries=5,
 )
 
@@ -126,11 +129,14 @@ class LocalFileAdapter(FileSystemAdapter):
         """Get the capabilities of this adapter."""
         return LOCAL_FILE_CAPABILITIES
 
+    @classmethod
+    def check_config(cls, config: dict[str, Any]) -> None:
+        """Refuse a path outside the local data root."""
+        cls(config)._get_base_path()
+
     def _get_base_path(self) -> str:
-        """Get the configured base path."""
-        path = self._config.get("path", ".")
-        result: str = os.path.abspath(os.path.expanduser(path))
-        return result
+        """Get the configured base path, resolved inside the local data root."""
+        return resolve_local_path(self._config.get("path"))
 
     async def connect(self) -> None:
         """Establish connection to local file system via DuckDB."""
@@ -142,9 +148,9 @@ class LocalFileAdapter(FileSystemAdapter):
                 details={"error": str(e)},
             ) from e
 
-        try:
-            base_path = self._get_base_path()
+        base_path = self._get_base_path()
 
+        try:
             if not os.path.exists(base_path):
                 raise ConnectionFailedError(
                     message=f"Directory does not exist: {base_path}",
@@ -157,7 +163,8 @@ class LocalFileAdapter(FileSystemAdapter):
                     details={"path": base_path},
                 )
 
-            self._conn = duckdb.connect(":memory:")
+            self._conn = duckdb.connect(":memory:", config=duckdb_sandbox.connection_config())
+            duckdb_sandbox.confine(self._conn, directories=[base_path])
             self._connected = True
 
         except ConnectionFailedError:

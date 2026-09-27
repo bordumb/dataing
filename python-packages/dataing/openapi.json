@@ -3330,7 +3330,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/dataing__entrypoints__api__routes__credentials__TestConnectionResponse"
+                  "$ref": "#/components/schemas/CredentialsTestResponse"
                 }
               }
             }
@@ -3447,380 +3447,6 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/DatasetInvestigationsResponse"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/v1/approvals/pending": {
-      "get": {
-        "tags": [
-          "approvals"
-        ],
-        "summary": "List Pending Approvals",
-        "description": "List all pending approval requests for this tenant.",
-        "operationId": "list_pending_approvals_api_v1_approvals_pending_get",
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/PendingApprovalsResponse"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "APIKeyHeader": []
-          },
-          {
-            "HTTPBearer": []
-          }
-        ]
-      }
-    },
-    "/api/v1/approvals/{approval_id}": {
-      "get": {
-        "tags": [
-          "approvals"
-        ],
-        "summary": "Get Approval Request",
-        "description": "Get approval request details including context to review.",
-        "operationId": "get_approval_request_api_v1_approvals__approval_id__get",
-        "security": [
-          {
-            "APIKeyHeader": []
-          },
-          {
-            "HTTPBearer": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "approval_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "uuid",
-              "title": "Approval Id"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApprovalRequestResponse"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/v1/approvals/{approval_id}/approve": {
-      "post": {
-        "tags": [
-          "approvals"
-        ],
-        "summary": "Approve Request",
-        "description": "Approve an investigation to proceed.",
-        "operationId": "approve_request_api_v1_approvals__approval_id__approve_post",
-        "security": [
-          {
-            "APIKeyHeader": []
-          },
-          {
-            "HTTPBearer": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "approval_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "uuid",
-              "title": "Approval Id"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/ApproveRequest"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApprovalDecisionResponse"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/v1/approvals/{approval_id}/reject": {
-      "post": {
-        "tags": [
-          "approvals"
-        ],
-        "summary": "Reject Request",
-        "description": "Reject an investigation.",
-        "operationId": "reject_request_api_v1_approvals__approval_id__reject_post",
-        "security": [
-          {
-            "APIKeyHeader": []
-          },
-          {
-            "HTTPBearer": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "approval_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "uuid",
-              "title": "Approval Id"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/RejectRequest"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApprovalDecisionResponse"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/v1/approvals/{approval_id}/modify": {
-      "post": {
-        "tags": [
-          "approvals"
-        ],
-        "summary": "Modify And Approve",
-        "description": "Approve with modifications.\n\nThis allows reviewers to modify the investigation context before approving.\nFor example, they can adjust which tables are included, modify query limits, etc.",
-        "operationId": "modify_and_approve_api_v1_approvals__approval_id__modify_post",
-        "security": [
-          {
-            "APIKeyHeader": []
-          },
-          {
-            "HTTPBearer": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "approval_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "uuid",
-              "title": "Approval Id"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/ModifyRequest"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApprovalDecisionResponse"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/v1/approvals/": {
-      "post": {
-        "tags": [
-          "approvals"
-        ],
-        "summary": "Create Approval Request",
-        "description": "Create a new approval request.\n\nThis is typically called by the system when an investigation reaches\na point requiring human review (e.g., context review before executing queries).",
-        "operationId": "create_approval_request_api_v1_approvals__post",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/CreateApprovalRequest"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "201": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApprovalRequestResponse"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "APIKeyHeader": []
-          },
-          {
-            "HTTPBearer": []
-          }
-        ]
-      }
-    },
-    "/api/v1/approvals/investigation/{investigation_id}": {
-      "get": {
-        "tags": [
-          "approvals"
-        ],
-        "summary": "Get Investigation Approvals",
-        "description": "Get all approval requests for a specific investigation.",
-        "operationId": "get_investigation_approvals_api_v1_approvals_investigation__investigation_id__get",
-        "security": [
-          {
-            "APIKeyHeader": []
-          },
-          {
-            "HTTPBearer": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "investigation_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "uuid",
-              "title": "Investigation Id"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/ApprovalRequestResponse"
-                  },
-                  "title": "Response Get Investigation Approvals Api V1 Approvals Investigation  Investigation Id  Get"
                 }
               }
             }
@@ -4635,54 +4261,6 @@
               "title": "Depth"
             },
             "description": "Depth of lineage traversal"
-          },
-          {
-            "name": "provider",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "string",
-              "description": "Lineage provider to use",
-              "default": "dbt",
-              "title": "Provider"
-            },
-            "description": "Lineage provider to use"
-          },
-          {
-            "name": "manifest_path",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "description": "Path to dbt manifest.json",
-              "title": "Manifest Path"
-            },
-            "description": "Path to dbt manifest.json"
-          },
-          {
-            "name": "base_url",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "description": "Base URL for API-based providers",
-              "title": "Base Url"
-            },
-            "description": "Base URL for API-based providers"
           }
         ],
         "responses": {
@@ -4750,54 +4328,6 @@
               "title": "Depth"
             },
             "description": "Depth of lineage traversal"
-          },
-          {
-            "name": "provider",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "string",
-              "description": "Lineage provider to use",
-              "default": "dbt",
-              "title": "Provider"
-            },
-            "description": "Lineage provider to use"
-          },
-          {
-            "name": "manifest_path",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "description": "Path to dbt manifest.json",
-              "title": "Manifest Path"
-            },
-            "description": "Path to dbt manifest.json"
-          },
-          {
-            "name": "base_url",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "description": "Base URL for API-based providers",
-              "title": "Base Url"
-            },
-            "description": "Base URL for API-based providers"
           }
         ],
         "responses": {
@@ -4879,54 +4409,6 @@
               "title": "Downstream Depth"
             },
             "description": "Downstream traversal depth"
-          },
-          {
-            "name": "provider",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "string",
-              "description": "Lineage provider to use",
-              "default": "dbt",
-              "title": "Provider"
-            },
-            "description": "Lineage provider to use"
-          },
-          {
-            "name": "manifest_path",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "description": "Path to dbt manifest.json",
-              "title": "Manifest Path"
-            },
-            "description": "Path to dbt manifest.json"
-          },
-          {
-            "name": "base_url",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "description": "Base URL for API-based providers",
-              "title": "Base Url"
-            },
-            "description": "Base URL for API-based providers"
           }
         ],
         "responses": {
@@ -4991,54 +4473,6 @@
               "title": "Column"
             },
             "description": "Column name to trace"
-          },
-          {
-            "name": "provider",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "string",
-              "description": "Lineage provider to use",
-              "default": "dbt",
-              "title": "Provider"
-            },
-            "description": "Lineage provider to use"
-          },
-          {
-            "name": "manifest_path",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "description": "Path to dbt manifest.json",
-              "title": "Manifest Path"
-            },
-            "description": "Path to dbt manifest.json"
-          },
-          {
-            "name": "base_url",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "description": "Base URL for API-based providers",
-              "title": "Base Url"
-            },
-            "description": "Base URL for API-based providers"
           }
         ],
         "responses": {
@@ -5090,54 +4524,6 @@
               "type": "string",
               "title": "Job Id"
             }
-          },
-          {
-            "name": "provider",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "string",
-              "description": "Lineage provider to use",
-              "default": "dbt",
-              "title": "Provider"
-            },
-            "description": "Lineage provider to use"
-          },
-          {
-            "name": "manifest_path",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "description": "Path to dbt manifest.json",
-              "title": "Manifest Path"
-            },
-            "description": "Path to dbt manifest.json"
-          },
-          {
-            "name": "base_url",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "description": "Base URL for API-based providers",
-              "title": "Base Url"
-            },
-            "description": "Base URL for API-based providers"
           }
         ],
         "responses": {
@@ -5203,54 +4589,6 @@
               "title": "Limit"
             },
             "description": "Maximum runs to return"
-          },
-          {
-            "name": "provider",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "string",
-              "description": "Lineage provider to use",
-              "default": "dbt",
-              "title": "Provider"
-            },
-            "description": "Lineage provider to use"
-          },
-          {
-            "name": "manifest_path",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "description": "Path to dbt manifest.json",
-              "title": "Manifest Path"
-            },
-            "description": "Path to dbt manifest.json"
-          },
-          {
-            "name": "base_url",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "description": "Base URL for API-based providers",
-              "title": "Base Url"
-            },
-            "description": "Base URL for API-based providers"
           }
         ],
         "responses": {
@@ -5319,54 +4657,6 @@
               "title": "Limit"
             },
             "description": "Maximum results"
-          },
-          {
-            "name": "provider",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "string",
-              "description": "Lineage provider to use",
-              "default": "dbt",
-              "title": "Provider"
-            },
-            "description": "Lineage provider to use"
-          },
-          {
-            "name": "manifest_path",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "description": "Path to dbt manifest.json",
-              "title": "Manifest Path"
-            },
-            "description": "Path to dbt manifest.json"
-          },
-          {
-            "name": "base_url",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "description": "Base URL for API-based providers",
-              "title": "Base Url"
-            },
-            "description": "Base URL for API-based providers"
           }
         ],
         "responses": {
@@ -5477,54 +4767,6 @@
               "title": "Limit"
             },
             "description": "Maximum results"
-          },
-          {
-            "name": "provider",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "string",
-              "description": "Lineage provider to use",
-              "default": "dbt",
-              "title": "Provider"
-            },
-            "description": "Lineage provider to use"
-          },
-          {
-            "name": "manifest_path",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "description": "Path to dbt manifest.json",
-              "title": "Manifest Path"
-            },
-            "description": "Path to dbt manifest.json"
-          },
-          {
-            "name": "base_url",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "description": "Base URL for API-based providers",
-              "title": "Base Url"
-            },
-            "description": "Base URL for API-based providers"
           }
         ],
         "responses": {
@@ -5576,54 +4818,6 @@
               "type": "string",
               "title": "Dataset Id"
             }
-          },
-          {
-            "name": "provider",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "string",
-              "description": "Lineage provider to use",
-              "default": "dbt",
-              "title": "Provider"
-            },
-            "description": "Lineage provider to use"
-          },
-          {
-            "name": "manifest_path",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "description": "Path to dbt manifest.json",
-              "title": "Manifest Path"
-            },
-            "description": "Path to dbt manifest.json"
-          },
-          {
-            "name": "base_url",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "description": "Base URL for API-based providers",
-              "title": "Base Url"
-            },
-            "description": "Base URL for API-based providers"
           }
         ],
         "responses": {
@@ -9468,202 +8662,6 @@
         "title": "AnomalySummary",
         "description": "Summary of detected anomaly."
       },
-      "ApprovalDecisionResponse": {
-        "properties": {
-          "id": {
-            "type": "string",
-            "title": "Id"
-          },
-          "investigation_id": {
-            "type": "string",
-            "title": "Investigation Id"
-          },
-          "decision": {
-            "type": "string",
-            "title": "Decision"
-          },
-          "decided_by": {
-            "type": "string",
-            "title": "Decided By"
-          },
-          "decided_at": {
-            "type": "string",
-            "format": "date-time",
-            "title": "Decided At"
-          },
-          "comment": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Comment"
-          }
-        },
-        "type": "object",
-        "required": [
-          "id",
-          "investigation_id",
-          "decision",
-          "decided_by",
-          "decided_at"
-        ],
-        "title": "ApprovalDecisionResponse",
-        "description": "Response for an approval decision."
-      },
-      "ApprovalRequestResponse": {
-        "properties": {
-          "id": {
-            "type": "string",
-            "title": "Id"
-          },
-          "investigation_id": {
-            "type": "string",
-            "title": "Investigation Id"
-          },
-          "request_type": {
-            "type": "string",
-            "title": "Request Type"
-          },
-          "context": {
-            "additionalProperties": true,
-            "type": "object",
-            "title": "Context"
-          },
-          "requested_at": {
-            "type": "string",
-            "format": "date-time",
-            "title": "Requested At"
-          },
-          "requested_by": {
-            "type": "string",
-            "title": "Requested By"
-          },
-          "decision": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Decision"
-          },
-          "decided_by": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Decided By"
-          },
-          "decided_at": {
-            "anyOf": [
-              {
-                "type": "string",
-                "format": "date-time"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Decided At"
-          },
-          "comment": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Comment"
-          },
-          "modifications": {
-            "anyOf": [
-              {
-                "additionalProperties": true,
-                "type": "object"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Modifications"
-          },
-          "dataset_id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Dataset Id"
-          },
-          "metric_name": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Metric Name"
-          },
-          "severity": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Severity"
-          }
-        },
-        "type": "object",
-        "required": [
-          "id",
-          "investigation_id",
-          "request_type",
-          "context",
-          "requested_at",
-          "requested_by"
-        ],
-        "title": "ApprovalRequestResponse",
-        "description": "Response for an approval request."
-      },
-      "ApproveRequest": {
-        "properties": {
-          "comment": {
-            "anyOf": [
-              {
-                "type": "string",
-                "maxLength": 1000
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Comment"
-          }
-        },
-        "type": "object",
-        "title": "ApproveRequest",
-        "description": "Request to approve an investigation."
-      },
       "AssetInstanceResult": {
         "properties": {
           "asset_urn": {
@@ -10004,6 +9002,39 @@
         "title": "BulkRepoMappingItem",
         "description": "Single item in a bulk import request."
       },
+      "BundleLineageGraphResponse": {
+        "properties": {
+          "root": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Root"
+          },
+          "datasets": {
+            "additionalProperties": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "object",
+            "title": "Datasets"
+          },
+          "edges": {
+            "items": {
+              "$ref": "#/components/schemas/LineageEdge"
+            },
+            "type": "array",
+            "title": "Edges"
+          }
+        },
+        "type": "object",
+        "title": "BundleLineageGraphResponse",
+        "description": "Lineage graph response."
+      },
       "CancelInvestigationResponse": {
         "properties": {
           "investigation_id": {
@@ -10165,6 +9196,192 @@
         "title": "ColumnLineageResponse",
         "description": "Response for column lineage."
       },
+      "ConfigField": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "string",
+              "integer",
+              "boolean",
+              "enum",
+              "secret",
+              "file",
+              "json"
+            ],
+            "title": "Type"
+          },
+          "required": {
+            "type": "boolean",
+            "title": "Required"
+          },
+          "group": {
+            "type": "string",
+            "title": "Group"
+          },
+          "default_value": {
+            "anyOf": [
+              {},
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Default Value"
+          },
+          "placeholder": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Placeholder"
+          },
+          "min_value": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Min Value"
+          },
+          "max_value": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Value"
+          },
+          "pattern": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pattern"
+          },
+          "options": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/ConfigFieldOption"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Options"
+          },
+          "show_if": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ShowIfCondition"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "help_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Help Url"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "label",
+          "type",
+          "required",
+          "group"
+        ],
+        "title": "ConfigField",
+        "description": "Configuration field for connection forms."
+      },
+      "ConfigFieldOption": {
+        "properties": {
+          "value": {
+            "type": "string",
+            "title": "Value"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          }
+        },
+        "type": "object",
+        "required": [
+          "value",
+          "label"
+        ],
+        "title": "ConfigFieldOption",
+        "description": "One choice of an enum configuration field."
+      },
+      "ConfigSchema": {
+        "properties": {
+          "fields": {
+            "items": {
+              "$ref": "#/components/schemas/ConfigField"
+            },
+            "type": "array",
+            "title": "Fields"
+          },
+          "field_groups": {
+            "items": {
+              "$ref": "#/components/schemas/FieldGroup"
+            },
+            "type": "array",
+            "title": "Field Groups"
+          }
+        },
+        "type": "object",
+        "required": [
+          "fields",
+          "field_groups"
+        ],
+        "title": "ConfigSchema",
+        "description": "Configuration schema for an adapter."
+      },
       "ContextBundleResponse": {
         "properties": {
           "bundle_id": {
@@ -10192,7 +9409,7 @@
           "lineage": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/dataing__entrypoints__api__routes__bundles__LineageGraphResponse"
+                "$ref": "#/components/schemas/BundleLineageGraphResponse"
               },
               {
                 "type": "null"
@@ -10243,33 +9460,6 @@
         ],
         "title": "ContextBundleResponse",
         "description": "Context bundle response."
-      },
-      "CreateApprovalRequest": {
-        "properties": {
-          "investigation_id": {
-            "type": "string",
-            "format": "uuid",
-            "title": "Investigation Id"
-          },
-          "request_type": {
-            "type": "string",
-            "pattern": "^(context_review|query_approval|execution_approval)$",
-            "title": "Request Type"
-          },
-          "context": {
-            "additionalProperties": true,
-            "type": "object",
-            "title": "Context"
-          }
-        },
-        "type": "object",
-        "required": [
-          "investigation_id",
-          "request_type",
-          "context"
-        ],
-        "title": "CreateApprovalRequest",
-        "description": "Request to create a new approval request."
       },
       "CreateBundleRequest": {
         "properties": {
@@ -10521,6 +9711,42 @@
         "title": "CredentialsStatusResponse",
         "description": "Response for credentials status check."
       },
+      "CredentialsTestResponse": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "title": "Success"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          },
+          "tables_accessible": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tables Accessible"
+          }
+        },
+        "type": "object",
+        "required": [
+          "success"
+        ],
+        "title": "CredentialsTestResponse",
+        "description": "Response for testing credentials."
+      },
       "DashboardResponse": {
         "properties": {
           "stats": {
@@ -10555,18 +9781,13 @@
           "data_sources": {
             "type": "integer",
             "title": "Data Sources"
-          },
-          "pending_approvals": {
-            "type": "integer",
-            "title": "Pending Approvals"
           }
         },
         "type": "object",
         "required": [
           "active_investigations",
           "completed_today",
-          "data_sources",
-          "pending_approvals"
+          "data_sources"
         ],
         "title": "DashboardStats",
         "description": "Dashboard statistics."
@@ -11470,6 +10691,41 @@
         "title": "FeedbackResponse",
         "description": "Response after submitting feedback."
       },
+      "FieldGroup": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "collapsed_by_default": {
+            "type": "boolean",
+            "title": "Collapsed By Default",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "label"
+        ],
+        "title": "FieldGroup",
+        "description": "Group of configuration fields."
+      },
       "HTTPValidationError": {
         "properties": {
           "detail": {
@@ -11746,10 +11002,6 @@
             "type": "string",
             "title": "Id"
           },
-          "dataset_id": {
-            "type": "string",
-            "title": "Dataset Id"
-          },
           "metric_name": {
             "type": "string",
             "title": "Metric Name"
@@ -11772,23 +11024,11 @@
           "created_at": {
             "type": "string",
             "title": "Created At"
-          },
-          "completed_at": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Completed At"
           }
         },
         "type": "object",
         "required": [
           "id",
-          "dataset_id",
           "metric_name",
           "status",
           "created_at"
@@ -12943,33 +12183,6 @@
         "title": "MatchedPatternResponse",
         "description": "A pattern that was matched during investigation."
       },
-      "ModifyRequest": {
-        "properties": {
-          "comment": {
-            "anyOf": [
-              {
-                "type": "string",
-                "maxLength": 1000
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Comment"
-          },
-          "modifications": {
-            "additionalProperties": true,
-            "type": "object",
-            "title": "Modifications"
-          }
-        },
-        "type": "object",
-        "required": [
-          "modifications"
-        ],
-        "title": "ModifyRequest",
-        "description": "Request to approve with modifications."
-      },
       "NotificationListResponse": {
         "properties": {
           "items": {
@@ -13186,28 +12399,6 @@
         ],
         "title": "PasswordResetRequest",
         "description": "Password reset request body."
-      },
-      "PendingApprovalsResponse": {
-        "properties": {
-          "approvals": {
-            "items": {
-              "$ref": "#/components/schemas/ApprovalRequestResponse"
-            },
-            "type": "array",
-            "title": "Approvals"
-          },
-          "total": {
-            "type": "integer",
-            "title": "Total"
-          }
-        },
-        "type": "object",
-        "required": [
-          "approvals",
-          "total"
-        ],
-        "title": "PendingApprovalsResponse",
-        "description": "Response for listing pending approvals."
       },
       "PermissionGrantCreate": {
         "properties": {
@@ -13617,22 +12808,6 @@
         ],
         "title": "RegisterRequest",
         "description": "Registration request body."
-      },
-      "RejectRequest": {
-        "properties": {
-          "reason": {
-            "type": "string",
-            "maxLength": 1000,
-            "minLength": 1,
-            "title": "Reason"
-          }
-        },
-        "type": "object",
-        "required": [
-          "reason"
-        ],
-        "title": "RejectRequest",
-        "description": "Request to reject an investigation."
       },
       "RepoMappingListResponse": {
         "properties": {
@@ -14486,6 +13661,24 @@
         "title": "SeverityOverride",
         "description": "Override SLA times for a specific severity."
       },
+      "ShowIfCondition": {
+        "properties": {
+          "field": {
+            "type": "string",
+            "title": "Field"
+          },
+          "value": {
+            "title": "Value"
+          }
+        },
+        "type": "object",
+        "required": [
+          "field",
+          "value"
+        ],
+        "title": "ShowIfCondition",
+        "description": "Shows a configuration field only while another field holds a value."
+      },
       "SourceTypeResponse": {
         "properties": {
           "type": {
@@ -14514,9 +13707,7 @@
             "title": "Capabilities"
           },
           "config_schema": {
-            "additionalProperties": true,
-            "type": "object",
-            "title": "Config Schema"
+            "$ref": "#/components/schemas/ConfigSchema"
           }
         },
         "type": "object",
@@ -16135,75 +15326,6 @@
         ],
         "title": "WeeklyUsageResponse",
         "description": "Weekly usage statistics response."
-      },
-      "dataing__entrypoints__api__routes__bundles__LineageGraphResponse": {
-        "properties": {
-          "root": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Root"
-          },
-          "datasets": {
-            "additionalProperties": {
-              "additionalProperties": true,
-              "type": "object"
-            },
-            "type": "object",
-            "title": "Datasets"
-          },
-          "edges": {
-            "items": {
-              "$ref": "#/components/schemas/LineageEdge"
-            },
-            "type": "array",
-            "title": "Edges"
-          }
-        },
-        "type": "object",
-        "title": "LineageGraphResponse",
-        "description": "Lineage graph response."
-      },
-      "dataing__entrypoints__api__routes__credentials__TestConnectionResponse": {
-        "properties": {
-          "success": {
-            "type": "boolean",
-            "title": "Success"
-          },
-          "error": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Error"
-          },
-          "tables_accessible": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Tables Accessible"
-          }
-        },
-        "type": "object",
-        "required": [
-          "success"
-        ],
-        "title": "TestConnectionResponse",
-        "description": "Response for testing credentials."
       }
     },
     "securitySchemes": {

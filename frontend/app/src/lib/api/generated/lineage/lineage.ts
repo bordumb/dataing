@@ -17,9 +17,7 @@ import type {
   DatasetResponse,
   DownstreamResponse,
   GetColumnLineageApiV1LineageColumnLineageGetParams,
-  GetDatasetApiV1LineageDatasetDatasetIdGetParams,
   GetDownstreamApiV1LineageDownstreamGetParams,
-  GetJobApiV1LineageJobJobIdGetParams,
   GetJobRunsApiV1LineageJobJobIdRunsGetParams,
   GetLineageGraphApiV1LineageGraphGetParams,
   GetUpstreamApiV1LineageUpstreamGetParams,
@@ -512,22 +510,17 @@ Returns information about a job that produces or consumes datasets.
  */
 export const getJobApiV1LineageJobJobIdGet = (
   jobId: string,
-  params?: GetJobApiV1LineageJobJobIdGetParams,
   signal?: AbortSignal,
 ) => {
   return customInstance<JobResponse>({
     url: `/api/v1/lineage/job/${jobId}`,
     method: "GET",
-    params,
     signal,
   });
 };
 
-export const getGetJobApiV1LineageJobJobIdGetQueryKey = (
-  jobId: string,
-  params?: GetJobApiV1LineageJobJobIdGetParams,
-) => {
-  return [`/api/v1/lineage/job/${jobId}`, ...(params ? [params] : [])] as const;
+export const getGetJobApiV1LineageJobJobIdGetQueryKey = (jobId: string) => {
+  return [`/api/v1/lineage/job/${jobId}`] as const;
 };
 
 export const getGetJobApiV1LineageJobJobIdGetQueryOptions = <
@@ -535,7 +528,6 @@ export const getGetJobApiV1LineageJobJobIdGetQueryOptions = <
   TError = HTTPValidationError,
 >(
   jobId: string,
-  params?: GetJobApiV1LineageJobJobIdGetParams,
   options?: {
     query?: Partial<
       UseQueryOptions<
@@ -549,12 +541,11 @@ export const getGetJobApiV1LineageJobJobIdGetQueryOptions = <
   const { query: queryOptions } = options ?? {};
 
   const queryKey =
-    queryOptions?.queryKey ??
-    getGetJobApiV1LineageJobJobIdGetQueryKey(jobId, params);
+    queryOptions?.queryKey ?? getGetJobApiV1LineageJobJobIdGetQueryKey(jobId);
 
   const queryFn: QueryFunction<
     Awaited<ReturnType<typeof getJobApiV1LineageJobJobIdGet>>
-  > = ({ signal }) => getJobApiV1LineageJobJobIdGet(jobId, params, signal);
+  > = ({ signal }) => getJobApiV1LineageJobJobIdGet(jobId, signal);
 
   return {
     queryKey,
@@ -581,7 +572,6 @@ export const useGetJobApiV1LineageJobJobIdGet = <
   TError = HTTPValidationError,
 >(
   jobId: string,
-  params?: GetJobApiV1LineageJobJobIdGetParams,
   options?: {
     query?: Partial<
       UseQueryOptions<
@@ -594,7 +584,6 @@ export const useGetJobApiV1LineageJobJobIdGet = <
 ): UseQueryResult<TData, TError> & { queryKey: QueryKey } => {
   const queryOptions = getGetJobApiV1LineageJobJobIdGetQueryOptions(
     jobId,
-    params,
     options,
   );
 
@@ -909,25 +898,19 @@ Returns metadata for a specific dataset.
  */
 export const getDatasetApiV1LineageDatasetDatasetIdGet = (
   datasetId: string,
-  params?: GetDatasetApiV1LineageDatasetDatasetIdGetParams,
   signal?: AbortSignal,
 ) => {
   return customInstance<DatasetResponse>({
     url: `/api/v1/lineage/dataset/${datasetId}`,
     method: "GET",
-    params,
     signal,
   });
 };
 
 export const getGetDatasetApiV1LineageDatasetDatasetIdGetQueryKey = (
   datasetId: string,
-  params?: GetDatasetApiV1LineageDatasetDatasetIdGetParams,
 ) => {
-  return [
-    `/api/v1/lineage/dataset/${datasetId}`,
-    ...(params ? [params] : []),
-  ] as const;
+  return [`/api/v1/lineage/dataset/${datasetId}`] as const;
 };
 
 export const getGetDatasetApiV1LineageDatasetDatasetIdGetQueryOptions = <
@@ -935,7 +918,6 @@ export const getGetDatasetApiV1LineageDatasetDatasetIdGetQueryOptions = <
   TError = HTTPValidationError,
 >(
   datasetId: string,
-  params?: GetDatasetApiV1LineageDatasetDatasetIdGetParams,
   options?: {
     query?: Partial<
       UseQueryOptions<
@@ -950,12 +932,12 @@ export const getGetDatasetApiV1LineageDatasetDatasetIdGetQueryOptions = <
 
   const queryKey =
     queryOptions?.queryKey ??
-    getGetDatasetApiV1LineageDatasetDatasetIdGetQueryKey(datasetId, params);
+    getGetDatasetApiV1LineageDatasetDatasetIdGetQueryKey(datasetId);
 
   const queryFn: QueryFunction<
     Awaited<ReturnType<typeof getDatasetApiV1LineageDatasetDatasetIdGet>>
   > = ({ signal }) =>
-    getDatasetApiV1LineageDatasetDatasetIdGet(datasetId, params, signal);
+    getDatasetApiV1LineageDatasetDatasetIdGet(datasetId, signal);
 
   return {
     queryKey,
@@ -983,7 +965,6 @@ export const useGetDatasetApiV1LineageDatasetDatasetIdGet = <
   TError = HTTPValidationError,
 >(
   datasetId: string,
-  params?: GetDatasetApiV1LineageDatasetDatasetIdGetParams,
   options?: {
     query?: Partial<
       UseQueryOptions<
@@ -996,7 +977,6 @@ export const useGetDatasetApiV1LineageDatasetDatasetIdGet = <
 ): UseQueryResult<TData, TError> & { queryKey: QueryKey } => {
   const queryOptions = getGetDatasetApiV1LineageDatasetDatasetIdGetQueryOptions(
     datasetId,
-    params,
     options,
   );
 

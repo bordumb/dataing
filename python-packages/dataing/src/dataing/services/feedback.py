@@ -518,22 +518,7 @@ class FixFeedbackService:
             context: dict[str, Any] = {}
 
             if include_context:
-                # Get investigation context
-                inv_row = await self.db.fetch_one(
-                    """
-                    SELECT
-                        issue_id,
-                        created_at as investigation_created_at
-                    FROM investigations
-                    WHERE id = $1
-                    """,
-                    row["investigation_id"],
-                )
-                if inv_row:
-                    context["issue_id"] = str(inv_row["issue_id"])
-                    context["investigation_created_at"] = inv_row[
-                        "investigation_created_at"
-                    ].isoformat()
+                context = await self.investigation_context(row["investigation_id"])
 
             records.append(
                 FeedbackExportRecord(
@@ -556,6 +541,44 @@ class FixFeedbackService:
         )
 
         return records
+
+    async def investigation_context(self, investigation_id: UUID) -> dict[str, Any]:
+        """Context an exported feedback record carries about its investigation.
+
+        Names the issue the investigation was most recently spawned from, if any.
+
+        Args:
+            investigation_id: The investigation the feedback is about.
+
+        Returns:
+            investigation_created_at, plus issue_id when an issue spawned it.
+        """
+        if not self.db:
+            return {}
+
+        row = await self.db.fetch_one(
+            """
+            SELECT i.created_at AS investigation_created_at, run.issue_id
+            FROM investigations i
+            LEFT JOIN LATERAL (
+                SELECT issue_id FROM issue_investigation_runs
+                WHERE investigation_id = i.id
+                ORDER BY created_at DESC
+                LIMIT 1
+            ) run ON true
+            WHERE i.id = $1
+            """,
+            investigation_id,
+        )
+        if row is None:
+            return {}
+
+        context: dict[str, Any] = {
+            "investigation_created_at": row["investigation_created_at"].isoformat()
+        }
+        if row["issue_id"] is not None:
+            context["issue_id"] = str(row["issue_id"])
+        return context
 
     def get_feedback(self, feedback_id: UUID) -> FixFeedback | None:
         """Get feedback by ID from cache.

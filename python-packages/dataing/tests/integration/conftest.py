@@ -32,7 +32,7 @@ def _psql(psql: str, dsn: str, *args: str) -> subprocess.CompletedProcess[str]:
 def migrated_dsn() -> Iterator[str]:
     """DSN of a throwaway database built from every schema migration.
 
-    Migrations are applied with psql, the same way `just demo-infra` and
+    Migrations are applied with psql, the same way `just demo-infra`, CI and
     infra/init-app-db.sh apply them (seed files skipped, statement errors do not
     stop a file), so tests see the schema the application actually runs on.
     The database is created on the server in DATABASE_URL and dropped afterwards.

@@ -1,3 +1,248 @@
+## [1.24.5](https://github.com/bordumb/dataing/compare/v1.24.4...v1.24.5) (2026-09-27)
+
+
+### Bug Fixes
+
+* **api:** enforce tenant isolation for investigations and worker datasources ([#149](https://github.com/bordumb/dataing/issues/149)) ([c0b457e](https://github.com/bordumb/dataing/commit/c0b457ec7373c4a23f3d50a30d8d586fd3ce54a8)), closes [#178](https://github.com/bordumb/dataing/issues/178)
+
+## [1.24.4](https://github.com/bordumb/dataing/compare/v1.24.3...v1.24.4) (2026-09-27)
+
+
+### Bug Fixes
+
+* **api:** finish moving investigation queries to the unified schema ([#191](https://github.com/bordumb/dataing/issues/191)) ([fcffde5](https://github.com/bordumb/dataing/commit/fcffde5d2d3fce07d1f960e4ca81b3a759f3f07f))
+
+## [1.24.3](https://github.com/bordumb/dataing/compare/v1.24.2...v1.24.3) (2026-09-27)
+
+
+### Bug Fixes
+
+* **core:** keep webhook URLs out of httpx request logs ([#161](https://github.com/bordumb/dataing/issues/161)) ([15ca355](https://github.com/bordumb/dataing/commit/15ca355c159a6e3f7a14f1cf3ab52a125cde0597)), closes [#153](https://github.com/bordumb/dataing/issues/153)
+
+## [1.24.2](https://github.com/bordumb/dataing/compare/v1.24.1...v1.24.2) (2026-09-27)
+
+
+### Bug Fixes
+
+* **temporal:** validate investigation SQL in the executing datasource's dialect ([#178](https://github.com/bordumb/dataing/issues/178)) ([e473e5a](https://github.com/bordumb/dataing/commit/e473e5aecbf14a6396fce23bc0d62719411feb10)), closes [#163](https://github.com/bordumb/dataing/issues/163) [#163](https://github.com/bordumb/dataing/issues/163)
+
+## [1.24.1](https://github.com/bordumb/dataing/compare/v1.24.0...v1.24.1) (2026-09-27)
+
+
+### Bug Fixes
+
+* **api:** stop writing pre-013 investigation columns and remove approvals ([#183](https://github.com/bordumb/dataing/issues/183)) ([bf18334](https://github.com/bordumb/dataing/commit/bf18334c2bb71322c10b5abaeafa9b02be5053ac)), closes [#162](https://github.com/bordumb/dataing/issues/162) [#150](https://github.com/bordumb/dataing/issues/150)
+
+# [1.24.0](https://github.com/bordumb/dataing/compare/v1.23.6...v1.24.0) (2026-09-27)
+
+
+### Features
+
+* **ee:** support provider secrets, Slack URL checks, forms and slash commands ([#185](https://github.com/bordumb/dataing/issues/185)) ([a2261fa](https://github.com/bordumb/dataing/commit/a2261faf64a087122ddcbfbfc3d6e4ca0a3811ae))
+
+## [1.23.6](https://github.com/bordumb/dataing/compare/v1.23.5...v1.23.6) (2026-09-27)
+
+
+### Bug Fixes
+
+* **frontend:** show API validation errors as text, not [object Object] ([#192](https://github.com/bordumb/dataing/issues/192)) ([3f48dcf](https://github.com/bordumb/dataing/commit/3f48dcfb641750dded40db322bfeb97bea6605ab))
+
+## [1.23.5](https://github.com/bordumb/dataing/compare/v1.23.4...v1.23.5) (2026-09-27)
+
+
+### Bug Fixes
+
+* **core:** confine DuckDB-backed sources to their own location ([#176](https://github.com/bordumb/dataing/issues/176)) ([a119ad1](https://github.com/bordumb/dataing/commit/a119ad1df5543d8c78ec4ab9fbddd85bb07723d5))
+
+## [1.23.4](https://github.com/bordumb/dataing/compare/v1.23.3...v1.23.4) (2026-09-27)
+
+
+### Bug Fixes
+
+* **api:** make the OpenAPI export deterministic ([#156](https://github.com/bordumb/dataing/issues/156)) ([ec8b97f](https://github.com/bordumb/dataing/commit/ec8b97f83553888af72071e702bde28b191554a9))
+
+## [1.23.3](https://github.com/bordumb/dataing/compare/v1.23.2...v1.23.3) (2026-09-27)
+
+
+### Bug Fixes
+
+* **ee:** stop repeated runbook feedback from inflating usefulness_score ([#177](https://github.com/bordumb/dataing/issues/177)) ([c806f42](https://github.com/bordumb/dataing/commit/c806f42e58b25a1b3411518c1ad82264240b2d4b))
+
+## [1.23.2](https://github.com/bordumb/dataing/compare/v1.23.1...v1.23.2) (2026-09-27)
+
+
+### Bug Fixes
+
+* **datasets:** list dataset investigations from the alert JSONB ([#160](https://github.com/bordumb/dataing/issues/160)) ([22a1c2f](https://github.com/bordumb/dataing/commit/22a1c2fa52aee2bdba3055cbc1dd6d25e75d9741))
+
+## [1.23.1](https://github.com/bordumb/dataing/compare/v1.23.0...v1.23.1) (2026-09-27)
+
+
+### Bug Fixes
+
+* **core:** render stdlib logs through structlog's processors ([#154](https://github.com/bordumb/dataing/issues/154)) ([c916e3c](https://github.com/bordumb/dataing/commit/c916e3c1727e4b5392b03b7dd2e5ec2ea790c685))
+
+# [1.23.0](https://github.com/bordumb/dataing/compare/v1.22.7...v1.23.0) (2026-09-27)
+
+
+### Features
+
+* type config field options and show_if, register EE adapters ([#165](https://github.com/bordumb/dataing/issues/165)) ([8929afe](https://github.com/bordumb/dataing/commit/8929afe89921f6f8517ea5c6567d89ab889290e1))
+
+## [1.22.7](https://github.com/bordumb/dataing/compare/v1.22.6...v1.22.7) (2026-09-27)
+
+
+### Bug Fixes
+
+* **api:** read lineage providers from org settings, not query params ([#190](https://github.com/bordumb/dataing/issues/190)) ([eed6fd8](https://github.com/bordumb/dataing/commit/eed6fd89c08d032eebe885867630e609f4913e7b))
+
+## [1.22.6](https://github.com/bordumb/dataing/compare/v1.22.5...v1.22.6) (2026-09-27)
+
+
+### Bug Fixes
+
+* **core:** bind get_schema filter values instead of splicing them into SQL ([#187](https://github.com/bordumb/dataing/issues/187)) ([c13250f](https://github.com/bordumb/dataing/commit/c13250fcede40a5aad16e85a9a3e956f67ca6638))
+
+## [1.22.5](https://github.com/bordumb/dataing/compare/v1.22.4...v1.22.5) (2026-09-27)
+
+
+### Bug Fixes
+
+* **temporal:** stop hiding failed queries and evaluations from synthesis ([#182](https://github.com/bordumb/dataing/issues/182)) ([8e2db95](https://github.com/bordumb/dataing/commit/8e2db9517e1acab5655d916d3ae68f2e9fa57e0f))
+
+## [1.22.4](https://github.com/bordumb/dataing/compare/v1.22.3...v1.22.4) (2026-09-27)
+
+
+### Bug Fixes
+
+* **git:** encrypt repository access tokens at rest ([#151](https://github.com/bordumb/dataing/issues/151)) ([293109d](https://github.com/bordumb/dataing/commit/293109d8b23fc6a398c97f0ca664dba1303d157e))
+
+## [1.22.3](https://github.com/bordumb/dataing/compare/v1.22.2...v1.22.3) (2026-09-27)
+
+
+### Bug Fixes
+
+* **ee:** read integration webhook headers case-insensitively ([#173](https://github.com/bordumb/dataing/issues/173)) ([922bf95](https://github.com/bordumb/dataing/commit/922bf956053c983c5b6a578ae472a7ac4f425065))
+
+## [1.22.2](https://github.com/bordumb/dataing/compare/v1.22.1...v1.22.2) (2026-09-27)
+
+
+### Bug Fixes
+
+* **safety:** reject COPY and other write-capable SQL statements ([#163](https://github.com/bordumb/dataing/issues/163)) ([3f4784c](https://github.com/bordumb/dataing/commit/3f4784c5ee91e2dfcdb0ec931eddc03e4c9b2c98))
+
+## [1.22.1](https://github.com/bordumb/dataing/compare/v1.22.0...v1.22.1) (2026-09-27)
+
+
+### Bug Fixes
+
+* **api:** confine tenant-supplied local paths to an operator root ([#168](https://github.com/bordumb/dataing/issues/168)) ([1809015](https://github.com/bordumb/dataing/commit/180901593e17a0f43d1d2c94f7dbb26886bc54b1)), closes [#164](https://github.com/bordumb/dataing/issues/164) [#148](https://github.com/bordumb/dataing/issues/148)
+
+# [1.22.0](https://github.com/bordumb/dataing/compare/v1.21.10...v1.22.0) (2026-09-27)
+
+
+### Features
+
+* **api:** enforce org roles on every mutating route and in the UI ([#150](https://github.com/bordumb/dataing/issues/150)) ([6c10bb9](https://github.com/bordumb/dataing/commit/6c10bb98c010b72341d720c6875360082b91c868))
+
+## [1.21.10](https://github.com/bordumb/dataing/compare/v1.21.9...v1.21.10) (2026-09-27)
+
+
+### Bug Fixes
+
+* **core:** send Postgres credentials verbatim, never from server PG* env ([#171](https://github.com/bordumb/dataing/issues/171)) ([5092f2e](https://github.com/bordumb/dataing/commit/5092f2eeaf5412708e8caed8c746f8c241e967a8))
+
+## [1.21.9](https://github.com/bordumb/dataing/compare/v1.21.8...v1.21.9) (2026-09-27)
+
+
+### Bug Fixes
+
+* **core:** stop registering incomplete Cassandra and DynamoDB adapters ([#169](https://github.com/bordumb/dataing/issues/169)) ([71da977](https://github.com/bordumb/dataing/commit/71da9774207eed773482989b74e31e7f7ab4885f))
+
+## [1.21.8](https://github.com/bordumb/dataing/compare/v1.21.7...v1.21.8) (2026-09-27)
+
+
+### Bug Fixes
+
+* **core:** make Redshift instantiable by deleting a dead adapter contract ([#175](https://github.com/bordumb/dataing/issues/175)) ([8b5cc5e](https://github.com/bordumb/dataing/commit/8b5cc5e16439d1cd04a2e35d7ba083e3009d5953))
+
+## [1.21.7](https://github.com/bordumb/dataing/compare/v1.21.6...v1.21.7) (2026-09-27)
+
+
+### Bug Fixes
+
+* **api:** use dataset_ids consistently for investigation alerts ([#159](https://github.com/bordumb/dataing/issues/159)) ([a0aa32d](https://github.com/bordumb/dataing/commit/a0aa32d81db16ac7b83efd1da90f17ed3d659f7b))
+
+## [1.21.6](https://github.com/bordumb/dataing/compare/v1.21.5...v1.21.6) (2026-09-27)
+
+
+### Bug Fixes
+
+* **ee:** scope runbook link feedback to the caller's tenant ([#166](https://github.com/bordumb/dataing/issues/166)) ([d88c701](https://github.com/bordumb/dataing/commit/d88c701086d83fedc687bfdcec772742bcf66082))
+
+## [1.21.5](https://github.com/bordumb/dataing/compare/v1.21.4...v1.21.5) (2026-09-27)
+
+
+### Bug Fixes
+
+* redact webhook URL secrets from logs, audit records and the webhook list ([#180](https://github.com/bordumb/dataing/issues/180)) ([ca4b3ec](https://github.com/bordumb/dataing/commit/ca4b3ec945920189c20551ea0fe09529953994b1))
+
+## [1.21.4](https://github.com/bordumb/dataing/compare/v1.21.3...v1.21.4) (2026-09-27)
+
+
+### Bug Fixes
+
+* **core:** connect GCS sources with a scoped HMAC secret and report connection-test failures ([#172](https://github.com/bordumb/dataing/issues/172)) ([0d40614](https://github.com/bordumb/dataing/commit/0d4061402102873045f2be54909404950f02af20))
+
+## [1.21.3](https://github.com/bordumb/dataing/compare/v1.21.2...v1.21.3) (2026-09-27)
+
+
+### Bug Fixes
+
+* **core:** start every AgentClient LLM call from an empty history ([#167](https://github.com/bordumb/dataing/issues/167)) ([0469d15](https://github.com/bordumb/dataing/commit/0469d153f8df69ba262088f3a0f808a48da306f9))
+
+## [1.21.2](https://github.com/bordumb/dataing/compare/v1.21.1...v1.21.2) (2026-09-27)
+
+
+### Bug Fixes
+
+* **temporal:** configure worker logging and stop apps building each other on import ([#153](https://github.com/bordumb/dataing/issues/153)) ([29cfe72](https://github.com/bordumb/dataing/commit/29cfe722601fe5059624477e319a8e60d4cdacf5))
+
+## [1.21.1](https://github.com/bordumb/dataing/compare/v1.21.0...v1.21.1) (2026-09-27)
+
+
+### Bug Fixes
+
+* accept Table models when building datasource schema responses ([#164](https://github.com/bordumb/dataing/issues/164)) ([a99180c](https://github.com/bordumb/dataing/commit/a99180ca4f25244fd44f121e4c374e7e5e9098b3))
+
+# [1.21.0](https://github.com/bordumb/dataing/compare/v1.20.4...v1.21.0) (2026-09-27)
+
+
+### Features
+
+* **datasources:** render connection form from backend config_schema ([#157](https://github.com/bordumb/dataing/issues/157)) ([20b02b0](https://github.com/bordumb/dataing/commit/20b02b074e5fdbabb9b01e7f4e18d3c9b584b553))
+
+## [1.20.4](https://github.com/bordumb/dataing/compare/v1.20.3...v1.20.4) (2026-09-27)
+
+
+### Bug Fixes
+
+* **api:** stop logging encryption key and decrypted datasource config ([#158](https://github.com/bordumb/dataing/issues/158)) ([8f44749](https://github.com/bordumb/dataing/commit/8f447490b234229c8445d4739d082d181a43b13c))
+
+## [1.20.3](https://github.com/bordumb/dataing/compare/v1.20.2...v1.20.3) (2026-09-27)
+
+
+### Bug Fixes
+
+* **infra:** make the backend and frontend images build ([#155](https://github.com/bordumb/dataing/issues/155)) ([593d18d](https://github.com/bordumb/dataing/commit/593d18d4dd047ac4a1fb6d43b6859a3ec538fa8f))
+
+## [1.20.2](https://github.com/bordumb/dataing/compare/v1.20.1...v1.20.2) (2026-09-27)
+
+
+### Bug Fixes
+
+* validate ad-hoc SQL by dialect; reject webhooks without a secret ([#148](https://github.com/bordumb/dataing/issues/148)) ([8080d4a](https://github.com/bordumb/dataing/commit/8080d4adf12b30428ba0a178f5323e780894711e))
+
 ## [1.20.1](https://github.com/bordumb/dataing/compare/v1.20.0...v1.20.1) (2026-09-27)
 
 

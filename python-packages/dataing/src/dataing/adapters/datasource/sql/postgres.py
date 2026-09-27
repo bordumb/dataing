@@ -7,8 +7,8 @@ data source interface with full schema discovery and query capabilities.
 from __future__ import annotations
 
 import time
+from collections.abc import Sequence
 from typing import Any
-from urllib.parse import quote_plus
 
 from dataing.adapters.datasource.errors import (
     AccessDeniedError,
@@ -112,15 +112,6 @@ POSTGRES_CONFIG_SCHEMA = ConfigSchema(
             min_value=5,
             max_value=300,
         ),
-        ConfigField(
-            name="schemas",
-            label="Schemas to Include",
-            type="string",
-            required=False,
-            group="advanced",
-            placeholder="public,analytics",
-            description="Comma-separated list of schemas to include (default: all)",
-        ),
     ],
 )
 
@@ -132,6 +123,7 @@ POSTGRES_CAPABILITIES = AdapterCapabilities(
     supports_preview=True,
     supports_write=False,
     query_language=QueryLanguage.SQL,
+    sql_dialect="postgres",
     max_concurrent_queries=10,
 )
 
@@ -163,7 +155,6 @@ class PostgresAdapter(SQLAdapter):
                 - password: Password
                 - ssl_mode: SSL mode (optional)
                 - connection_timeout: Timeout in seconds (optional)
-                - schemas: Comma-separated schemas to include (optional)
         """
         super().__init__(config)
         self._pool: Any = None
@@ -179,21 +170,6 @@ class PostgresAdapter(SQLAdapter):
         """Get the capabilities of this adapter."""
         return POSTGRES_CAPABILITIES
 
-    def _build_dsn(self) -> str:
-        """Build PostgreSQL DSN from config."""
-        host = self._config.get("host", "localhost")
-        port = int(self._config.get("port", 5432))
-        database = self._config.get("database", "postgres")
-        username = str(self._config.get("username", ""))
-        password = str(self._config.get("password", ""))
-        ssl_mode = self._config.get("ssl_mode", "prefer")
-
-        # URL-encode credentials to handle special characters like @, :, /
-        encoded_username = quote_plus(username) if username else ""
-        encoded_password = quote_plus(password) if password else ""
-
-        return f"postgresql://{encoded_username}:{encoded_password}@{host}:{port}/{database}?sslmode={ssl_mode}"
-
     async def connect(self) -> None:
         """Establish connection to PostgreSQL."""
         try:
@@ -206,8 +182,16 @@ class PostgresAdapter(SQLAdapter):
 
         try:
             timeout = self._config.get("connection_timeout", 30)
+            # Discrete arguments, not a DSN, so credentials reach the server verbatim.
+            # Never pass None: asyncpg would fill the gap from the server's own PG*
+            # environment and ~/.pgpass.
             self._pool = await asyncpg.create_pool(
-                self._build_dsn(),
+                host=self._config.get("host") or "localhost",
+                port=int(self._config.get("port") or 5432),
+                database=self._config.get("database") or "postgres",
+                user=self._config.get("username") or "",
+                password=self._config.get("password") or "",
+                ssl=self._config.get("ssl_mode") or "prefer",
                 min_size=1,
                 max_size=10,
                 command_timeout=timeout,
@@ -276,11 +260,11 @@ class PostgresAdapter(SQLAdapter):
     async def execute_query(
         self,
         sql: str,
-        params: dict[str, Any] | None = None,
+        params: Sequence[Any] | None = None,
         timeout_seconds: int = 30,
         limit: int | None = None,
     ) -> QueryResult:
-        """Execute a SQL query."""
+        """Execute a SQL query, binding params to its $1, $2, ... placeholders."""
         if not self._connected or not self._pool:
             raise ConnectionFailedError(message="Not connected to PostgreSQL")
 
@@ -291,7 +275,7 @@ class PostgresAdapter(SQLAdapter):
                 await conn.execute(f"SET statement_timeout = {timeout_seconds * 1000}")
 
                 # Execute query
-                rows = await conn.fetch(sql)
+                rows = await conn.fetch(sql, *(params or ()))
 
                 execution_time_ms = int((time.time() - start_time) * 1000)
 
@@ -342,30 +326,6 @@ class PostgresAdapter(SQLAdapter):
             else:
                 raise
 
-    async def _fetch_table_metadata(self) -> list[dict[str, Any]]:
-        """Fetch table metadata from PostgreSQL."""
-        schemas_filter = self._config.get("schemas", "")
-        if schemas_filter:
-            schema_list = [s.strip() for s in schemas_filter.split(",")]
-            schema_condition = f"AND table_schema IN ({','.join(repr(s) for s in schema_list)})"
-        else:
-            schema_condition = "AND table_schema NOT IN ('pg_catalog', 'information_schema')"
-
-        sql = f"""
-            SELECT
-                table_catalog,
-                table_schema,
-                table_name,
-                table_type
-            FROM information_schema.tables
-            WHERE 1=1
-            {schema_condition}
-            ORDER BY table_schema, table_name
-        """
-
-        result = await self.execute_query(sql)
-        return list(result.rows)
-
     async def get_schema(
         self,
         filter: SchemaFilter | None = None,
@@ -375,18 +335,21 @@ class PostgresAdapter(SQLAdapter):
             raise ConnectionFailedError(message="Not connected to PostgreSQL")
 
         try:
-            # Build filter conditions
-            conditions = ["table_schema NOT IN ('pg_catalog', 'information_schema')"]
-            if filter:
-                if filter.table_pattern:
-                    conditions.append(f"table_name LIKE '{filter.table_pattern}'")
-                if filter.schema_pattern:
-                    conditions.append(f"table_schema LIKE '{filter.schema_pattern}'")
-                if not filter.include_views:
-                    conditions.append("table_type = 'BASE TABLE'")
+            schema_filter = filter or SchemaFilter()
 
-            where_clause = " AND ".join(conditions)
-            limit_clause = f"LIMIT {filter.max_tables}" if filter else "LIMIT 1000"
+            # Name filters apply to every query below. Patterns are bound as $n
+            # parameters, never spliced into the SQL text.
+            conditions = ["table_schema NOT IN ('pg_catalog', 'information_schema')"]
+            params: list[str] = []
+            if schema_filter.table_pattern:
+                params.append(schema_filter.table_pattern)
+                conditions.append(f"table_name LIKE ${len(params)}")
+            if schema_filter.schema_pattern:
+                params.append(schema_filter.schema_pattern)
+                conditions.append(f"table_schema LIKE ${len(params)}")
+            name_filter = " AND ".join(conditions)
+            # information_schema.columns has no table_type, so only tables filter on it
+            type_filter = "" if schema_filter.include_views else "AND table_type = 'BASE TABLE'"
 
             # Get tables
             tables_sql = f"""
@@ -395,11 +358,11 @@ class PostgresAdapter(SQLAdapter):
                     table_name,
                     table_type
                 FROM information_schema.tables
-                WHERE {where_clause}
+                WHERE {name_filter} {type_filter}
                 ORDER BY table_schema, table_name
-                {limit_clause}
+                LIMIT {int(schema_filter.max_tables)}
             """
-            tables_result = await self.execute_query(tables_sql)
+            tables_result = await self.execute_query(tables_sql, params)
 
             # Get columns for all tables
             columns_sql = f"""
@@ -412,30 +375,30 @@ class PostgresAdapter(SQLAdapter):
                     column_default,
                     ordinal_position
                 FROM information_schema.columns
-                WHERE {where_clause}
+                WHERE {name_filter}
                 ORDER BY table_schema, table_name, ordinal_position
             """
-            columns_result = await self.execute_query(columns_sql)
+            columns_result = await self.execute_query(columns_sql, params)
 
-            # Get primary keys
+            # Get primary keys. The subquery exposes plain table_schema and
+            # table_name columns, so the same name filter applies unchanged.
             pk_sql = f"""
-                SELECT
-                    kcu.table_schema,
-                    kcu.table_name,
-                    kcu.column_name
-                FROM information_schema.table_constraints tc
-                JOIN information_schema.key_column_usage kcu
-                    ON tc.constraint_name = kcu.constraint_name
-                    AND tc.table_schema = kcu.table_schema
-                WHERE tc.constraint_type = 'PRIMARY KEY'
-                    AND {
-                where_clause.replace("table_schema", "tc.table_schema")
-                .replace("table_name", "tc.table_name")
-                .replace("table_type", "'BASE TABLE'")
-            }
+                SELECT table_schema, table_name, column_name
+                FROM (
+                    SELECT
+                        kcu.table_schema,
+                        kcu.table_name,
+                        kcu.column_name
+                    FROM information_schema.table_constraints tc
+                    JOIN information_schema.key_column_usage kcu
+                        ON tc.constraint_name = kcu.constraint_name
+                        AND tc.table_schema = kcu.table_schema
+                    WHERE tc.constraint_type = 'PRIMARY KEY'
+                ) pk
+                WHERE {name_filter}
             """
             try:
-                pk_result = await self.execute_query(pk_sql)
+                pk_result = await self.execute_query(pk_sql, params)
                 pk_set = {
                     (row["table_schema"], row["table_name"], row["column_name"])
                     for row in pk_result.rows

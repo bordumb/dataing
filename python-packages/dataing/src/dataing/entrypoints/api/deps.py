@@ -27,6 +27,7 @@ from dataing.adapters.investigation_feedback import InvestigationFeedbackAdapter
 from dataing.adapters.lineage import BaseLineageAdapter, LineageAdapter, get_lineage_registry
 from dataing.adapters.notifications.email import EmailConfig, EmailNotifier
 from dataing.agents import AgentClient
+from dataing.config import settings
 from dataing.core.auth.recovery import PasswordRecoveryAdapter
 from dataing.core.investigation.collaboration import CollaborationService
 from dataing.core.investigation.service import InvestigationService
@@ -39,64 +40,6 @@ if TYPE_CHECKING:
     from dataing.services.investigation import InvestigationStarterService
 
 logger = logging.getLogger(__name__)
-
-
-class Settings:
-    """Application settings loaded from environment."""
-
-    def __init__(self) -> None:
-        """Load settings from environment variables."""
-        self.database_url = os.getenv("DATABASE_URL", "postgresql://localhost:5432/dataing")
-        self.app_database_url = os.getenv("APP_DATABASE_URL", self.database_url)
-        self.anthropic_api_key = os.getenv("ANTHROPIC_API_KEY", "")
-        self.llm_model = os.getenv("LLM_MODEL", "claude-sonnet-4-20250514")
-
-        # Circuit breaker settings
-        self.max_total_queries = int(os.getenv("MAX_TOTAL_QUERIES", "50"))
-        self.max_queries_per_hypothesis = int(os.getenv("MAX_QUERIES_PER_HYPOTHESIS", "5"))
-        self.max_retries_per_hypothesis = int(os.getenv("MAX_RETRIES_PER_HYPOTHESIS", "2"))
-
-        # SMTP settings for email notifications
-        self.smtp_host = os.getenv("SMTP_HOST", "")
-        self.smtp_port = int(os.getenv("SMTP_PORT", "587"))
-        self.smtp_user = os.getenv("SMTP_USER", "")
-        self.smtp_password = os.getenv("SMTP_PASSWORD", "")
-        self.smtp_from_email = os.getenv("SMTP_FROM_EMAIL", "noreply@dataing.io")
-        self.smtp_from_name = os.getenv("SMTP_FROM_NAME", "Dataing")
-        self.smtp_use_tls = os.getenv("SMTP_USE_TLS", "true").lower() == "true"
-
-        # Frontend URL for building links in emails
-        self.frontend_url = os.getenv("FRONTEND_URL", "http://localhost:3000")
-
-        # Password recovery settings
-        # "auto" = email if SMTP configured, else console
-        # "email" = force email (fails if no SMTP)
-        # "console" = force console (prints reset link to stdout)
-        # "admin_contact" = show admin contact info (for SSO orgs)
-        self.password_recovery_type = os.getenv("PASSWORD_RECOVERY_TYPE", "auto")
-        self.admin_email = os.getenv("ADMIN_EMAIL", "")
-
-        # Redis settings for job queue
-        self.redis_url = os.getenv("REDIS_URL", "")
-        self.redis_host = os.getenv("REDIS_HOST", "localhost")
-        self.redis_port = int(os.getenv("REDIS_PORT", "6379"))
-        self.redis_password = os.getenv("REDIS_PASSWORD", "")
-        self.redis_db = int(os.getenv("REDIS_DB", "0"))
-
-        # Temporal settings for durable workflow execution
-        self.TEMPORAL_HOST = os.getenv("TEMPORAL_HOST", "localhost:7233")
-        self.TEMPORAL_NAMESPACE = os.getenv("TEMPORAL_NAMESPACE", "default")
-        self.TEMPORAL_TASK_QUEUE = os.getenv("TEMPORAL_TASK_QUEUE", "investigations")
-
-        # Investigation engine: "temporal" (durable workflow execution)
-        self.INVESTIGATION_ENGINE = os.getenv("INVESTIGATION_ENGINE", "temporal")
-
-        # GitHub OAuth settings for git integration
-        self.github_client_id = os.getenv("GITHUB_CLIENT_ID", "")
-        self.github_client_secret = os.getenv("GITHUB_CLIENT_SECRET", "")
-
-
-settings = Settings()
 
 
 @asynccontextmanager
@@ -259,18 +202,11 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     # Demo mode: seed demo data
     demo_mode = os.getenv("DATADR_DEMO_MODE", "").lower()
     print(f"[DEBUG] DATADR_DEMO_MODE={demo_mode}", flush=True)
-    enc_key = app.state.encryption_key
-    enc_preview = enc_key[:15] if enc_key else "None"
-    print(f"[DEBUG] Initial encryption_key: {enc_preview}...", flush=True)
     if demo_mode == "true":
         print("[DEBUG] Running in DEMO MODE - seeding demo data", flush=True)
         await _seed_demo_data(app_db)
         # Re-read encryption key in case _seed_demo_data generated one
         app.state.encryption_key = os.getenv("DATADR_ENCRYPTION_KEY") or os.getenv("ENCRYPTION_KEY")
-
-    enc_key = app.state.encryption_key
-    enc_preview = enc_key[:15] if enc_key else "None"
-    print(f"[DEBUG] Final encryption_key prefix: {enc_preview}...", flush=True)
 
     yield
 
@@ -457,28 +393,12 @@ async def get_tenant_adapter(
         )
 
     encrypted_config = ds.get("connection_config_encrypted", "")
-    key_preview = encryption_key[:10] if encryption_key else "None"
-    print(f"[DECRYPT DEBUG] encryption_key type: {type(encryption_key)}", flush=True)
-    print(f"[DECRYPT DEBUG] encryption_key full: {encryption_key}", flush=True)
-    print(
-        f"[DECRYPT DEBUG] encryption_key length: {len(encryption_key) if encryption_key else 0}",
-        flush=True,
-    )
-    print(f"[DECRYPT DEBUG] encrypted_config length: {len(encrypted_config)}", flush=True)
-    print(f"[DECRYPT DEBUG] encrypted_config start: {encrypted_config[:50]}", flush=True)
     try:
         f = Fernet(encryption_key.encode())
         decrypted = f.decrypt(encrypted_config.encode()).decode()
         config: dict[str, Any] = json.loads(decrypted)
-        print(f"[DECRYPT DEBUG] SUCCESS: {decrypted}", flush=True)
     except Exception as e:
-        print(f"[DECRYPT DEBUG] FAILED: {e}", flush=True)
-        import traceback
-
-        traceback.print_exc()
-        raise RuntimeError(
-            f"Failed to decrypt connection config (key_prefix={key_preview}): {e}"
-        ) from e
+        raise RuntimeError(f"Failed to decrypt connection config: {e}") from e
 
     # Create adapter using registry
     registry = get_registry()

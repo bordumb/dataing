@@ -1,5 +1,6 @@
 """Tests for SQLAdapter base class."""
 
+from collections.abc import Sequence
 from typing import Any
 
 import pytest
@@ -49,7 +50,7 @@ class ConcreteSQLAdapter(SQLAdapter):
     async def execute_query(
         self,
         sql: str,
-        params: dict[str, Any] | None = None,
+        params: Sequence[Any] | None = None,
         timeout_seconds: int = 30,
         limit: int | None = None,
     ) -> QueryResult:
@@ -63,9 +64,6 @@ class ConcreteSQLAdapter(SQLAdapter):
             rows=[{"cnt": 100}],
             row_count=1,
         )
-
-    async def _fetch_table_metadata(self) -> list[dict[str, Any]]:
-        return []
 
     def set_query_results(self, results: list[QueryResult]) -> None:
         """Set mock query results for testing."""

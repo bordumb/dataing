@@ -1,3 +1,5 @@
+import { apiErrorMessage } from "./error-message";
+
 // API base URL - empty for same-origin (dev), set VITE_API_URL for production
 const API_BASE_URL = import.meta.env.VITE_API_URL || "";
 
@@ -67,22 +69,7 @@ export const customInstance = async <T>(config: RequestConfig): Promise<T> => {
       }
     }
 
-    // Handle FastAPI validation errors (422) which return { detail: [{loc, msg, type}, ...] }
-    if (Array.isArray(errorData.detail)) {
-      const messages = errorData.detail
-        .map((e: { loc?: string[]; msg?: string }) => {
-          const field = e.loc?.slice(1).join(".") || "field";
-          return `${field}: ${e.msg || "invalid"}`;
-        })
-        .join("; ");
-      throw new Error(messages || `HTTP error ${response.status}`);
-    }
-
-    throw new Error(
-      errorData.detail?.message ||
-        errorData.detail ||
-        `HTTP error ${response.status}`,
-    );
+    throw new Error(apiErrorMessage(errorData, response.status));
   }
 
   return response.json();

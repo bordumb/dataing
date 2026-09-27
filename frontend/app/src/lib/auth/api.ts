@@ -9,6 +9,7 @@ import type {
   RefreshRequest,
   RegisterRequest,
 } from "./types";
+import { apiErrorMessage } from "@/lib/api/error-message";
 
 // API base URL - empty for same-origin (dev), set VITE_API_URL for production
 const API_URL = import.meta.env.VITE_API_URL || "";
@@ -28,7 +29,7 @@ async function handleResponse<T>(response: Response): Promise<T> {
   if (!response.ok) {
     const errorData = await response.json().catch(() => ({}));
     throw new AuthApiError(
-      errorData.detail || `HTTP error ${response.status}`,
+      apiErrorMessage(errorData, response.status),
       response.status,
     );
   }

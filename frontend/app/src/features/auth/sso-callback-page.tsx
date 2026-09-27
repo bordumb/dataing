@@ -11,6 +11,7 @@ import {
   CardTitle,
 } from "@/components/ui/Card";
 import { useJwtAuth } from "@/lib/auth/jwt-context";
+import { apiErrorMessage } from "@/lib/api/error-message";
 
 type CallbackStatus = "processing" | "success" | "error";
 
@@ -54,9 +55,13 @@ export function SSOCallbackPage() {
         });
 
         if (!response.ok) {
-          const errorData = await response.json();
+          const errorData = await response.json().catch(() => ({}));
           throw new Error(
-            errorData.detail || "Failed to complete authentication",
+            apiErrorMessage(
+              errorData,
+              response.status,
+              "Failed to complete authentication",
+            ),
           );
         }
 

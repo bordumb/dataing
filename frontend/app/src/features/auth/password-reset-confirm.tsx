@@ -25,6 +25,7 @@ import {
   CardTitle,
 } from "@/components/ui/Card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { apiErrorMessage } from "@/lib/api/error-message";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:8000";
 
@@ -77,8 +78,10 @@ export function PasswordResetConfirm() {
       );
 
       if (!response.ok) {
-        const data = await response.json();
-        throw new Error(data.detail || "Failed to reset password");
+        const data = await response.json().catch(() => ({}));
+        throw new Error(
+          apiErrorMessage(data, response.status, "Failed to reset password"),
+        );
       }
 
       setIsSuccess(true);

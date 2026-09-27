@@ -42,6 +42,7 @@ import {
 } from "@/components/ui/table";
 import { useJwtAuth } from "@/lib/auth";
 import type { OrgRole } from "@/lib/auth";
+import { apiErrorMessage } from "@/lib/api/error-message";
 
 interface OrgMember {
   user_id: string;
@@ -127,7 +128,7 @@ export function UserManagement() {
 
       if (!response.ok) {
         const error = await response.json().catch(() => ({}));
-        throw new Error(error.detail || `HTTP ${response.status}`);
+        throw new Error(apiErrorMessage(error, response.status));
       }
 
       setInviteEmail("");
@@ -155,7 +156,7 @@ export function UserManagement() {
 
       if (!response.ok) {
         const error = await response.json().catch(() => ({}));
-        throw new Error(error.detail || `HTTP ${response.status}`);
+        throw new Error(apiErrorMessage(error, response.status));
       }
 
       await fetchMembers();

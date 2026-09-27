@@ -345,3 +345,169 @@ class TestSanitizeIdentifier:
             sanitize_identifier("user-accounts")
 
         assert "Invalid identifier" in str(exc_info.value)
+
+
+COPY_QUERY_TO_FILE = "COPY (SELECT * FROM orders LIMIT 10) TO '/data/src/orders.csv'"
+
+
+class TestCopyStatements:
+    """Tests that COPY is rejected: it writes files, runs programs and loads tables."""
+
+    @pytest.mark.parametrize("dialect", ["duckdb", "postgres"])
+    def test_copy_to_file_forbidden_without_require_select(self, dialect: str) -> None:
+        """Test COPY ... TO a file is rejected even though its inner SELECT has a LIMIT."""
+        with pytest.raises(QueryValidationError) as exc_info:
+            validate_query(COPY_QUERY_TO_FILE, dialect=dialect, require_select=False)
+
+        assert "Forbidden statement type: Copy" in str(exc_info.value)
+
+    @pytest.mark.parametrize("dialect", ["duckdb", "postgres"])
+    def test_copy_to_file_rejected_with_require_select(self, dialect: str) -> None:
+        """Test COPY ... TO a file fails the SELECT-only check."""
+        with pytest.raises(QueryValidationError) as exc_info:
+            validate_query(COPY_QUERY_TO_FILE, dialect=dialect, require_select=True)
+
+        assert "Only SELECT statements allowed, got: Copy" in str(exc_info.value)
+
+    def test_copy_to_program_forbidden(self) -> None:
+        """Test Postgres COPY ... TO PROGRAM, which runs a shell command, is rejected."""
+        with pytest.raises(QueryValidationError) as exc_info:
+            validate_query(
+                "COPY (SELECT * FROM orders LIMIT 10) TO PROGRAM 'rm -rf /data/src'",
+                dialect="postgres",
+                require_select=False,
+            )
+
+        assert "Forbidden statement type: Copy" in str(exc_info.value)
+
+    @pytest.mark.parametrize("dialect", ["duckdb", "postgres"])
+    @pytest.mark.parametrize(
+        "sql",
+        [
+            "COPY orders TO '/data/src/orders.csv'",
+            "COPY orders FROM '/data/src/orders.csv'",
+        ],
+        ids=["to_file", "from_file"],
+    )
+    def test_copy_table_forbidden(self, sql: str, dialect: str) -> None:
+        """Test COPY of a whole table is forbidden, not just rejected for lacking a LIMIT."""
+        with pytest.raises(QueryValidationError) as exc_info:
+            validate_query(sql, dialect=dialect, require_select=False)
+
+        assert "Forbidden statement type: Copy" in str(exc_info.value)
+
+
+class TestWriteCapableStatements:
+    """Tests that statements which write data or files, or change session state, are rejected.
+
+    The assertions check for the forbidden-statement error, not just any
+    rejection: the LIMIT rule guards result size, not writes, and an embedded
+    SELECT can satisfy it.
+    """
+
+    @pytest.mark.parametrize(
+        ("sql", "dialect", "statement_type"),
+        [
+            pytest.param(
+                "COPY INTO @unload_stage FROM (SELECT * FROM orders LIMIT 10)",
+                "snowflake",
+                "Copy",
+                id="snowflake_copy_into_stage",
+            ),
+            pytest.param(
+                "EXPORT DATA OPTIONS (uri = 'gs://bucket/orders-*.csv', format = 'CSV') "
+                "AS SELECT * FROM orders LIMIT 10",
+                "bigquery",
+                "Export",
+                id="bigquery_export_data",
+            ),
+            pytest.param(
+                "CACHE TABLE orders_cache AS SELECT * FROM orders LIMIT 10",
+                "postgres",
+                "Cache",
+                id="cache_table_as_select",
+            ),
+            pytest.param(
+                "SET VARIABLE last_id = (SELECT id FROM orders LIMIT 1)",
+                "duckdb",
+                "Set",
+                id="duckdb_set_variable",
+            ),
+            pytest.param(
+                "SET @last_id = (SELECT id FROM orders LIMIT 1)",
+                "mysql",
+                "Set",
+                id="mysql_set_user_variable",
+            ),
+            pytest.param("ATTACH '/data/src/new.db' AS new_db", "duckdb", "Attach", id="attach"),
+            pytest.param("DETACH new_db", "duckdb", "Detach", id="detach"),
+            pytest.param("INSTALL httpfs", "duckdb", "Install", id="install"),
+            pytest.param("LOAD httpfs", "duckdb", "Command", id="load_extension"),
+            pytest.param("PRAGMA user_version = 5", "sqlite", "Pragma", id="pragma"),
+            pytest.param("USE ROLE accountadmin", "snowflake", "Use", id="use_role"),
+            pytest.param("PUT 'file:///tmp/orders.csv' @my_stage", "snowflake", "Put", id="put"),
+            pytest.param("GET @my_stage 'file:///tmp/'", "snowflake", "Get", id="get"),
+            pytest.param(
+                "LOAD DATA INPATH '/data/src/orders.csv' INTO TABLE orders",
+                "postgres",
+                "LoadData",
+                id="load_data",
+            ),
+            pytest.param(
+                "COMMENT ON TABLE orders IS 'overwritten'", "postgres", "Comment", id="comment_on"
+            ),
+            pytest.param("KILL 123", "mysql", "Kill", id="kill"),
+            pytest.param(
+                "VACUUM INTO '/data/src/copy.db'", "sqlite", "Command", id="sqlite_vacuum_into"
+            ),
+            pytest.param(
+                "DO $$ BEGIN PERFORM 1; END $$", "postgres", "Command", id="postgres_do_block"
+            ),
+        ],
+    )
+    def test_statement_forbidden(self, sql: str, dialect: str, statement_type: str) -> None:
+        """Test the statement is rejected as forbidden when SELECT is not required."""
+        with pytest.raises(QueryValidationError) as exc_info:
+            validate_query(sql, dialect=dialect, require_select=False)
+
+        assert f"Forbidden statement type: {statement_type}" in str(exc_info.value)
+
+    @pytest.mark.parametrize(
+        "sql",
+        ["EXPORT DATABASE '/data/src/'", "IMPORT DATABASE '/data/src/'"],
+        ids=["export_database", "import_database"],
+    )
+    def test_duckdb_database_export_import_rejected(self, sql: str) -> None:
+        """Test DuckDB EXPORT/IMPORT DATABASE are rejected (sqlglot cannot parse them)."""
+        with pytest.raises(QueryValidationError):
+            validate_query(sql, dialect="duckdb", require_select=False)
+
+    @pytest.mark.parametrize(
+        ("sql", "dialect"),
+        [
+            pytest.param(
+                "SELECT id FROM orders UNION ALL SELECT id FROM refunds LIMIT 10",
+                "postgres",
+                id="union_is_not_set",
+            ),
+            pytest.param(
+                "SELECT * FROM orders USE INDEX (idx_created_at) LIMIT 10",
+                "mysql",
+                id="index_hint_is_not_use",
+            ),
+            pytest.param(
+                "SELECT GET(line_items, 0) FROM orders LIMIT 10",
+                "snowflake",
+                id="get_function_is_not_get",
+            ),
+            pytest.param(
+                "SELECT * FROM events WHERE action = 'copy' LIMIT 10",
+                "duckdb",
+                id="copy_in_string_literal",
+            ),
+            pytest.param("SUMMARIZE SELECT * FROM orders LIMIT 10", "duckdb", id="summarize"),
+        ],
+    )
+    def test_read_only_statement_allowed(self, sql: str, dialect: str) -> None:
+        """Test read-only statements that resemble forbidden ones still pass."""
+        validate_query(sql, dialect=dialect, require_select=False)  # Should not raise

@@ -1,3 +1,10 @@
+## [1.21.1](https://github.com/bordumb/dataing/compare/v1.21.0...v1.21.1) (2026-09-27)
+
+
+### Bug Fixes
+
+* accept Table models when building datasource schema responses ([#164](https://github.com/bordumb/dataing/issues/164)) ([a99180c](https://github.com/bordumb/dataing/commit/a99180ca4f25244fd44f121e4c374e7e5e9098b3))
+
 # [1.21.0](https://github.com/bordumb/dataing/compare/v1.20.4...v1.21.0) (2026-09-27)
 
 

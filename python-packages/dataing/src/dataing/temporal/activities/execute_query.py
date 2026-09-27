@@ -6,16 +6,25 @@ Extracts business logic from ExecuteQueryStep into a Temporal activity factory.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Protocol
+from typing import TYPE_CHECKING, Any, Protocol
 
 from temporalio import activity
+
+from dataing.core.json_utils import to_json_safe
+
+if TYPE_CHECKING:
+    from dataing.adapters.datasource.types import QueryResult
 
 
 class DatabaseProtocol(Protocol):
     """Protocol for database adapter used by execute_query activity."""
 
-    async def execute_query(self, sql: str, datasource_id: str | None = None) -> dict[str, Any]:
-        """Execute SQL query and return results."""
+    async def execute_query(self, sql: str, datasource_id: str | None = None) -> QueryResult:
+        """Execute SQL query and return results.
+
+        Raises:
+            Exception: If the query fails. Never return an empty result instead.
+        """
         ...
 
 
@@ -43,12 +52,18 @@ class ExecuteQueryInput:
 
 @dataclass
 class ExecuteQueryResult:
-    """Result from execute_query activity."""
+    """Result from execute_query activity.
+
+    `error` is set when the query failed. Check it before reading rows: a failed
+    query has no rows, but it did not return zero rows.
+    """
 
     rows: list[dict[str, Any]]
-    columns: list[str]
+    columns: list[dict[str, Any]]
     row_count: int
     hypothesis_id: str
+    truncated: bool = False
+    execution_time_ms: int | None = None
     error: str | None = None
 
 
@@ -90,12 +105,9 @@ def make_execute_query_activity(
         # Execute query
         try:
             result = await database.execute_query(input.query, input.datasource_id)
-            # Convert QueryResult to dict if it's a Pydantic model
-            # Use mode="json" to ensure dates, UUIDs, etc. are JSON-serializable
-            if hasattr(result, "model_dump"):
-                result_dict: dict[str, Any] = result.model_dump(mode="json")
-            else:
-                result_dict = result
+            # Convert to JSON-safe types (handles date, datetime, UUID, etc.)
+            rows = to_json_safe(result.rows)
+            columns = to_json_safe(result.columns)
         except Exception as e:
             return ExecuteQueryResult(
                 rows=[],
@@ -106,10 +118,12 @@ def make_execute_query_activity(
             )
 
         return ExecuteQueryResult(
-            rows=result_dict.get("rows", []),
-            columns=result_dict.get("columns", []),
-            row_count=result_dict.get("row_count", len(result_dict.get("rows", []))),
+            rows=rows,
+            columns=columns,
+            row_count=result.row_count,
             hypothesis_id=input.hypothesis_id,
+            truncated=result.truncated,
+            execution_time_ms=result.execution_time_ms,
         )
 
     return execute_query

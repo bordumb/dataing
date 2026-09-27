@@ -21,6 +21,7 @@ from dataing.core.domain_types import (
     LineageContext,
     MetricSpec,
     RelevantCodeChange,
+    UntestedHypothesis,
 )
 from dataing.core.exceptions import LLMError
 
@@ -283,6 +284,7 @@ class AgentClient:
         evidence: list[Evidence],
         handlers: StreamHandlers | None = None,
         code_changes: list[RelevantCodeChange] | None = None,
+        untested_hypotheses: list[UntestedHypothesis] | None = None,
     ) -> SynthesisResponse:
         """Synthesize all evidence into a root cause finding (raw response).
 
@@ -291,6 +293,7 @@ class AgentClient:
             evidence: All collected evidence.
             handlers: Optional streaming handlers for real-time updates.
             code_changes: Optional list of code changes related to the investigation.
+            untested_hypotheses: Optional hypotheses whose evaluation failed.
 
         Returns:
             Raw SynthesisResponse with all fields from LLM.
@@ -298,7 +301,12 @@ class AgentClient:
         Raises:
             LLMError: If synthesis fails.
         """
-        prompt = synthesis.build_user(alert=alert, evidence=evidence, code_changes=code_changes)
+        prompt = synthesis.build_user(
+            alert=alert,
+            evidence=evidence,
+            code_changes=code_changes,
+            untested_hypotheses=untested_hypotheses,
+        )
         system = synthesis.build_system()
 
         try:

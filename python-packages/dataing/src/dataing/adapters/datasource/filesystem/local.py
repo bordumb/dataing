@@ -17,6 +17,7 @@ from dataing.adapters.datasource.errors import (
     SchemaFetchFailedError,
 )
 from dataing.adapters.datasource.filesystem.base import FileInfo, FileSystemAdapter
+from dataing.adapters.datasource.local_paths import resolve_local_path
 from dataing.adapters.datasource.registry import register_adapter
 from dataing.adapters.datasource.type_mapping import normalize_type
 from dataing.adapters.datasource.types import (
@@ -127,11 +128,14 @@ class LocalFileAdapter(FileSystemAdapter):
         """Get the capabilities of this adapter."""
         return LOCAL_FILE_CAPABILITIES
 
+    @classmethod
+    def check_config(cls, config: dict[str, Any]) -> None:
+        """Refuse a path outside the local data root."""
+        cls(config)._get_base_path()
+
     def _get_base_path(self) -> str:
-        """Get the configured base path."""
-        path = self._config.get("path", ".")
-        result: str = os.path.abspath(os.path.expanduser(path))
-        return result
+        """Get the configured base path, resolved inside the local data root."""
+        return resolve_local_path(self._config.get("path"))
 
     async def connect(self) -> None:
         """Establish connection to local file system via DuckDB."""
@@ -143,9 +147,9 @@ class LocalFileAdapter(FileSystemAdapter):
                 details={"error": str(e)},
             ) from e
 
-        try:
-            base_path = self._get_base_path()
+        base_path = self._get_base_path()
 
+        try:
             if not os.path.exists(base_path):
                 raise ConnectionFailedError(
                     message=f"Directory does not exist: {base_path}",

@@ -8,6 +8,13 @@ import pytest
 from dataing.adapters.datasource import DuckDBAdapter, SourceType
 
 
+@pytest.fixture(autouse=True)
+def local_data_root(tmp_path, monkeypatch):
+    """Enable DuckDB sources, with this test's tmp_path as the local data root."""
+    monkeypatch.setenv("DATAING_LOCAL_DATA_ROOT", str(tmp_path))
+    return tmp_path
+
+
 @pytest.fixture
 def memory_adapter():
     """Create a DuckDB adapter with in-memory database."""
@@ -133,10 +140,10 @@ class TestDuckDBDirectoryMode:
     """Tests for DuckDB directory mode."""
 
     @pytest.mark.asyncio
-    async def test_directory_mode_with_parquet(self):
+    async def test_directory_mode_with_parquet(self, tmp_path):
         """Test reading parquet files from directory."""
         # Create a temporary directory with a parquet file
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with tempfile.TemporaryDirectory(dir=tmp_path) as tmpdir:
             # Create a parquet file using DuckDB
             import duckdb
 
@@ -161,9 +168,9 @@ class TestDuckDBDirectoryMode:
                 assert len(schema.catalogs) >= 1
 
     @pytest.mark.asyncio
-    async def test_directory_mode_with_csv(self):
+    async def test_directory_mode_with_csv(self, tmp_path):
         """Test reading CSV files from directory."""
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with tempfile.TemporaryDirectory(dir=tmp_path) as tmpdir:
             # Create a CSV file
             csv_path = os.path.join(tmpdir, "data.csv")
             with open(csv_path, "w") as f:
@@ -185,13 +192,13 @@ class TestDuckDBAdapterErrors:
     """Tests for DuckDB adapter error handling."""
 
     @pytest.mark.asyncio
-    async def test_connect_file_not_found(self):
+    async def test_connect_file_not_found(self, tmp_path):
         """Test connect raises error for non-existent database file."""
         from dataing.adapters.datasource.errors import ConnectionFailedError
 
         adapter = DuckDBAdapter(
             {
-                "path": "/nonexistent/path/to/db.duckdb",
+                "path": str(tmp_path / "nonexistent" / "db.duckdb"),
                 "source_type": "database",
             }
         )

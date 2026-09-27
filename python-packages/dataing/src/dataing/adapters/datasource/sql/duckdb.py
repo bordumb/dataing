@@ -17,6 +17,7 @@ from dataing.adapters.datasource.errors import (
     QueryTimeoutError,
     SchemaFetchFailedError,
 )
+from dataing.adapters.datasource.local_paths import require_local_data_root, resolve_local_path
 from dataing.adapters.datasource.registry import register_adapter
 from dataing.adapters.datasource.sql.base import SQLAdapter
 from dataing.adapters.datasource.type_mapping import normalize_type
@@ -125,6 +126,11 @@ class DuckDBAdapter(SQLAdapter):
         """Get the capabilities of this adapter."""
         return DUCKDB_CAPABILITIES
 
+    @classmethod
+    def check_config(cls, config: dict[str, Any]) -> None:
+        """Refuse a path outside the local data root."""
+        cls(config)._resolve_path()
+
     async def connect(self) -> None:
         """Establish connection to DuckDB."""
         try:
@@ -135,7 +141,7 @@ class DuckDBAdapter(SQLAdapter):
                 details={"error": str(e)},
             ) from e
 
-        path = self._config.get("path", ":memory:")
+        path = self._resolve_path()
         read_only = self._config.get("read_only", True)
 
         try:
@@ -165,10 +171,21 @@ class DuckDBAdapter(SQLAdapter):
                 details={"error": str(e), "path": path},
             ) from e
 
+    def _resolve_path(self) -> str:
+        """Resolve the configured path inside the local data root.
+
+        An in-memory database has no path, but it is a local source all the same.
+        """
+        path = self._config.get("path", ":memory:")
+        if path == ":memory:" and not self._is_directory_mode:
+            require_local_data_root()
+            return ":memory:"
+        return resolve_local_path(path)
+
     async def _register_directory_files(self) -> None:
         """Register files in directory as DuckDB views."""
-        path = self._config.get("path", "")
-        if not path or not os.path.isdir(path):
+        path = self._resolve_path()
+        if not os.path.isdir(path):
             return
 
         # Find all parquet and CSV files

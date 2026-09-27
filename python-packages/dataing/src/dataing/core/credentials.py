@@ -28,6 +28,27 @@ class DecryptedCredentials:
     warehouse: str | None = None
     extra: dict[str, Any] | None = None
 
+    def apply_to(self, base_config: dict[str, Any]) -> dict[str, Any]:
+        """Overlay these credentials onto a datasource connection config.
+
+        Adapters read their login from ``username``, so the user's login
+        replaces the datasource's stored one under that key.
+
+        Args:
+            base_config: The datasource's stored connection config.
+
+        Returns:
+            A new connection config that connects as this user.
+        """
+        config = {**base_config, "username": self.username, "password": self.password}
+        if self.role:
+            config["role"] = self.role
+        if self.warehouse:
+            config["warehouse"] = self.warehouse
+        if self.extra:
+            config.update(self.extra)
+        return config
+
 
 class CredentialsService:
     """Service for managing user datasource credentials.

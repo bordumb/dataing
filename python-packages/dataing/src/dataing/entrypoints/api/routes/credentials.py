@@ -18,7 +18,7 @@ from dataing.adapters.audit import audited
 from dataing.adapters.datasource import SourceType, get_registry
 from dataing.adapters.datasource.encryption import decrypt_config, get_encryption_key
 from dataing.adapters.db.app_db import AppDatabase
-from dataing.core.credentials import CredentialsService
+from dataing.core.credentials import CredentialsService, DecryptedCredentials
 from dataing.entrypoints.api.deps import get_app_db
 from dataing.entrypoints.api.middleware.auth import (
     ApiKeyContext,
@@ -213,16 +213,12 @@ async def test_credentials(
             error=f"Failed to decrypt datasource configuration: {e!s}",
         )
 
-    # Build connection config with user credentials
-    connection_config = {
-        **base_config,
-        "user": body.username,
-        "password": body.password,
-    }
-    if body.role:
-        connection_config["role"] = body.role
-    if body.warehouse:
-        connection_config["warehouse"] = body.warehouse
+    connection_config = DecryptedCredentials(
+        username=body.username,
+        password=body.password,
+        role=body.role,
+        warehouse=body.warehouse,
+    ).apply_to(base_config)
 
     # Test connection
     try:

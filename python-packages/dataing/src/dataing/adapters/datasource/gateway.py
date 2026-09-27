@@ -214,21 +214,7 @@ class QueryGateway:
             ds_info["connection_config_encrypted"],
             self._encryption_key,
         )
-
-        # Merge user credentials into connection config
-        connection_config = {
-            **base_config,
-            "user": credentials.username,
-            "password": credentials.password,
-        }
-
-        # Add optional fields if present
-        if credentials.role:
-            connection_config["role"] = credentials.role
-        if credentials.warehouse:
-            connection_config["warehouse"] = credentials.warehouse
-        if credentials.extra:
-            connection_config.update(credentials.extra)
+        connection_config = credentials.apply_to(base_config)
 
         # Create fresh adapter with user's credentials
         source_type = SourceType(ds_info["type"])

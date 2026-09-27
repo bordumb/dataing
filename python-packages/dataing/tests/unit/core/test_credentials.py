@@ -65,6 +65,46 @@ class TestDecryptedCredentials:
             creds.username = "newuser"  # type: ignore[misc]
 
 
+class TestDecryptedCredentialsApplyTo:
+    """Tests for overlaying user credentials onto a datasource config."""
+
+    def test_replaces_stored_login_under_username_key(self) -> None:
+        """The user's login replaces the datasource's stored login."""
+        base_config = {"host": "db", "username": "svc_dataing", "password": "svc-secret"}
+        creds = DecryptedCredentials(username="alice", password="alice-secret")
+
+        assert creds.apply_to(base_config) == {
+            "host": "db",
+            "username": "alice",
+            "password": "alice-secret",
+        }
+
+    def test_overlays_optional_fields_when_set(self) -> None:
+        """Role, warehouse, and extra fields override the stored values."""
+        creds = DecryptedCredentials(
+            username="alice",
+            password="alice-secret",
+            role="ANALYST",
+            warehouse="ALICE_WH",
+            extra={"authenticator": "snowflake"},
+        )
+
+        config = creds.apply_to({"role": "SYSADMIN", "warehouse": "COMPUTE_WH"})
+
+        assert config["role"] == "ANALYST"
+        assert config["warehouse"] == "ALICE_WH"
+        assert config["authenticator"] == "snowflake"
+
+    def test_keeps_stored_optional_fields_when_unset(self) -> None:
+        """Unset role and warehouse leave the datasource's values in place."""
+        creds = DecryptedCredentials(username="alice", password="alice-secret")
+
+        config = creds.apply_to({"role": "SYSADMIN", "warehouse": "COMPUTE_WH"})
+
+        assert config["role"] == "SYSADMIN"
+        assert config["warehouse"] == "COMPUTE_WH"
+
+
 class TestCredentialsServiceEncryption:
     """Tests for credentials encryption/decryption."""
 

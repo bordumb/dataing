@@ -6,7 +6,9 @@ import uuid
 from unittest.mock import AsyncMock, patch
 
 import pytest
+from cryptography.fernet import Fernet
 
+from dataing.adapters.datasource.encryption import encrypt_config
 from dataing.adapters.datasource.errors import (
     CredentialsNotConfiguredError,
 )
@@ -15,6 +17,7 @@ from dataing.adapters.datasource.gateway import (
     QueryGateway,
     QueryPrincipal,
 )
+from dataing.core.credentials import DecryptedCredentials
 
 
 @pytest.fixture
@@ -244,3 +247,42 @@ class TestQueryGatewayExecute:
             assert call_kwargs["status"] == "denied"
             assert call_kwargs["user_id"] == query_principal.user_id
             assert call_kwargs["datasource_id"] == query_principal.datasource_id
+
+
+class TestQueryGatewayUserAdapter:
+    """Tests for building adapters from the user's own credentials."""
+
+    @pytest.mark.asyncio
+    async def test_connects_as_user_not_stored_login(
+        self,
+        mock_app_db: AsyncMock,
+        query_principal: QueryPrincipal,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """The adapter connects with the user's login, not the datasource's."""
+        key = Fernet.generate_key()
+        monkeypatch.delenv("DATADR_ENCRYPTION_KEY", raising=False)
+        monkeypatch.setenv("ENCRYPTION_KEY", key.decode())
+        mock_app_db.get_data_source.return_value = {
+            "id": query_principal.datasource_id,
+            "name": "Warehouse",
+            "type": "postgresql",
+            "connection_config_encrypted": encrypt_config(
+                {
+                    "host": "db.internal",
+                    "port": 5432,
+                    "database": "analytics",
+                    "username": "svc_dataing",
+                    "password": "svc-secret",
+                },
+                key,
+            ),
+        }
+        credentials = DecryptedCredentials(username="alice", password="alice-secret")
+
+        gateway = QueryGateway(mock_app_db)
+        adapter = await gateway._create_user_adapter(query_principal, credentials)
+
+        assert adapter._build_dsn() == (
+            "postgresql://alice:alice-secret@db.internal:5432/analytics?sslmode=prefer"
+        )

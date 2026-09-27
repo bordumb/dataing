@@ -56,14 +56,14 @@ GRANT ROLE dataing_role TO USER dataing_user;
     ```python
     from dataing.adapters.datasource.sql.snowflake import SnowflakeAdapter
 
-    adapter = SnowflakeAdapter(
-        account="xy12345.us-east-1",
-        user="dataing_user",
-        password="secure_password",
-        database="analytics",
-        schema="public",
-        warehouse="COMPUTE_WH",
-    )
+    adapter = SnowflakeAdapter({
+        "account": "xy12345.us-east-1",
+        "username": "dataing_user",
+        "password": "secure_password",  # pragma: allowlist secret
+        "database": "analytics",
+        "schema": "public",
+        "warehouse": "COMPUTE_WH",
+    })
     ```
 
 === "Connection String"
@@ -77,7 +77,7 @@ GRANT ROLE dataing_role TO USER dataing_user;
 | Field | Required | Description |
 |-------|----------|-------------|
 | `account` | Yes | Snowflake account identifier (e.g., `xy12345.us-east-1`) |
-| `user` | Yes | Username for authentication |
+| `username` | Yes | Username for authentication |
 | `password` | Yes | Password for authentication |
 | `database` | Yes | Default database |
 | `schema` | No | Default schema (defaults to `PUBLIC`) |

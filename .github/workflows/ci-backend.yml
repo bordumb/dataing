@@ -92,8 +92,9 @@ jobs:
       - name: Install dependencies
         run: uv sync --locked --extra dev
 
-      # The migrated_db fixture (tests/integration/conftest.py) creates a throwaway
-      # database on this server and applies every migration to it with psql.
+      # The migrated_dsn fixture (tests/integration/conftest.py) creates a throwaway
+      # database on this server and migrates it with infra/init-app-db.sh, which
+      # needs psql and pg_isready (postgresql-client, preinstalled on ubuntu-latest).
       - name: Run integration tests
         run: uv run pytest python-packages/dataing/tests/integration -m integration --no-cov
         env:

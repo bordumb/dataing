@@ -1,0 +1,28 @@
+{
+  "assignee": "bordumbb@gmail.com",
+  "claim_note": "",
+  "claimed_at": "2026-09-26T03:54:22.873594Z",
+  "created_at": "2026-09-26T03:44:58.176411Z",
+  "depends_on": [
+    "fn-58.1"
+  ],
+  "epic": "fn-58",
+  "evidence": {
+    "commits": [],
+    "prs": [],
+    "tests": [
+      "pytest python-packages/dataing/tests/integration -m integration (52 passed)",
+      "pytest python-packages/dataing/tests (2047 passed, 38 skipped)",
+      "compose db-migrate simulation in postgres:16-alpine (6 scenarios)",
+      "just demo-infra migration step",
+      "migrate-prod.sh fresh/rerun/no-url",
+      "prek hooks on changed files (exit 0)"
+    ]
+  },
+  "id": "fn-58.2",
+  "priority": null,
+  "spec_path": ".flow/tasks/fn-58.2.md",
+  "status": "done",
+  "title": "Point compose, demo-infra, migrate-prod and the fixture at the runner",
+  "updated_at": "2026-09-26T04:12:02.702304Z"
+}

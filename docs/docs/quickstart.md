@@ -449,14 +449,26 @@ docker compose logs temporal
 
 ### "Database migration failed"
 
-**Symptom**: API fails to start, logs show SQL errors.
+**Symptom**: API fails to start because the `db-migrate` service exited with an error.
 
-**Fix**: Check logs and try a clean start:
+**Fix**: Check the migration logs:
 
 ```bash
-# Check API logs
-docker compose logs api
+docker compose logs db-migrate
+```
 
+If the log says the database **has tables but no migration history**, it was created before
+migrations were tracked. Recreate it (below) unless you need its data: adopting it keeps the
+schema as it is, including damage from earlier restarts (emptied users and investigations,
+missing foreign keys). To adopt it anyway, record the migrations it already has:
+
+```bash
+MIGRATIONS_BASELINE=034_code_changes_pr_metadata.sql docker compose up -d
+```
+
+Otherwise, fix the failing migration or try a clean start:
+
+```bash
 # Clean start (removes all data)
 docker compose down -v
 docker compose up -d

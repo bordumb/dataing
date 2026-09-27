@@ -1,3 +1,10 @@
+## [1.23.6](https://github.com/bordumb/dataing/compare/v1.23.5...v1.23.6) (2026-09-27)
+
+
+### Bug Fixes
+
+* **frontend:** show API validation errors as text, not [object Object] ([#192](https://github.com/bordumb/dataing/issues/192)) ([3f48dcf](https://github.com/bordumb/dataing/commit/3f48dcfb641750dded40db322bfeb97bea6605ab))
+
 ## [1.23.5](https://github.com/bordumb/dataing/compare/v1.23.4...v1.23.5) (2026-09-27)
 
 

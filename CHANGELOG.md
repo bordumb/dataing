@@ -1,3 +1,10 @@
+## [1.24.4](https://github.com/bordumb/dataing/compare/v1.24.3...v1.24.4) (2026-09-27)
+
+
+### Bug Fixes
+
+* **api:** finish moving investigation queries to the unified schema ([#191](https://github.com/bordumb/dataing/issues/191)) ([fcffde5](https://github.com/bordumb/dataing/commit/fcffde5d2d3fce07d1f960e4ca81b3a759f3f07f))
+
 ## [1.24.3](https://github.com/bordumb/dataing/compare/v1.24.2...v1.24.3) (2026-09-27)
 
 

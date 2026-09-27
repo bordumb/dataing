@@ -5,9 +5,10 @@ Uses BondAgent for type-safe, validated LLM responses with optional streaming.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, TypeVar
 
 from bond import BondAgent, StreamHandlers
+from pydantic import BaseModel
 from pydantic_ai.models.anthropic import AnthropicModel
 from pydantic_ai.output import PromptedOutput
 from pydantic_ai.providers.anthropic import AnthropicProvider
@@ -39,12 +40,17 @@ from .prompts import counter_analysis, hypothesis, interpretation, query, reflex
 if TYPE_CHECKING:
     from dataing.adapters.datasource.types import QueryResult, SchemaResponse
 
+OutputT = TypeVar("OutputT", bound=BaseModel)
+
 
 class AgentClient:
     """LLM client facade for investigation agents.
 
     Uses BondAgent for type-safe, validated LLM responses with optional streaming.
     Prompts are modular and live in the prompts/ package.
+
+    One instance serves every investigation in a process, across tenants, so every
+    LLM call runs on a fresh BondAgent and starts from an empty message history.
     """
 
     def __init__(
@@ -62,44 +68,48 @@ class AgentClient:
         """
         provider = AnthropicProvider(api_key=api_key)
         self._model = AnthropicModel(model, provider=provider)
+        self._max_retries = max_retries
 
+    async def _ask(
+        self,
+        name: str,
+        output_type: type[OutputT],
+        prompt: str,
+        *,
+        instructions: str,
+        handlers: StreamHandlers | None = None,
+    ) -> OutputT:
+        """Run one LLM call on a fresh BondAgent.
+
+        BondAgent keeps every message it has seen and replays them on each ask().
+        Never hold a BondAgent across calls: its history would carry one
+        investigation's schemas, alerts and query rows into the next prompt.
+
+        Args:
+            name: Agent name.
+            output_type: Response model the LLM output is validated against.
+            prompt: User prompt.
+            instructions: System prompt for this call.
+            handlers: Optional streaming handlers for real-time updates.
+
+        Returns:
+            The validated response.
+        """
         # Empty base instructions: all prompting via dynamic_instructions at runtime.
         # This ensures PromptedOutput gets the full detailed prompt without conflicts.
-        self._hypothesis_agent: BondAgent[HypothesesResponse, None] = BondAgent(
-            name="hypothesis-generator",
+        agent: BondAgent[OutputT, None] = BondAgent(
+            name=name,
             instructions="",
             model=self._model,
-            output_type=PromptedOutput(HypothesesResponse),
-            max_retries=max_retries,
+            output_type=PromptedOutput(output_type),
+            max_retries=self._max_retries,
         )
-        self._interpretation_agent: BondAgent[InterpretationResponse, None] = BondAgent(
-            name="evidence-interpreter",
-            instructions="",
-            model=self._model,
-            output_type=PromptedOutput(InterpretationResponse),
-            max_retries=max_retries,
+        result: OutputT = await agent.ask(
+            prompt,
+            dynamic_instructions=instructions,
+            handlers=handlers,
         )
-        self._synthesis_agent: BondAgent[SynthesisResponse, None] = BondAgent(
-            name="finding-synthesizer",
-            instructions="",
-            model=self._model,
-            output_type=PromptedOutput(SynthesisResponse),
-            max_retries=max_retries,
-        )
-        self._query_agent: BondAgent[QueryResponse, None] = BondAgent(
-            name="sql-generator",
-            instructions="",
-            model=self._model,
-            output_type=PromptedOutput(QueryResponse),
-            max_retries=max_retries,
-        )
-        self._counter_analysis_agent: BondAgent[CounterAnalysisResponse, None] = BondAgent(
-            name="counter-analyst",
-            instructions="",
-            model=self._model,
-            output_type=PromptedOutput(CounterAnalysisResponse),
-            max_retries=max_retries,
-        )
+        return result
 
     async def generate_hypotheses(
         self,
@@ -128,9 +138,11 @@ class AgentClient:
         user_prompt = hypothesis.build_user(alert=alert, context=context, code_changes=code_changes)
 
         try:
-            result = await self._hypothesis_agent.ask(
+            result = await self._ask(
+                "hypothesis-generator",
+                HypothesesResponse,
                 user_prompt,
-                dynamic_instructions=system_prompt,
+                instructions=system_prompt,
                 handlers=handlers,
             )
 
@@ -182,9 +194,11 @@ class AgentClient:
             system = query.build_system(schema=schema, alert=alert)
 
         try:
-            result = await self._query_agent.ask(
+            result = await self._ask(
+                "sql-generator",
+                QueryResponse,
                 prompt,
-                dynamic_instructions=system,
+                instructions=system,
                 handlers=handlers,
             )
             sql_query: str = result.query
@@ -218,9 +232,11 @@ class AgentClient:
         system = interpretation.build_system()
 
         try:
-            result = await self._interpretation_agent.ask(
+            result = await self._ask(
+                "evidence-interpreter",
+                InterpretationResponse,
                 prompt,
-                dynamic_instructions=system,
+                instructions=system,
                 handlers=handlers,
             )
 
@@ -302,12 +318,13 @@ class AgentClient:
         system = synthesis.build_system()
 
         try:
-            result: SynthesisResponse = await self._synthesis_agent.ask(
+            return await self._ask(
+                "finding-synthesizer",
+                SynthesisResponse,
                 prompt,
-                dynamic_instructions=system,
+                instructions=system,
                 handlers=handlers,
             )
-            return result
 
         except Exception as e:
             raise LLMError(
@@ -431,9 +448,11 @@ class AgentClient:
         system = counter_analysis.build_system()
 
         try:
-            result = await self._counter_analysis_agent.ask(
+            result = await self._ask(
+                "counter-analyst",
+                CounterAnalysisResponse,
                 prompt,
-                dynamic_instructions=system,
+                instructions=system,
             )
             return {
                 "alternative_explanations": result.alternative_explanations,

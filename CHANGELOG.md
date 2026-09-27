@@ -1,3 +1,10 @@
+## [1.22.6](https://github.com/bordumb/dataing/compare/v1.22.5...v1.22.6) (2026-09-27)
+
+
+### Bug Fixes
+
+* **core:** bind get_schema filter values instead of splicing them into SQL ([#187](https://github.com/bordumb/dataing/issues/187)) ([c13250f](https://github.com/bordumb/dataing/commit/c13250fcede40a5aad16e85a9a3e956f67ca6638))
+
 ## [1.22.5](https://github.com/bordumb/dataing/compare/v1.22.4...v1.22.5) (2026-09-27)
 
 

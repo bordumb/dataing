@@ -1,3 +1,10 @@
+## [1.23.3](https://github.com/bordumb/dataing/compare/v1.23.2...v1.23.3) (2026-09-27)
+
+
+### Bug Fixes
+
+* **ee:** stop repeated runbook feedback from inflating usefulness_score ([#177](https://github.com/bordumb/dataing/issues/177)) ([c806f42](https://github.com/bordumb/dataing/commit/c806f42e58b25a1b3411518c1ad82264240b2d4b))
+
 ## [1.23.2](https://github.com/bordumb/dataing/compare/v1.23.1...v1.23.2) (2026-09-27)
 
 

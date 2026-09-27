@@ -25,8 +25,11 @@ def data_dir(tmp_path: Path) -> Path:
 
 
 @pytest.fixture
-async def local_adapter(data_dir: Path) -> AsyncIterator[LocalFileAdapter]:
+async def local_adapter(
+    data_dir: Path, monkeypatch: pytest.MonkeyPatch
+) -> AsyncIterator[LocalFileAdapter]:
     """A connected local file adapter over data_dir."""
+    monkeypatch.setenv("DATAING_LOCAL_DATA_ROOT", str(data_dir))
     adapter = LocalFileAdapter({"path": str(data_dir)})
     await adapter.connect()
     yield adapter

@@ -1,3 +1,10 @@
+## [1.21.4](https://github.com/bordumb/dataing/compare/v1.21.3...v1.21.4) (2026-09-27)
+
+
+### Bug Fixes
+
+* **core:** connect GCS sources with a scoped HMAC secret and report connection-test failures ([#172](https://github.com/bordumb/dataing/issues/172)) ([0d40614](https://github.com/bordumb/dataing/commit/0d4061402102873045f2be54909404950f02af20))
+
 ## [1.21.3](https://github.com/bordumb/dataing/compare/v1.21.2...v1.21.3) (2026-09-27)
 
 

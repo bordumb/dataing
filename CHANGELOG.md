@@ -1,3 +1,10 @@
+## [1.21.5](https://github.com/bordumb/dataing/compare/v1.21.4...v1.21.5) (2026-09-27)
+
+
+### Bug Fixes
+
+* redact webhook URL secrets from logs, audit records and the webhook list ([#180](https://github.com/bordumb/dataing/issues/180)) ([ca4b3ec](https://github.com/bordumb/dataing/commit/ca4b3ec945920189c20551ea0fe09529953994b1))
+
 ## [1.21.4](https://github.com/bordumb/dataing/compare/v1.21.3...v1.21.4) (2026-09-27)
 
 

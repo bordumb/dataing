@@ -1,3 +1,10 @@
+## [1.20.3](https://github.com/bordumb/dataing/compare/v1.20.2...v1.20.3) (2026-09-27)
+
+
+### Bug Fixes
+
+* **infra:** make the backend and frontend images build ([#155](https://github.com/bordumb/dataing/issues/155)) ([593d18d](https://github.com/bordumb/dataing/commit/593d18d4dd047ac4a1fb6d43b6859a3ec538fa8f))
+
 ## [1.20.2](https://github.com/bordumb/dataing/compare/v1.20.1...v1.20.2) (2026-09-27)
 
 

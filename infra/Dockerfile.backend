@@ -66,15 +66,15 @@ WORKDIR /app
 # Copy migrations
 COPY --chown=dataing:dataing python-packages/dataing/migrations /app/migrations
 
-# Switch to non-root user
-USER dataing
+# Switch to non-root user (numeric, so runtimes can verify it isn't root)
+USER 1000:1000
 
 # Expose API port
 EXPOSE 8000
 
 # Health check for API server
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD curl -f http://localhost:8000/health || exit 1
+    CMD ["curl", "-f", "http://localhost:8000/health"]
 
 # Default command: start API server
 # Override with: docker run ... python -m dataing.entrypoints.temporal_worker

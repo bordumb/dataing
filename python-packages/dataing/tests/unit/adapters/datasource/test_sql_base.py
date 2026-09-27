@@ -1,5 +1,6 @@
 """Tests for SQLAdapter base class."""
 
+from collections.abc import Sequence
 from typing import Any
 
 import pytest
@@ -49,7 +50,7 @@ class ConcreteSQLAdapter(SQLAdapter):
     async def execute_query(
         self,
         sql: str,
-        params: dict[str, Any] | None = None,
+        params: Sequence[Any] | None = None,
         timeout_seconds: int = 30,
         limit: int | None = None,
     ) -> QueryResult:

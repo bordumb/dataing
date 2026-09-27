@@ -7,6 +7,7 @@ data source interface with full schema discovery and query capabilities.
 from __future__ import annotations
 
 import time
+from collections.abc import Sequence
 from typing import Any
 
 from dataing.adapters.datasource.errors import (
@@ -259,11 +260,11 @@ class PostgresAdapter(SQLAdapter):
     async def execute_query(
         self,
         sql: str,
-        params: dict[str, Any] | None = None,
+        params: Sequence[Any] | None = None,
         timeout_seconds: int = 30,
         limit: int | None = None,
     ) -> QueryResult:
-        """Execute a SQL query."""
+        """Execute a SQL query, binding params to its $1, $2, ... placeholders."""
         if not self._connected or not self._pool:
             raise ConnectionFailedError(message="Not connected to PostgreSQL")
 
@@ -274,7 +275,7 @@ class PostgresAdapter(SQLAdapter):
                 await conn.execute(f"SET statement_timeout = {timeout_seconds * 1000}")
 
                 # Execute query
-                rows = await conn.fetch(sql)
+                rows = await conn.fetch(sql, *(params or ()))
 
                 execution_time_ms = int((time.time() - start_time) * 1000)
 
@@ -334,18 +335,21 @@ class PostgresAdapter(SQLAdapter):
             raise ConnectionFailedError(message="Not connected to PostgreSQL")
 
         try:
-            # Build filter conditions
-            conditions = ["table_schema NOT IN ('pg_catalog', 'information_schema')"]
-            if filter:
-                if filter.table_pattern:
-                    conditions.append(f"table_name LIKE '{filter.table_pattern}'")
-                if filter.schema_pattern:
-                    conditions.append(f"table_schema LIKE '{filter.schema_pattern}'")
-                if not filter.include_views:
-                    conditions.append("table_type = 'BASE TABLE'")
+            schema_filter = filter or SchemaFilter()
 
-            where_clause = " AND ".join(conditions)
-            limit_clause = f"LIMIT {filter.max_tables}" if filter else "LIMIT 1000"
+            # Name filters apply to every query below. Patterns are bound as $n
+            # parameters, never spliced into the SQL text.
+            conditions = ["table_schema NOT IN ('pg_catalog', 'information_schema')"]
+            params: list[str] = []
+            if schema_filter.table_pattern:
+                params.append(schema_filter.table_pattern)
+                conditions.append(f"table_name LIKE ${len(params)}")
+            if schema_filter.schema_pattern:
+                params.append(schema_filter.schema_pattern)
+                conditions.append(f"table_schema LIKE ${len(params)}")
+            name_filter = " AND ".join(conditions)
+            # information_schema.columns has no table_type, so only tables filter on it
+            type_filter = "" if schema_filter.include_views else "AND table_type = 'BASE TABLE'"
 
             # Get tables
             tables_sql = f"""
@@ -354,11 +358,11 @@ class PostgresAdapter(SQLAdapter):
                     table_name,
                     table_type
                 FROM information_schema.tables
-                WHERE {where_clause}
+                WHERE {name_filter} {type_filter}
                 ORDER BY table_schema, table_name
-                {limit_clause}
+                LIMIT {int(schema_filter.max_tables)}
             """
-            tables_result = await self.execute_query(tables_sql)
+            tables_result = await self.execute_query(tables_sql, params)
 
             # Get columns for all tables
             columns_sql = f"""
@@ -371,30 +375,30 @@ class PostgresAdapter(SQLAdapter):
                     column_default,
                     ordinal_position
                 FROM information_schema.columns
-                WHERE {where_clause}
+                WHERE {name_filter}
                 ORDER BY table_schema, table_name, ordinal_position
             """
-            columns_result = await self.execute_query(columns_sql)
+            columns_result = await self.execute_query(columns_sql, params)
 
-            # Get primary keys
+            # Get primary keys. The subquery exposes plain table_schema and
+            # table_name columns, so the same name filter applies unchanged.
             pk_sql = f"""
-                SELECT
-                    kcu.table_schema,
-                    kcu.table_name,
-                    kcu.column_name
-                FROM information_schema.table_constraints tc
-                JOIN information_schema.key_column_usage kcu
-                    ON tc.constraint_name = kcu.constraint_name
-                    AND tc.table_schema = kcu.table_schema
-                WHERE tc.constraint_type = 'PRIMARY KEY'
-                    AND {
-                where_clause.replace("table_schema", "tc.table_schema")
-                .replace("table_name", "tc.table_name")
-                .replace("table_type", "'BASE TABLE'")
-            }
+                SELECT table_schema, table_name, column_name
+                FROM (
+                    SELECT
+                        kcu.table_schema,
+                        kcu.table_name,
+                        kcu.column_name
+                    FROM information_schema.table_constraints tc
+                    JOIN information_schema.key_column_usage kcu
+                        ON tc.constraint_name = kcu.constraint_name
+                        AND tc.table_schema = kcu.table_schema
+                    WHERE tc.constraint_type = 'PRIMARY KEY'
+                ) pk
+                WHERE {name_filter}
             """
             try:
-                pk_result = await self.execute_query(pk_sql)
+                pk_result = await self.execute_query(pk_sql, params)
                 pk_set = {
                     (row["table_schema"], row["table_name"], row["column_name"])
                     for row in pk_result.rows

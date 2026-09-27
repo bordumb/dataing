@@ -14,11 +14,23 @@ from dataing.core.domain_types import AnomalyAlert, MetricSpec
 
 @dataclass
 class WebhookRequest:
-    """Represents an incoming webhook request."""
+    """Represents an incoming webhook request.
+
+    Header names are case-insensitive, so they are stored lowercased; read them
+    with ``header``, which accepts a name in any case.
+    """
 
     body: bytes
     headers: dict[str, str]
     query_params: dict[str, str]
+
+    def __post_init__(self) -> None:
+        """Lowercase header names, the form ASGI servers deliver them in."""
+        self.headers = {name.lower(): value for name, value in self.headers.items()}
+
+    def header(self, name: str) -> str | None:
+        """Get a header's value by case-insensitive name, or None if it was not sent."""
+        return self.headers.get(name.lower())
 
     @property
     def body_json(self) -> dict[str, Any]:

@@ -48,7 +48,7 @@ class MonteCarloAdapter(IntegrationAdapter):
         secret: str,
     ) -> bool:
         """Verify Monte Carlo webhook signature (HMAC-SHA256)."""
-        signature = request.headers.get(self.signature_header)
+        signature = request.header(self.signature_header)
         if not signature:
             return False
         return self._verify_hmac_sha256(request.body, signature, secret)
@@ -174,7 +174,7 @@ class MonteCarloAdapter(IntegrationAdapter):
             return f"mc_alert_{alert['id']}"
 
         # Check headers
-        request_id = request.headers.get("X-Request-Id")
+        request_id = request.header("X-Request-Id")
         if request_id:
             return f"mc_{request_id}"
 

@@ -60,11 +60,11 @@ class SlackAdapter(IntegrationAdapter):
         Slack signature is HMAC-SHA256 of "v0:{timestamp}:{body}"
         with header format "v0={signature}".
         """
-        signature = request.headers.get(self.signature_header)
+        signature = request.header(self.signature_header)
         if not signature:
             return False
 
-        timestamp = request.headers.get("X-Slack-Request-Timestamp")
+        timestamp = request.header("X-Slack-Request-Timestamp")
         if not timestamp:
             return False
 

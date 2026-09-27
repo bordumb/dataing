@@ -53,7 +53,7 @@ class GreatExpectationsAdapter(IntegrationAdapter):
         secret: str,
     ) -> bool:
         """Verify Great Expectations webhook signature (sha256=...)."""
-        signature = request.headers.get(self.signature_header)
+        signature = request.header(self.signature_header)
         return self._verify_sha256_prefixed(request.body, signature, secret)
 
     def parse_payload(

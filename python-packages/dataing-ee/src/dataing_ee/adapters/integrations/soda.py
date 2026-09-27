@@ -49,7 +49,7 @@ class SodaAdapter(IntegrationAdapter):
         secret: str,
     ) -> bool:
         """Verify Soda Cloud webhook signature (HMAC-SHA256 with sha256= prefix)."""
-        signature = request.headers.get(self.signature_header)
+        signature = request.header(self.signature_header)
         return self._verify_sha256_prefixed(request.body, signature, secret)
 
     def parse_payload(
@@ -207,7 +207,7 @@ class SodaAdapter(IntegrationAdapter):
             return f"soda_{event_id}"
 
         # Check headers
-        request_id = request.headers.get("X-Request-Id")
+        request_id = request.header("X-Request-Id")
         if request_id:
             return f"soda_{request_id}"
 

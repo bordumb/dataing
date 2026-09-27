@@ -35,7 +35,7 @@ class JiraAdapter(IntegrationAdapter):
         secret: str,
     ) -> bool:
         """Verify Jira webhook signature (sha256=...)."""
-        signature = request.headers.get(self.signature_header)
+        signature = request.header(self.signature_header)
         return self._verify_sha256_prefixed(request.body, signature, secret)
 
     def parse_payload(
@@ -81,7 +81,7 @@ class JiraAdapter(IntegrationAdapter):
     ) -> str:
         """Generate fingerprint from Jira issue ID and event type."""
         # Check for webhook ID header first
-        webhook_id = request.headers.get("X-Atlassian-Webhook-Id")
+        webhook_id = request.header("X-Atlassian-Webhook-Id")
         if webhook_id:
             return f"jira_webhook_{webhook_id}"
 

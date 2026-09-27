@@ -3,12 +3,14 @@
 import hashlib
 import hmac
 import json
+import time
 from datetime import UTC, datetime
 from typing import Any
 from unittest.mock import AsyncMock
 from uuid import uuid4
 
 import pytest
+from dataing_ee.adapters.integrations.registry import AdapterRegistry
 from dataing_ee.entrypoints.api.routes.integrations import (
     FieldMappingCreate,
     IntegrationCreate,
@@ -556,6 +558,62 @@ def _signed(payload: dict[str, Any], header: str) -> dict[str, str]:
     return {header: f"sha256={digest}"}
 
 
+def _hmac_hex(secret: str, message: bytes) -> str:
+    return hmac.new(secret.encode(), message, hashlib.sha256).hexdigest()
+
+
+def _signed_by(
+    provider: str, payload: dict[str, Any], secret: str = WEBHOOK_SECRET
+) -> dict[str, str]:
+    """Sign ``payload`` the way ``provider`` does, under its own header names."""
+    body = json.dumps(payload).encode()
+    if provider == "slack":
+        timestamp = str(int(time.time()))
+        digest = _hmac_hex(secret, f"v0:{timestamp}:{body.decode()}".encode())
+        return {"X-Slack-Signature": f"v0={digest}", "X-Slack-Request-Timestamp": timestamp}
+    digest = _hmac_hex(secret, body)
+    if provider == "monte_carlo":
+        return {"X-MC-Signature": digest}
+    if provider == "dbt":
+        return {"Authorization": digest}
+    header = {
+        "jira": "X-Hub-Signature",
+        "great_expectations": "X-GE-Signature",
+        "soda": "X-Soda-Signature",
+    }[provider]
+    return {header: f"sha256={digest}"}
+
+
+# A webhook for each provider that has an adapter, and the response it gets once its
+# signature checks out: the adapter either filters it or records it and finds no title.
+ADAPTER_WEBHOOKS: dict[str, tuple[dict[str, Any], dict[str, str]]] = {
+    "jira": (
+        {"webhookEvent": "jira:issue_created", "issue": {"id": "1", "fields": {}}},
+        {"status": "skipped", "reason": "no_title"},
+    ),
+    "monte_carlo": (
+        {"event_type": "incident_created"},
+        {"status": "skipped", "reason": "no_title"},
+    ),
+    "great_expectations": (
+        {"result": {"success": True}},
+        {"status": "skipped", "reason": "filtered_by_adapter"},
+    ),
+    "dbt": (
+        {"eventType": "job.run.completed", "data": {"runStatus": "Success"}},
+        {"status": "skipped", "reason": "filtered_by_adapter"},
+    ),
+    "slack": (
+        {"type": "event_callback", "event": {"type": "reaction_added", "reaction": "eyes"}},
+        {"status": "skipped", "reason": "filtered_by_adapter"},
+    ),
+    "soda": (
+        {"event_type": "check.passed"},
+        {"status": "skipped", "reason": "filtered_by_adapter"},
+    ),
+}
+
+
 def _recorded_event(db: AsyncMock) -> bool:
     return any(
         "INSERT INTO integration_events" in call.args[0] for call in db.fetch_one.await_args_list
@@ -630,3 +688,29 @@ class TestProviderWebhookAuthentication:
 
         assert response.status_code == 200
         assert response.json() == {"status": "skipped", "reason": "integration_disabled"}
+
+    @pytest.mark.parametrize("provider", list(ADAPTER_WEBHOOKS))
+    def test_accepts_webhook_signed_by_provider(self, provider: str) -> None:
+        # The server hands the adapter lowercase header names, whatever case was sent.
+        payload, expected = ADAPTER_WEBHOOKS[provider]
+        db = _webhook_db(_integration_row(provider, WEBHOOK_SECRET))
+
+        response = _post_webhook(db, provider, payload, _signed_by(provider, payload))
+
+        assert response.status_code == 200
+        assert response.json() == expected
+
+    @pytest.mark.parametrize("provider", list(ADAPTER_WEBHOOKS))
+    def test_rejects_webhook_signed_with_another_secret(self, provider: str) -> None:
+        payload, _ = ADAPTER_WEBHOOKS[provider]
+        db = _webhook_db(_integration_row(provider, WEBHOOK_SECRET))
+
+        response = _post_webhook(
+            db, provider, payload, _signed_by(provider, payload, secret="another_secret")
+        )
+
+        assert response.status_code == 401
+        assert not _recorded_event(db)
+
+    def test_signed_webhooks_cover_every_adapter(self) -> None:
+        assert set(ADAPTER_WEBHOOKS) == set(AdapterRegistry.list_providers())

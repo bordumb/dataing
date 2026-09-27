@@ -6,7 +6,7 @@ from datetime import datetime
 from typing import Annotated, Any, Literal
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Response
+from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from pydantic import BaseModel, EmailStr, Field
 
 from dataing.adapters.audit import audited
@@ -189,6 +189,7 @@ class InviteUserRequest(BaseModel):
 @router.post("/invite", status_code=201)
 @audited(action="user.invite", resource_type="user")
 async def invite_user(
+    http_request: Request,
     body: InviteUserRequest,
     auth: RequireAdmin,
     app_db: AppDbDep,
@@ -285,6 +286,7 @@ async def get_user(
 @router.post("/", response_model=UserResponse, status_code=201)
 @audited(action="user.create", resource_type="user")
 async def create_user(
+    http_request: Request,
     request: CreateUserRequest,
     auth: AdminScopeDep,
     app_db: AppDbDep,
@@ -332,6 +334,7 @@ async def create_user(
 @router.patch("/{user_id}", response_model=UserResponse)
 @audited(action="user.update", resource_type="user")
 async def update_user(
+    http_request: Request,
     user_id: UUID,
     request: UpdateUserRequest,
     auth: AdminScopeDep,
@@ -386,6 +389,7 @@ async def update_user(
 @router.delete("/{user_id}", status_code=204, response_class=Response)
 @audited(action="user.deactivate", resource_type="user")
 async def deactivate_user(
+    http_request: Request,
     user_id: UUID,
     auth: AdminScopeDep,
     app_db: AppDbDep,
@@ -416,6 +420,7 @@ async def deactivate_user(
 @router.patch("/{user_id}/role")
 @audited(action="user.role_update", resource_type="user")
 async def update_member_role(
+    http_request: Request,
     user_id: UUID,
     body: UpdateRoleRequest,
     auth: RequireAdmin,
@@ -460,6 +465,7 @@ async def update_member_role(
 @router.post("/{user_id}/remove")
 @audited(action="user.remove", resource_type="user")
 async def remove_org_member(
+    http_request: Request,
     user_id: UUID,
     auth: RequireAdmin,
     app_db: AppDbDep,

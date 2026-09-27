@@ -3,9 +3,16 @@
 from __future__ import annotations
 
 from unittest.mock import AsyncMock, MagicMock
+from uuid import uuid4
 
 import pytest
 from dataing_ee.entrypoints.api.middleware.audit import AuditMiddleware
+from fastapi import Depends, FastAPI
+from fastapi.testclient import TestClient
+from starlette.requests import Request
+from starlette.responses import Response
+
+from dataing.adapters.audit import audited, record_audit
 
 
 class TestAuditMiddleware:
@@ -227,3 +234,89 @@ class TestAuditMiddleware:
         await middleware.dispatch(request, call_next)
 
         request.body.assert_called_once()
+
+
+def _request(method: str, audit_repo: AsyncMock | None = None) -> Request:
+    """Build a real Starlette request to /api/v1/widgets."""
+    app = FastAPI()
+    app.state.audit_repo = audit_repo
+
+    async def receive() -> dict[str, object]:
+        return {"type": "http.request", "body": b"{}", "more_body": False}
+
+    return Request(
+        {
+            "type": "http",
+            "app": app,
+            "method": method,
+            "path": "/api/v1/widgets",
+            "query_string": b"",
+            "headers": [],
+        },
+        receive,
+    )
+
+
+class TestAuditMiddlewareSkips:
+    """The middleware writes a generic row only for mutations nothing else audited."""
+
+    @pytest.fixture
+    def middleware(self) -> AuditMiddleware:
+        """Return an audit middleware whose row writer is observable."""
+        middleware = AuditMiddleware(MagicMock())
+        middleware._log_request = AsyncMock()  # type: ignore[method-assign]
+        return middleware
+
+    async def test_skips_reads(self, middleware: AuditMiddleware) -> None:
+        """GETs get no row, but still get an X-Request-ID."""
+        response = await middleware.dispatch(_request("GET"), AsyncMock(return_value=Response()))
+
+        middleware._log_request.assert_not_called()  # type: ignore[attr-defined]
+        assert "X-Request-ID" in response.headers
+
+    async def test_skips_requests_with_an_audit_entry(self, middleware: AuditMiddleware) -> None:
+        """A route that recorded its own entry gets no generic duplicate."""
+        request = _request("POST", audit_repo=AsyncMock())
+
+        async def audited_route(req: Request) -> Response:
+            await record_audit(req, action="webhook.create", tenant_id=uuid4())
+            return Response(status_code=201)
+
+        await middleware.dispatch(request, audited_route)
+
+        middleware._log_request.assert_not_called()  # type: ignore[attr-defined]
+
+    async def test_logs_unaudited_mutations(self, middleware: AuditMiddleware) -> None:
+        """Mutations nothing else audited keep their generic row."""
+        await middleware.dispatch(_request("POST"), AsyncMock(return_value=Response()))
+
+        middleware._log_request.assert_called_once()  # type: ignore[attr-defined]
+
+
+def test_audited_route_gets_no_generic_row_in_a_real_app(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The endpoint's Request and the middleware's share state through the ASGI scope."""
+    log_request = AsyncMock()
+    monkeypatch.setattr(AuditMiddleware, "_log_request", log_request)
+    app = FastAPI()
+    app.state.audit_repo = AsyncMock()
+    app.add_middleware(AuditMiddleware)
+
+    async def authenticate(request: Request) -> None:
+        request.state.auth_context = MagicMock(tenant_id=uuid4(), user_id=uuid4())
+
+    @app.post("/widgets", dependencies=[Depends(authenticate)])
+    @audited(action="widget.create", resource_type="widget")
+    async def create_widget(http_request: Request) -> dict[str, str]:
+        return {"id": str(uuid4())}
+
+    @app.post("/gadgets", dependencies=[Depends(authenticate)])
+    async def create_gadget() -> dict[str, str]:
+        return {}
+
+    client = TestClient(app)
+
+    client.post("/widgets")
+    assert log_request.call_count == 0
+
+    client.post("/gadgets")
+    assert log_request.call_count == 1

@@ -1,3 +1,10 @@
+## [1.20.1](https://github.com/bordumb/dataing/compare/v1.20.0...v1.20.1) (2026-09-27)
+
+
+### Bug Fixes
+
+* **api:** record audit entries for every audited route and auth event ([#152](https://github.com/bordumb/dataing/issues/152)) ([d013433](https://github.com/bordumb/dataing/commit/d013433ab2676220a474ff0202c5e059496ad961))
+
 # [1.20.0](https://github.com/bordumb/dataing/compare/v1.19.0...v1.20.0) (2026-02-01)
 
 

@@ -1,3 +1,10 @@
+## [1.21.9](https://github.com/bordumb/dataing/compare/v1.21.8...v1.21.9) (2026-09-27)
+
+
+### Bug Fixes
+
+* **core:** stop registering incomplete Cassandra and DynamoDB adapters ([#169](https://github.com/bordumb/dataing/issues/169)) ([71da977](https://github.com/bordumb/dataing/commit/71da9774207eed773482989b74e31e7f7ab4885f))
+
 ## [1.21.8](https://github.com/bordumb/dataing/compare/v1.21.7...v1.21.8) (2026-09-27)
 
 

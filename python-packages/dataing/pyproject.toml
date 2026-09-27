@@ -1,6 +1,6 @@
 [project]
 name = "dataing"
-version = "1.21.9"
+version = "1.21.10"
 description = "Autonomous Data Quality Investigation - Community Edition"
 readme = "README.md"
 requires-python = ">=3.11"

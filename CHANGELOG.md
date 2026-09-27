@@ -1,3 +1,10 @@
+## [1.21.10](https://github.com/bordumb/dataing/compare/v1.21.9...v1.21.10) (2026-09-27)
+
+
+### Bug Fixes
+
+* **core:** send Postgres credentials verbatim, never from server PG* env ([#171](https://github.com/bordumb/dataing/issues/171)) ([5092f2e](https://github.com/bordumb/dataing/commit/5092f2eeaf5412708e8caed8c746f8c241e967a8))
+
 ## [1.21.9](https://github.com/bordumb/dataing/compare/v1.21.8...v1.21.9) (2026-09-27)
 
 

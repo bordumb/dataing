@@ -115,11 +115,7 @@ export async function createDataSource(
 export async function testDataSourceConnection(
   data: TestConnectionRequest,
 ): Promise<TestConnectionResponse> {
-  try {
-    return await testConnectionApiV1DatasourcesTestPost(data);
-  } catch {
-    throw new Error("Connection test failed");
-  }
+  return testConnectionApiV1DatasourcesTestPost(data);
 }
 
 export function useDataSourceSchema(datasourceId: string | null) {
@@ -176,81 +172,10 @@ export function useTableSearch(
   });
 }
 
-export interface SourceTypeInfo {
-  type: string;
-  display_name: string;
-  category: string;
-  icon: string;
-  description?: string;
-  config_schema?: Record<string, unknown>;
-}
-
 export function useSourceTypes() {
   return useQuery({
     queryKey: queryKeys.datasources.types,
-    queryFn: async () => {
-      try {
-        const response = await listSourceTypesApiV1DatasourcesTypesGet();
-        return response.types as SourceTypeInfo[];
-      } catch {
-        // Fallback source types
-        return [
-          {
-            type: "postgresql",
-            display_name: "PostgreSQL",
-            category: "database",
-            icon: "",
-          },
-          {
-            type: "mysql",
-            display_name: "MySQL",
-            category: "database",
-            icon: "",
-          },
-          {
-            type: "trino",
-            display_name: "Trino",
-            category: "database",
-            icon: "",
-          },
-          {
-            type: "snowflake",
-            display_name: "Snowflake",
-            category: "database",
-            icon: "",
-          },
-          {
-            type: "bigquery",
-            display_name: "BigQuery",
-            category: "database",
-            icon: "",
-          },
-          {
-            type: "redshift",
-            display_name: "Redshift",
-            category: "database",
-            icon: "",
-          },
-          {
-            type: "duckdb",
-            display_name: "DuckDB",
-            category: "database",
-            icon: "",
-          },
-          {
-            type: "mongodb",
-            display_name: "MongoDB",
-            category: "database",
-            icon: "",
-          },
-          {
-            type: "s3",
-            display_name: "Amazon S3",
-            category: "filesystem",
-            icon: "",
-          },
-        ] as SourceTypeInfo[];
-      }
-    },
+    queryFn: async ({ signal }) =>
+      (await listSourceTypesApiV1DatasourcesTypesGet(signal)).types,
   });
 }

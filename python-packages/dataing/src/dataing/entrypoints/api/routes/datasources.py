@@ -16,6 +16,7 @@ from pydantic import BaseModel, Field
 
 from dataing.adapters.audit import audited
 from dataing.adapters.datasource import (
+    ConfigSchema,
     SchemaFilter,
     SourceType,
     get_registry,
@@ -118,7 +119,7 @@ class SourceTypeResponse(BaseModel):
     icon: str
     description: str
     capabilities: dict[str, Any]
-    config_schema: dict[str, Any]
+    config_schema: ConfigSchema
 
 
 class SourceTypesResponse(BaseModel):
@@ -235,7 +236,7 @@ async def list_source_types() -> SourceTypesResponse:
                 icon=type_def.icon,
                 description=type_def.description,
                 capabilities=type_def.capabilities.model_dump(),
-                config_schema=type_def.config_schema.model_dump(),
+                config_schema=type_def.config_schema,
             )
         )
 

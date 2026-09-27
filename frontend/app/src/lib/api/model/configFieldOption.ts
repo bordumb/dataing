@@ -6,4 +6,10 @@
  * OpenAPI spec version: 2.0.0
  */
 
-export type ConfigFieldOptionsAnyOfItem = { [key: string]: string };
+/**
+ * One choice of an enum configuration field.
+ */
+export interface ConfigFieldOption {
+  label: string;
+  value: string;
+}

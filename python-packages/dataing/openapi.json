@@ -9821,10 +9821,7 @@
             "anyOf": [
               {
                 "items": {
-                  "additionalProperties": {
-                    "type": "string"
-                  },
-                  "type": "object"
+                  "$ref": "#/components/schemas/ConfigFieldOption"
                 },
                 "type": "array"
               },
@@ -9837,14 +9834,12 @@
           "show_if": {
             "anyOf": [
               {
-                "additionalProperties": true,
-                "type": "object"
+                "$ref": "#/components/schemas/ShowIfCondition"
               },
               {
                 "type": "null"
               }
-            ],
-            "title": "Show If"
+            ]
           },
           "description": {
             "anyOf": [
@@ -9879,6 +9874,25 @@
         ],
         "title": "ConfigField",
         "description": "Configuration field for connection forms."
+      },
+      "ConfigFieldOption": {
+        "properties": {
+          "value": {
+            "type": "string",
+            "title": "Value"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          }
+        },
+        "type": "object",
+        "required": [
+          "value",
+          "label"
+        ],
+        "title": "ConfigFieldOption",
+        "description": "One choice of an enum configuration field."
       },
       "ConfigSchema": {
         "properties": {
@@ -14260,6 +14274,24 @@
         "type": "object",
         "title": "SeverityOverride",
         "description": "Override SLA times for a specific severity."
+      },
+      "ShowIfCondition": {
+        "properties": {
+          "field": {
+            "type": "string",
+            "title": "Field"
+          },
+          "value": {
+            "title": "Value"
+          }
+        },
+        "type": "object",
+        "required": [
+          "field",
+          "value"
+        ],
+        "title": "ShowIfCondition",
+        "description": "Shows a configuration field only while another field holds a value."
       },
       "SourceTypeResponse": {
         "properties": {

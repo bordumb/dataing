@@ -6,4 +6,10 @@
  * OpenAPI spec version: 2.0.0
  */
 
-export type ConfigFieldShowIfAnyOf = { [key: string]: unknown };
+/**
+ * Shows a configuration field only while another field holds a value.
+ */
+export interface ShowIfCondition {
+  field: string;
+  value: unknown;
+}

@@ -299,6 +299,24 @@ class FieldGroup(BaseModel):
     collapsed_by_default: bool = False
 
 
+class ConfigFieldOption(BaseModel):
+    """One choice of an enum configuration field."""
+
+    model_config = ConfigDict(frozen=True)
+
+    value: str
+    label: str
+
+
+class ShowIfCondition(BaseModel):
+    """Shows a configuration field only while another field holds a value."""
+
+    model_config = ConfigDict(frozen=True)
+
+    field: str
+    value: Any
+
+
 class ConfigField(BaseModel):
     """Configuration field for connection forms."""
 
@@ -314,8 +332,8 @@ class ConfigField(BaseModel):
     min_value: int | None = None
     max_value: int | None = None
     pattern: str | None = None
-    options: list[dict[str, str]] | None = None
-    show_if: dict[str, Any] | None = None
+    options: list[ConfigFieldOption] | None = None
+    show_if: ShowIfCondition | None = None
     description: str | None = None
     help_url: str | None = None
 

@@ -663,9 +663,9 @@ async def verify_investigation(
 
 @router.post("/{investigation_id}/codify", response_model=CodifyResponse)
 async def codify_investigation(
+    auth: WriteScopeDep,
     investigation_id: TenantInvestigationId,
     request: CodifyRequest,
-    auth: WriteScopeDep,
     db: AppDbDep,
     temporal_client: TemporalClientDep,
 ) -> CodifyResponse:
@@ -944,9 +944,9 @@ async def record_test_run(
 
 @router.post("/{investigation_id}/messages", response_model=SendMessageResponse)
 async def send_message(
+    auth: WriteScopeDep,
     investigation_id: TenantInvestigationId,
     request: SendMessageRequest,
-    auth: WriteScopeDep,
     temporal_client: TemporalClientDep,
 ) -> SendMessageResponse:
     """Send a message to an investigation via Temporal signal.
@@ -1029,9 +1029,9 @@ async def get_investigation_status(
 
 @router.post("/{investigation_id}/input")
 async def send_user_input(
+    auth: WriteScopeDep,
     investigation_id: TenantInvestigationId,
     request: UserInputRequest,
-    auth: WriteScopeDep,
     temporal_client: TemporalClientDep,
 ) -> dict[str, str]:
     """Send user input to an investigation awaiting feedback.

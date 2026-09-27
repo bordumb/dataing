@@ -56,10 +56,12 @@ class FakeAppDb:
     def __init__(self, owners: dict[UUID, UUID]) -> None:
         """Initialize with investigation ID -> owning tenant ID."""
         self.owners = owners
+        self.reads: list[str] = []
         self.writes: list[str] = []
 
     async def fetch_one(self, query: str, *args: Any) -> dict[str, Any] | None:
         """Return the investigation row visible to this query, if any."""
+        self.reads.append(query)
         investigation_id = args[0]
         owner = self.owners.get(investigation_id)
         if owner is None:
@@ -120,7 +122,9 @@ def _completed_status(investigation_id: str) -> InvestigationStatus:
     )
 
 
-def _build_harness(owners: dict[UUID, UUID]) -> Harness:
+def _build_harness(
+    owners: dict[UUID, UUID], scopes: tuple[str, ...] = ("read", "write")
+) -> Harness:
     app = FastAPI()
     app.include_router(router, prefix="/api/v1")
     app.dependency_overrides[verify_api_key] = lambda: ApiKeyContext(
@@ -129,7 +133,7 @@ def _build_harness(owners: dict[UUID, UUID]) -> Harness:
         tenant_slug="caller",
         tenant_name="Caller",
         user_id=uuid4(),
-        scopes=["read", "write"],
+        scopes=list(scopes),
     )
 
     db = FakeAppDb(owners)
@@ -202,3 +206,21 @@ def test_investigation_owned_by_caller_is_served(route: tuple[str, str, str]) ->
     response = _call(harness, route, investigation_id)
 
     assert response.status_code == 200, response.text
+
+
+@pytest.mark.parametrize(
+    "route",
+    [route for route in INVESTIGATION_ROUTES if route[0] in {"POST", "PUT", "PATCH", "DELETE"}],
+    ids=_route_id,
+)
+def test_read_only_caller_is_refused_before_the_investigation_lookup(
+    route: tuple[str, str, str],
+) -> None:
+    """Write routes check scope first: 403 whether or not the ID exists, and no lookup."""
+    investigation_id = uuid4()
+    harness = _build_harness({investigation_id: OTHER_TENANT}, scopes=("read",))
+
+    response = _call(harness, route, investigation_id)
+
+    assert response.status_code == 403
+    assert harness.db.reads == []

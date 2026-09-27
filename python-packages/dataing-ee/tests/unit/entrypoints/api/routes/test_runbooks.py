@@ -1,12 +1,64 @@
 """Unit tests for Runbooks API routes (EE)."""
 
+from typing import Any
+from unittest.mock import MagicMock
+from uuid import UUID, uuid4
+
 import pytest
 from dataing_ee.entrypoints.api.routes.runbooks import (
     GenerateRunbookRequest,
     LinkFeedbackRequest,
     RunbookCreate,
     RunbookUpdate,
+    router,
 )
+from fastapi import FastAPI
+from fastapi.testclient import TestClient
+
+from dataing.adapters.db.app_db import AppDatabase
+from dataing.entrypoints.api.deps import get_app_db
+from dataing.entrypoints.api.middleware.auth import ApiKeyContext, verify_api_key
+
+
+@pytest.fixture
+def tenant_id() -> UUID:
+    """Return the caller's tenant ID."""
+    return uuid4()
+
+
+@pytest.fixture
+def mock_db() -> MagicMock:
+    """Create mock app database."""
+    return MagicMock(spec=AppDatabase)
+
+
+@pytest.fixture
+def mock_auth_context(tenant_id: UUID) -> ApiKeyContext:
+    """Create mock auth context for the caller's tenant."""
+    return ApiKeyContext(
+        key_id=uuid4(),
+        tenant_id=tenant_id,
+        tenant_slug="test",
+        tenant_name="Test Tenant",
+        user_id=uuid4(),
+        scopes=["read", "write"],
+    )
+
+
+@pytest.fixture
+def app(mock_db: MagicMock, mock_auth_context: ApiKeyContext) -> FastAPI:
+    """Create test app with runbook routes."""
+    app = FastAPI()
+    app.include_router(router, prefix="/api/v1")
+    app.dependency_overrides[get_app_db] = lambda: mock_db
+    app.dependency_overrides[verify_api_key] = lambda: mock_auth_context
+    return app
+
+
+@pytest.fixture
+def client(app: FastAPI) -> TestClient:
+    """Create test client."""
+    return TestClient(app)
 
 
 class TestRunbookCreateSchema:
@@ -121,6 +173,48 @@ class TestLinkFeedbackRequestSchema:
         feedback = LinkFeedbackRequest(was_helpful=True)
         assert feedback.was_helpful is True
         assert feedback.feedback_notes is None
+
+
+class TestProvideLinkFeedback:
+    """Tests for POST /runbooks/{runbook_id}/link/{issue_id}/feedback."""
+
+    def test_own_runbook_records_feedback(self, client: TestClient, mock_db: MagicMock) -> None:
+        """Test feedback on a link to the caller's own runbook is recorded."""
+        runbook_id, issue_id = uuid4(), uuid4()
+        mock_db.fetch_one.return_value = {"id": runbook_id}
+        mock_db.execute.return_value = "UPDATE 1"
+
+        response = client.post(
+            f"/api/v1/runbooks/{runbook_id}/link/{issue_id}/feedback",
+            json={"was_helpful": True},
+        )
+
+        assert response.status_code == 200
+        assert response.json() == {"status": "feedback_recorded"}
+        mock_db.execute.assert_awaited()
+
+    def test_other_tenants_runbook_returns_404_without_update(
+        self, client: TestClient, mock_db: MagicMock, tenant_id: UUID
+    ) -> None:
+        """Test feedback on another tenant's runbook link is rejected before any write."""
+        runbook_id, issue_id = uuid4(), uuid4()
+
+        async def fetch_one(query: str, *args: Any) -> dict[str, Any] | None:
+            # The runbook belongs to another tenant: a lookup scoped to the
+            # caller's tenant finds nothing, an unscoped one would find it.
+            return None if tenant_id in args else {"id": runbook_id}
+
+        mock_db.fetch_one.side_effect = fetch_one
+        # The link row exists, so an unscoped UPDATE would match it.
+        mock_db.execute.return_value = "UPDATE 1"
+
+        response = client.post(
+            f"/api/v1/runbooks/{runbook_id}/link/{issue_id}/feedback",
+            json={"was_helpful": False, "feedback_notes": "overwritten"},
+        )
+
+        assert response.status_code == 404
+        mock_db.execute.assert_not_awaited()
 
 
 class TestRunbookContentValidation:

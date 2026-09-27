@@ -115,6 +115,7 @@ class TestQueryValidation:
             "CREATE TABLE test (id INT)",
             "GRANT SELECT ON users TO public",
             "REVOKE SELECT ON users FROM public",
+            "COPY (SELECT * FROM users LIMIT 10) TO '/tmp/users.csv'",
         ],
         ids=[
             "insert",
@@ -126,6 +127,7 @@ class TestQueryValidation:
             "create",
             "grant",
             "revoke",
+            "copy_to_file",
         ],
     )
     def test_mutation_statements_blocked_hypothesis(self, mutation_query: str) -> None:

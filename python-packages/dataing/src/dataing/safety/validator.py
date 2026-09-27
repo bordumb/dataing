@@ -10,6 +10,8 @@ SAFETY IS NON-NEGOTIABLE:
 - Queries are parsed in the caller's SQL dialect; there is no default
 - Queries must have a LIMIT clause unless the caller opts out
 - Forbidden keywords are checked even in subqueries
+- No statements that move data to files or programs, or change session
+  state (COPY, EXPORT DATA, ATTACH, SET, etc.)
 """
 
 from __future__ import annotations
@@ -23,6 +25,26 @@ from dataing.core.exceptions import QueryValidationError
 
 # Forbidden statement types - these are never allowed
 FORBIDDEN_STATEMENTS: set[type[exp.Expression]] = {
+    # Moving data to or from files, programs, stages and buckets
+    exp.Copy,  # COPY ... TO/FROM a file or PROGRAM, Snowflake COPY INTO
+    exp.Export,  # BigQuery EXPORT DATA
+    exp.LoadData,
+    exp.Put,  # Snowflake PUT uploads to a stage
+    exp.Get,  # Snowflake GET downloads from a stage
+    # Database files, extensions, catalog and session state
+    exp.Attach,  # ATTACH creates or opens database files
+    exp.Detach,
+    exp.Install,  # DuckDB INSTALL downloads extensions
+    exp.Cache,  # CACHE TABLE ... AS SELECT materializes a table
+    exp.Comment,  # COMMENT ON writes catalog metadata
+    exp.Set,
+    exp.Pragma,
+    exp.Use,  # includes Snowflake USE ROLE
+    exp.Kill,
+    # sqlglot's fallback for statements it cannot parse (e.g. LOAD, CALL,
+    # VACUUM INTO, DO): the validator cannot see what they do
+    exp.Command,
+    # Data modification, DDL and privileges
     exp.Delete,
     exp.Drop,
     exp.TruncateTable,

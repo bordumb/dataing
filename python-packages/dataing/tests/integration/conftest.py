@@ -32,9 +32,10 @@ def _psql(psql: str, dsn: str, *args: str) -> subprocess.CompletedProcess[str]:
 def migrated_dsn() -> Iterator[str]:
     """DSN of a throwaway database built from every schema migration.
 
-    Migrations are applied with psql, the same way `just demo-infra`, CI and
-    infra/init-app-db.sh apply them (seed files skipped, statement errors do not
-    stop a file), so tests see the schema the application actually runs on.
+    Migrations are applied with psql in file order, seed files skipped, like
+    `just demo-infra` and infra/init-app-db.sh apply them. Unlike those runners,
+    ON_ERROR_STOP is set, so a statement that fails fails the fixture instead of
+    being skipped: a broken migration fails CI rather than leaving the schema short.
     The database is created on the server in DATABASE_URL and dropped afterwards.
 
     Integration tests only run when selected with `-m integration`, so a missing
@@ -60,7 +61,7 @@ def migrated_dsn() -> Iterator[str]:
         for migration in sorted(MIGRATIONS_DIR.glob("*.sql")):
             if "seed" in migration.name:
                 continue
-            applied = _psql(psql, dsn, "--file", str(migration))
+            applied = _psql(psql, dsn, "--set", "ON_ERROR_STOP=1", "--file", str(migration))
             if applied.returncode != 0:
                 raise RuntimeError(f"psql could not apply {migration.name}: {applied.stderr}")
         yield dsn

@@ -1,17 +1,8 @@
--- RBAC tables for teams, tags, and permission grants
+-- RBAC tables for team membership, tags, and permission grants
 -- Migration 008: RBAC
-
--- Teams (synced from SCIM Groups or created manually)
-CREATE TABLE teams (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    org_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
-    name VARCHAR(100) NOT NULL,
-    external_id VARCHAR(255),
-    is_scim_managed BOOLEAN DEFAULT false,
-    created_at TIMESTAMPTZ DEFAULT NOW(),
-    updated_at TIMESTAMPTZ DEFAULT NOW(),
-    UNIQUE(org_id, name)
-);
+--
+-- The teams table itself (synced from SCIM Groups or created manually) is
+-- created by 007_auth_tables.sql, along with its idx_teams_org index.
 
 -- Team membership
 CREATE TABLE team_members (
@@ -83,7 +74,6 @@ CREATE TABLE scim_role_groups (
 );
 
 -- Indexes
-CREATE INDEX idx_teams_org ON teams(org_id);
 CREATE INDEX idx_teams_external ON teams(external_id) WHERE external_id IS NOT NULL;
 CREATE INDEX idx_team_members_user ON team_members(user_id);
 CREATE INDEX idx_team_members_team ON team_members(team_id);

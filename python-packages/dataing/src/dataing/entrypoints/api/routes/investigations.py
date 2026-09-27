@@ -263,6 +263,43 @@ def get_temporal_client(request: Request) -> TemporalInvestigationClient:
 TemporalClientDep = Annotated[TemporalInvestigationClient, Depends(get_temporal_client)]
 
 
+async def require_tenant_investigation(
+    investigation_id: UUID,
+    auth: AuthDep,
+    db: AppDbDep,
+) -> UUID:
+    """Resolve the path investigation ID, enforcing tenant ownership.
+
+    Missing investigations and other tenants' investigations both return the
+    same 404, so callers cannot probe which investigation IDs exist.
+
+    Args:
+        investigation_id: Investigation ID from the request path.
+        auth: Authentication context from API key/JWT.
+        db: Application database.
+
+    Returns:
+        The investigation ID, verified to belong to the caller's tenant.
+
+    Raises:
+        HTTPException: 404 if the investigation is missing or owned by another tenant.
+    """
+    row = await db.fetch_one(
+        "SELECT tenant_id FROM investigations WHERE id = $1",
+        investigation_id,
+    )
+    if row is None or row["tenant_id"] != auth.tenant_id:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Investigation not found: {investigation_id}",
+        )
+    return investigation_id
+
+
+# Every /{investigation_id} route must take its ID through this dependency.
+TenantInvestigationId = Annotated[UUID, Depends(require_tenant_investigation)]
+
+
 @router.get("", response_model=list[InvestigationListItem])
 async def list_investigations(
     auth: AuthDep,
@@ -445,8 +482,8 @@ async def start_investigation(
 
 @router.post("/{investigation_id}/cancel", response_model=CancelInvestigationResponse)
 async def cancel_investigation(
-    investigation_id: UUID,
     auth: WriteScopeDep,
+    investigation_id: TenantInvestigationId,
     temporal_client: TemporalClientDep,
 ) -> CancelInvestigationResponse:
     """Cancel an investigation and all its child workflows.
@@ -483,7 +520,7 @@ async def cancel_investigation(
 
 @router.get("/{investigation_id}", response_model=InvestigationStateResponse)
 async def get_investigation(
-    investigation_id: UUID,
+    investigation_id: TenantInvestigationId,
     auth: AuthDep,
     temporal_client: TemporalClientDep,
 ) -> InvestigationStateResponse:
@@ -538,7 +575,7 @@ async def get_investigation(
 
 @router.get("/{investigation_id}/verify", response_model=ChainVerificationResponse)
 async def verify_investigation(
-    investigation_id: UUID,
+    investigation_id: TenantInvestigationId,
     auth: AuthDep,
     db: AppDbDep,
 ) -> ChainVerificationResponse:
@@ -626,9 +663,9 @@ async def verify_investigation(
 
 @router.post("/{investigation_id}/codify", response_model=CodifyResponse)
 async def codify_investigation(
-    investigation_id: UUID,
-    request: CodifyRequest,
     auth: WriteScopeDep,
+    investigation_id: TenantInvestigationId,
+    request: CodifyRequest,
     db: AppDbDep,
     temporal_client: TemporalClientDep,
 ) -> CodifyResponse:
@@ -907,9 +944,9 @@ async def record_test_run(
 
 @router.post("/{investigation_id}/messages", response_model=SendMessageResponse)
 async def send_message(
-    investigation_id: UUID,
-    request: SendMessageRequest,
     auth: WriteScopeDep,
+    investigation_id: TenantInvestigationId,
+    request: SendMessageRequest,
     temporal_client: TemporalClientDep,
 ) -> SendMessageResponse:
     """Send a message to an investigation via Temporal signal.
@@ -952,7 +989,7 @@ async def send_message(
 
 @router.get("/{investigation_id}/status", response_model=TemporalStatusResponse)
 async def get_investigation_status(
-    investigation_id: UUID,
+    investigation_id: TenantInvestigationId,
     auth: AuthDep,
     temporal_client: TemporalClientDep,
 ) -> TemporalStatusResponse:
@@ -992,9 +1029,9 @@ async def get_investigation_status(
 
 @router.post("/{investigation_id}/input")
 async def send_user_input(
-    investigation_id: UUID,
-    request: UserInputRequest,
     auth: WriteScopeDep,
+    investigation_id: TenantInvestigationId,
+    request: UserInputRequest,
     temporal_client: TemporalClientDep,
 ) -> dict[str, str]:
     """Send user input to an investigation awaiting feedback.
@@ -1034,7 +1071,7 @@ async def send_user_input(
 
 @router.get("/{investigation_id}/stream")
 async def stream_updates(
-    investigation_id: UUID,
+    investigation_id: TenantInvestigationId,
     auth: AuthDep,
     temporal_client: TemporalClientDep,
 ) -> EventSourceResponse:
@@ -1177,9 +1214,8 @@ class StreamEventResponse(BaseModel):
 @router.get("/{investigation_id}/events")
 async def stream_events(
     request: Request,
-    investigation_id: UUID,
+    investigation_id: TenantInvestigationId,
     auth: AuthDep,
-    db: AppDbDep,
     temporal_client: TemporalClientDep,
     last_event_id: int | None = Query(
         default=None, alias="seq", description="Resume from this sequence number"
@@ -1196,21 +1232,12 @@ async def stream_events(
         request: FastAPI request object.
         investigation_id: UUID of the investigation.
         auth: Authentication context from API key/JWT.
-        db: Application database.
         temporal_client: Temporal client for status polling.
         last_event_id: Optional sequence number to resume from.
 
     Returns:
         EventSourceResponse with SSE stream.
     """
-    # Check if investigation exists in investigations table
-    result = await db.fetch_one(
-        "SELECT id FROM investigations WHERE id = $1 AND tenant_id = $2",
-        investigation_id,
-        auth.tenant_id,
-    )
-    if not result:
-        raise HTTPException(status_code=404, detail=f"Investigation not found: {investigation_id}")
 
     async def event_generator() -> AsyncIterator[dict[str, Any]]:
         """Generate SSE events by polling Temporal workflow status."""
@@ -1385,7 +1412,7 @@ SnapshotStoreDep = Annotated[Any, Depends(get_snapshot_store)]
 
 @router.get("/{investigation_id}/snapshots")
 async def list_snapshots(
-    investigation_id: UUID,
+    investigation_id: TenantInvestigationId,
     auth: AuthDep,
     db: AppDbDep,
 ) -> SnapshotListResponse:
@@ -1446,10 +1473,9 @@ async def list_snapshots(
 
 @router.get("/{investigation_id}/snapshots/{checkpoint}")
 async def download_snapshot(
-    investigation_id: UUID,
+    investigation_id: TenantInvestigationId,
     checkpoint: SnapshotCheckpointParam,
     auth: AuthDep,
-    db: AppDbDep,
     snapshot_store: SnapshotStoreDep,
     accept_encoding: str | None = Header(default=None, alias="Accept-Encoding"),
 ) -> Response:
@@ -1461,7 +1487,6 @@ async def download_snapshot(
         investigation_id: UUID of the investigation.
         checkpoint: The checkpoint to download (start, hypothesis_generated, etc).
         auth: Authentication context from API key/JWT.
-        db: Application database.
         snapshot_store: Snapshot storage backend.
         accept_encoding: Accept-Encoding header for compression.
 
@@ -1471,22 +1496,6 @@ async def download_snapshot(
     Raises:
         HTTPException: If investigation not found, access denied, or snapshot missing.
     """
-    # Verify investigation exists and belongs to tenant
-    result = await db.fetch_one(
-        """
-        SELECT id, outcome
-        FROM investigations
-        WHERE id = $1 AND tenant_id = $2
-        """,
-        investigation_id,
-        auth.tenant_id,
-    )
-    if not result:
-        raise HTTPException(
-            status_code=404,
-            detail=f"Investigation not found: {investigation_id}",
-        )
-
     # Build expected storage path
     storage_path = f"{auth.tenant_id}/snapshots/{investigation_id}/{checkpoint.value}.snapshot"
 
@@ -1571,7 +1580,7 @@ class ImportSnapshotResponse(BaseModel):
 
 @router.get("/{investigation_id}/snapshot")
 async def export_snapshot_archive(
-    investigation_id: UUID,
+    investigation_id: TenantInvestigationId,
     auth: AuthDep,
     db: AppDbDep,
     temporal_client: TemporalClientDep,

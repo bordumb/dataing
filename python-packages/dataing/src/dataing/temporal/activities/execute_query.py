@@ -8,7 +8,7 @@ through. There is no default dialect: a query whose dialect is unknown is refuse
 
 from __future__ import annotations
 
-from collections.abc import Awaitable, Callable
+from collections.abc import Awaitable
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Protocol, runtime_checkable
 
@@ -36,6 +36,14 @@ class DatabaseProtocol(Protocol):
         ...
 
 
+class AdapterGetter(Protocol):
+    """Resolves the connected adapter for a datasource owned by a tenant."""
+
+    def __call__(self, *, tenant_id: str, datasource_id: str) -> Awaitable[BaseAdapter]:
+        """Return the adapter, raising if the tenant has no such active datasource."""
+        ...
+
+
 @dataclass
 class ExecuteQueryInput:
     """Input for execute_query activity."""
@@ -43,6 +51,7 @@ class ExecuteQueryInput:
     investigation_id: str
     query: str
     hypothesis_id: str
+    tenant_id: str
     datasource_id: str
 
 
@@ -64,12 +73,13 @@ class ExecuteQueryResult:
 
 
 def make_execute_query_activity(
-    get_adapter: Callable[[str], Awaitable[BaseAdapter]],
+    get_adapter: AdapterGetter,
 ) -> Any:
     """Factory that creates execute_query activity with injected dependencies.
 
     Args:
-        get_adapter: Async function returning the connected adapter for a datasource ID.
+        get_adapter: Async function returning the connected adapter for a tenant's
+            datasource.
 
     Returns:
         The execute_query activity function.
@@ -80,7 +90,7 @@ def make_execute_query_activity(
         """Execute SQL query against the data source.
 
         This activity:
-        1. Resolves the adapter for the data source
+        1. Resolves the adapter for the tenant's data source
         2. Validates the query in that adapter's SQL dialect
         3. Executes the query on the same adapter
         4. Returns structured query result
@@ -98,7 +108,9 @@ def make_execute_query_activity(
             )
 
         try:
-            adapter = await get_adapter(input.datasource_id)
+            adapter = await get_adapter(
+                tenant_id=input.tenant_id, datasource_id=input.datasource_id
+            )
             dialect = adapter.capabilities.sql_dialect
         except Exception as e:
             return failed(f"Query execution failed: {e}")

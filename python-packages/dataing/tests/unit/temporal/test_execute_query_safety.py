@@ -7,7 +7,6 @@ the adapter that will execute the query. There is no default dialect.
 
 from __future__ import annotations
 
-from collections.abc import Awaitable, Callable
 from typing import Any
 from unittest.mock import AsyncMock
 
@@ -21,6 +20,7 @@ from dataing.adapters.datasource.sql.mysql import MySQLAdapter
 from dataing.adapters.datasource.sql.postgres import PostgresAdapter
 from dataing.adapters.datasource.types import AdapterCapabilities, QueryLanguage, QueryResult
 from dataing.temporal.activities.execute_query import (
+    AdapterGetter,
     ExecuteQueryInput,
     ExecuteQueryResult,
     make_execute_query_activity,
@@ -29,8 +29,6 @@ from dataing.temporal.activities.execute_query import (
 # One SELECT to a Postgres parser, which nests block comments. MySQL ends the
 # comment at the first */ and runs the RENAME as a second statement.
 NESTED_COMMENT_SMUGGLE = "SELECT 1 LIMIT 1 /* /* */ ; RENAME TABLE a TO b; /* */ */"
-
-GetAdapter = Callable[[str], Awaitable[Any]]
 
 
 class _UndeclaredDialectAdapter(PostgresAdapter):
@@ -65,16 +63,16 @@ def _recording(adapter_cls: type[BaseAdapter], result: QueryResult = ONE_ROW) ->
     return adapter
 
 
-def _serving(adapter: Any) -> GetAdapter:
+def _serving(adapter: Any) -> AdapterGetter:
     """Build a get_adapter function that always resolves to the given adapter."""
 
-    async def get_adapter(datasource_id: str) -> Any:
+    async def get_adapter(*, tenant_id: str, datasource_id: str) -> Any:
         return adapter
 
     return get_adapter
 
 
-async def _run(get_adapter: GetAdapter, sql: str) -> ExecuteQueryResult:
+async def _run(get_adapter: AdapterGetter, sql: str) -> ExecuteQueryResult:
     """Run the execute_query activity outside a Temporal worker."""
     execute_query = make_execute_query_activity(get_adapter=get_adapter)
     result: ExecuteQueryResult = await execute_query(
@@ -82,6 +80,7 @@ async def _run(get_adapter: GetAdapter, sql: str) -> ExecuteQueryResult:
             investigation_id="inv-1",
             query=sql,
             hypothesis_id="h1",
+            tenant_id="tenant-1",
             datasource_id="ds-1",
         )
     )
@@ -161,7 +160,7 @@ class TestFailsClosed:
     async def test_unavailable_data_source_is_an_error(self) -> None:
         """Test that a data source that cannot be resolved yields an error result."""
 
-        async def get_adapter(datasource_id: str) -> Any:
+        async def get_adapter(*, tenant_id: str, datasource_id: str) -> Any:
             raise ValueError(f"Datasource {datasource_id} not found or inactive")
 
         result = await _run(get_adapter, "SELECT id FROM users LIMIT 10")

@@ -28,7 +28,7 @@ SQL = sql_for("h-1")
 async def _evaluate(
     monkeypatch: pytest.MonkeyPatch, datasource: FakeDatasource, agent: FakeAgent
 ) -> EvaluateHypothesisResult:
-    async def get_adapter(datasource_id: str) -> FakeDatasource:
+    async def get_adapter(*, tenant_id: str, datasource_id: str) -> FakeDatasource:
         return datasource
 
     InProcessTemporal(
@@ -44,6 +44,7 @@ async def _evaluate(
             hypothesis={"id": "h-1", "title": "Upstream ETL wrote NULL amounts"},
             schema_info={},
             alert_summary="orders.amount null rate spiked to 40%",
+            tenant_id="tenant-1",
             datasource_id="ds-1",
         )
     )

@@ -68,7 +68,7 @@ async def _investigate(
     *,
     terminated: Collection[str] = (),
 ) -> None:
-    async def get_adapter(datasource_id: str) -> FakeDatasource:
+    async def get_adapter(*, tenant_id: str, datasource_id: str) -> FakeDatasource:
         return datasource
 
     temporal = InProcessTemporal(

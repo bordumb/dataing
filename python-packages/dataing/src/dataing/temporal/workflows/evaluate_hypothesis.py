@@ -23,6 +23,7 @@ class EvaluateHypothesisInput:
     hypothesis: dict[str, Any]
     schema_info: dict[str, Any]
     alert_summary: str
+    tenant_id: str
     datasource_id: str
     alert: dict[str, Any] | None = None
 
@@ -90,6 +91,7 @@ class EvaluateHypothesisWorkflow:
             investigation_id=input.investigation_id,
             query=query,
             hypothesis_id=hypothesis_id,
+            tenant_id=input.tenant_id,
             datasource_id=input.datasource_id,
         )
         execute_result = await workflow.execute_activity(

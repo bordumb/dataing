@@ -36,6 +36,7 @@ class GatherContextInput:
     """Input for gather_context activity."""
 
     investigation_id: str
+    tenant_id: str
     datasource_id: str
     alert: dict[str, Any]
 
@@ -51,13 +52,13 @@ class GatherContextResult:
 
 def make_gather_context_activity(
     context_engine: ContextEngineProtocol,
-    get_adapter: Any,  # Callable[[str], Awaitable[BaseAdapter]]
+    get_adapter: Any,  # async (*, tenant_id: str, datasource_id: str) -> BaseAdapter
 ) -> Any:
     """Factory that creates gather_context activity with injected dependencies.
 
     Args:
         context_engine: Engine for gathering context from data source.
-        get_adapter: Async function to get adapter for a datasource ID.
+        get_adapter: Async function returning the adapter for a tenant's datasource.
 
     Returns:
         The gather_context activity function.
@@ -90,9 +91,11 @@ def make_gather_context_activity(
                 error=f"Invalid alert data: {e}",
             )
 
-        # Get adapter for datasource
+        # Get adapter for the tenant's datasource
         try:
-            adapter = await get_adapter(input.datasource_id)
+            adapter = await get_adapter(
+                tenant_id=input.tenant_id, datasource_id=input.datasource_id
+            )
         except Exception as e:
             return GatherContextResult(
                 schema_info={},

@@ -403,6 +403,65 @@ class TestEvaluateAndApplyPolicy:
             assert inv_id is not None
             mock_temporal.start_investigation.assert_called_once()
 
+    @pytest.mark.parametrize(
+        "resolve_error",
+        [
+            "No active datasources found for tenant",
+            "ambiguous_datasource:Multiple datasources available.",
+        ],
+    )
+    async def test_auto_action_without_resolvable_datasource_skips_investigation(
+        self,
+        mock_db: AsyncMock,
+        mock_auth: MagicMock,
+        sample_payload: GenericWebhookPayload,
+        resolve_error: str,
+    ) -> None:
+        """No datasource of the tenant's own means no investigation (no fallback ID)."""
+        from unittest.mock import AsyncMock, MagicMock, patch
+
+        from dataing.adapters.db.team_policy_repository import PolicyAction
+        from dataing.entrypoints.api.routes.integrations import _evaluate_and_apply_policy
+        from dataing.services.policy import PolicyResult, QueueConfig
+
+        team_id = uuid4()
+        mock_request = MagicMock()
+        mock_temporal = AsyncMock()
+        mock_request.app.state.temporal_client = mock_temporal
+
+        with (
+            patch("dataing.entrypoints.api.routes.integrations.TeamPolicyRepository") as MockRepo,
+            patch("dataing.entrypoints.api.routes.integrations.PolicyService") as MockPolicyService,
+            patch(
+                "dataing.entrypoints.api.deps.resolve_datasource_id",
+                AsyncMock(side_effect=ValueError(resolve_error)),
+            ),
+        ):
+            MockRepo.return_value.get_default_team_for_tenant = AsyncMock(return_value=team_id)
+            MockPolicyService.return_value.evaluate = AsyncMock(
+                return_value=PolicyResult(
+                    action=PolicyAction.AUTO,
+                    queue_config=QueueConfig(),
+                    source="team_default",
+                    team_id=team_id,
+                )
+            )
+            mock_db.execute = AsyncMock()
+
+            action, inv_id = await _evaluate_and_apply_policy(
+                request=mock_request,
+                db=mock_db,
+                auth=mock_auth,
+                issue_id=uuid4(),
+                payload=sample_payload,
+            )
+
+        assert action == "auto"
+        assert inv_id is None
+        mock_temporal.start_investigation.assert_not_called()
+        executed_sql = [call.args[0] for call in mock_db.execute.call_args_list]
+        assert not any("INSERT INTO investigations" in sql for sql in executed_sql)
+
     async def test_auto_action_without_temporal_returns_none_investigation(
         self,
         mock_db: AsyncMock,

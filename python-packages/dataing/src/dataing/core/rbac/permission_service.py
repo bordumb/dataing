@@ -77,7 +77,7 @@ class PermissionService:
 
                 -- Datasource-based grant (user)
                 SELECT 1 FROM permission_grants pg
-                JOIN investigations i ON pg.data_source_id = i.data_source_id
+                JOIN investigations i ON pg.data_source_id::text = i.alert->>'datasource_id'
                 WHERE pg.user_id = $1 AND i.id = $2
 
                 UNION ALL
@@ -102,7 +102,7 @@ class PermissionService:
                 -- Team grants (datasource-based)
                 SELECT 1 FROM permission_grants pg
                 JOIN team_members tm ON pg.team_id = tm.team_id
-                JOIN investigations i ON pg.data_source_id = i.data_source_id
+                JOIN investigations i ON pg.data_source_id::text = i.alert->>'datasource_id'
                 WHERE tm.user_id = $1 AND i.id = $2
             )
             """,
@@ -158,7 +158,7 @@ class PermissionService:
                 -- Datasource grant (user)
                 OR EXISTS (
                     SELECT 1 FROM permission_grants pg
-                    WHERE pg.user_id = $1 AND pg.data_source_id = i.data_source_id
+                    WHERE pg.user_id = $1 AND pg.data_source_id::text = i.alert->>'datasource_id'
                 )
 
                 -- Team grants
@@ -172,7 +172,7 @@ class PermissionService:
                             SELECT tag_id FROM investigation_tags
                             WHERE investigation_id = i.id
                         )
-                        OR pg.data_source_id = i.data_source_id
+                        OR pg.data_source_id::text = i.alert->>'datasource_id'
                     )
                 )
             )

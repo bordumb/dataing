@@ -572,24 +572,24 @@ class AppDatabase:
     async def list_investigations(
         self,
         tenant_id: UUID,
-        status: str | None = None,
         limit: int = 50,
         offset: int = 0,
     ) -> list[dict[str, Any]]:
-        """List investigations for a tenant."""
-        if status:
-            return await self.fetch_all(
-                """SELECT * FROM investigations
-                   WHERE tenant_id = $1 AND status = $2
-                   ORDER BY created_at DESC
-                   LIMIT $3 OFFSET $4""",
-                tenant_id,
-                status,
-                limit,
-                offset,
-            )
+        """List investigation summaries for a tenant, newest first.
+
+        Summaries come from the alert JSONB: the primary dataset, the metric's
+        display name (else the anomaly type) and the severity. Alerts that are not
+        an AnomalyAlert, such as imported replays, report "unknown".
+        """
         return await self.fetch_all(
-            """SELECT * FROM investigations
+            """SELECT id,
+                      COALESCE(alert->'dataset_ids'->>0, 'unknown') AS dataset_id,
+                      COALESCE(NULLIF(alert #>> '{metric_spec,display_name}', ''),
+                               alert->>'anomaly_type', 'unknown') AS metric_name,
+                      COALESCE(outcome->>'status', status) AS status,
+                      alert->>'severity' AS severity,
+                      created_at
+               FROM investigations
                WHERE tenant_id = $1
                ORDER BY created_at DESC
                LIMIT $2 OFFSET $3""",
@@ -793,18 +793,17 @@ class AppDatabase:
     # Dashboard stats
     async def get_dashboard_stats(self, tenant_id: UUID) -> dict[str, Any]:
         """Get dashboard statistics for a tenant."""
-        # Active investigations
+        # Active investigations (no outcome yet)
         active_result = await self.fetch_one(
             """SELECT COUNT(*) as count FROM investigations
-               WHERE tenant_id = $1 AND status IN ('pending', 'in_progress')""",
+               WHERE tenant_id = $1 AND status = 'active'""",
             tenant_id,
         )
 
-        # Completed today
+        # Completed today (outcome set today, whatever it says)
         completed_result = await self.fetch_one(
             """SELECT COUNT(*) as count FROM investigations
-               WHERE tenant_id = $1 AND status = 'completed'
-                 AND completed_at >= CURRENT_DATE""",
+               WHERE tenant_id = $1 AND completed_at >= CURRENT_DATE""",
             tenant_id,
         )
 

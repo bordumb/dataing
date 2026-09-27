@@ -1,4 +1,4 @@
-import customInstance from "./client";
+import { getStatsApiV1DashboardStatsGet } from "./generated/dashboard/dashboard";
 
 export interface DashboardStats {
   activeInvestigations: number;
@@ -7,17 +7,10 @@ export interface DashboardStats {
 }
 
 export async function fetchDashboardStats(): Promise<DashboardStats> {
-  try {
-    return await customInstance<DashboardStats>({
-      url: "/dashboard/stats",
-      method: "GET",
-    });
-  } catch {
-    // Return mock data if endpoint doesn't exist
-    return {
-      activeInvestigations: 3,
-      completedToday: 7,
-      dataSources: 2,
-    };
-  }
+  const stats = await getStatsApiV1DashboardStatsGet();
+  return {
+    activeInvestigations: stats.active_investigations,
+    completedToday: stats.completed_today,
+    dataSources: stats.data_sources,
+  };
 }

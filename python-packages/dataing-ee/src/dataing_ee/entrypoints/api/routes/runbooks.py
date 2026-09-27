@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import logging
 from datetime import datetime
 from typing import Annotated, Any
@@ -488,13 +489,6 @@ async def generate_runbook_from_issue(
             detail="Could not generate runbook from issue",
         )
 
-    # Get investigation ID if exists
-    inv_row = await db.fetch_one(
-        "SELECT id FROM investigations WHERE issue_id = $1 ORDER BY created_at DESC LIMIT 1",
-        issue_id,
-    )
-    investigation_id = inv_row["id"] if inv_row else None
-
     # Insert runbook
     row = await db.fetch_one(
         """
@@ -521,7 +515,7 @@ async def generate_runbook_from_issue(
         generated.prevention_notes,
         body.publish,
         issue_id,
-        investigation_id,
+        generated.investigation_id,
         auth.user_id,
     )
 
@@ -725,6 +719,14 @@ def _usefulness_score(helpful: int, not_helpful: int) -> float:
     return max(0.0, 0.1 * helpful - 0.05 * not_helpful)
 
 
+def _json_list(value: Any) -> list[dict[str, Any]]:
+    """A JSONB array column value as a list (AppDatabase returns JSONB as text)."""
+    if isinstance(value, str):
+        value = json.loads(value)
+    result: list[dict[str, Any]] = value or []
+    return result
+
+
 def _row_to_response(row: dict[str, Any]) -> RunbookResponse:
     """Convert database row to response model."""
     return RunbookResponse(
@@ -735,10 +737,10 @@ def _row_to_response(row: dict[str, Any]) -> RunbookResponse:
         summary=row.get("summary"),
         dataset_id=row.get("dataset_id"),
         labels=row.get("labels") or [],
-        symptoms=row.get("symptoms") or [],
+        symptoms=_json_list(row.get("symptoms")),
         root_cause=row.get("root_cause"),
-        verification_steps=row.get("verification_steps") or [],
-        fix_steps=row.get("fix_steps") or [],
+        verification_steps=_json_list(row.get("verification_steps")),
+        fix_steps=_json_list(row.get("fix_steps")),
         prevention_notes=row.get("prevention_notes"),
         is_published=row["is_published"],
         view_count=row["view_count"],

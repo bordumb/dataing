@@ -73,13 +73,6 @@ export const queryKeys = {
     webhooks: ["/api/v1/settings/webhooks"] as const,
   },
 
-  // Approvals
-  approvals: {
-    all: ["/api/v1/approvals/"] as const,
-    pending: ["/api/v1/approvals/", { status: "pending" }] as const,
-    detail: (id: string) => [`/api/v1/approvals/${id}`] as const,
-  },
-
   // Datasets
   datasets: {
     all: (datasourceId: string) =>

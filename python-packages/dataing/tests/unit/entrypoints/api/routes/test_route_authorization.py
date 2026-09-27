@@ -36,11 +36,6 @@ from dataing.entrypoints.api.routes.datasources import router as datasources_rou
 POLICY: dict[tuple[str, str], str] = {
     # analytics.py: refreshes a materialized view shared by every tenant
     ("POST", "/analytics/refresh"): SCOPE_ADMIN,
-    # approvals.py
-    ("POST", "/approvals/"): SCOPE_WRITE,
-    ("POST", "/approvals/{approval_id}/approve"): SCOPE_WRITE,
-    ("POST", "/approvals/{approval_id}/modify"): SCOPE_WRITE,
-    ("POST", "/approvals/{approval_id}/reject"): SCOPE_WRITE,
     # auth.py: sign-in and account recovery
     ("POST", "/auth/login"): PUBLIC,
     ("POST", "/auth/password-reset/confirm"): PUBLIC,

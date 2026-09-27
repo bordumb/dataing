@@ -146,60 +146,6 @@ This email was sent by Dataing. Please do not reply to this email.
 
         return self.send(to_emails, subject, body_html, body_text)
 
-    def send_approval_required(
-        self,
-        to_emails: list[str],
-        investigation_id: str,
-        approval_url: str,
-        context: dict[str, Any],
-    ) -> bool:
-        """Send approval request email."""
-        subject = f"Approval Required: Investigation {investigation_id}"
-
-        body_html = f"""
-        <html>
-        <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
-            <h2 style="color: #ffc107;">Approval Required</h2>
-
-            <p>An investigation requires your approval to proceed.</p>
-
-            <p><strong>Investigation ID:</strong> {investigation_id}</p>
-
-            <div style="background: #fff3cd; padding: 15px; border-radius: 5px; margin: 20px 0;">
-                <h3 style="margin-top: 0; color: #856404;">Context</h3>
-                <p>Please review the context and approve or reject this investigation.</p>
-            </div>
-
-            <p style="text-align: center; margin: 30px 0;">
-                <a href="{approval_url}" style="background: #007bff; color: white;
-                padding: 12px 24px; text-decoration: none; border-radius: 5px; font-weight: bold;">
-                    Review and Approve
-                </a>
-            </p>
-
-            <hr style="border: none; border-top: 1px solid #ddd; margin: 30px 0;">
-            <p style="color: #666; font-size: 12px;">
-                This email was sent by Dataing. Please do not reply to this email.
-            </p>
-        </body>
-        </html>
-        """
-
-        body_text = f"""
-Approval Required
-
-An investigation requires your approval to proceed.
-
-Investigation ID: {investigation_id}
-
-Please review and approve at: {approval_url}
-
----
-This email was sent by Dataing. Please do not reply to this email.
-        """
-
-        return self.send(to_emails, subject, body_html, body_text)
-
     async def send_password_reset(
         self,
         to_email: str,

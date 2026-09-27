@@ -112,20 +112,6 @@ class TestSlackNotifier:
         assert message["attachments"][0]["color"] == "#dc3545"  # Red
         assert any(f["title"] == "Error" for f in message["attachments"][0]["fields"])
 
-    def test_build_message_approval_required(
-        self,
-        notifier: SlackNotifier,
-    ) -> None:
-        """Test message building for approval.required event."""
-        payload = {
-            "investigation_id": "inv-123",
-            "context": {"query": "SELECT 1"},
-        }
-
-        message = notifier._build_message("approval.required", payload)
-
-        assert message["attachments"][0]["color"] == "#ffc107"  # Yellow
-
     def test_build_message_generic_event(
         self,
         notifier: SlackNotifier,
@@ -143,7 +129,6 @@ class TestSlackNotifier:
         assert notifier._get_color_for_event("investigation.completed") == "#36a64f"
         assert notifier._get_color_for_event("investigation.failed") == "#dc3545"
         assert notifier._get_color_for_event("investigation.started") == "#007bff"
-        assert notifier._get_color_for_event("approval.required") == "#ffc107"
         assert notifier._get_color_for_event("unknown.event") == "#6c757d"
 
 

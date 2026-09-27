@@ -1648,8 +1648,7 @@ async def export_snapshot_archive(
     except SnapshotSizeExceededError as e:
         raise HTTPException(
             status_code=413,
-            detail=f"Snapshot too large: {e.actual_size:,} bytes exceeds "
-            f"{e.max_size:,} byte limit",
+            detail=f"Snapshot too large: {e.actual_size:,} bytes exceeds {e.max_size:,} byte limit",
         ) from e
     except Exception as e:
         logger.error(f"Failed to build snapshot archive: {e}")
@@ -1748,11 +1747,11 @@ async def import_snapshot_archive(
             new_investigation_id = uuid4()
             original_id = metadata.investigation_id
 
-            # Store in database with replay flag
+            # Store in database with replay flag; status is generated from outcome
             await db.execute(
                 """
-                INSERT INTO investigations (id, tenant_id, alert, outcome, status)
-                VALUES ($1, $2, $3, $4, $5)
+                INSERT INTO investigations (id, tenant_id, alert, outcome)
+                VALUES ($1, $2, $3, $4)
                 """,
                 new_investigation_id,
                 auth.tenant_id,
@@ -1768,7 +1767,6 @@ async def import_snapshot_archive(
                         "schema_version": metadata.schema_version,
                     }
                 ),
-                "imported",
             )
 
             # TODO: Import evidence items from archive

@@ -2,17 +2,45 @@
 
 from __future__ import annotations
 
+import json
 import os
+import sqlite3
 from pathlib import Path
 
 import duckdb
 import pytest
 
-from dataing.adapters.datasource import DuckDBAdapter, LocalFileAdapter
+from dataing.adapters.datasource import DuckDBAdapter, LocalFileAdapter, SQLiteAdapter
 from dataing.adapters.datasource.errors import InvalidConfigError
 from dataing.adapters.datasource.local_paths import resolve_local_path
+from dataing.adapters.lineage.adapters.dbt import DbtAdapter
 
 ROOT_ENV = "DATAING_LOCAL_DATA_ROOT"
+MANIFEST = {
+    "nodes": {
+        "model.shop.orders": {
+            "name": "orders",
+            "resource_type": "model",
+            "database": "analytics",
+            "schema": "shop",
+        }
+    }
+}
+
+
+def make_sqlite(path: Path) -> Path:
+    """Create a SQLite database at path with one table holding one row."""
+    conn = sqlite3.connect(path)
+    conn.execute("CREATE TABLE orders AS SELECT 42 AS id")
+    conn.commit()
+    conn.close()
+    return path
+
+
+def write_manifest(path: Path) -> Path:
+    """Write a dbt manifest with one model at path."""
+    path.write_text(json.dumps(MANIFEST))
+    return path
 
 
 @pytest.fixture
@@ -191,3 +219,106 @@ class TestDuckDBAdapter:
         async with DuckDBAdapter({"path": str(db_path), "source_type": "database"}) as adapter:
             result = await adapter.execute_query("SELECT id FROM orders")
         assert result.rows == [{"id": 42}]
+
+
+class TestSQLiteAdapter:
+    """The SQLite adapter checks its path every time it connects."""
+
+    @pytest.mark.asyncio
+    async def test_refuses_to_connect_outside_the_root(self, escaping_path: str) -> None:
+        """No database opens for a path outside the root."""
+        adapter = SQLiteAdapter({"path": escaping_path})
+        with pytest.raises(InvalidConfigError):
+            await adapter.connect()
+        assert adapter.is_connected is False
+
+    @pytest.mark.asyncio
+    async def test_refuses_a_database_file_linked_from_outside(
+        self, root: Path, tmp_path: Path
+    ) -> None:
+        """A symlink inside the root cannot lead to a database file outside it."""
+        secret = make_sqlite(tmp_path / "outside" / "secret.sqlite")
+        (root / "data" / "linked.sqlite").symlink_to(secret)
+        with pytest.raises(InvalidConfigError):
+            await SQLiteAdapter({"path": f"{root}/data/linked.sqlite"}).connect()
+
+    @pytest.mark.parametrize(
+        "uri", ["file:/etc/hosts?mode=ro", "file:{root}/data/new.sqlite?mode=rwc"]
+    )
+    @pytest.mark.asyncio
+    async def test_refuses_file_uris(self, root: Path, uri: str) -> None:
+        """A file: URI could name any file and pick its own open mode."""
+        with pytest.raises(InvalidConfigError):
+            await SQLiteAdapter({"path": uri.format(root=root)}).connect()
+        assert not (root / "data" / "new.sqlite").exists()
+
+    @pytest.mark.parametrize("path", [":memory:", "data/shop.sqlite"])
+    @pytest.mark.asyncio
+    async def test_refuses_to_connect_while_the_root_is_unset(
+        self, no_root: None, path: str
+    ) -> None:
+        """Without a root, SQLite sources are refused, in-memory ones included."""
+        with pytest.raises(InvalidConfigError, match=ROOT_ENV):
+            await SQLiteAdapter({"path": path}).connect()
+
+    @pytest.mark.asyncio
+    async def test_queries_a_database_file_inside_the_root(self, root: Path) -> None:
+        """A database file inside the root opens as before."""
+        db = make_sqlite(root / "data" / "shop.sqlite")
+        async with SQLiteAdapter({"path": str(db)}) as adapter:
+            result = await adapter.execute_query("SELECT id FROM orders")
+        assert result.rows == [{"id": 42}]
+
+    @pytest.mark.asyncio
+    async def test_uri_characters_stay_part_of_the_file_name(self, root: Path) -> None:
+        """A ? in the file name cannot switch files or drop read-only mode."""
+        db = make_sqlite(root / "data" / "odd?name.sqlite")
+        async with SQLiteAdapter({"path": str(db)}) as adapter:
+            result = await adapter.execute_query("SELECT id FROM orders")
+            with pytest.raises(sqlite3.OperationalError, match="readonly"):
+                await adapter.execute_query("INSERT INTO orders VALUES (1)")
+        assert result.rows == [{"id": 42}]
+        assert not (root / "data" / "odd").exists()
+
+    @pytest.mark.asyncio
+    async def test_cannot_attach_another_database_file(self, root: Path, tmp_path: Path) -> None:
+        """SQL cannot reach other database files on the host by attaching them."""
+        secret = make_sqlite(tmp_path / "outside" / "secret.sqlite")
+        db = make_sqlite(root / "data" / "shop.sqlite")
+        async with SQLiteAdapter({"path": str(db)}) as adapter:
+            with pytest.raises(sqlite3.OperationalError, match="too many attached databases"):
+                await adapter.execute_query(f"ATTACH DATABASE '{secret}' AS secret")
+
+
+class TestDbtManifest:
+    """The dbt lineage adapter reads a local manifest only from inside the root."""
+
+    @pytest.mark.parametrize("where", ["outside", "escaping-symlink"])
+    @pytest.mark.asyncio
+    async def test_refuses_a_manifest_outside_the_root(
+        self, root: Path, tmp_path: Path, where: str
+    ) -> None:
+        """A manifest outside the root is never read, however the path gets there."""
+        write_manifest(tmp_path / "outside" / "manifest.json")
+        path = {
+            "outside": tmp_path / "outside" / "manifest.json",
+            "escaping-symlink": root / "escape" / "manifest.json",
+        }[where]
+        with pytest.raises(InvalidConfigError):
+            await DbtAdapter({"manifest_path": str(path)}).search_datasets("orders")
+
+    @pytest.mark.asyncio
+    async def test_refuses_a_manifest_while_the_root_is_unset(
+        self, tmp_path: Path, no_root: None
+    ) -> None:
+        """Without a root, local manifests are refused."""
+        manifest = write_manifest(tmp_path / "manifest.json")
+        with pytest.raises(InvalidConfigError, match=ROOT_ENV):
+            await DbtAdapter({"manifest_path": str(manifest)}).search_datasets("orders")
+
+    @pytest.mark.asyncio
+    async def test_reads_a_manifest_inside_the_root(self, root: Path) -> None:
+        """A manifest inside the root is read as before."""
+        manifest = write_manifest(root / "data" / "manifest.json")
+        datasets = await DbtAdapter({"manifest_path": str(manifest)}).search_datasets("orders")
+        assert [d.name for d in datasets] == ["orders"]

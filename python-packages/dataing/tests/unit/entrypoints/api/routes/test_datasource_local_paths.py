@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import sqlite3
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -19,15 +20,19 @@ from dataing.entrypoints.api.routes.datasources import router
 
 ROOT_ENV = "DATAING_LOCAL_DATA_ROOT"
 HEADERS = {"X-API-Key": "test-key"}
-LOCAL_TYPES = ["local_file", "duckdb"]
+LOCAL_TYPES = ["local_file", "duckdb", "sqlite"]
 
 
 @pytest.fixture
 def root(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
-    """Set a local data root holding one CSV file."""
+    """Set a local data root holding one CSV file and one SQLite database."""
     root = tmp_path / "root"
     root.mkdir()
     (root / "orders.csv").write_text("id\n1\n2\n")
+    conn = sqlite3.connect(root / "shop.sqlite")
+    conn.execute("CREATE TABLE orders AS SELECT 42 AS id")
+    conn.commit()
+    conn.close()
     monkeypatch.setenv(ROOT_ENV, str(root))
     return root
 
@@ -129,14 +134,16 @@ class TestCreateDatasource:
         assert ROOT_ENV in response.json()["detail"]
         app_db.create_data_source.assert_not_awaited()
 
-    @pytest.mark.parametrize("source_type", LOCAL_TYPES)
+    @pytest.mark.parametrize(
+        ("source_type", "name"), [("local_file", ""), ("duckdb", ""), ("sqlite", "shop.sqlite")]
+    )
     def test_creates_a_source_inside_the_root(
-        self, client: TestClient, app_db: AsyncMock, root: Path, source_type: str
+        self, client: TestClient, app_db: AsyncMock, root: Path, source_type: str, name: str
     ) -> None:
-        """A directory inside the root is saved as before."""
+        """A directory or database file inside the root is saved as before."""
         response = client.post(
             "/api/v1/datasources",
-            json={"name": "Orders", "type": source_type, "config": {"path": str(root)}},
+            json={"name": "Orders", "type": source_type, "config": {"path": str(root / name)}},
             headers=HEADERS,
         )
 

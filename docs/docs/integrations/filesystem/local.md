@@ -58,7 +58,7 @@ Local file sources read the disk of the hosts that run the dataing API and worke
 the operator decides where they may look. Set `DATAING_LOCAL_DATA_ROOT` on both to the
 directory that holds the data. A source's `path` must resolve inside it, following
 symlinks, and a relative `path` is taken relative to it. While the variable is unset,
-the server refuses local file and DuckDB sources.
+the server refuses local file, DuckDB and SQLite sources.
 
 ---
 

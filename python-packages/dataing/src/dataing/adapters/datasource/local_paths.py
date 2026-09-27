@@ -1,7 +1,7 @@
 """Keep local data sources inside the directory the operator set aside for them.
 
-Local file and DuckDB sources read files on the hosts that run the API and the
-Temporal worker, starting from a ``path`` that a tenant admin types in. Left
+Local file, DuckDB and SQLite sources, and dbt manifests, read files on the hosts
+that run the API and the Temporal worker, from a path that a tenant types in. Left
 unchecked, ``/`` would make the whole host the source's own location, and a symlink
 could lead anywhere.
 

@@ -11,6 +11,8 @@ from typing import Annotated, Any
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
 
+from dataing.adapters.datasource.errors import AdapterError
+from dataing.adapters.datasource.local_paths import resolve_local_path
 from dataing.adapters.lineage import (
     DatasetId,
     get_lineage_registry,
@@ -585,11 +587,18 @@ def _build_provider_config(
 
     Returns:
         Configuration dictionary.
+
+    Raises:
+        HTTPException: 400 if the manifest path is outside the local data root.
     """
     config: dict[str, Any] = {}
 
     if provider == "dbt":
         if manifest_path:
+            try:
+                resolve_local_path(manifest_path)
+            except AdapterError as e:
+                raise HTTPException(status_code=400, detail=e.message) from e
             config["manifest_path"] = manifest_path
         config["target_platform"] = "snowflake"  # Default, should be configurable
     elif provider in ("openlineage", "airflow", "dagster", "datahub"):

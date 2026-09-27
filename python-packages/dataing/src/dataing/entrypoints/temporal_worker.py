@@ -1,6 +1,7 @@
 """Temporal worker entrypoint with full dependency injection.
 
 This module creates a production-ready Temporal worker that:
+- Configures logging from LOG_LEVEL and LOG_FORMAT, like the API
 - Connects to Temporal using settings from environment
 - Wires all 8 activities with factory closures capturing dependencies
 - Registers both InvestigationWorkflow and EvaluateHypothesisWorkflow
@@ -32,8 +33,9 @@ from dataing.adapters.datasource.base import BaseAdapter
 from dataing.adapters.db.app_db import AppDatabase
 from dataing.adapters.investigation.pattern_adapter import InMemoryPatternRepository
 from dataing.agents import AgentClient
+from dataing.config import settings
 from dataing.core.snapshot_store import LocalSnapshotStore
-from dataing.entrypoints.api.deps import settings
+from dataing.telemetry import configure_logging
 from dataing.temporal.activities import (
     make_capture_snapshot_activity,
     make_check_patterns_activity,
@@ -49,10 +51,6 @@ from dataing.temporal.activities import (
 from dataing.temporal.adapters import TemporalAgentAdapter
 from dataing.temporal.workflows import EvaluateHypothesisWorkflow, InvestigationWorkflow
 
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-)
 logger = logging.getLogger(__name__)
 
 # Worker configuration
@@ -288,6 +286,13 @@ async def run_worker() -> None:
 
 def main() -> None:
     """Main entry point for the Temporal worker."""
+    # Nothing else configures logging in the worker process. Unconfigured, structlog's
+    # default renderer prints traceback frame locals, such as the encryption key and
+    # decrypted connection configs in get_adapter().
+    configure_logging(
+        log_level=os.getenv("LOG_LEVEL", "INFO"),
+        json_output=os.getenv("LOG_FORMAT", "json").lower() == "json",
+    )
     try:
         asyncio.run(run_worker())
     except KeyboardInterrupt:

@@ -44,7 +44,13 @@ def configure_logging(
     if json_output:
         processors.append(structlog.processors.JSONRenderer())
     else:
-        processors.append(structlog.dev.ConsoleRenderer())
+        # Rich renders every frame's locals by default, which would print decrypted
+        # datasource credentials and the encryption key held at the decrypt call sites.
+        processors.append(
+            structlog.dev.ConsoleRenderer(
+                exception_formatter=structlog.dev.RichTracebackFormatter(show_locals=False)
+            )
+        )
 
     structlog.configure(
         processors=processors,

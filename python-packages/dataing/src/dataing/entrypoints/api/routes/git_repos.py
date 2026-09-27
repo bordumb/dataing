@@ -13,7 +13,8 @@ from pydantic import BaseModel, Field
 
 from dataing.adapters.db.app_db import AppDatabase
 from dataing.adapters.git import GitHubProvider, GitSyncService
-from dataing.entrypoints.api.deps import get_app_db, settings
+from dataing.config import settings
+from dataing.entrypoints.api.deps import get_app_db
 from dataing.entrypoints.api.middleware.auth import (
     ApiKeyContext,
     verify_api_key,

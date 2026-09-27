@@ -2,9 +2,12 @@
 
 import json
 import logging
+import sys
+import uuid
 from io import StringIO
 from unittest.mock import MagicMock, patch
 
+import pytest
 import structlog
 
 from dataing.telemetry.logging import configure_logging
@@ -95,6 +98,36 @@ class TestConfigureLogging:
         logger = structlog.get_logger("test")
         # Should work without errors
         assert logger is not None
+
+    def test_console_exception_output_hides_frame_locals(
+        self, capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Console tracebacks do not render frame locals such as encryption keys."""
+        # Generated at runtime so the value never appears in rendered source lines.
+        secret = f"secret-{uuid.uuid4().hex[:12]}"
+        # Wide enough that a rendered secret is never wrapped across lines and missed.
+        monkeypatch.setenv("COLUMNS", "200")
+
+        def build_adapter(encryption_key: str) -> None:
+            raise RuntimeError("adapter construction failed")
+
+        configure_logging(log_level="INFO", json_output=False)
+        # pytest's logging plugin pre-installs root handlers, which makes basicConfig() a
+        # no-op here; attach the stdout handler that basicConfig() installs in production.
+        stdlib_logger = logging.getLogger(__name__)
+        stdout_handler = logging.StreamHandler(sys.stdout)
+        stdlib_logger.addHandler(stdout_handler)
+        try:
+            build_adapter(secret)
+        except RuntimeError:
+            structlog.get_logger(__name__).exception("adapter_failed")
+        finally:
+            stdlib_logger.removeHandler(stdout_handler)
+
+        output = capsys.readouterr().out
+        assert "adapter_failed" in output
+        assert "adapter construction failed" in output
+        assert secret not in output
 
     def test_debug_level(self) -> None:
         """DEBUG log level can be configured."""

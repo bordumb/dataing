@@ -13,13 +13,7 @@ from dataing.adapters.datasource import (
 
 # Registered adapters known to be abstract while their fix is in flight. strict=True
 # fails the run as soon as one turns concrete, so an entry cannot outlive its bug.
-_KNOWN_ABSTRACT = {
-    SourceType.REDSHIFT: pytest.mark.xfail(
-        strict=True,
-        reason="RedshiftAdapter does not implement _fetch_table_metadata yet; "
-        "remove this entry when it does",
-    ),
-}
+_KNOWN_ABSTRACT: dict[SourceType, pytest.MarkDecorator] = {}
 
 
 class TestAdapterRegistry:

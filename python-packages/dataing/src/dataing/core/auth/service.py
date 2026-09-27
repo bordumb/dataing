@@ -16,7 +16,7 @@ from dataing.core.auth.tokens import (
     hash_token,
     is_token_expired,
 )
-from dataing.core.auth.types import OrgRole
+from dataing.core.auth.types import OrgRole, User
 
 logger = structlog.get_logger()
 
@@ -268,6 +268,29 @@ class AuthService:
             for org, role in orgs
         ]
 
+    async def get_user_org_ids(self, user_id: UUID) -> list[UUID]:
+        """Get the IDs of all organizations a user belongs to.
+
+        Args:
+            user_id: User's ID.
+
+        Returns:
+            Organization IDs.
+        """
+        orgs = await self._repo.get_user_orgs(user_id)
+        return [org.id for org, _ in orgs]
+
+    async def org_exists(self, org_id: UUID) -> bool:
+        """Check whether an organization exists.
+
+        Args:
+            org_id: Organization ID.
+
+        Returns:
+            True if the organization exists.
+        """
+        return await self._repo.get_org_by_id(org_id) is not None
+
     def _generate_slug(self, name: str) -> str:
         """Generate URL-safe slug from name."""
         slug = name.lower()
@@ -300,28 +323,33 @@ class AuthService:
         email: str,
         recovery_adapter: PasswordRecoveryAdapter,
         frontend_url: str,
-    ) -> None:
+    ) -> User | None:
         """Request a password reset.
 
         For security, this always succeeds (doesn't reveal if email exists).
         If the email exists and recovery is possible, sends a reset link.
+        Callers must not let the return value change their response.
 
         Args:
             email: User's email address.
             recovery_adapter: The recovery adapter to use.
             frontend_url: Base URL of the frontend for building reset links.
+
+        Returns:
+            The user a reset link was issued for, or None if the email
+            belongs to no active user.
         """
         # Find user by email
         user = await self._repo.get_user_by_email(email)
         if not user:
             # Silently succeed - don't reveal if email exists
             logger.info("password_reset_requested_unknown_email", email=email)
-            return
+            return None
 
         if not user.is_active:
             # Silently succeed - don't reveal account status
             logger.info("password_reset_requested_inactive_user", user_id=str(user.id))
-            return
+            return None
 
         # Delete any existing tokens for this user
         await self._repo.delete_user_reset_tokens(user.id)
@@ -354,12 +382,17 @@ class AuthService:
             logger.error("password_reset_email_failed", user_id=str(user.id))
             # Don't raise - we don't want to reveal email delivery status
 
-    async def reset_password(self, token: str, new_password: str) -> None:
+        return user
+
+    async def reset_password(self, token: str, new_password: str) -> User:
         """Reset password using a valid token.
 
         Args:
             token: The reset token from the email link.
             new_password: The new password to set.
+
+        Returns:
+            The user whose password was reset.
 
         Raises:
             AuthError: If token is invalid, expired, or already used.
@@ -403,3 +436,4 @@ class AuthService:
         await self._repo.delete_user_reset_tokens(user.id)
 
         logger.info("password_reset_successful", user_id=str(user.id))
+        return user

@@ -3,7 +3,7 @@
 from datetime import UTC, datetime
 from uuid import uuid4
 
-from dataing_ee.adapters.audit.types import AuditLogCreate, AuditLogEntry
+from dataing_ee.adapters.audit.types import AuditLogEntry
 
 
 class TestAuditLogEntry:
@@ -36,18 +36,3 @@ class TestAuditLogEntry:
         assert entry.actor_id is None
         assert entry.resource_type is None
         assert entry.changes is None
-
-
-class TestAuditLogCreate:
-    """Tests for AuditLogCreate model."""
-
-    def test_create_audit_log_create(self) -> None:
-        """Test creating an audit log create request."""
-        create = AuditLogCreate(
-            tenant_id=uuid4(),
-            actor_id=uuid4(),
-            actor_email="test@example.com",
-            action="datasource.create",
-            resource_type="datasource",
-        )
-        assert create.action == "datasource.create"

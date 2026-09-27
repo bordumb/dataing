@@ -6,7 +6,7 @@ import logging
 from typing import Annotated, Literal
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Response, status
+from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from pydantic import BaseModel
 
 from dataing.adapters.audit import audited
@@ -105,6 +105,7 @@ async def list_permissions(
 @router.post("/", response_model=PermissionGrantResponse, status_code=status.HTTP_201_CREATED)
 @audited(action="permission.grant", resource_type="permission")
 async def create_permission(
+    http_request: Request,
     body: PermissionGrantCreate,
     auth: AdminScopeDep,
     app_db: AppDbDep,
@@ -217,8 +218,9 @@ async def create_permission(
 
 
 @router.delete("/{grant_id}", status_code=status.HTTP_204_NO_CONTENT, response_class=Response)
-@audited(action="permission.revoke", resource_type="permission")
+@audited(action="permission.revoke", resource_type="permission", resource_id_param="grant_id")
 async def delete_permission(
+    http_request: Request,
     grant_id: UUID,
     auth: AdminScopeDep,
     app_db: AppDbDep,

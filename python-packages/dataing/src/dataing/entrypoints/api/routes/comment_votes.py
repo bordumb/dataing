@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import Annotated, Literal
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Response
+from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from pydantic import BaseModel, Field
 
 from dataing.adapters.audit import audited
@@ -28,6 +28,7 @@ class VoteCreate(BaseModel):
 @router.post("/{comment_type}/{comment_id}/vote", status_code=204, response_class=Response)
 @audited(action="comment.vote", resource_type="comment")
 async def vote_on_comment(
+    http_request: Request,
     comment_type: Literal["schema", "knowledge"],
     comment_id: UUID,
     body: VoteCreate,
@@ -60,6 +61,7 @@ async def vote_on_comment(
 @router.delete("/{comment_type}/{comment_id}/vote", status_code=204, response_class=Response)
 @audited(action="comment.unvote", resource_type="comment")
 async def remove_vote(
+    http_request: Request,
     comment_type: Literal["schema", "knowledge"],
     comment_id: UUID,
     auth: AuthDep,

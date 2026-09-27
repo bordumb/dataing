@@ -11,6 +11,8 @@ from starlette.requests import Request
 from starlette.responses import Response
 from starlette.types import ASGIApp
 
+from dataing.adapters.audit import was_audited
+
 logger = structlog.get_logger()
 
 # Fields to redact from request bodies
@@ -56,15 +58,18 @@ class AuditMiddleware(BaseHTTPMiddleware):
         # Process the request
         response = await call_next(request)
 
-        # Log asynchronously (fire and forget)
-        asyncio.create_task(
-            self._log_request(
-                request=request,
-                request_id=request_id,
-                body=body,
-                status_code=response.status_code,
+        # Reads aren't audited, and a request that already has its own entry
+        # (from @audited or record_audit) needs no generic duplicate.
+        if request.method not in ["GET", "HEAD"] and not was_audited(request):
+            # Log asynchronously (fire and forget)
+            asyncio.create_task(
+                self._log_request(
+                    request=request,
+                    request_id=request_id,
+                    body=body,
+                    status_code=response.status_code,
+                )
             )
-        )
 
         # Add request ID to response headers
         response.headers["X-Request-ID"] = request_id

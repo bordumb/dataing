@@ -7,7 +7,7 @@ from datetime import datetime
 from typing import Annotated, Literal
 from uuid import UUID
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Request
 from pydantic import BaseModel
 
 from dataing.adapters.audit import audited
@@ -59,6 +59,7 @@ TARGET_TYPE_TO_EVENT = {
 @router.post("/", status_code=201, response_model=FeedbackResponse)
 @audited(action="feedback.submit", resource_type="feedback")
 async def submit_feedback(
+    http_request: Request,
     body: FeedbackCreate,
     auth: AuthDep,
     feedback_adapter: InvestigationFeedbackAdapterDep,

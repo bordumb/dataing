@@ -7,10 +7,10 @@ import logging
 from typing import Annotated, Any
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Header, HTTPException, Query, status
+from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request, status
 from pydantic import BaseModel
 
-from dataing_ee.adapters.audit import audited
+from dataing.adapters.audit import audited
 from dataing_ee.core.scim import (
     SCIMError,
     SCIMGroup,
@@ -173,12 +173,14 @@ async def get_user(
 @router.post("/Users", status_code=status.HTTP_201_CREATED)
 @audited(action="scim.user_provision", resource_type="scim_user")
 async def create_user(
+    http_request: Request,
     body: SCIMUserCreateRequest,
     org_id: Annotated[UUID, Depends(validate_scim_token)],
 ) -> dict[str, Any]:
     """Create a user (SCIM 2.0).
 
     Args:
+        http_request: HTTP request, for audit logging.
         body: SCIM user creation request.
         org_id: Organization ID from token.
 
@@ -216,6 +218,7 @@ async def create_user(
 @router.put("/Users/{user_id}")
 @audited(action="scim.user_update", resource_type="scim_user")
 async def replace_user(
+    http_request: Request,
     user_id: str,
     body: SCIMUserUpdateRequest,
     org_id: Annotated[UUID, Depends(validate_scim_token)],
@@ -223,6 +226,7 @@ async def replace_user(
     """Replace a user (SCIM 2.0).
 
     Args:
+        http_request: HTTP request, for audit logging.
         user_id: User ID.
         body: SCIM user update request.
         org_id: Organization ID from token.
@@ -242,12 +246,14 @@ async def replace_user(
 @router.delete("/Users/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
 @audited(action="scim.user_deprovision", resource_type="scim_user")
 async def delete_user(
+    http_request: Request,
     user_id: str,
     org_id: Annotated[UUID, Depends(validate_scim_token)],
 ) -> None:
     """Delete (deactivate) a user (SCIM 2.0).
 
     Args:
+        http_request: HTTP request, for audit logging.
         user_id: User ID.
         org_id: Organization ID from token.
     """
@@ -318,12 +324,14 @@ async def get_group(
 @router.post("/Groups", status_code=status.HTTP_201_CREATED)
 @audited(action="scim.group_create", resource_type="scim_group")
 async def create_group(
+    http_request: Request,
     body: SCIMGroupCreateRequest,
     org_id: Annotated[UUID, Depends(validate_scim_token)],
 ) -> dict[str, Any]:
     """Create a group (SCIM 2.0).
 
     Args:
+        http_request: HTTP request, for audit logging.
         body: SCIM group creation request.
         org_id: Organization ID from token.
 
@@ -352,12 +360,14 @@ async def create_group(
 @router.delete("/Groups/{group_id}", status_code=status.HTTP_204_NO_CONTENT)
 @audited(action="scim.group_delete", resource_type="scim_group")
 async def delete_group(
+    http_request: Request,
     group_id: str,
     org_id: Annotated[UUID, Depends(validate_scim_token)],
 ) -> None:
     """Delete a group (SCIM 2.0).
 
     Args:
+        http_request: HTTP request, for audit logging.
         group_id: Group ID.
         org_id: Organization ID from token.
     """

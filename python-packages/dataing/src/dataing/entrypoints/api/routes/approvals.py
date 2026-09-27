@@ -6,7 +6,7 @@ from datetime import datetime
 from typing import Annotated, Any
 from uuid import UUID
 
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
 
 from dataing.adapters.audit import audited
@@ -165,6 +165,7 @@ async def get_approval_request(
 @router.post("/{approval_id}/approve", response_model=ApprovalDecisionResponse)
 @audited(action="approval.approve", resource_type="approval")
 async def approve_request(
+    http_request: Request,
     approval_id: UUID,
     request: ApproveRequest,
     background_tasks: BackgroundTasks,
@@ -201,6 +202,7 @@ async def approve_request(
 @router.post("/{approval_id}/reject", response_model=ApprovalDecisionResponse)
 @audited(action="approval.reject", resource_type="approval")
 async def reject_request(
+    http_request: Request,
     approval_id: UUID,
     request: RejectRequest,
     auth: WriteScopeDep,
@@ -239,6 +241,7 @@ async def reject_request(
 @router.post("/{approval_id}/modify", response_model=ApprovalDecisionResponse)
 @audited(action="approval.modify", resource_type="approval")
 async def modify_and_approve(
+    http_request: Request,
     approval_id: UUID,
     request: ModifyRequest,
     background_tasks: BackgroundTasks,
@@ -281,6 +284,7 @@ async def modify_and_approve(
 @router.post("/", response_model=ApprovalRequestResponse, status_code=201)
 @audited(action="approval.create", resource_type="approval")
 async def create_approval_request(
+    http_request: Request,
     request: CreateApprovalRequest,
     auth: WriteScopeDep,
     app_db: AppDbDep,

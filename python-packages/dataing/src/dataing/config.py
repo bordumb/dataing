@@ -16,6 +16,13 @@ class Settings:
         self.anthropic_api_key = os.getenv("ANTHROPIC_API_KEY", "")
         self.llm_model = os.getenv("LLM_MODEL", "claude-sonnet-4-20250514")
 
+        # Issue chat agent (docs/specs/0001_issue_chat.md): model and effort per route.
+        # Speed comes from low effort, not a smaller model; an empty effort leaves
+        # the model's default.
+        self.chat_agent_model = os.getenv("CHAT_AGENT_MODEL", "claude-opus-5")
+        self.chat_agent_effort = os.getenv("CHAT_AGENT_EFFORT", "low")
+        self.chat_brief_effort = os.getenv("CHAT_BRIEF_EFFORT", "medium")
+
         # Circuit breaker settings
         self.max_total_queries = int(os.getenv("MAX_TOTAL_QUERIES", "50"))
         self.max_queries_per_hypothesis = int(os.getenv("MAX_QUERIES_PER_HYPOTHESIS", "5"))

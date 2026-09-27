@@ -1,3 +1,10 @@
+## [1.23.4](https://github.com/bordumb/dataing/compare/v1.23.3...v1.23.4) (2026-09-27)
+
+
+### Bug Fixes
+
+* **api:** make the OpenAPI export deterministic ([#156](https://github.com/bordumb/dataing/issues/156)) ([ec8b97f](https://github.com/bordumb/dataing/commit/ec8b97f83553888af72071e702bde28b191554a9))
+
 ## [1.23.3](https://github.com/bordumb/dataing/compare/v1.23.2...v1.23.3) (2026-09-27)
 
 

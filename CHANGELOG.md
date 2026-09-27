@@ -1,3 +1,10 @@
+# [1.24.0](https://github.com/bordumb/dataing/compare/v1.23.6...v1.24.0) (2026-09-27)
+
+
+### Features
+
+* **ee:** support provider secrets, Slack URL checks, forms and slash commands ([#185](https://github.com/bordumb/dataing/issues/185)) ([a2261fa](https://github.com/bordumb/dataing/commit/a2261faf64a087122ddcbfbfc3d6e4ca0a3811ae))
+
 ## [1.23.6](https://github.com/bordumb/dataing/compare/v1.23.5...v1.23.6) (2026-09-27)
 
 

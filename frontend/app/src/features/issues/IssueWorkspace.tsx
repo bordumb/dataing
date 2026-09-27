@@ -34,6 +34,7 @@ import {
   getPriorityVariant,
   getSeverityVariant,
 } from "@/lib/api/issues";
+import { useRole } from "@/lib/auth";
 import type {
   IssueResponse,
   IssueCommentResponse,
@@ -217,6 +218,7 @@ function InvestigationRunsSection({
   const [executionProfile, setExecutionProfile] = useState("standard");
   const query = useIssueInvestigationRuns(issueId);
   const spawnInvestigation = useSpawnInvestigation();
+  const { isMember } = useRole();
   const invalidate = useInvalidateIssues();
 
   const handleSpawn = async (e: React.FormEvent) => {
@@ -249,10 +251,12 @@ function InvestigationRunsSection({
               <Search className="h-4 w-4" />
               Investigation Runs
             </CardTitle>
-            <Button size="sm" onClick={() => setShowModal(true)}>
-              <Play className="h-4 w-4 mr-1" />
-              Run Investigation
-            </Button>
+            {isMember && (
+              <Button size="sm" onClick={() => setShowModal(true)}>
+                <Play className="h-4 w-4 mr-1" />
+                Run Investigation
+              </Button>
+            )}
           </div>
         </CardHeader>
         <CardContent>
@@ -475,6 +479,7 @@ interface IssueWorkspaceContentProps {
 function IssueWorkspaceContent({ issue }: IssueWorkspaceContentProps) {
   const updateIssue = useUpdateIssue();
   const invalidate = useInvalidateIssues();
+  const { isMember } = useRole();
   const [isEditingStatus, setIsEditingStatus] = useState(false);
 
   const handleStatusChange = async (newStatus: string) => {
@@ -530,8 +535,10 @@ function IssueWorkspaceContent({ issue }: IssueWorkspaceContentProps) {
               ) : (
                 <Badge
                   variant={getStatusVariant(issue.status)}
-                  className="cursor-pointer"
-                  onClick={() => setIsEditingStatus(true)}
+                  className={isMember ? "cursor-pointer" : undefined}
+                  onClick={
+                    isMember ? () => setIsEditingStatus(true) : undefined
+                  }
                 >
                   {getStatusLabel(issue.status)}
                 </Badge>

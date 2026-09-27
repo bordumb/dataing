@@ -10,10 +10,19 @@ import { datasourceColumns } from "./datasource-columns";
 import { DataSourceForm } from "./datasource-form";
 import { LoadingSpinner } from "@/components/shared/loading-spinner";
 import { EmptyState } from "@/components/shared/empty-state";
+import { useRole } from "@/lib/auth";
 
 export function DataSourcePage() {
   const [formOpen, setFormOpen] = React.useState(false);
   const { data: datasources, isLoading, error, refetch } = useDataSources();
+  const { isAdmin } = useRole();
+
+  const addButton = isAdmin ? (
+    <Button onClick={() => setFormOpen(true)}>
+      <Plus className="mr-2 h-4 w-4" />
+      Add Data Source
+    </Button>
+  ) : undefined;
 
   if (isLoading) {
     return (
@@ -55,12 +64,7 @@ export function DataSourcePage() {
       <PageHeader
         title="Data Sources"
         description="Manage your connected data warehouses and databases."
-        action={
-          <Button onClick={() => setFormOpen(true)}>
-            <Plus className="mr-2 h-4 w-4" />
-            Add Data Source
-          </Button>
-        }
+        action={addButton}
       />
 
       {datasources?.length === 0 ? (
@@ -68,12 +72,7 @@ export function DataSourcePage() {
           icon={Database}
           title="No data sources"
           description="Connect your first data warehouse to start investigating data quality issues."
-          action={
-            <Button onClick={() => setFormOpen(true)}>
-              <Plus className="mr-2 h-4 w-4" />
-              Add Data Source
-            </Button>
-          }
+          action={addButton}
         />
       ) : (
         <DataTable

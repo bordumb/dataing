@@ -36,7 +36,7 @@ import {
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/Badge";
 import { useJwtAuth } from "@/lib/auth/jwt-context";
-import { useDemoRoleContext } from "@/lib/auth/demo-role-context";
+import { useRole } from "@/lib/auth";
 import { useNotifications } from "@/lib/notifications";
 // IMPORTANT: OrgSelector is critical for multi-tenant support - DO NOT REMOVE
 import { OrgSelector } from "@/lib/auth/org-selector";
@@ -78,7 +78,7 @@ export function AppSidebar() {
   const location = useLocation();
   const { state } = useSidebar();
   const { logout, org } = useJwtAuth();
-  const { canAccessAdmin } = useDemoRoleContext();
+  const { isAdmin, isMember } = useRole();
   const { unreadCount } = useNotifications();
 
   // Build settings nav items based on role
@@ -90,7 +90,7 @@ export function AppSidebar() {
       icon: Settings,
     },
     // Only show Admin to admin/owner roles
-    ...(canAccessAdmin
+    ...(isAdmin
       ? [
           {
             title: "Admin",
@@ -134,18 +134,20 @@ export function AppSidebar() {
 
       <SidebarContent>
         {/* Quick Action */}
-        <SidebarGroup>
-          <SidebarMenu>
-            <SidebarMenuItem>
-              <SidebarMenuButton asChild tooltip="New Investigation">
-                <Link to="/investigations/new">
-                  <Plus className="size-4" />
-                  <span>New Investigation</span>
-                </Link>
-              </SidebarMenuButton>
-            </SidebarMenuItem>
-          </SidebarMenu>
-        </SidebarGroup>
+        {isMember && (
+          <SidebarGroup>
+            <SidebarMenu>
+              <SidebarMenuItem>
+                <SidebarMenuButton asChild tooltip="New Investigation">
+                  <Link to="/investigations/new">
+                    <Plus className="size-4" />
+                    <span>New Investigation</span>
+                  </Link>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+            </SidebarMenu>
+          </SidebarGroup>
+        )}
 
         {/* Main Navigation */}
         <SidebarGroup>

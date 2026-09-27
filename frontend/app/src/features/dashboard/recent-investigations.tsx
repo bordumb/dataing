@@ -6,6 +6,7 @@ import { formatDate } from "@/lib/utils";
 import { EmptyState } from "@/components/shared/empty-state";
 import { Search } from "lucide-react";
 import { Button } from "@/components/ui/Button";
+import { useRole } from "@/lib/auth";
 
 function getStatusVariant(status: string) {
   switch (status) {
@@ -23,6 +24,7 @@ function getStatusVariant(status: string) {
 
 export function RecentInvestigations() {
   const { data: investigations, isLoading, error } = useInvestigations();
+  const { isMember } = useRole();
 
   if (isLoading) {
     return (
@@ -55,9 +57,11 @@ export function RecentInvestigations() {
         title="No investigations yet"
         description="Start by creating your first investigation to analyze data quality issues."
         action={
-          <Button asChild>
-            <Link to="/investigations/new">Create Investigation</Link>
-          </Button>
+          isMember ? (
+            <Button asChild>
+              <Link to="/investigations/new">Create Investigation</Link>
+            </Button>
+          ) : undefined
         }
       />
     );

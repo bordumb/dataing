@@ -51,7 +51,7 @@ from pydantic import BaseModel
 
 from dataing.adapters.db.app_db import AppDatabase
 from dataing.entrypoints.api.deps import get_app_db
-from dataing.entrypoints.api.middleware.auth import ApiKeyContext, verify_api_key
+from dataing.entrypoints.api.middleware.auth import ApiKeyContext, require_scope, verify_api_key
 from dataing.services.analytics import AnalyticsService
 
 router = APIRouter(prefix="/analytics", tags=["analytics"])
@@ -59,6 +59,7 @@ router = APIRouter(prefix="/analytics", tags=["analytics"])
 # Annotated types for dependency injection
 AppDbDep = Annotated[AppDatabase, Depends(get_app_db)]
 AuthDep = Annotated[ApiKeyContext, Depends(verify_api_key)]
+AdminScopeDep = Annotated[ApiKeyContext, Depends(require_scope("admin"))]
 
 
 class WeeklyUsageResponse(BaseModel):
@@ -214,7 +215,7 @@ async def get_activation_funnel(
 
 @router.post("/refresh", status_code=204)
 async def refresh_weekly_stats(
-    auth: AuthDep,
+    auth: AdminScopeDep,
     app_db: AppDbDep,
 ) -> None:
     """Refresh the weekly usage statistics materialized view.

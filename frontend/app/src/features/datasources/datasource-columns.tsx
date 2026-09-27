@@ -13,6 +13,7 @@ import {
 import { DataTableColumnHeader } from "@/components/data-table/data-table-column-header";
 import { formatDate } from "@/lib/utils";
 import { DataSource } from "@/lib/api/datasources";
+import { RoleGuard } from "@/lib/auth";
 
 function getStatusVariant(status: string) {
   switch (status) {
@@ -126,10 +127,12 @@ export const datasourceColumns: ColumnDef<DataSource>[] = [
             >
               Copy ID
             </DropdownMenuItem>
-            <DropdownMenuItem className="text-destructive">
-              <Trash2 className="mr-2 h-4 w-4" />
-              Delete
-            </DropdownMenuItem>
+            <RoleGuard minRole="admin">
+              <DropdownMenuItem className="text-destructive">
+                <Trash2 className="mr-2 h-4 w-4" />
+                Delete
+              </DropdownMenuItem>
+            </RoleGuard>
           </DropdownMenuContent>
         </DropdownMenu>
       );

@@ -27,6 +27,7 @@ import {
 import { StepTimeline, PatternList, EvidenceList, CodifyWidget } from "./components";
 import { InvestigationFeedbackProvider } from "./context/InvestigationFeedbackContext";
 import { InvestigationFeedbackButtons } from "./components/InvestigationFeedbackButtons";
+import { useRole } from "@/lib/auth";
 
 function getStatusVariant(status: string) {
   switch (status) {
@@ -422,6 +423,7 @@ function ChatInput({ onSend, isPending, error }: ChatInputProps) {
 export function InvestigationDetail() {
   const { id } = useParams<{ id: string }>();
   const { data, isLoading, error, refetch } = useInvestigation(id);
+  const { isMember } = useRole();
   const sendMessage = useSendMessage();
   const cancelMutation =
     useCancelInvestigationApiV1InvestigationsInvestigationIdCancelPost();
@@ -573,7 +575,7 @@ export function InvestigationDetail() {
           </div>
           <div className="flex items-center gap-2">
             {/* Codify Button - only for completed investigations */}
-            {isComplete && data.main_branch.synthesis && (
+            {isMember && isComplete && data.main_branch.synthesis && (
               <CodifyWidget
                 investigationId={id}
                 confidence={
@@ -586,14 +588,16 @@ export function InvestigationDetail() {
             )}
 
             {/* Collaborate Button */}
-            <Button
-              variant="default"
-              className="gap-2"
-              onClick={() => setShowCollaborateModal(true)}
-            >
-              <Users className="h-4 w-4" />
-              Collaborate
-            </Button>
+            {isMember && (
+              <Button
+                variant="default"
+                className="gap-2"
+                onClick={() => setShowCollaborateModal(true)}
+              >
+                <Users className="h-4 w-4" />
+                Collaborate
+              </Button>
+            )}
 
             {/* Share Button */}
             <div className="relative">
@@ -638,7 +642,7 @@ export function InvestigationDetail() {
                 />
 
                 {/* Cancel Button - only show when investigation is active */}
-                {!isComplete && (
+                {isMember && !isComplete && (
                   <Button
                     variant="destructive"
                     size="sm"
@@ -689,7 +693,7 @@ export function InvestigationDetail() {
                 )}
 
               {/* Chat input for asking questions */}
-              {!isComplete && (
+              {isMember && !isComplete && (
                 <div className="border-t pt-4">
                   <p className="text-sm text-muted-foreground mb-2">
                     Ask a question or provide direction

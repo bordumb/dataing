@@ -24,7 +24,7 @@ from sse_starlette.sse import EventSourceResponse
 from dataing.adapters.db.app_db import AppDatabase
 from dataing.core.domain_types import AnomalyAlert, MetricSpec
 from dataing.core.json_utils import to_json_string
-from dataing.entrypoints.api.middleware.auth import ApiKeyContext, verify_api_key
+from dataing.entrypoints.api.middleware.auth import ApiKeyContext, require_scope, verify_api_key
 from dataing.temporal.client import TemporalInvestigationClient
 
 logger = logging.getLogger(__name__)
@@ -33,6 +33,7 @@ router = APIRouter(prefix="/investigations", tags=["investigations"])
 
 # Annotated types for dependency injection
 AuthDep = Annotated[ApiKeyContext, Depends(verify_api_key)]
+WriteScopeDep = Annotated[ApiKeyContext, Depends(require_scope("write"))]
 
 
 class StartInvestigationRequest(BaseModel):
@@ -313,7 +314,7 @@ async def list_investigations(
 async def start_investigation(
     http_request: Request,
     request: StartInvestigationRequest,
-    auth: AuthDep,
+    auth: WriteScopeDep,
     db: AppDbDep,
     temporal_client: TemporalClientDep,
 ) -> StartInvestigationResponse:
@@ -445,7 +446,7 @@ async def start_investigation(
 @router.post("/{investigation_id}/cancel", response_model=CancelInvestigationResponse)
 async def cancel_investigation(
     investigation_id: UUID,
-    auth: AuthDep,
+    auth: WriteScopeDep,
     temporal_client: TemporalClientDep,
 ) -> CancelInvestigationResponse:
     """Cancel an investigation and all its child workflows.
@@ -627,7 +628,7 @@ async def verify_investigation(
 async def codify_investigation(
     investigation_id: UUID,
     request: CodifyRequest,
-    auth: AuthDep,
+    auth: WriteScopeDep,
     db: AppDbDep,
     temporal_client: TemporalClientDep,
 ) -> CodifyResponse:
@@ -839,7 +840,7 @@ async def get_recent_catches(
 @router.post("/tests/adopt")
 async def adopt_test(
     request: TestAdoptionRequest,
-    auth: AuthDep,
+    auth: WriteScopeDep,
     db: AppDbDep,
 ) -> dict[str, str]:
     """Mark a generated test as adopted.
@@ -875,7 +876,7 @@ async def adopt_test(
 @router.post("/tests/run")
 async def record_test_run(
     request: TestRunResultRequest,
-    auth: AuthDep,
+    auth: WriteScopeDep,
     db: AppDbDep,
 ) -> dict[str, str]:
     """Record a test run result.
@@ -908,7 +909,7 @@ async def record_test_run(
 async def send_message(
     investigation_id: UUID,
     request: SendMessageRequest,
-    auth: AuthDep,
+    auth: WriteScopeDep,
     temporal_client: TemporalClientDep,
 ) -> SendMessageResponse:
     """Send a message to an investigation via Temporal signal.
@@ -993,7 +994,7 @@ async def get_investigation_status(
 async def send_user_input(
     investigation_id: UUID,
     request: UserInputRequest,
-    auth: AuthDep,
+    auth: WriteScopeDep,
     temporal_client: TemporalClientDep,
 ) -> dict[str, str]:
     """Send user input to an investigation awaiting feedback.
@@ -1678,7 +1679,7 @@ async def export_snapshot_archive(
 
 @router.post("/import", response_model=ImportSnapshotResponse)
 async def import_snapshot_archive(
-    auth: AuthDep,
+    auth: WriteScopeDep,
     db: AppDbDep,
     file: Annotated[bytes, File()],
 ) -> ImportSnapshotResponse:

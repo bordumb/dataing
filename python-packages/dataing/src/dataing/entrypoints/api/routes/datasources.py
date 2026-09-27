@@ -248,11 +248,13 @@ async def list_source_types() -> SourceTypesResponse:
 async def test_connection(
     request: Request,
     body: TestConnectionRequest,
+    auth: AdminScopeDep,
 ) -> TestConnectionResponse:
     """Test a connection without saving it.
 
     Use this endpoint to validate connection settings before creating
-    a data source.
+    a data source. Admin-only, like creating one: it opens a connection
+    to whatever host the caller supplies.
     """
     registry = get_registry()
 
@@ -294,7 +296,7 @@ async def test_connection(
 async def create_datasource(
     request: Request,
     body: CreateDataSourceRequest,
-    auth: WriteScopeDep,
+    auth: AdminScopeDep,
     app_db: AppDbDep,
 ) -> DataSourceResponse:
     """Create a new data source.
@@ -496,7 +498,7 @@ async def get_datasource(
 async def delete_datasource(
     http_request: Request,
     datasource_id: UUID,
-    auth: WriteScopeDep,
+    auth: AdminScopeDep,
     app_db: AppDbDep,
 ) -> Response:
     """Delete a data source (soft delete)."""
@@ -513,7 +515,7 @@ async def delete_datasource(
 async def test_datasource_connection(
     http_request: Request,
     datasource_id: UUID,
-    auth: AuthDep,
+    auth: WriteScopeDep,
     app_db: AppDbDep,
 ) -> TestConnectionResponse:
     """Test connectivity for an existing data source."""
@@ -828,7 +830,7 @@ async def get_column_stats(
 async def sync_datasource_schema(
     http_request: Request,
     datasource_id: UUID,
-    auth: AuthDep,
+    auth: WriteScopeDep,
     app_db: AppDbDep,
 ) -> SyncResponse:
     """Sync schema and register/update datasets.

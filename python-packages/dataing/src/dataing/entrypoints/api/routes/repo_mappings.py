@@ -16,6 +16,7 @@ from dataing.core.repo_mapping import resolve_all_repo_mappings, resolve_file_pa
 from dataing.entrypoints.api.deps import get_app_db
 from dataing.entrypoints.api.middleware.auth import (
     ApiKeyContext,
+    require_scope,
     verify_api_key,
 )
 
@@ -25,6 +26,7 @@ router = APIRouter(prefix="/dataset-repo-mappings", tags=["dataset-repo-mappings
 
 AppDbDep = Annotated[AppDatabase, Depends(get_app_db)]
 AuthDep = Annotated[ApiKeyContext, Depends(verify_api_key)]
+WriteScopeDep = Annotated[ApiKeyContext, Depends(require_scope("write"))]
 
 
 # --- Pydantic schemas ---
@@ -117,7 +119,7 @@ def _to_response(row: dict[str, Any]) -> RepoMappingResponse:
 @router.post("")
 async def create_repo_mapping(
     req: CreateRepoMappingRequest,
-    auth: AuthDep,
+    auth: WriteScopeDep,
     db: AppDbDep,
 ) -> RepoMappingResponse:
     """Create a dataset-to-repository mapping."""
@@ -175,7 +177,7 @@ async def list_repo_mappings(
 async def update_repo_mapping(
     mapping_id: UUID,
     req: UpdateRepoMappingRequest,
-    auth: AuthDep,
+    auth: WriteScopeDep,
     db: AppDbDep,
 ) -> RepoMappingResponse:
     """Update a dataset-to-repository mapping."""
@@ -192,7 +194,7 @@ async def update_repo_mapping(
 @router.delete("/{mapping_id}")
 async def delete_repo_mapping(
     mapping_id: UUID,
-    auth: AuthDep,
+    auth: WriteScopeDep,
     db: AppDbDep,
 ) -> dict[str, bool]:
     """Delete a dataset-to-repository mapping."""
@@ -233,7 +235,7 @@ class BulkImportResponse(BaseModel):
 @router.post("/bulk")
 async def bulk_import_repo_mappings(
     req: BulkImportRequest,
-    auth: AuthDep,
+    auth: WriteScopeDep,
     db: AppDbDep,
 ) -> BulkImportResponse:
     """Bulk import dataset-to-repository mappings."""
@@ -319,7 +321,7 @@ def _parse_dbt_manifest(
 @router.post("/import-dbt-manifest")
 async def import_dbt_manifest(
     file: UploadFile,
-    auth: AuthDep,
+    auth: WriteScopeDep,
     db: AppDbDep,
     repo_owner: str = Query(..., min_length=1),
     repo_name: str = Query(..., min_length=1),
@@ -386,7 +388,7 @@ async def list_suggestions(
 @router.post("/{mapping_id}/confirm")
 async def confirm_suggestion(
     mapping_id: UUID,
-    auth: AuthDep,
+    auth: WriteScopeDep,
     db: AppDbDep,
 ) -> RepoMappingResponse:
     """Confirm a suggested mapping, promoting it to explicit."""
@@ -402,7 +404,7 @@ async def confirm_suggestion(
 @router.post("/{mapping_id}/dismiss")
 async def dismiss_suggestion(
     mapping_id: UUID,
-    auth: AuthDep,
+    auth: WriteScopeDep,
     db: AppDbDep,
 ) -> dict[str, bool]:
     """Dismiss (delete) a suggested mapping."""

@@ -26,7 +26,7 @@ from dataing.entrypoints.api.deps import (
     get_investigation_starter,
     resolve_datasource_id,
 )
-from dataing.entrypoints.api.middleware.auth import ApiKeyContext, verify_api_key
+from dataing.entrypoints.api.middleware.auth import ApiKeyContext, require_scope, verify_api_key
 from dataing.models.issue import IssueStatus
 from dataing.services.investigation import InvestigationStarterService
 
@@ -36,6 +36,7 @@ router = APIRouter(prefix="/issues", tags=["issues"])
 
 # Annotated types for dependency injection
 AuthDep = Annotated[ApiKeyContext, Depends(verify_api_key)]
+WriteScopeDep = Annotated[ApiKeyContext, Depends(require_scope("write"))]
 AppDbDep = Annotated[AppDatabase, Depends(get_app_db)]
 InvestigationStarterDep = Annotated[InvestigationStarterService, Depends(get_investigation_starter)]
 
@@ -401,7 +402,7 @@ async def list_issues(
 
 @router.post("", response_model=IssueResponse, status_code=201)
 async def create_issue(
-    auth: AuthDep,
+    auth: WriteScopeDep,
     db: AppDbDep,
     body: IssueCreate,
 ) -> IssueResponse:
@@ -540,7 +541,7 @@ async def get_issue(
 @router.patch("/{issue_id}", response_model=IssueResponse)
 async def update_issue(
     issue_id: UUID,
-    auth: AuthDep,
+    auth: WriteScopeDep,
     db: AppDbDep,
     body: IssueUpdate,
 ) -> IssueResponse:
@@ -1097,7 +1098,7 @@ async def list_investigation_runs(
 async def spawn_investigation(
     issue_id: UUID,
     http_request: Request,
-    auth: AuthDep,
+    auth: WriteScopeDep,
     db: AppDbDep,
     investigation_starter: InvestigationStarterDep,
     body: InvestigationRunCreate,

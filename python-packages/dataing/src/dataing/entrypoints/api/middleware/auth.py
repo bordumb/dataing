@@ -40,6 +40,17 @@ class ApiKeyContext:
     user_id: UUID | None
     scopes: list[str]
 
+    def has_scope(self, scope: str) -> bool:
+        """Return whether the caller holds a scope, directly or via the '*' wildcard."""
+        return scope in self.scopes or "*" in self.scopes
+
+    def is_user(self, user_id: UUID | None) -> bool:
+        """Return whether the caller is the given user.
+
+        A caller with no user identity, such as a service API key, is nobody.
+        """
+        return self.user_id is not None and self.user_id == user_id
+
 
 def _scopes_for_role(role: str) -> list[str]:
     """Return the API scopes granted to a JWT caller's org role.
@@ -178,7 +189,7 @@ def require_scope(required_scope: str) -> Callable[..., Any]:
     async def scope_checker(
         auth: Annotated[ApiKeyContext, Depends(verify_api_key)],
     ) -> ApiKeyContext:
-        if required_scope not in auth.scopes and "*" not in auth.scopes:
+        if not auth.has_scope(required_scope):
             raise HTTPException(
                 status_code=403,
                 detail=f"Scope '{required_scope}' required",

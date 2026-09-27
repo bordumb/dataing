@@ -22,6 +22,7 @@ router = APIRouter(prefix="/tags", tags=["tags"])
 # Annotated types for dependency injection
 AppDbDep = Annotated[AppDatabase, Depends(get_app_db)]
 AuthDep = Annotated[ApiKeyContext, Depends(verify_api_key)]
+WriteScopeDep = Annotated[ApiKeyContext, Depends(require_scope("write"))]
 AdminScopeDep = Annotated[ApiKeyContext, Depends(require_scope("admin"))]
 
 
@@ -240,7 +241,7 @@ async def add_investigation_tag(
     http_request: Request,
     investigation_id: UUID,
     body: InvestigationTagAdd,
-    auth: AuthDep,
+    auth: WriteScopeDep,
     app_db: AppDbDep,
 ) -> dict[str, str]:
     """Add a tag to an investigation."""
@@ -274,7 +275,7 @@ async def remove_investigation_tag(
     http_request: Request,
     investigation_id: UUID,
     tag_id: UUID,
-    auth: AuthDep,
+    auth: WriteScopeDep,
     app_db: AppDbDep,
 ) -> Response:
     """Remove a tag from an investigation."""

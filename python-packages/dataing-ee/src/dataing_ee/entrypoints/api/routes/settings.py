@@ -31,7 +31,6 @@ router = APIRouter(prefix="/settings", tags=["settings"])
 # Annotated types for dependency injection
 AppDbDep = Annotated[AppDatabase, Depends(get_app_db)]
 AuthDep = Annotated[ApiKeyContext, Depends(verify_api_key)]
-WriteScopeDep = Annotated[ApiKeyContext, Depends(require_scope("write"))]
 AdminScopeDep = Annotated[ApiKeyContext, Depends(require_scope("admin"))]
 
 
@@ -240,7 +239,7 @@ async def list_webhooks(
 async def create_webhook(
     http_request: Request,
     request: CreateWebhookRequest,
-    auth: WriteScopeDep,
+    auth: AdminScopeDep,
     app_db: AppDbDep,
 ) -> WebhookCreatedResponse:
     """Create a new webhook.
@@ -270,7 +269,7 @@ async def create_webhook(
 async def delete_webhook(
     http_request: Request,
     webhook_id: UUID,
-    auth: WriteScopeDep,
+    auth: AdminScopeDep,
     app_db: AppDbDep,
 ) -> Response:
     """Delete a webhook."""

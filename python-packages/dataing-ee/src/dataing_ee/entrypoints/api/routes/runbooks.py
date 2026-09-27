@@ -27,6 +27,7 @@ router = APIRouter(prefix="/runbooks", tags=["runbooks"])
 
 # Dependencies
 AuthDep = Annotated[ApiKeyContext, Depends(verify_api_key)]
+WriteScopeDep = Annotated[ApiKeyContext, Depends(require_scope("write"))]
 AdminScopeDep = Annotated[ApiKeyContext, Depends(require_scope("admin"))]
 AppDbDep = Annotated[AppDatabase, Depends(get_app_db)]
 
@@ -222,7 +223,7 @@ async def list_runbooks(
 
 @router.post("", response_model=RunbookResponse, status_code=status.HTTP_201_CREATED)
 async def create_runbook(
-    auth: AuthDep,
+    auth: WriteScopeDep,
     db: AppDbDep,
     body: RunbookCreate,
 ) -> RunbookResponse:
@@ -295,7 +296,7 @@ async def get_runbook(
 
 @router.patch("/{runbook_id}", response_model=RunbookResponse)
 async def update_runbook(
-    auth: AuthDep,
+    auth: WriteScopeDep,
     db: AppDbDep,
     runbook_id: UUID,
     body: RunbookUpdate,
@@ -446,7 +447,7 @@ async def delete_runbook(
     status_code=status.HTTP_201_CREATED,
 )
 async def generate_runbook_from_issue(
-    auth: AuthDep,
+    auth: WriteScopeDep,
     db: AppDbDep,
     issue_id: UUID,
     body: GenerateRunbookRequest,
@@ -586,7 +587,7 @@ async def get_suggested_runbooks(
     status_code=status.HTTP_201_CREATED,
 )
 async def link_runbook_to_issue(
-    auth: AuthDep,
+    auth: WriteScopeDep,
     db: AppDbDep,
     runbook_id: UUID,
     issue_id: UUID,

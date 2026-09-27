@@ -1,6 +1,5 @@
 """Tests for SSO admin configuration routes."""
 
-from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from unittest.mock import AsyncMock, MagicMock, patch
 from uuid import UUID, uuid4
@@ -16,17 +15,7 @@ from dataing_ee.entrypoints.api.routes.settings import (
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-
-@dataclass
-class MockApiKeyContext:
-    """Mock API key context for testing."""
-
-    key_id: UUID
-    tenant_id: UUID
-    tenant_slug: str
-    tenant_name: str
-    user_id: UUID | None
-    scopes: list[str]
+from dataing.entrypoints.api.middleware.auth import ApiKeyContext
 
 
 @pytest.fixture
@@ -44,9 +33,9 @@ def mock_sso_repo() -> MagicMock:
 
 
 @pytest.fixture
-def mock_auth(tenant_id: UUID) -> MockApiKeyContext:
+def mock_auth(tenant_id: UUID) -> ApiKeyContext:
     """Create mock auth context with admin scope."""
-    return MockApiKeyContext(
+    return ApiKeyContext(
         key_id=uuid4(),
         tenant_id=tenant_id,
         tenant_slug="test-tenant",
@@ -57,7 +46,7 @@ def mock_auth(tenant_id: UUID) -> MockApiKeyContext:
 
 
 @pytest.fixture
-def app(mock_sso_repo: MagicMock, mock_auth: MockApiKeyContext) -> FastAPI:
+def app(mock_sso_repo: MagicMock, mock_auth: ApiKeyContext) -> FastAPI:
     """Create test FastAPI app with mocked dependencies."""
     from dataing.entrypoints.api.middleware.auth import verify_api_key
 

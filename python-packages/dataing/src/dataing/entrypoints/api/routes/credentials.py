@@ -174,7 +174,7 @@ async def test_credentials(
     http_request: Request,
     datasource_id: UUID,
     body: SaveCredentialsRequest,
-    auth: AuthDep,
+    auth: WriteScopeDep,
     app_db: AppDbDep,
 ) -> TestConnectionResponse:
     """Test credentials without saving them.

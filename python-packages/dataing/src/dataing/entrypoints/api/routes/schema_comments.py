@@ -105,15 +105,21 @@ async def update_schema_comment(
     auth: AuthDep,
     db: DbDep,
 ) -> SchemaCommentResponse:
-    """Update a schema comment."""
+    """Update a schema comment. Only its author may edit it."""
+    existing = await db.get_schema_comment(
+        tenant_id=auth.tenant_id,
+        comment_id=comment_id,
+    )
+    if not existing or existing["dataset_id"] != dataset_id:
+        raise HTTPException(status_code=404, detail="Comment not found")
+    if not auth.is_user(existing["author_id"]):
+        raise HTTPException(status_code=403, detail="Only the author can edit this comment")
     comment = await db.update_schema_comment(
         tenant_id=auth.tenant_id,
         comment_id=comment_id,
         content=body.content,
     )
     if not comment:
-        raise HTTPException(status_code=404, detail="Comment not found")
-    if comment["dataset_id"] != dataset_id:
         raise HTTPException(status_code=404, detail="Comment not found")
     return SchemaCommentResponse(**comment)
 
@@ -131,13 +137,17 @@ async def delete_schema_comment(
     auth: AuthDep,
     db: DbDep,
 ) -> Response:
-    """Delete a schema comment."""
+    """Delete a schema comment. Its author or an admin may delete it."""
     existing = await db.get_schema_comment(
         tenant_id=auth.tenant_id,
         comment_id=comment_id,
     )
     if not existing or existing["dataset_id"] != dataset_id:
         raise HTTPException(status_code=404, detail="Comment not found")
+    if not (auth.is_user(existing["author_id"]) or auth.has_scope("admin")):
+        raise HTTPException(
+            status_code=403, detail="Only the author or an admin can delete this comment"
+        )
     deleted = await db.delete_schema_comment(
         tenant_id=auth.tenant_id,
         comment_id=comment_id,

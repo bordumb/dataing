@@ -559,43 +559,6 @@ class AppDatabase:
         return result["count"] if result else 0
 
     # Investigation operations
-    async def create_investigation(
-        self,
-        tenant_id: UUID,
-        dataset_id: str,
-        metric_name: str,
-        data_source_id: UUID | None = None,
-        created_by: UUID | None = None,
-        expected_value: float | None = None,
-        actual_value: float | None = None,
-        deviation_pct: float | None = None,
-        anomaly_date: str | None = None,
-        severity: str | None = None,
-        metadata: dict[str, Any] | None = None,
-    ) -> dict[str, Any]:
-        """Create a new investigation."""
-        result = await self.execute_returning(
-            """INSERT INTO investigations
-               (tenant_id, data_source_id, created_by, dataset_id, metric_name,
-                expected_value, actual_value, deviation_pct, anomaly_date, severity, metadata)
-               VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
-               RETURNING *""",
-            tenant_id,
-            data_source_id,
-            created_by,
-            dataset_id,
-            metric_name,
-            expected_value,
-            actual_value,
-            deviation_pct,
-            anomaly_date,
-            severity,
-            to_json_string(metadata or {}),
-        )
-        if result is None:
-            raise RuntimeError("Failed to create investigation")
-        return result
-
     async def get_investigation(
         self, investigation_id: UUID, tenant_id: UUID
     ) -> dict[str, Any] | None:
@@ -660,51 +623,6 @@ class AppDatabase:
             LIMIT $3
         """
         return await self.fetch_all(query, tenant_id, dataset_native_path, limit)
-
-    async def update_investigation_status(
-        self,
-        investigation_id: UUID,
-        status: str,
-        events: list[Any] | None = None,
-        finding: dict[str, Any] | None = None,
-        started_at: Any = None,
-        completed_at: Any = None,
-        duration_seconds: float | None = None,
-    ) -> dict[str, Any] | None:
-        """Update investigation status and optionally other fields."""
-        updates = ["status = $2"]
-        args: list[Any] = [investigation_id, status]
-        idx = 3
-
-        if events is not None:
-            updates.append(f"events = ${idx}")
-            args.append(to_json_string(events))
-            idx += 1
-
-        if finding is not None:
-            updates.append(f"finding = ${idx}")
-            args.append(to_json_string(finding))
-            idx += 1
-
-        if started_at is not None:
-            updates.append(f"started_at = ${idx}")
-            args.append(started_at)
-            idx += 1
-
-        if completed_at is not None:
-            updates.append(f"completed_at = ${idx}")
-            args.append(completed_at)
-            idx += 1
-
-        if duration_seconds is not None:
-            updates.append(f"duration_seconds = ${idx}")
-            args.append(duration_seconds)
-            idx += 1
-
-        query = f"""UPDATE investigations SET {", ".join(updates)}
-                    WHERE id = $1 RETURNING *"""
-
-        return await self.execute_returning(query, *args)
 
     # Audit log operations
     async def create_audit_log(
@@ -853,66 +771,6 @@ class AppDatabase:
             month,
         )
 
-    # Approval requests
-    async def create_approval_request(
-        self,
-        investigation_id: UUID,
-        tenant_id: UUID,
-        request_type: str,
-        context: dict[str, Any],
-        requested_by: str = "system",
-    ) -> dict[str, Any]:
-        """Create an approval request."""
-        result = await self.execute_returning(
-            """INSERT INTO approval_requests
-                (investigation_id, tenant_id, request_type, context, requested_by)
-               VALUES ($1, $2, $3, $4, $5)
-               RETURNING *""",
-            investigation_id,
-            tenant_id,
-            request_type,
-            to_json_string(context),
-            requested_by,
-        )
-        if result is None:
-            raise RuntimeError("Failed to create approval request")
-        return result
-
-    async def get_pending_approvals(self, tenant_id: UUID) -> list[dict[str, Any]]:
-        """Get all pending approval requests for a tenant."""
-        return await self.fetch_all(
-            """SELECT ar.*, i.dataset_id, i.metric_name, i.severity
-               FROM approval_requests ar
-               JOIN investigations i ON i.id = ar.investigation_id
-               WHERE ar.tenant_id = $1 AND ar.decision IS NULL
-               ORDER BY ar.requested_at DESC""",
-            tenant_id,
-        )
-
-    async def make_approval_decision(
-        self,
-        approval_id: UUID,
-        tenant_id: UUID,
-        decision: str,
-        decided_by: UUID,
-        comment: str | None = None,
-        modifications: dict[str, Any] | None = None,
-    ) -> dict[str, Any] | None:
-        """Record an approval decision."""
-        return await self.execute_returning(
-            """UPDATE approval_requests
-               SET decision = $3, decided_by = $4, decided_at = NOW(),
-                   comment = $5, modifications = $6
-               WHERE id = $1 AND tenant_id = $2
-               RETURNING *""",
-            approval_id,
-            tenant_id,
-            decision,
-            decided_by,
-            comment,
-            to_json_string(modifications) if modifications else None,
-        )
-
     # Dashboard stats
     async def get_dashboard_stats(self, tenant_id: UUID) -> dict[str, Any]:
         """Get dashboard statistics for a tenant."""
@@ -938,18 +796,10 @@ class AppDatabase:
             tenant_id,
         )
 
-        # Pending approvals
-        approvals_result = await self.fetch_one(
-            """SELECT COUNT(*) as count FROM approval_requests
-               WHERE tenant_id = $1 AND decision IS NULL""",
-            tenant_id,
-        )
-
         return {
             "activeInvestigations": active_result["count"] if active_result else 0,
             "completedToday": completed_result["count"] if completed_result else 0,
             "dataSources": ds_result["count"] if ds_result else 0,
-            "pendingApprovals": approvals_result["count"] if approvals_result else 0,
         }
 
     # Feedback event operations

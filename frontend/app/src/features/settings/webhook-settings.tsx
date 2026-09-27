@@ -25,7 +25,6 @@ const EVENT_TYPES = [
   { id: "investigation.started", label: "Investigation Started" },
   { id: "investigation.completed", label: "Investigation Completed" },
   { id: "investigation.failed", label: "Investigation Failed" },
-  { id: "approval.required", label: "Approval Required" },
 ];
 
 export function WebhookSettings() {

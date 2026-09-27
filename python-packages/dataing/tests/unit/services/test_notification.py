@@ -148,26 +148,6 @@ class TestNotificationService:
         call_args = mock_db.get_webhooks_for_event.call_args
         assert call_args[0][1] == "investigation.failed"
 
-    async def test_notify_approval_required(
-        self,
-        service: NotificationService,
-        tenant_id: uuid.UUID,
-        mock_db: AsyncMock,
-    ) -> None:
-        """Test convenience method for approval required."""
-        inv_id = uuid.uuid4()
-        approval_id = uuid.uuid4()
-
-        await service.notify_approval_required(
-            tenant_id=tenant_id,
-            investigation_id=inv_id,
-            approval_request_id=approval_id,
-            context={"query": "SELECT 1"},
-        )
-
-        call_args = mock_db.get_webhooks_for_event.call_args
-        assert call_args[0][1] == "approval.required"
-
 
 class TestNotificationEvent:
     """Tests for NotificationEvent."""

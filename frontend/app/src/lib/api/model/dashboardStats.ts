@@ -13,5 +13,4 @@ export interface DashboardStats {
   active_investigations: number;
   completed_today: number;
   data_sources: number;
-  pending_approvals: number;
 }

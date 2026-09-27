@@ -36,16 +36,24 @@ def migrated_dsn() -> Iterator[str]:
     infra/init-app-db.sh apply them (seed files skipped, statement errors do not
     stop a file), so tests see the schema the application actually runs on.
     The database is created on the server in DATABASE_URL and dropped afterwards.
+
+    Integration tests only run when selected with `-m integration`, so a missing
+    psql or database server fails them instead of skipping them: a skip would let
+    CI pass without testing anything.
     """
     psql = shutil.which("psql")
     if psql is None:
-        pytest.skip("psql is required to apply migrations")
+        pytest.fail("psql must be on PATH to apply migrations", pytrace=False)
 
     server_dsn = os.getenv("DATABASE_URL", DEFAULT_DATABASE_URL)
     database = f"dataing_test_{uuid4().hex[:12]}"
     created = _psql(psql, server_dsn, "--command", f'CREATE DATABASE "{database}"')
     if created.returncode != 0:
-        pytest.skip(f"Database not available: {created.stderr.strip()}")
+        pytest.fail(
+            f"Cannot create a test database on the DATABASE_URL server "
+            f"(run `just demo-infra` or set DATABASE_URL): {created.stderr.strip()}",
+            pytrace=False,
+        )
 
     dsn = urlsplit(server_dsn)._replace(path=f"/{database}").geturl()
     try:

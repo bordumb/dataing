@@ -16,11 +16,6 @@ const NOTIFICATION_SETTINGS = [
     description: "Get notified when an investigation finishes.",
   },
   {
-    id: "approval_required",
-    label: "Approval Required",
-    description: "Get notified when human-in-the-loop approval is needed.",
-  },
-  {
     id: "error_alerts",
     label: "Error Alerts",
     description: "Get notified when investigations fail or encounter errors.",

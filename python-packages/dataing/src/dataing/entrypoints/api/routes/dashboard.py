@@ -25,7 +25,6 @@ class DashboardStats(BaseModel):
     active_investigations: int
     completed_today: int
     data_sources: int
-    pending_approvals: int
 
 
 class RecentInvestigation(BaseModel):
@@ -63,7 +62,6 @@ async def get_dashboard(
             active_investigations=stats["activeInvestigations"],
             completed_today=stats["completedToday"],
             data_sources=stats["dataSources"],
-            pending_approvals=stats["pendingApprovals"],
         ),
         recent_investigations=[
             RecentInvestigation(
@@ -91,5 +89,4 @@ async def get_stats(
         active_investigations=stats["activeInvestigations"],
         completed_today=stats["completedToday"],
         data_sources=stats["dataSources"],
-        pending_approvals=stats["pendingApprovals"],
     )

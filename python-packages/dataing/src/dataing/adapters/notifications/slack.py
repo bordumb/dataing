@@ -1,6 +1,5 @@
 """Slack notification adapter."""
 
-import json
 from dataclasses import dataclass
 from typing import Any
 
@@ -129,25 +128,6 @@ class SlackNotifier:
                 }
             )
 
-        elif event_type == "approval.required":
-            attachment["pretext"] = ":eyes: Approval Required"
-            fields.append(
-                {
-                    "title": "Investigation ID",
-                    "value": payload.get("investigation_id", "Unknown"),
-                    "short": True,
-                }
-            )
-            context = payload.get("context", {})
-            if context:
-                fields.append(
-                    {
-                        "title": "Context",
-                        "value": json.dumps(context, indent=2)[:500],
-                        "short": False,
-                    }
-                )
-
         else:
             # Generic event
             attachment["pretext"] = f":bell: {event_type}"
@@ -178,6 +158,5 @@ class SlackNotifier:
             "investigation.completed": "#36a64f",  # Green
             "investigation.failed": "#dc3545",  # Red
             "investigation.started": "#007bff",  # Blue
-            "approval.required": "#ffc107",  # Yellow
         }
         return colors.get(event_type, "#6c757d")  # Gray default

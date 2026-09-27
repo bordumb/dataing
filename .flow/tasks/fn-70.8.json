@@ -1,0 +1,16 @@
+{
+  "assignee": null,
+  "claim_note": "",
+  "claimed_at": null,
+  "created_at": "2026-09-27T23:20:31.744606Z",
+  "depends_on": [
+    "fn-70.5"
+  ],
+  "epic": "fn-70",
+  "id": "fn-70.8",
+  "priority": null,
+  "spec_path": ".flow/tasks/fn-70.8.md",
+  "status": "todo",
+  "title": "M2: brief schema, draft_brief turn, brief-drafts route",
+  "updated_at": "2026-09-27T23:20:32.125849Z"
+}

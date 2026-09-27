@@ -3330,7 +3330,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/dataing__entrypoints__api__routes__credentials__TestConnectionResponse"
+                  "$ref": "#/components/schemas/CredentialsTestResponse"
                 }
               }
             }
@@ -9572,6 +9572,39 @@
         "title": "BulkRepoMappingItem",
         "description": "Single item in a bulk import request."
       },
+      "BundleLineageGraphResponse": {
+        "properties": {
+          "root": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Root"
+          },
+          "datasets": {
+            "additionalProperties": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "object",
+            "title": "Datasets"
+          },
+          "edges": {
+            "items": {
+              "$ref": "#/components/schemas/LineageEdge"
+            },
+            "type": "array",
+            "title": "Edges"
+          }
+        },
+        "type": "object",
+        "title": "BundleLineageGraphResponse",
+        "description": "Lineage graph response."
+      },
       "CancelInvestigationResponse": {
         "properties": {
           "investigation_id": {
@@ -9946,7 +9979,7 @@
           "lineage": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/dataing__entrypoints__api__routes__bundles__LineageGraphResponse"
+                "$ref": "#/components/schemas/BundleLineageGraphResponse"
               },
               {
                 "type": "null"
@@ -10274,6 +10307,42 @@
         ],
         "title": "CredentialsStatusResponse",
         "description": "Response for credentials status check."
+      },
+      "CredentialsTestResponse": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "title": "Success"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          },
+          "tables_accessible": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tables Accessible"
+          }
+        },
+        "type": "object",
+        "required": [
+          "success"
+        ],
+        "title": "CredentialsTestResponse",
+        "description": "Response for testing credentials."
       },
       "DashboardResponse": {
         "properties": {
@@ -15924,75 +15993,6 @@
         ],
         "title": "WeeklyUsageResponse",
         "description": "Weekly usage statistics response."
-      },
-      "dataing__entrypoints__api__routes__bundles__LineageGraphResponse": {
-        "properties": {
-          "root": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Root"
-          },
-          "datasets": {
-            "additionalProperties": {
-              "additionalProperties": true,
-              "type": "object"
-            },
-            "type": "object",
-            "title": "Datasets"
-          },
-          "edges": {
-            "items": {
-              "$ref": "#/components/schemas/LineageEdge"
-            },
-            "type": "array",
-            "title": "Edges"
-          }
-        },
-        "type": "object",
-        "title": "LineageGraphResponse",
-        "description": "Lineage graph response."
-      },
-      "dataing__entrypoints__api__routes__credentials__TestConnectionResponse": {
-        "properties": {
-          "success": {
-            "type": "boolean",
-            "title": "Success"
-          },
-          "error": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Error"
-          },
-          "tables_accessible": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Tables Accessible"
-          }
-        },
-        "type": "object",
-        "required": [
-          "success"
-        ],
-        "title": "TestConnectionResponse",
-        "description": "Response for testing credentials."
       }
     },
     "securitySchemes": {

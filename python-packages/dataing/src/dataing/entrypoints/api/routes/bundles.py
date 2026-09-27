@@ -60,7 +60,7 @@ class LineageEdge(BaseModel):
     edge_type: str = "transforms"
 
 
-class LineageGraphResponse(BaseModel):
+class BundleLineageGraphResponse(BaseModel):
     """Lineage graph response."""
 
     root: str | None = None
@@ -91,7 +91,7 @@ class ContextBundleResponse(BaseModel):
     bundle_id: str
     resolved_assets: list[ResolvedAssetResponse]
     default_datasource_id: str | None = None
-    lineage: LineageGraphResponse | None = None
+    lineage: BundleLineageGraphResponse | None = None
     operational: OperationalFactsResponse | None = None
     anomalies: list[AnomalySummary] | None = None
     bundle_hash: str = Field(..., description="Server-derived cache key")
@@ -330,7 +330,7 @@ async def create_bundle(
     default_datasource_id = resolved_assets[0].datasource_id if resolved_assets else None
 
     # Build context data
-    lineage_data = LineageGraphResponse() if body.include_lineage else None
+    lineage_data = BundleLineageGraphResponse() if body.include_lineage else None
     operational_data = OperationalFactsResponse() if body.include_operational else None
     anomalies_data: list[AnomalySummary] | None = [] if body.include_anomalies else None
 
@@ -430,7 +430,7 @@ async def get_bundle(
     # Reconstruct context data
     lineage_data = None
     if bundle_record.get("lineage"):
-        lineage_data = LineageGraphResponse(**bundle_record["lineage"])
+        lineage_data = BundleLineageGraphResponse(**bundle_record["lineage"])
 
     operational_data = None
     if bundle_record.get("operational"):

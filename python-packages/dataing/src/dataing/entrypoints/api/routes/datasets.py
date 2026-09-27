@@ -117,7 +117,7 @@ async def _fetch_columns_from_datasource(
         return []
 
 
-class DatasetResponse(BaseModel):
+class DatasetBaseResponse(BaseModel):
     """Response for a dataset."""
 
     id: str
@@ -138,11 +138,11 @@ class DatasetResponse(BaseModel):
 class DatasetListResponse(BaseModel):
     """Response for listing datasets."""
 
-    datasets: list[DatasetResponse]
+    datasets: list[DatasetBaseResponse]
     total: int
 
 
-class DatasetDetailResponse(DatasetResponse):
+class DatasetDetailResponse(DatasetBaseResponse):
     """Detailed dataset response with columns."""
 
     columns: list[dict[str, Any]] = Field(default_factory=list)
@@ -165,9 +165,9 @@ class DatasetInvestigationsResponse(BaseModel):
     total: int
 
 
-def _format_dataset(ds: dict[str, Any]) -> DatasetResponse:
+def _format_dataset(ds: dict[str, Any]) -> DatasetBaseResponse:
     """Format dataset record for response."""
-    return DatasetResponse(
+    return DatasetBaseResponse(
         id=str(ds["id"]),
         datasource_id=str(ds["datasource_id"]),
         datasource_name=ds.get("datasource_name"),

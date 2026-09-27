@@ -6,5 +6,6 @@
  * OpenAPI spec version: 2.0.0
  */
 
-export type DataingEntrypointsApiRoutesDatasourcesTestConnectionResponseLatencyMs =
-  number | null;
+export type BundleLineageGraphResponseDatasets = {
+  [key: string]: { [key: string]: unknown };
+};

@@ -6,4 +6,4 @@
  * OpenAPI spec version: 2.0.0
  */
 
-export type TestConnectionResponseError = string | null;
+export type CredentialsTestResponseError = string | null;

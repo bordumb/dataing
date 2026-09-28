@@ -46,6 +46,7 @@ from dataing.entrypoints.api.routes.repo_mappings import (
 from dataing.entrypoints.api.routes.repo_mappings import router as repo_mappings_router
 from dataing.entrypoints.api.routes.schema_comments import router as schema_comments_router
 from dataing.entrypoints.api.routes.sla_policies import router as sla_policies_router
+from dataing.entrypoints.api.routes.system import router as system_router
 from dataing.entrypoints.api.routes.tags import (
     investigation_tags_router,
 )
@@ -67,6 +68,7 @@ api_router.include_router(investigation_outcomes_router)  # Confirm/reject a run
 api_router.include_router(investigation_steers_router)  # Steer a running investigation
 api_router.include_router(issues_router)  # Issues CRUD API
 api_router.include_router(issue_threads_router)  # Issue hub threads and messages
+api_router.include_router(system_router)  # Key and model check for the app banner
 api_router.include_router(datasources_router)
 api_router.include_router(datasources_v2_router, prefix="/v2")  # New unified adapter API
 api_router.include_router(credentials_router)  # User datasource credentials

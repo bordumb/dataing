@@ -32,6 +32,7 @@ from dataing.core.auth.recovery import PasswordRecoveryAdapter
 from dataing.core.investigation.collaboration import CollaborationService
 from dataing.core.investigation.service import InvestigationService
 from dataing.core.json_utils import to_json_string
+from dataing.services.llm_status import LLMStatusChecker
 from dataing.services.usage import UsageTracker
 
 if TYPE_CHECKING:
@@ -51,6 +52,15 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     - LLM client initialization
     - Orchestrator configuration
     """
+    # Check the Anthropic key and models in the background; the app's banner reads
+    # the result (docs/specs/0001_issue_chat.md §7.12)
+    llm_status = LLMStatusChecker(
+        api_key=settings.anthropic_api_key,
+        models=[settings.llm_model, settings.chat_agent_model],
+    )
+    llm_status.start()
+    app.state.llm_status = llm_status
+
     # Setup application database
     app_db = AppDatabase(settings.app_database_url)
     await app_db.connect()
@@ -210,7 +220,8 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
     yield
 
-    # Teardown - close all cached adapters
+    # Teardown - stop the key check if it is still running, close all cached adapters
+    await llm_status.aclose()
     for cache_key, adapter in app.state.adapter_cache.items():
         try:
             await adapter.disconnect()

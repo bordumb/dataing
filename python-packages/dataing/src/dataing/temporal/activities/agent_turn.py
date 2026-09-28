@@ -44,6 +44,7 @@ from dataing.agents.chat import (
     draft_brief,
     run_turn,
 )
+from dataing.agents.errors import classify_llm_error
 from dataing.core.agent_query import AgentQueryService
 from dataing.core.investigation.brief import BriefDraft, brief_from_draft, brief_to_markdown
 from dataing.core.issue_chat import (
@@ -51,6 +52,7 @@ from dataing.core.issue_chat import (
     ThreadChatServices,
     resolve_chat_datasource,
 )
+from dataing.temporal.errors import llm_activity_error
 
 logger = logging.getLogger(__name__)
 
@@ -202,6 +204,8 @@ def make_run_agent_turn_activity(
                 status="cancelled",
             )
             raise
+        except Exception as e:
+            raise _readable(e) from e
 
         await threads.update_message(
             reply_id,
@@ -240,6 +244,16 @@ def make_mark_turn_failed_activity(app_db: AppDatabase) -> Any:
         )
 
     return mark_turn_failed
+
+
+def _readable(error: Exception) -> Exception:
+    """Return the error to fail a turn with: a model failure says what to fix.
+
+    A failure no retry can fix is LLMRejected, so the turn isn't retried
+    (docs/specs/0001_issue_chat.md §7.12); anything else is raised as it is.
+    """
+    failure = classify_llm_error(error)
+    return llm_activity_error(failure) if failure is not None else error
 
 
 async def _with_heartbeats(work: Awaitable[T]) -> T:
@@ -382,13 +396,16 @@ def make_run_brief_draft_activity(
         overview = await services.issue_context()
         sources = await _brief_sources(app_db, threads, issue_id, thread_id, message["seq"])
 
-        draft, usage = await _with_heartbeats(
-            draft_brief(
-                agent_factory(),
-                build_history(sources.history, max_messages=len(sources.history)),
-                instructions=build_instructions(overview),
+        try:
+            draft, usage = await _with_heartbeats(
+                draft_brief(
+                    agent_factory(),
+                    build_history(sources.history, max_messages=len(sources.history)),
+                    instructions=build_instructions(overview),
+                )
             )
-        )
+        except Exception as e:
+            raise _readable(e) from e
         brief = brief_from_draft(
             draft,
             seq_to_message=sources.seq_to_message,

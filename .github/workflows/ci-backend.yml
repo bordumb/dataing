@@ -54,7 +54,7 @@ jobs:
           uv run pytest python-packages/dataing-ee/tests --cov=python-packages/dataing-ee/src/dataing_ee --cov-report=xml --cov-append
 
       - name: Upload coverage
-        uses: codecov/codecov-action@v5
+        uses: codecov/codecov-action@v7
         with:
           files: coverage.xml
           fail_ci_if_error: false

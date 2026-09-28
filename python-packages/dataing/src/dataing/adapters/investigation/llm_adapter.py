@@ -18,6 +18,7 @@ from dataing.adapters.datasource.types import (
     SourceCategory,
     SourceType,
 )
+from dataing.config import INVESTIGATION_MODEL
 from dataing.core.domain_types import (
     AnomalyAlert,
     Evidence,
@@ -144,7 +145,7 @@ class HypothesisLLMAdapter:
         usage_tracker: UsageTracker | None = None,
         tenant_id: UUID | None = None,
         investigation_id: UUID | None = None,
-        model: str = "claude-sonnet-4-20250514",
+        model: str = INVESTIGATION_MODEL,
     ) -> None:
         """Initialize the adapter.
 
@@ -232,7 +233,7 @@ class SynthesisLLMAdapter:
         usage_tracker: UsageTracker | None = None,
         tenant_id: UUID | None = None,
         investigation_id: UUID | None = None,
-        model: str = "claude-sonnet-4-20250514",
+        model: str = INVESTIGATION_MODEL,
     ) -> None:
         """Initialize the adapter.
 
@@ -323,7 +324,7 @@ class QueryLLMAdapter:
         usage_tracker: UsageTracker | None = None,
         tenant_id: UUID | None = None,
         investigation_id: UUID | None = None,
-        model: str = "claude-sonnet-4-20250514",
+        model: str = INVESTIGATION_MODEL,
     ) -> None:
         """Initialize the adapter.
 
@@ -400,7 +401,7 @@ class InterpretEvidenceLLMAdapter:
         usage_tracker: UsageTracker | None = None,
         tenant_id: UUID | None = None,
         investigation_id: UUID | None = None,
-        model: str = "claude-sonnet-4-20250514",
+        model: str = INVESTIGATION_MODEL,
     ) -> None:
         """Initialize the adapter.
 

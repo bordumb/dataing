@@ -7,6 +7,7 @@ from unittest.mock import AsyncMock
 
 import pytest
 
+from dataing.config import INVESTIGATION_MODEL
 from dataing.services.usage import UsageSummary, UsageTracker
 
 
@@ -41,7 +42,7 @@ class TestUsageTracker:
         """Test recording LLM usage."""
         cost = await tracker.record_llm_usage(
             tenant_id=tenant_id,
-            model="claude-sonnet-4-20250514",
+            model=INVESTIGATION_MODEL,
             input_tokens=1000,
             output_tokens=500,
         )
@@ -63,7 +64,7 @@ class TestUsageTracker:
 
         await tracker.record_llm_usage(
             tenant_id=tenant_id,
-            model="claude-sonnet-4-20250514",
+            model=INVESTIGATION_MODEL,
             input_tokens=100,
             output_tokens=100,
             investigation_id=inv_id,

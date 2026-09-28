@@ -8,14 +8,14 @@ from uuid import UUID
 import structlog
 
 from dataing.adapters.db.app_db import AppDatabase
+from dataing.config import CHAT_MODEL, INVESTIGATION_MODEL
 
 logger = structlog.get_logger()
 
-# LLM pricing per 1K tokens (approximate)
+# LLM pricing per 1K tokens (approximate), for the models dataing.config names
 LLM_PRICING = {
-    "claude-sonnet-4-20250514": {"input": 0.003, "output": 0.015},
-    "claude-3-5-sonnet-20241022": {"input": 0.003, "output": 0.015},
-    "claude-3-haiku-20240307": {"input": 0.00025, "output": 0.00125},
+    INVESTIGATION_MODEL: {"input": 0.003, "output": 0.015},  # Sonnet tier
+    CHAT_MODEL: {"input": 0.004, "output": 0.02},  # $4 / $20 per MTok
     "default": {"input": 0.01, "output": 0.03},
 }
 

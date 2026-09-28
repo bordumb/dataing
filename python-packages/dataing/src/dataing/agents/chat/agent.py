@@ -36,7 +36,7 @@ def build_chat_model(model_name: str, api_key: str, effort: str | None) -> Model
     """Return the Anthropic model for chat turns with prompt caching turned on.
 
     Args:
-        model_name: Anthropic model id, e.g. "claude-opus-5-5".
+        model_name: Anthropic model id (settings.chat_agent_model).
         api_key: Anthropic API key.
         effort: "low", "medium" or "high"; empty or None leaves the model default.
     """

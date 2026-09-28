@@ -13,6 +13,7 @@ from pydantic_ai.models.anthropic import AnthropicModel
 from pydantic_ai.output import PromptedOutput
 from pydantic_ai.providers.anthropic import AnthropicProvider
 
+from dataing.config import INVESTIGATION_MODEL
 from dataing.core.domain_types import (
     AnomalyAlert,
     Evidence,
@@ -56,7 +57,7 @@ class AgentClient:
     def __init__(
         self,
         api_key: str,
-        model: str = "claude-sonnet-4-20250514",
+        model: str = INVESTIGATION_MODEL,
         max_retries: int = 3,
     ) -> None:
         """Initialize the agent client.

@@ -231,7 +231,7 @@ class GenerateHypothesesStep(BondStep[Context, None, list[Hypothesis], str]):
     def create_agent(self, context):
         return BondAgent(
             name="hypothesis_generator",
-            model="anthropic:claude-sonnet-4-20250514",
+            model="anthropic:claude-sonnet-5-5",
         )
 
     def build_prompt(self, context, input_data):

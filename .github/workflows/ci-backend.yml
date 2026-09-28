@@ -35,9 +35,11 @@ jobs:
         with:
           python-version: '3.11'
 
-      # --locked fails the job when uv.lock is out of date with the pyproject files
+      # --locked fails the job when uv.lock is out of date with the pyproject files.
+      # jupyterlab-dataing (demo extra) is a JupyterLab extension that no Python
+      # test imports; installing it builds it with npm, which flakes in CI.
       - name: Install dependencies
-        run: uv sync --locked --all-extras
+        run: uv sync --locked --all-extras --no-install-package jupyterlab-dataing
 
       - name: Run Ruff
         run: uv run ruff check python-packages/dataing/src python-packages/dataing-ee/src

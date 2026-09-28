@@ -13,6 +13,11 @@ updates:
       - "python"
     commit-message:
       prefix: "chore(deps)"
+    ignore:
+      # sentence-transformers 6 needs huggingface-hub 1.x. That forces pydantic-ai
+      # back to 1.22, which has no pydantic_ai.embeddings (see #199).
+      - dependency-name: "sentence-transformers"
+        versions: [">=6"]
 
   # Frontend dependencies
   - package-ecosystem: "npm"

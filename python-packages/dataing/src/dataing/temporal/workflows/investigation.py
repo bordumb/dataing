@@ -6,6 +6,7 @@ from datetime import timedelta
 from typing import Any
 
 from temporalio import workflow
+from temporalio.common import RetryPolicy
 from temporalio.exceptions import ActivityError, CancelledError, ChildWorkflowError
 
 with workflow.unsafe.imports_passed_through():
@@ -539,6 +540,17 @@ class InvestigationWorkflow:
                     snapshot_paths=self._snapshot_paths,
                 )
 
+        # Publish the outcome for the app and, for runs started from an issue, its thread
+        if workflow.patched("outcome-v1"):
+            await self._publish_outcome(
+                input=input,
+                hypotheses=hypotheses,
+                evidence=evidence,
+                untested=untested_hypotheses,
+                synthesis=synthesis,
+                counter_analysis=counter_analysis,
+            )
+
         # Capture COMPLETE snapshot
         await self._capture_snapshot(
             checkpoint="complete",
@@ -567,6 +579,35 @@ class InvestigationWorkflow:
             root_hash=root_hash,
             snapshot_paths=self._snapshot_paths,
         )
+
+    async def _publish_outcome(
+        self,
+        *,
+        input: InvestigationInput,
+        hypotheses: list[dict[str, Any]],
+        evidence: list[dict[str, Any]],
+        untested: list[dict[str, Any]],
+        synthesis: dict[str, Any],
+        counter_analysis: dict[str, Any] | None,
+    ) -> None:
+        """Write the outcome (investigation row, linked run, issue thread). Non-fatal."""
+        payload = {
+            "investigation_id": input.investigation_id,
+            "tenant_id": input.tenant_id,
+            "issue_id": (input.alert_data or {}).get("issue_id"),
+            "synthesis": synthesis,
+            "hypotheses": hypothesis_statuses(hypotheses, evidence, untested),
+            "counter_analysis": counter_analysis,
+        }
+        try:
+            await workflow.execute_activity(
+                "publish_investigation_outcome",
+                payload,
+                start_to_close_timeout=timedelta(minutes=1),
+                retry_policy=RetryPolicy(maximum_attempts=5),
+            )
+        except Exception as e:
+            workflow.logger.warning(f"Publishing the outcome failed (non-fatal): {e}")
 
     async def _evaluate_hypotheses_parallel(
         self,
@@ -654,6 +695,29 @@ class InvestigationWorkflow:
                 all_evidence.extend(result.evidence)
 
         return all_evidence, untested
+
+
+def hypothesis_statuses(
+    hypotheses: list[dict[str, Any]],
+    evidence: list[dict[str, Any]],
+    untested: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    """Return each hypothesis with how it ended: supported, refuted or untested."""
+    untested_ids = {u["hypothesis_id"] for u in untested}
+    results: list[dict[str, Any]] = []
+    for index, hypothesis in enumerate(hypotheses):
+        hypothesis_id = hypothesis.get("id", f"h-{index}")
+        found = [e for e in evidence if e.get("hypothesis_id") == hypothesis_id]
+        if hypothesis_id in untested_ids or not found:
+            status = "untested"
+        elif any(e.get("supports_hypothesis") for e in found):
+            status = "supported"
+        else:
+            status = "refuted"
+        results.append(
+            {"id": hypothesis_id, "title": hypothesis.get("title", ""), "status": status}
+        )
+    return results
 
 
 def _untested(hypothesis: dict[str, Any], index: int, error: str) -> dict[str, Any]:

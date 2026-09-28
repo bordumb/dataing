@@ -555,6 +555,17 @@ class TestEventDescriptions:
             ),
             ("label_added", {"label": "app_v2"}, "Label app_v2 added"),
             ("acknowledged", {"to": "u1"}, "Acknowledged"),
+            ("outcome_reviewed", {"verdict": "confirmed"}, "Root cause confirmed"),
+            (
+                "outcome_reviewed",
+                {"verdict": "rejected", "note": "late events"},
+                "Root cause rejected: late events",
+            ),
+            (
+                "resolved_with_cause",
+                {"root_cause": "app_v2 writes COMPLETE"},
+                "Resolved with confirmed cause: app_v2 writes COMPLETE",
+            ),
         ],
     )
     def test_describe_event(self, event_type: str, payload: dict[str, Any], text: str) -> None:

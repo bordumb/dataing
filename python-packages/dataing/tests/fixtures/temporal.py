@@ -114,6 +114,8 @@ class InProcessTemporal:
         monkeypatch.setattr(workflow, "start_child_workflow", self.start_child_workflow)
         monkeypatch.setattr(workflow, "info", lambda: SimpleNamespace(workflow_id="wf-1"))
         monkeypatch.setattr(workflow, "logger", logging.getLogger("workflow"))
+        # A new run takes every patched code path
+        monkeypatch.setattr(workflow, "patched", lambda _patch_id: True)
 
     async def execute_activity(self, activity: str, arg: Any, **options: Any) -> Any:
         # Typed decoding (result_type=...) of these dataclasses fails inside Temporal's

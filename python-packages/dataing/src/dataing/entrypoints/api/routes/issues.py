@@ -455,6 +455,32 @@ async def _record_issue_event(
         await IssueThreadRepository(db).append_event(issue_id, event_type, actor_user_id, payload)
 
 
+async def _record_confirmed_cause(
+    db: AppDatabase, issue_id: UUID, actor_user_id: UUID | None
+) -> None:
+    """Record the confirmed root cause an issue was resolved with, if it has one."""
+    confirmed = await db.fetch_one(
+        """
+        SELECT investigation_id, synthesis_summary FROM issue_investigation_runs
+        WHERE issue_id = $1 AND outcome_verdict = 'confirmed'
+        ORDER BY outcome_reviewed_at DESC LIMIT 1
+        """,
+        issue_id,
+    )
+    if confirmed is None:
+        return
+    await _record_issue_event(
+        db,
+        issue_id,
+        "resolved_with_cause",
+        actor_user_id,
+        {
+            "investigation_id": str(confirmed["investigation_id"]),
+            "root_cause": confirmed["synthesis_summary"],
+        },
+    )
+
+
 # PATCHable columns, in the order they are written.
 _UPDATABLE_COLUMNS = (
     "title",
@@ -783,6 +809,9 @@ async def update_issue(
             event_type, payload = _field_change_event(field, old, value)
             await _record_issue_event(db, issue_id, event_type, auth.user_id, payload)
 
+        if changes.get("status") == IssueStatus.RESOLVED.value:
+            await _record_confirmed_cause(db, issue_id, auth.user_id)
+
     if labels_changed:
         new_labels = sorted(set(body.labels or []))
         await _set_issue_labels(db, issue_id, new_labels)
@@ -984,12 +1013,17 @@ class InvestigationRunResponse(BaseModel):
     synthesis_summary: str | None
     created_at: datetime
     completed_at: datetime | None
+    outcome_verdict: str | None = None  # confirmed | rejected, once someone reviewed it
+    outcome_note: str | None = None
+    outcome_reviewed_by: UUID | None = None
+    outcome_reviewed_at: datetime | None = None
 
 
 RUN_COLUMNS = """
     id, issue_id, investigation_id, trigger_type, brief, source_thread_id, parent_run_id,
     execution_profile, approval_status, confidence, root_cause_tag, synthesis_summary,
-    created_at, completed_at
+    created_at, completed_at, outcome_verdict, outcome_note, outcome_reviewed_by,
+    outcome_reviewed_at
 """
 
 

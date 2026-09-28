@@ -66,6 +66,10 @@ class FakeWorkflowApi:
         """Return minimal workflow info."""
         return MagicMock(workflow_id="investigation-1")
 
+    def patched(self, _patch_id: str) -> bool:
+        """Behave like a new run: every patch applies."""
+        return True
+
 
 async def test_gather_context_resolves_adapter_for_input_tenant() -> None:
     """gather_context asks for the adapter of the investigation's tenant."""

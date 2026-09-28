@@ -54,6 +54,14 @@ def describe_event(event_type: str, payload: dict[str, Any]) -> str:
         return "Investigation started"
     if event_type == "investigation_completed":
         return "Investigation finished"
+    if event_type == "outcome_reviewed":
+        if payload.get("verdict") == "confirmed":
+            return "Root cause confirmed"
+        note = payload.get("note")
+        return f"Root cause rejected: {note}" if note else "Root cause rejected"
+    if event_type == "resolved_with_cause":
+        cause = payload.get("root_cause")
+        return f"Resolved with confirmed cause: {cause}" if cause else "Resolved"
     if event_type in ("label_added", "label_removed"):
         verb = "added" if event_type == "label_added" else "removed"
         return f"Label {payload.get('label', '')} {verb}".strip()

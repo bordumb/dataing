@@ -30,11 +30,11 @@ import {
 } from "@/lib/api/investigation-runs";
 import { useThreadMessages, type ThreadMessage } from "@/lib/api/issue-threads";
 import { queryKeys } from "@/lib/api/query-keys";
-import { useUserDirectory } from "@/lib/api/users";
 import { cn } from "@/lib/utils";
 
 import type { BriefEditorRequest } from "../hub/hub-context";
 import { useThreadStream } from "../thread/use-thread-stream";
+import { useThreadViewer } from "../thread/use-thread-viewer";
 import {
   briefFromForm,
   formFromBrief,
@@ -104,7 +104,7 @@ function SourceLink({
   scratchThreadId: string | null;
 }) {
   const [open, setOpen] = useState(false);
-  const { nameOf } = useUserDirectory();
+  const { nameOf } = useThreadViewer();
   const source = lookup(messageId);
   const who = !source
     ? "a thread message"

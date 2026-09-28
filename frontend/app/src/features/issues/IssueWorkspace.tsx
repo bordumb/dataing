@@ -25,6 +25,7 @@ import { IssueSidebar } from "./IssueSidebar";
 import { IssueHubProvider } from "./hub/IssueHub";
 import { useIssueHub } from "./hub/hub-context";
 import { IssueThread } from "./thread/IssueThread";
+import { ScratchChatsSection } from "./scratch/ScratchChatsSection";
 import { Pill } from "./thread/Pill";
 
 /** The symptom a run's brief states, for its one-line label. */
@@ -193,6 +194,7 @@ function IssueWorkspaceContent({ issue }: IssueWorkspaceContentProps) {
           <div className="space-y-4">
             <IssueSidebar issue={issue} />
             <InvestigationRunsSection issueId={issue.id} />
+            <ScratchChatsSection issueId={issue.id} />
           </div>
         </div>
       </div>

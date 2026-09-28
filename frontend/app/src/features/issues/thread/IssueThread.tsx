@@ -3,23 +3,17 @@
  */
 
 import { useMemo } from "react";
-import { Loader2, MessageSquare, Search } from "lucide-react";
+import { Loader2, Lock, MessageSquare, Search } from "lucide-react";
 
 import { Button } from "@/components/ui/Button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
 import { useIssueThreads, useThreadMessages } from "@/lib/api/issue-threads";
-import { useUserDirectory } from "@/lib/api/users";
-import { useJwtAuth } from "@/lib/auth/jwt-context";
-import { useRole } from "@/lib/auth/use-role";
 
 import { useIssueHub } from "../hub/hub-context";
 import { Composer } from "./Composer";
-import {
-  ThreadMessageItem,
-  threadFacts,
-  type ThreadViewer,
-} from "./ThreadMessageItem";
+import { ThreadMessageItem, threadFacts } from "./ThreadMessageItem";
 import { useThreadStream } from "./use-thread-stream";
+import { useThreadViewer } from "./use-thread-viewer";
 
 interface ThreadViewProps {
   issueId: string;
@@ -31,22 +25,15 @@ function ThreadView({ issueId, threadId }: ThreadViewProps) {
   const { isConnected } = useThreadStream(issueId, threadId, {
     enabled: messages.isSuccess,
   });
-  const { user } = useJwtAuth();
-  const { isMember, isAdmin } = useRole();
-  const { nameOf } = useUserDirectory();
+  const viewer = useThreadViewer();
   const hub = useIssueHub();
+  const threads = useIssueThreads(issueId);
+  const scratchCount =
+    threads.data?.items.filter((t) => t.kind === "scratch").length ?? 0;
   const facts = useMemo(
     () => threadFacts(messages.data ?? []),
     [messages.data],
   );
-
-  const viewer: ThreadViewer = {
-    userId: user?.id ?? null,
-    isAdmin,
-    canWrite: isMember,
-    nameOf: (id) =>
-      id && id === user?.id && user.name ? user.name : nameOf(id),
-  };
 
   return (
     <Card>
@@ -55,12 +42,25 @@ function ThreadView({ issueId, threadId }: ThreadViewProps) {
           <MessageSquare className="h-4 w-4" />
           Thread
         </CardTitle>
-        {isConnected && (
-          <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
-            <span className="h-2 w-2 rounded-full bg-green-500" />
-            live
-          </span>
-        )}
+        <div className="flex items-center gap-3">
+          {hub?.canWrite && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-7 gap-1.5 px-2 text-xs text-muted-foreground"
+              onClick={() => hub.openScratch()}
+            >
+              <Lock className="h-3 w-3" />
+              My scratch chats{scratchCount > 0 ? ` (${scratchCount})` : ""}
+            </Button>
+          )}
+          {isConnected && (
+            <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
+              <span className="h-2 w-2 rounded-full bg-green-500" />
+              live
+            </span>
+          )}
+        </div>
       </CardHeader>
       <CardContent className="space-y-3 pt-2">
         {messages.isLoading ? (
@@ -94,7 +94,7 @@ function ThreadView({ issueId, threadId }: ThreadViewProps) {
           <Composer
             issueId={issueId}
             threadId={threadId}
-            canAskAgent={isMember}
+            canAskAgent={viewer.canWrite}
             actions={
               hub?.canWrite ? (
                 <Button

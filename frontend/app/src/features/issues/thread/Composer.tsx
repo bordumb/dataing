@@ -30,12 +30,24 @@ const HINT: Record<Mode, string> = {
   ask: "Agent replies are visible to everyone on this issue.",
 };
 
+const PRIVATE_PLACEHOLDER: Record<Mode, string> = {
+  comment: "A note to yourself (Markdown)",
+  ask: "Ask the agent privately…",
+};
+
+const PRIVATE_HINT: Record<Mode, string> = {
+  comment: "Only you can see this chat.",
+  ask: "Only you can see this chat. Queries still run as you and are audited.",
+};
+
 interface ComposerProps {
   issueId: string;
   threadId: string;
   canAskAgent: boolean;
   /** Extra buttons beside Send, such as Investigate…. */
   actions?: React.ReactNode;
+  /** A scratch chat: asks the agent by default, and says only you see it. */
+  privateChat?: boolean;
 }
 
 export function Composer({
@@ -43,8 +55,11 @@ export function Composer({
   threadId,
   canAskAgent,
   actions,
+  privateChat = false,
 }: ComposerProps) {
-  const [mode, setMode] = useState<Mode>("comment");
+  const [mode, setMode] = useState<Mode>(privateChat ? "ask" : "comment");
+  const placeholder = privateChat ? PRIVATE_PLACEHOLDER : PLACEHOLDER;
+  const hint = privateChat ? PRIVATE_HINT : HINT;
   const [body, setBody] = useState("");
   const post = usePostMessage(issueId, threadId);
   const effectiveMode: Mode = canAskAgent ? mode : "comment";
@@ -122,7 +137,7 @@ export function Composer({
         value={body}
         onChange={(e) => setBody(e.target.value)}
         onKeyDown={onKeyDown}
-        placeholder={PLACEHOLDER[effectiveMode]}
+        placeholder={placeholder[effectiveMode]}
         disabled={post.isPending}
         rows={3}
       />
@@ -130,12 +145,12 @@ export function Composer({
         <p
           className={cn(
             "text-xs",
-            effectiveMode === "ask"
+            effectiveMode === "ask" && !privateChat
               ? "text-amber-700 dark:text-amber-400"
               : "text-muted-foreground",
           )}
         >
-          {HINT[effectiveMode]}
+          {hint[effectiveMode]}
         </p>
         <div className="flex items-center gap-2">
           <span className="hidden text-xs text-muted-foreground sm:inline">

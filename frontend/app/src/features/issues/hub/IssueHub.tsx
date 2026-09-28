@@ -11,6 +11,7 @@ import { useIssueThreads, useRequestBriefDraft } from "@/lib/api/issue-threads";
 import { useRole } from "@/lib/auth/use-role";
 
 import { BriefEditorDialog } from "../brief/BriefEditor";
+import { ScratchDrawer } from "../scratch/ScratchDrawer";
 import {
   IssueHubContext,
   type BriefEditorRequest,
@@ -37,6 +38,10 @@ export function IssueHubProvider({
   const [briefRequest, setBriefRequest] = useState<BriefEditorRequest | null>(
     null,
   );
+  const [scratch, setScratch] = useState<{
+    open: boolean;
+    threadId: string | null;
+  }>({ open: false, threadId: null });
   const requestDraft = useRequestBriefDraft(issueId);
   const { mutateAsync: requestDraftAsync } = requestDraft;
 
@@ -59,6 +64,16 @@ export function IssueHubProvider({
     [requestDraftAsync, issueTitle],
   );
 
+  const openScratch = useCallback(
+    (threadId: string | null = null) => setScratch({ open: true, threadId }),
+    [],
+  );
+  const selectScratch = useCallback(
+    (threadId: string | null) =>
+      setScratch((current) => ({ ...current, threadId })),
+    [],
+  );
+
   const hub: IssueHub = useMemo(
     () => ({
       issueId,
@@ -69,6 +84,7 @@ export function IssueHubProvider({
       investigateFrom,
       isRequestingDraft: requestDraft.isPending,
       openBriefEditor: setBriefRequest,
+      openScratch,
     }),
     [
       issueId,
@@ -78,6 +94,7 @@ export function IssueHubProvider({
       isMember,
       investigateFrom,
       requestDraft.isPending,
+      openScratch,
     ],
   );
 
@@ -92,6 +109,21 @@ export function IssueHubProvider({
         request={briefRequest}
         onClose={() => setBriefRequest(null)}
       />
+      {isMember && (
+        <ScratchDrawer
+          issueId={issueId}
+          open={scratch.open}
+          threadId={scratch.threadId}
+          onSelect={selectScratch}
+          onClose={() => setScratch((current) => ({ ...current, open: false }))}
+          onInvestigate={(threadId) => {
+            // The brief editor opens over the page, so the drawer steps aside.
+            setScratch((current) => ({ ...current, open: false }));
+            void investigateFrom(threadId);
+          }}
+          isRequestingDraft={requestDraft.isPending}
+        />
+      )}
     </IssueHubContext.Provider>
   );
 }

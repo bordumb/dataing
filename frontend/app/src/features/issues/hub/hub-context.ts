@@ -35,6 +35,8 @@ export interface IssueHub {
   investigateFrom: (threadId: string) => Promise<void>;
   isRequestingDraft: boolean;
   openBriefEditor: (request: BriefEditorRequest) => void;
+  /** Open the scratch drawer, on one chat or (without an id) the list. */
+  openScratch: (threadId?: string | null) => void;
 }
 
 export const IssueHubContext = createContext<IssueHub | null>(null);

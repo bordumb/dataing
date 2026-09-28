@@ -122,6 +122,11 @@ export interface QueryResult {
   created_at: string;
 }
 
+export interface PublishBody {
+  message_ids: string[];
+  note?: string | null;
+}
+
 export interface PostMessageBody {
   body_md: string;
   ask_agent?: boolean;
@@ -224,6 +229,53 @@ export function getQueryResult(
     url: `${threadsUrl(issueId)}/${threadId}/query-results/${resultId}`,
     method: "GET",
     signal,
+  });
+}
+
+/** Create a private scratch chat on the issue. */
+export function createScratchThread(issueId: string, title: string | null) {
+  return customInstance<IssueThread>({
+    url: threadsUrl(issueId),
+    method: "POST",
+    data: { title },
+  });
+}
+
+/**
+ * Rename one of the caller's scratch chats.
+ *
+ * Needs PATCH /issues/{issue_id}/threads/{thread_id} on the server, which
+ * routes/issue_threads.py doesn't have yet; until it does this fails with 405.
+ */
+export function renameThread(issueId: string, threadId: string, title: string) {
+  return customInstance<IssueThread>({
+    url: `${threadsUrl(issueId)}/${threadId}`,
+    method: "PATCH",
+    data: { title },
+  });
+}
+
+/** Delete one of the caller's scratch chats. */
+export function deleteThread(issueId: string, threadId: string) {
+  return customInstance<void>({
+    url: `${threadsUrl(issueId)}/${threadId}`,
+    method: "DELETE",
+  });
+}
+
+/**
+ * Copy selected scratch-chat messages into one `published` message in the
+ * shared thread, with their query snapshots.
+ */
+export function publishFromScratch(
+  issueId: string,
+  threadId: string,
+  body: PublishBody,
+) {
+  return customInstance<ThreadMessage>({
+    url: `${threadsUrl(issueId)}/${threadId}/publish`,
+    method: "POST",
+    data: body,
   });
 }
 
@@ -351,6 +403,64 @@ export function usePostMessage(issueId: string, threadId: string) {
     mutationFn: (body: PostMessageBody) => postMessage(issueId, threadId, body),
     onSuccess: (message) =>
       mergeIntoCache(queryClient, issueId, threadId, [message]),
+  });
+}
+
+export function useCreateScratchThread(issueId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (title: string | null) => createScratchThread(issueId, title),
+    onSuccess: (thread) =>
+      queryClient.setQueryData<IssueThreadList>(
+        queryKeys.issueThreads.list(issueId),
+        (current) => ({ items: [...(current?.items ?? []), thread] }),
+      ),
+  });
+}
+
+export function useRenameThread(issueId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ threadId, title }: { threadId: string; title: string }) =>
+      renameThread(issueId, threadId, title),
+    onSuccess: (thread) =>
+      queryClient.setQueryData<IssueThreadList>(
+        queryKeys.issueThreads.list(issueId),
+        (current) =>
+          current && {
+            items: current.items.map((t) => (t.id === thread.id ? thread : t)),
+          },
+      ),
+  });
+}
+
+export function useDeleteThread(issueId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (threadId: string) => deleteThread(issueId, threadId),
+    onSuccess: (_void, threadId) => {
+      queryClient.setQueryData<IssueThreadList>(
+        queryKeys.issueThreads.list(issueId),
+        (current) =>
+          current && {
+            items: current.items.filter((t) => t.id !== threadId),
+          },
+      );
+      queryClient.removeQueries({
+        queryKey: queryKeys.issueThreads.messages(issueId, threadId),
+      });
+    },
+  });
+}
+
+export function usePublishFromScratch(issueId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ threadId, body }: { threadId: string; body: PublishBody }) =>
+      publishFromScratch(issueId, threadId, body),
+    // The published message lands in the shared thread.
+    onSuccess: (message) =>
+      mergeIntoCache(queryClient, issueId, message.thread_id, [message]),
   });
 }
 

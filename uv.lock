@@ -959,7 +959,7 @@ wheels = [
 
 [[package]]
 name = "dataing"
-version = "1.24.8"
+version = "1.24.9"
 source = { editable = "." }
 dependencies = [
     { name = "anthropic" },
@@ -1089,7 +1089,7 @@ dev = [
 
 [[package]]
 name = "dataing-cli"
-version = "1.24.8"
+version = "1.24.9"
 source = { editable = "python-packages/dataing-cli" }
 dependencies = [
     { name = "dataing-sdk" },
@@ -1119,7 +1119,7 @@ provides-extras = ["dev"]
 
 [[package]]
 name = "dataing-notebook"
-version = "1.24.8"
+version = "1.24.9"
 source = { editable = "python-packages/dataing-notebook" }
 dependencies = [
     { name = "dataing-sdk" },
@@ -1156,7 +1156,7 @@ provides-extras = ["dev", "rich", "server", "keyring", "graph"]
 
 [[package]]
 name = "dataing-sdk"
-version = "1.24.8"
+version = "1.24.9"
 source = { editable = "python-packages/dataing-sdk" }
 dependencies = [
     { name = "httpx" },

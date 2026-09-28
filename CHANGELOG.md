@@ -1,3 +1,10 @@
+## [1.24.9](https://github.com/bordumb/dataing/compare/v1.24.8...v1.24.9) (2026-09-28)
+
+
+### Bug Fixes
+
+* **core:** reject per-user credentials for datasources with no login ([#205](https://github.com/bordumb/dataing/issues/205)) ([3f9c9e4](https://github.com/bordumb/dataing/commit/3f9c9e4af6ab28f87f24574d476e0a3b04fc8522))
+
 ## [1.24.8](https://github.com/bordumb/dataing/compare/v1.24.7...v1.24.8) (2026-09-27)
 
 

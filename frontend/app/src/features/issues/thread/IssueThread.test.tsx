@@ -3,12 +3,13 @@ import { act, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { toast } from "sonner";
 
-import type { ThreadMessage } from "@/lib/api/issue-threads";
+import type { ThreadMessage, ToolCall } from "@/lib/api/issue-threads";
 import type { OrgRole } from "@/lib/auth/types";
 import { FakeEventSource, stubApi } from "@/test/api";
 import { renderAsRole } from "@/test/auth";
 
 import { IssueThread } from "./IssueThread";
+import { toolCallsSummary } from "./ToolCalls";
 
 vi.mock("sonner", async (importOriginal) => ({
   ...(await importOriginal<typeof import("sonner")>()),
@@ -348,6 +349,8 @@ describe("IssueThread tool calls", () => {
             summary: "2 rows",
             query_result_id: "qr-1",
             error_code: null,
+            duration_ms: 212,
+            row_count: 2,
           },
         ],
       },
@@ -376,7 +379,10 @@ describe("IssueThread tool calls", () => {
     const user = userEvent.setup();
     renderThread("member");
 
-    const toggle = await screen.findByRole("button", { name: /Ran 1 query/ });
+    const toggle = await screen.findByRole("button", {
+      name: "Ran 1 query · 212 ms · 2 rows",
+    });
+    expect(toggle).toHaveTextContent("▸ Ran 1 query · 212 ms · 2 rows");
     expect(toggle).toHaveAttribute("aria-expanded", "false");
     expect(
       api.find("GET", `${THREADS}/${THREAD}/query-results/qr-1`),
@@ -389,10 +395,208 @@ describe("IssueThread tool calls", () => {
     expect(within(table).getByText("region")).toBeInTheDocument();
     expect(within(table).getByText("18402")).toBeInTheDocument();
     expect(within(table).getByText("eu")).toBeInTheDocument();
-    expect(screen.getByText(/2 rows · 212 ms/)).toBeInTheDocument();
+    expect(toggle).toHaveTextContent("▾ Ran 1 query");
+    expect(
+      screen.getByText(
+        /2 rows · 212 ms · postgres · Snapshot saved with this message/,
+      ),
+    ).toBeInTheDocument();
     expect(
       screen.getByRole("button", { name: "Copy SQL" }),
     ).toBeInTheDocument();
+  });
+});
+
+describe("toolCallsSummary", () => {
+  function call(overrides: Partial<ToolCall>): ToolCall {
+    return {
+      id: "call-1",
+      tool: "run_query",
+      input: {},
+      status: "ok",
+      summary: "",
+      query_result_id: "qr-1",
+      error_code: null,
+      ...overrides,
+    };
+  }
+
+  it("totals the time and rows the queries took", () => {
+    expect(toolCallsSummary([call({ duration_ms: 212, row_count: 4 })])).toBe(
+      "Ran 1 query · 212 ms · 4 rows",
+    );
+    expect(
+      toolCallsSummary([
+        call({ duration_ms: 200, row_count: 17 }),
+        call({ id: "call-2", duration_ms: 280, row_count: 4 }),
+      ]),
+    ).toBe("Ran 2 queries · 480 ms · 21 rows");
+    expect(
+      toolCallsSummary([
+        call({ duration_ms: 1500, row_count: 18400 }),
+        call({ id: "call-2", tool: "describe_table" }),
+      ]),
+    ).toBe("Ran 1 query · 1,500 ms · 18,400 rows · 1 other tool call");
+  });
+
+  it("falls back to the count on messages recorded without totals", () => {
+    expect(
+      toolCallsSummary([call({}), call({ id: "call-2", tool: "list_tables" })]),
+    ).toBe("Ran 1 query · 1 other tool call");
+    expect(toolCallsSummary([call({ tool: "describe_table" })])).toBe(
+      "Used 1 tool",
+    );
+  });
+
+  it("counts no rows for a query that failed", () => {
+    expect(
+      toolCallsSummary([
+        call({ duration_ms: 30, row_count: 3 }),
+        call({
+          id: "call-2",
+          status: "error",
+          query_result_id: null,
+          duration_ms: 5,
+          row_count: null,
+        }),
+      ]),
+    ).toBe("Ran 2 queries · 35 ms · 3 rows");
+  });
+});
+
+describe("IssueThread opening entry", () => {
+  const ISSUE_URL = `/api/v1/issues/${ISSUE}`;
+
+  function issue(overrides: Record<string, unknown> = {}) {
+    return {
+      id: ISSUE,
+      number: 42,
+      title: "Completed orders dropped",
+      description: "Completed orders fell **30%** on the 14th.",
+      status: "open",
+      priority: null,
+      severity: null,
+      dataset_id: null,
+      due_at: null,
+      assignee_user_id: null,
+      acknowledged_by: null,
+      created_by_user_id: "user-1",
+      author_type: "human",
+      source_provider: null,
+      source_external_id: null,
+      source_external_url: null,
+      resolution_note: null,
+      context: {},
+      labels: [],
+      allowed_transitions: [],
+      transition_requirements: {},
+      created_at: "2026-09-14T08:02:00Z",
+      updated_at: "2026-09-14T08:02:00Z",
+      closed_at: null,
+      ...overrides,
+    };
+  }
+
+  function opened(overrides: Partial<ThreadMessage> = {}) {
+    return message({
+      id: "e-1",
+      seq: 1,
+      rev: 1,
+      author_kind: "system",
+      author_user_id: "user-1",
+      kind: "event",
+      body_md: "Issue created",
+      payload: { event_type: "created", title: "Completed orders dropped" },
+      created_at: "2026-09-14T08:02:00Z",
+      ...overrides,
+    });
+  }
+
+  it("opens with who opened the issue and its description, which they can edit", async () => {
+    const api = stubThread([opened()], {
+      [`GET ${ISSUE_URL}`]: { body: issue() },
+      [`PATCH ${ISSUE_URL}`]: (req: { body: unknown }) => ({
+        body: issue(req.body as Record<string, unknown>),
+      }),
+    });
+    const user = userEvent.setup();
+    renderThread("member");
+
+    expect(await screen.findByText(/opened the issue/)).toHaveTextContent(
+      /^Ada · opened the issue · /,
+    );
+    expect((await screen.findByText("30%")).tagName).toBe("STRONG");
+    expect(screen.queryByText("Issue created")).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Edit" }));
+    const editor = screen.getByLabelText("Edit description");
+    await user.clear(editor);
+    await user.paste("Completed orders fell 30%; only app_v2.");
+    await user.click(screen.getByRole("button", { name: "Save" }));
+
+    expect(
+      await screen.findByText("Completed orders fell 30%; only app_v2."),
+    ).toBeInTheDocument();
+    expect(api.find("PATCH", ISSUE_URL)[0].body).toEqual({
+      description: "Completed orders fell 30%; only app_v2.",
+    });
+  });
+
+  it("says when there's no description, and only its author can edit", async () => {
+    stubThread([opened({ author_user_id: "user-2" })], {
+      [`GET ${ISSUE_URL}`]: {
+        body: issue({ description: null, created_by_user_id: "user-2" }),
+      },
+    });
+    renderThread("member");
+
+    expect(await screen.findByText("No description.")).toBeInTheDocument();
+    expect(screen.getByText(/opened the issue/)).toHaveTextContent(
+      /^Raj Patel · opened the issue/,
+    );
+    expect(
+      screen.queryByRole("button", { name: "Edit" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("starts an issue dataing opened with the event line", async () => {
+    stubThread(
+      [
+        opened({
+          author_user_id: null,
+          payload: { event_type: "created", source_provider: "monte_carlo" },
+        }),
+      ],
+      {
+        [`GET ${ISSUE_URL}`]: {
+          body: issue({
+            created_by_user_id: null,
+            source_provider: "monte_carlo",
+          }),
+        },
+      },
+    );
+    renderThread("member");
+
+    expect(
+      await screen.findByText(/Issue opened by dataing from monte_carlo ·/),
+    ).toHaveTextContent(/^⚑ Issue opened by dataing from monte_carlo · /);
+    expect((await screen.findByText("30%")).tagName).toBe("STRONG");
+    expect(
+      screen.queryByRole("button", { name: "Edit" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("still shows the description on a thread without an opening entry", async () => {
+    stubThread([], {
+      [`GET ${ISSUE_URL}`]: { body: issue({ created_by_user_id: "user-2" }) },
+    });
+    renderThread("member");
+
+    expect((await screen.findByText("30%")).tagName).toBe("STRONG");
+    expect(screen.getByText(/opened the issue/)).toHaveTextContent(
+      /^Raj Patel · opened the issue/,
+    );
   });
 });
 

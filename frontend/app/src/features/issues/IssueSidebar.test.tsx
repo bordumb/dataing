@@ -1,5 +1,5 @@
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
-import { act, screen, waitFor } from "@testing-library/react";
+import { act, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { toast } from "sonner";
 
@@ -101,11 +101,14 @@ describe("IssueSidebar status", () => {
     const user = userEvent.setup();
     renderSidebar("member");
 
-    await user.click(
-      await screen.findByRole("button", { name: /Change status/ }),
-    );
+    const change = await screen.findByRole("button", { name: /Change status/ });
+    expect(change).toHaveTextContent("Change ▾");
+    await user.click(change);
 
     const items = await screen.findAllByRole("menuitem");
+    expect(
+      screen.getByText("Only moves that will succeed are shown"),
+    ).toBeInTheDocument();
     expect(items.map((i) => i.textContent)).toEqual([
       "In Progress",
       "Blocked",
@@ -226,8 +229,13 @@ describe("IssueSidebar status", () => {
     await user.click(
       await screen.findByRole("button", { name: /Change status/ }),
     );
-    // ...but the person still sees the note, pre-filled, before resolving.
-    await user.click(await screen.findByRole("menuitem", { name: "Resolved" }));
+    // ...but the person still sees the note, pre-filled, before resolving,
+    // and the menu says so.
+    const resolved = await screen.findByRole("menuitem", { name: /^Resolved/ });
+    expect(resolved).toHaveTextContent(
+      "Resolved · asks for a note, pre-filled from the confirmed cause",
+    );
+    await user.click(resolved);
     expect(screen.getByLabelText("Resolution note")).toHaveValue(
       "app_v2 writes COMPLETE instead of completed",
     );
@@ -326,6 +334,9 @@ describe("IssueSidebar details", () => {
     const user = userEvent.setup();
     renderSidebar("member");
 
+    // Labels show as pills with "＋", which opens the box to add one.
+    expect(screen.queryByRole("textbox", { name: "Add label" })).toBeNull();
+    await user.click(await screen.findByRole("button", { name: "New label" }));
     await user.click(await screen.findByRole("textbox", { name: "Add label" }));
     await user.paste("App_V2");
     await user.keyboard("{Enter}");
@@ -339,5 +350,217 @@ describe("IssueSidebar details", () => {
     );
     await waitFor(() => expect(api.find("PATCH", ISSUE_URL)).toHaveLength(2));
     expect(api.find("PATCH", ISSUE_URL)[1].body).toEqual({ labels: [] });
+  });
+
+  it("has no timeline: the thread records when things happened", async () => {
+    stubSidebar({ body: baseIssue });
+    renderSidebar("member");
+
+    expect(await screen.findByText("Raj Patel")).toBeInTheDocument();
+    expect(screen.queryByText("Timeline")).not.toBeInTheDocument();
+  });
+});
+
+function run(overrides: Record<string, unknown>) {
+  return {
+    id: "run-1",
+    issue_id: "issue-1",
+    investigation_id: "inv-1",
+    trigger_type: "human",
+    brief: { symptom: "Completed orders dropped" },
+    source_thread_id: "thread-1",
+    parent_run_id: null,
+    execution_profile: "standard",
+    approval_status: null,
+    confidence: null,
+    root_cause_tag: null,
+    synthesis_summary: null,
+    created_at: "2026-09-14T08:20:00Z",
+    completed_at: null,
+    outcome_verdict: null,
+    outcome_note: null,
+    outcome_reviewed_by: null,
+    outcome_reviewed_at: null,
+    number: 1,
+    status: "running",
+    error: null,
+    ...overrides,
+  };
+}
+
+describe("IssueSidebar investigations", () => {
+  it("lists each run by number and depth with how it ended", async () => {
+    stubApi({
+      "GET /api/v1/users/": { body: { users: [], total: 0 } },
+      [`GET ${ISSUE_URL}/watchers`]: { body: { items: [], total: 0 } },
+      [`GET ${ISSUE_URL}/investigation-runs`]: {
+        body: {
+          items: [
+            run({
+              id: "run-3",
+              investigation_id: "inv-3",
+              number: 3,
+              execution_profile: "safe",
+            }),
+            run({
+              id: "run-1",
+              investigation_id: "inv-1",
+              number: 1,
+              status: "completed",
+              completed_at: "2026-09-14T08:44:00Z",
+              confidence: 0.91,
+            }),
+            run({
+              id: "run-2",
+              investigation_id: "inv-2",
+              number: 2,
+              execution_profile: "deep",
+              status: "failed",
+              completed_at: "2026-09-14T09:01:00Z",
+              error: "Anthropic rejected the API key (401).",
+            }),
+            run({
+              id: "run-4",
+              investigation_id: "inv-4",
+              number: 4,
+              status: "completed",
+              confidence: 0.8,
+              outcome_verdict: "confirmed",
+            }),
+            run({
+              id: "run-5",
+              investigation_id: "inv-5",
+              number: 5,
+              status: "completed",
+              outcome_verdict: "rejected",
+            }),
+          ],
+          total: 5,
+        },
+      },
+    });
+    renderSidebar("member");
+
+    const list = await screen.findByRole("list", { name: "Investigations" });
+    const rows = within(list).getAllByRole("link");
+    expect(rows.map((r) => r.textContent)).toEqual([
+      "#1 · standarddone · 0.91",
+      "#2 · deepfailed",
+      "#3 · saferunning",
+      "#4 · standardconfirmed",
+      "#5 · standardrejected",
+    ]);
+    expect(rows[1]).toHaveAttribute("href", "/investigations/inv-2");
+    // A failed run is red, not "running" forever.
+    expect(within(rows[1]).getByText("failed").className).toContain("red");
+    expect(within(rows[2]).getByText("running").className).toContain("violet");
+  });
+
+  it("numbers runs listed without a number by start time", async () => {
+    const legacy = (id: string, created_at: string) =>
+      run({ id, investigation_id: `inv-${id}`, created_at, number: undefined });
+    stubApi({
+      "GET /api/v1/users/": { body: { users: [], total: 0 } },
+      [`GET ${ISSUE_URL}/watchers`]: { body: { items: [], total: 0 } },
+      [`GET ${ISSUE_URL}/investigation-runs`]: {
+        body: {
+          items: [
+            legacy("b", "2026-09-14T09:00:00Z"),
+            legacy("a", "2026-09-14T08:00:00Z"),
+          ],
+          total: 2,
+        },
+      },
+    });
+    renderSidebar("member");
+
+    const list = await screen.findByRole("list", { name: "Investigations" });
+    expect(
+      within(list)
+        .getAllByRole("link")
+        .map((r) => r.getAttribute("href")),
+    ).toEqual(["/investigations/inv-a", "/investigations/inv-b"]);
+  });
+});
+
+describe("IssueSidebar dataset", () => {
+  const DATASOURCES = {
+    body: {
+      items: [
+        {
+          id: "src-1",
+          name: "warehouse",
+          type: "postgres",
+          category: "database",
+          is_active: true,
+          is_default: true,
+          status: "connected",
+          created_at: "2026-01-01T00:00:00Z",
+        },
+      ],
+      total: 1,
+    },
+  };
+
+  function dataset(native_path: string) {
+    return {
+      id: "dset-9",
+      datasource_id: "src-1",
+      native_path,
+      name: "orders",
+      table_type: "table",
+      created_at: "2026-01-01T00:00:00Z",
+    };
+  }
+
+  it("links to the dataset's page when a datasource has synced it", async () => {
+    const api = stubApi({
+      "GET /api/v1/users/": { body: { users: [], total: 0 } },
+      "GET /api/v1/datasources": DATASOURCES,
+      "GET /api/v1/datasources/src-1/datasets": {
+        body: {
+          datasets: [
+            dataset("analytics.public.orders_archive"),
+            dataset("analytics.public.orders"),
+          ],
+          total: 2,
+        },
+      },
+    });
+    renderSidebar("member");
+
+    const link = await screen.findByRole("link", {
+      name: "open dataset page →",
+    });
+    expect(link).toHaveAttribute("href", "/datasets/dset-9");
+    expect(
+      api
+        .find("GET", "/api/v1/datasources/src-1/datasets")[0]
+        .query.get("search"),
+    ).toBe("analytics.public.orders");
+  });
+
+  it("shows the dataset without a link when no datasource has it", async () => {
+    const api = stubApi({
+      "GET /api/v1/users/": { body: { users: [], total: 0 } },
+      "GET /api/v1/datasources": DATASOURCES,
+      "GET /api/v1/datasources/src-1/datasets": {
+        body: { datasets: [dataset("analytics.public.orders_v2")], total: 1 },
+      },
+    });
+    renderSidebar("member");
+
+    expect(
+      await screen.findByText("analytics.public.orders"),
+    ).toBeInTheDocument();
+    await waitFor(() =>
+      expect(
+        api.find("GET", "/api/v1/datasources/src-1/datasets"),
+      ).toHaveLength(1),
+    );
+    await act(() => new Promise((resolve) => setTimeout(resolve, 0)));
+    expect(
+      screen.queryByRole("link", { name: "open dataset page →" }),
+    ).not.toBeInTheDocument();
   });
 });

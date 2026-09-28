@@ -2,6 +2,7 @@
  * Small status pills for thread cards (the mockup's .pill variants).
  */
 
+import { runStatus, type InvestigationRunResponse } from "@/lib/api/issues";
 import { cn } from "@/lib/utils";
 
 export type PillTone = "neutral" | "ok" | "bad" | "warn" | "agent" | "info";
@@ -55,4 +56,43 @@ export function hypothesisStatus(status: string) {
   return (
     HYPOTHESIS_STATUS[status] ?? { tone: "neutral" as const, label: status }
   );
+}
+
+/** Issue statuses in the mockup's colours: amber in progress, red blocked. */
+export function issueStatusTone(status: string): PillTone {
+  switch (status) {
+    case "in_progress":
+      return "warn";
+    case "blocked":
+      return "bad";
+    case "resolved":
+      return "ok";
+    default:
+      return "neutral";
+  }
+}
+
+/** A run's state for the sidebar: running, done · 0.91, confirmed, failed. */
+export function runPill(run: InvestigationRunResponse): {
+  tone: PillTone;
+  label: string;
+} {
+  const status = runStatus(run);
+  if (status === "failed") return { tone: "bad", label: "failed" };
+  if (run.outcome_verdict === "confirmed") {
+    return { tone: "ok", label: "confirmed" };
+  }
+  if (run.outcome_verdict === "rejected") {
+    return { tone: "bad", label: "rejected" };
+  }
+  if (status === "completed") {
+    return {
+      tone: "ok",
+      label:
+        typeof run.confidence === "number"
+          ? `done · ${run.confidence.toFixed(2)}`
+          : "done",
+    };
+  }
+  return { tone: "agent", label: "running" };
 }

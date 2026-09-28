@@ -145,6 +145,62 @@ describe("Investigation card", () => {
     expect(within(card).getByText("Only app_v2 dropped")).toBeInTheDocument();
   });
 
+  it("is numbered among the issue's runs and links to the run's details", async () => {
+    stubHub([started], {
+      [`GET ${INVESTIGATION}/status`]: { body: runningStatus },
+      [`GET ${INVESTIGATION}/steers`]: { body: { items: [] } },
+      [`GET ${RUNS}`]: {
+        body: {
+          items: [run({ number: 2, status: "running", completed_at: null })],
+          total: 1,
+        },
+      },
+    });
+    renderHub("member");
+
+    const card = await screen.findByLabelText("Investigation");
+    expect(
+      await within(card).findByRole("heading", { name: "Investigation #2" }),
+    ).toBeInTheDocument();
+    expect(within(card).getByText("standard")).toBeInTheDocument();
+    expect(
+      within(card).getByRole("link", { name: "details →" }),
+    ).toHaveAttribute("href", `/investigations/${INV}`);
+    expect(
+      within(card).queryByRole("link", { name: /Open/ }),
+    ).not.toBeInTheDocument();
+    // The brief reads like the mockup's one-liner.
+    expect(
+      within(card).getByText(
+        /Brief: Completed orders dropped 30% · Only app_v2 dropped · lead: app_v2 deploy\./,
+      ),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(/started an investigation/, { exact: false }),
+    ).toBeInTheDocument();
+  });
+
+  it("attributes a run nobody started by hand to dataing", async () => {
+    stubHub(
+      [
+        {
+          ...started,
+          author_kind: "system",
+          author_user_id: null,
+        },
+      ],
+      {
+        [`GET ${INVESTIGATION}/status`]: { body: runningStatus },
+        [`GET ${INVESTIGATION}/steers`]: { body: { items: [] } },
+      },
+    );
+    renderHub("member");
+
+    await screen.findByLabelText("Investigation");
+    const meta = screen.getByText(/started an investigation/);
+    expect(meta).toHaveTextContent(/^dataing · started an investigation · /);
+  });
+
   it("shows how each hypothesis ended once the run finished", async () => {
     stubHub([started, outcomeMessage], {
       [`GET ${INVESTIGATION}/status`]: { body: completedStatus },
@@ -315,6 +371,37 @@ describe("Outcome card", () => {
     });
   });
 
+  it("warns when the check of the conclusion didn't run", async () => {
+    stubHub(
+      [
+        started,
+        {
+          ...outcomeMessage,
+          payload: {
+            ...outcomeMessage.payload,
+            outcome: {
+              ...(outcomeMessage.payload.outcome as object),
+              counter_analysis: { error: "Anthropic is overloaded (529)." },
+            },
+          },
+        },
+      ],
+      {
+        [`GET ${INVESTIGATION}/status`]: { body: completedStatus },
+        [`GET ${INVESTIGATION}/steers`]: { body: { items: [] } },
+        [`GET ${RUNS}`]: { body: { items: [run()], total: 1 } },
+      },
+    );
+    renderHub("member");
+
+    const card = await screen.findByLabelText("Investigation outcome");
+    expect(
+      within(card).getByText(
+        "The check of this conclusion didn't run: Anthropic is overloaded (529).",
+      ),
+    ).toBeInTheDocument();
+  });
+
   it("shows the review to viewers without the actions", async () => {
     stubOutcome({
       [`GET ${RUNS}`]: {
@@ -338,6 +425,110 @@ describe("Outcome card", () => {
     ).toBeInTheDocument();
     expect(
       within(card).queryByRole("button", { name: "Confirm" }),
+    ).not.toBeInTheDocument();
+  });
+});
+
+describe("A failed run", () => {
+  const REASON =
+    "Anthropic rejected the API key (401). Set a valid ANTHROPIC_API_KEY and restart the API and the worker.";
+
+  const failedOutcome = message({
+    ...outcomeMessage,
+    payload: {
+      phase: "outcome",
+      outcome_for: INV,
+      investigation_id: INV,
+      run_id: "run-1",
+      outcome: {
+        status: "failed",
+        error: {
+          code: "invalid_key",
+          message: REASON,
+          step: "generate_hypotheses",
+        },
+      },
+    },
+  });
+
+  const failedRun = run({
+    status: "failed",
+    error: REASON,
+    confidence: null,
+    synthesis_summary: null,
+  });
+
+  function stubFailed(messages = [started, failedOutcome], extra = {}) {
+    return stubHub(messages, {
+      [`GET ${INVESTIGATION}/status`]: {
+        body: { investigation_id: INV, workflow_status: "failed" },
+      },
+      [`GET ${INVESTIGATION}/steers`]: { body: { items: [] } },
+      [`GET ${RUNS}`]: { body: { items: [failedRun], total: 1 } },
+      ...extra,
+    });
+  }
+
+  it("says why it failed instead of a root cause, and offers Retry", async () => {
+    stubFailed();
+    const user = userEvent.setup();
+    renderHub("member");
+
+    const outcome = await screen.findByLabelText("Investigation outcome");
+    expect(within(outcome).getByText("failed")).toBeInTheDocument();
+    expect(within(outcome).getByText(REASON)).toBeInTheDocument();
+    expect(
+      within(outcome).getByText("while generating hypotheses"),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/root cause/i)).not.toBeInTheDocument();
+    expect(
+      await screen.findByText(/investigation #1 failed/),
+    ).toBeInTheDocument();
+
+    // The start card turns failed with the reason; the outcome carries Retry.
+    const card = screen.getByLabelText("Investigation");
+    expect(within(card).getByText("failed")).toBeInTheDocument();
+    expect(within(card).getByText(REASON)).toBeInTheDocument();
+    expect(
+      within(card).queryByRole("button", { name: "Retry" }),
+    ).not.toBeInTheDocument();
+
+    await user.click(within(outcome).getByRole("button", { name: "Retry" }));
+    const dialog = await screen.findByRole("dialog", {
+      name: "Hand off to an investigation",
+    });
+    expect(within(dialog).getByLabelText("Symptom")).toHaveValue(
+      "Completed orders dropped 30%",
+    );
+    expect(within(dialog).getByLabelText("finding 1")).toHaveValue(
+      "Only app_v2 dropped",
+    );
+  });
+
+  it("offers Retry on the card when the run failed without an outcome", async () => {
+    stubFailed([started]);
+    const user = userEvent.setup();
+    renderHub("member");
+
+    const card = await screen.findByLabelText("Investigation");
+    expect(await within(card).findByText("failed")).toBeInTheDocument();
+    expect(await within(card).findByText(REASON)).toBeInTheDocument();
+    await user.click(within(card).getByRole("button", { name: "Retry" }));
+    expect(
+      await screen.findByRole("dialog", {
+        name: "Hand off to an investigation",
+      }),
+    ).toBeInTheDocument();
+  });
+
+  it("leaves Retry to members", async () => {
+    stubFailed();
+    renderHub("viewer");
+
+    const outcome = await screen.findByLabelText("Investigation outcome");
+    expect(within(outcome).getByText(REASON)).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Retry" }),
     ).not.toBeInTheDocument();
   });
 });

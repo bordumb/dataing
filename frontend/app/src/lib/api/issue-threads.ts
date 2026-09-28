@@ -60,6 +60,9 @@ export interface ToolCall {
   summary: string;
   query_result_id: string | null;
   error_code: string | null;
+  /** Set for run_query (spec 0001 §7.4); absent on older messages. */
+  duration_ms?: number | null;
+  row_count?: number | null;
 }
 
 export interface SteerProposal {

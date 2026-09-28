@@ -5,7 +5,7 @@
  */
 
 import { useState } from "react";
-import { Loader2, Plus, Send, Square } from "lucide-react";
+import { Loader2, Send } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/Button";
@@ -26,7 +26,9 @@ import { Pill, hypothesisStatus, type PillTone } from "./Pill";
 export interface HypothesisRowProps {
   hypothesis: HypothesisState;
   index: number;
-  /** Extra words after the status, e.g. who ruled it out. */
+  /** The pill's words, when they say more than the status, e.g. by whom. */
+  label?: string;
+  /** Muted words at the end of the row, e.g. "stopped". */
   note?: string;
   action?: React.ReactNode;
 }
@@ -34,6 +36,7 @@ export interface HypothesisRowProps {
 export function HypothesisRow({
   hypothesis,
   index,
+  label,
   note,
   action,
 }: HypothesisRowProps) {
@@ -43,7 +46,7 @@ export function HypothesisRow({
       className="flex items-center gap-2 border-t border-border py-1.5 text-sm"
       aria-label={`Hypothesis ${hypothesis.title}`}
     >
-      <Pill tone={status.tone}>{status.label}</Pill>
+      <Pill tone={status.tone}>{label ?? status.label}</Pill>
       <span
         className={
           hypothesis.status === "ruled_out"
@@ -298,13 +301,16 @@ export function Steering({
       {hypotheses.length > 0 && (
         <ul className="mt-2">
           {hypotheses.map((h, i) => {
-            const by = ruledOutBy.get(h.id);
-            const note =
+            // "ruled out by Maya · stopped", as the mockup writes it.
+            const ruledOutByName =
               h.status === "ruled_out" && ruledOutBy.has(h.id)
-                ? `by ${nameOf(by)}`
-                : pendingRuleOuts.has(h.id)
-                  ? "rule-out pending"
-                  : undefined;
+                ? nameOf(ruledOutBy.get(h.id))
+                : null;
+            const note = ruledOutByName
+              ? "stopped"
+              : pendingRuleOuts.has(h.id)
+                ? "rule-out pending"
+                : undefined;
             const canRuleOut =
               canSteer &&
               OPEN_STATUSES.has(h.status) &&
@@ -314,6 +320,9 @@ export function Steering({
                 key={h.id}
                 hypothesis={h}
                 index={i}
+                label={
+                  ruledOutByName ? `ruled out by ${ruledOutByName}` : undefined
+                }
                 note={note}
                 action={
                   canRuleOut ? (
@@ -355,7 +364,7 @@ export function Steering({
               className="h-7 gap-1 text-xs"
               onClick={() => setDraft({ kind: "add_context" })}
             >
-              <Plus className="h-3 w-3" />
+              <span aria-hidden>＋</span>
               Add context
             </Button>
             <Button
@@ -364,7 +373,7 @@ export function Steering({
               className="h-7 gap-1 text-xs"
               onClick={() => setDraft({ kind: "add_hypothesis" })}
             >
-              <Plus className="h-3 w-3" />
+              <span aria-hidden>＋</span>
               Add hypothesis
             </Button>
             <Button
@@ -379,7 +388,6 @@ export function Steering({
               }
               onClick={() => setDraft({ kind: "stop_and_synthesize" })}
             >
-              <Square className="h-3 w-3" />
               Stop and conclude
             </Button>
           </div>

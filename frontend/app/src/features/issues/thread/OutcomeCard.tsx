@@ -1,6 +1,7 @@
 /**
  * The outcome a finished investigation posts to the thread: the root cause,
- * how each hypothesis ended, and the review actions (spec 0001 §7.10).
+ * how each hypothesis ended, and the review actions (spec 0001 §7.10). A run
+ * that failed posts why instead, with Retry (§7.12).
  */
 
 import { useState } from "react";
@@ -13,17 +14,17 @@ import { CodifyModal } from "@/features/investigation/components/codify-widget";
 import { errorText } from "@/lib/api/error-message";
 import {
   asBrief,
+  isFailedOutcome,
   useReviewOutcome,
+  type InvestigationBrief,
   type InvestigationOutcome,
 } from "@/lib/api/investigation-runs";
-import {
-  useIssueInvestigationRuns,
-  type InvestigationRunResponse,
-} from "@/lib/api/issues";
+import type { InvestigationRunResponse } from "@/lib/api/issues";
 import type { ThreadMessage } from "@/lib/api/issue-threads";
 
 import { continuationBrief } from "../brief/brief-form";
 import { useIssueHub } from "../hub/hub-context";
+import { phaseLabel } from "./InvestigationCard";
 import { Pill, hypothesisStatus, type PillTone } from "./Pill";
 
 /** Codify refuses a synthesis below this confidence. */
@@ -53,16 +54,108 @@ function evidenceText(item: unknown): string {
   return String(item);
 }
 
+/** Why the conclusion's check (counter-analysis) didn't run, if it didn't. */
+function counterAnalysisError(outcome: InvestigationOutcome): string | null {
+  const counter = outcome.counter_analysis as { error?: unknown } | null;
+  return counter && typeof counter.error === "string" && counter.error
+    ? counter.error
+    : null;
+}
+
 interface OutcomeCardProps {
   message: ThreadMessage;
   issueId: string;
+  /** The issue's record of this run, once the runs list has loaded. */
+  run?: InvestigationRunResponse;
+  /** The run's number among the issue's runs. */
+  number?: number;
+  /** The brief the run started with, for Retry. */
+  brief?: InvestigationBrief | null;
   canWrite: boolean;
   nameOf: (userId: string | null | undefined) => string;
 }
 
-export function OutcomeCard({
+/** A run that failed: the reason, and Retry with the same brief. */
+function FailedOutcome({
+  message,
+  outcome,
+  run,
+  number,
+  brief,
+  canWrite,
+}: {
+  message: ThreadMessage;
+  outcome: InvestigationOutcome;
+  run?: InvestigationRunResponse;
+  number?: number;
+  brief?: InvestigationBrief | null;
+  canWrite: boolean;
+}) {
+  const hub = useIssueHub();
+  const error = outcome.error ?? null;
+  const retry = () => {
+    if (!hub) return;
+    hub.openBriefEditor({
+      kind: "brief",
+      brief: brief ?? asBrief(run?.brief) ?? { symptom: hub.issueTitle },
+      sourceThreadId: run?.source_thread_id ?? message.thread_id,
+    });
+  };
+
+  return (
+    <div
+      className="mt-2 rounded-[10px] border border-border px-3 py-2.5"
+      aria-label="Investigation outcome"
+    >
+      <div className="flex flex-wrap items-center gap-2">
+        <h4 className="text-[13.5px] font-semibold">
+          {number ? `Investigation #${number}` : "Investigation"}
+        </h4>
+        <Pill tone="bad">failed</Pill>
+        {error?.step && (
+          <span className="text-xs text-muted-foreground">
+            while {phaseLabel(error.step)}
+          </span>
+        )}
+      </div>
+      <p className="mt-1 text-sm text-red-700 dark:text-red-400">
+        {error?.message ||
+          run?.error ||
+          "The run failed before it could finish."}
+      </p>
+      {canWrite && hub && (
+        <div className="mt-2 flex flex-wrap gap-1.5">
+          <Button size="sm" className="h-7 gap-1 text-xs" onClick={retry}>
+            <RotateCcw className="h-3 w-3" />
+            Retry
+          </Button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+export function OutcomeCard(props: OutcomeCardProps) {
+  const outcome = (props.message.payload as OutcomePayload).outcome ?? {};
+  if (isFailedOutcome(outcome)) {
+    return (
+      <FailedOutcome
+        message={props.message}
+        outcome={outcome}
+        run={props.run}
+        number={props.number}
+        brief={props.brief}
+        canWrite={props.canWrite}
+      />
+    );
+  }
+  return <RootCauseOutcome {...props} />;
+}
+
+function RootCauseOutcome({
   message,
   issueId,
+  run,
   canWrite,
   nameOf,
 }: OutcomeCardProps) {
@@ -70,12 +163,6 @@ export function OutcomeCard({
   const outcome = payload.outcome ?? {};
   const investigationId = payload.investigation_id ?? null;
   const hub = useIssueHub();
-  const runs = useIssueInvestigationRuns(issueId);
-  const run: InvestigationRunResponse | undefined = runs.data?.items.find(
-    (r) =>
-      (payload.run_id && r.id === payload.run_id) ||
-      r.investigation_id === investigationId,
-  );
   const review = useReviewOutcome(issueId);
   const [rejecting, setRejecting] = useState(false);
   const [reason, setReason] = useState("");
@@ -88,6 +175,7 @@ export function OutcomeCard({
   const hypotheses = outcome.hypotheses ?? [];
   const evidence = outcome.supporting_evidence ?? [];
   const recommendations = outcome.recommendations ?? [];
+  const checkError = counterAnalysisError(outcome);
 
   const send = async (next: "confirmed" | "rejected") => {
     if (!investigationId) return;
@@ -136,11 +224,11 @@ export function OutcomeCard({
 
   return (
     <div
-      className="mt-1 rounded-lg border border-border px-3 py-2.5"
+      className="mt-2 rounded-[10px] border border-border px-3 py-2.5"
       aria-label="Investigation outcome"
     >
       <div className="flex flex-wrap items-center gap-2">
-        <h4 className="text-sm font-semibold">Root cause</h4>
+        <h4 className="text-[13.5px] font-semibold">Root cause</h4>
         {confidence !== null && (
           <Pill tone={confidenceTone(confidence)}>
             confidence {confidence.toFixed(2)}
@@ -196,6 +284,11 @@ export function OutcomeCard({
             ))}
           </ul>
         </div>
+      )}
+      {checkError && (
+        <p className="mt-2 text-xs text-amber-700 dark:text-amber-400">
+          The check of this conclusion didn't run: {checkError}
+        </p>
       )}
 
       {run?.outcome_verdict && (

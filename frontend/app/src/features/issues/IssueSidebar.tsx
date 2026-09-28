@@ -1,5 +1,6 @@
 /**
- * Issue sidebar: status, assignee, priority, severity, labels and context.
+ * Issue sidebar: one panel, in the mockup's order (spec 0001 §8.1): status,
+ * details, dataset, investigations, watchers and the person's scratch chats.
  *
  * The status menu offers only the moves the server says will succeed
  * (allowed_transitions). When a move still needs a field
@@ -8,26 +9,17 @@
  */
 
 import { useState } from "react";
-import {
-  ChevronDown,
-  Clock,
-  Eye,
-  EyeOff,
-  Loader2,
-  Plus,
-  X,
-} from "lucide-react";
+import { Link } from "react-router-dom";
+import { Eye, EyeOff, Loader2, Plus, X } from "lucide-react";
 import { toast } from "sonner";
 
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
-import { Card, CardContent } from "@/components/ui/Card";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuLabel,
-  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/Input";
@@ -39,13 +31,14 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { useDatasetByPath } from "@/lib/api/datasets";
 import { errorText } from "@/lib/api/error-message";
 import {
   ISSUE_PRIORITIES,
   ISSUE_SEVERITIES,
   getSeverityLabel,
   getStatusLabel,
-  getStatusVariant,
+  runNumbers,
   useIssueInvestigationRuns,
   useIssueWatchers,
   useInvalidateIssues,
@@ -59,6 +52,11 @@ import { useUserDirectory, displayName } from "@/lib/api/users";
 import { useJwtAuth } from "@/lib/auth/jwt-context";
 import { useRole } from "@/lib/auth/use-role";
 import { formatDate } from "@/lib/utils";
+
+import { ScratchChatsSection } from "./scratch/ScratchChatsSection";
+import { SectionTitle } from "./SectionTitle";
+import { LINK_CLASS } from "./thread/message-parts";
+import { Pill, issueStatusTone, runPill } from "./thread/Pill";
 
 const NONE = "__none__";
 
@@ -75,14 +73,6 @@ function useIssuePatch(issueId: string) {
     }
   };
   return { patch, isPending: update.isPending };
-}
-
-function SectionTitle({ children }: { children: React.ReactNode }) {
-  return (
-    <h3 className="mb-1.5 mt-4 text-xs font-semibold uppercase tracking-wide text-muted-foreground first:mt-0">
-      {children}
-    </h3>
-  );
 }
 
 function Field({
@@ -167,35 +157,42 @@ function StatusSection({ issue, canEdit }: StatusSectionProps) {
 
   return (
     <div>
-      <SectionTitle>Status</SectionTitle>
+      <SectionTitle className="mt-0">Status</SectionTitle>
       <div className="flex items-center justify-between gap-2">
-        <Badge variant={getStatusVariant(issue.status)}>
+        <Pill tone={issueStatusTone(issue.status)}>
           {getStatusLabel(issue.status)}
-        </Badge>
+        </Pill>
         {canEdit && issue.allowed_transitions.length > 0 && (
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button
                 variant="outline"
                 size="sm"
-                className="h-7 gap-1 px-2 text-xs"
+                aria-label="Change status"
+                className="h-6 gap-1 px-2 text-xs"
                 disabled={isPending}
               >
                 {isPending ? (
                   <Loader2 className="h-3 w-3 animate-spin" />
                 ) : null}
-                Change status
-                <ChevronDown className="h-3 w-3" />
+                Change ▾
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="min-w-[12rem]">
-              <DropdownMenuLabel className="text-xs font-normal text-muted-foreground">
-                Moves that will succeed
+            <DropdownMenuContent align="end" className="min-w-[13rem]">
+              <DropdownMenuLabel className="text-[11.5px] font-normal text-muted-foreground">
+                Only moves that will succeed are shown
               </DropdownMenuLabel>
-              <DropdownMenuSeparator />
               {issue.allowed_transitions.map((status) => (
                 <DropdownMenuItem key={status} onSelect={() => choose(status)}>
-                  {getStatusLabel(status)}
+                  <span>
+                    {getStatusLabel(status)}
+                    {status === "resolved" && confirmedCause && (
+                      <span className="text-[11.5px] text-muted-foreground">
+                        {" "}
+                        · asks for a note, pre-filled from the confirmed cause
+                      </span>
+                    )}
+                  </span>
                 </DropdownMenuItem>
               ))}
             </DropdownMenuContent>
@@ -284,7 +281,11 @@ function FieldSelect({
       onValueChange={(v) => onChange(v === NONE ? null : v)}
       disabled={disabled}
     >
-      <SelectTrigger aria-label={label} className="h-7 w-40 text-xs">
+      {/* Compact, like the mockup's "Maya Chen ▾" buttons. */}
+      <SelectTrigger
+        aria-label={label}
+        className="h-7 w-auto max-w-[11rem] gap-1 px-2 text-xs [&>span]:truncate"
+      >
         <SelectValue />
       </SelectTrigger>
       <SelectContent>
@@ -307,57 +308,85 @@ function LabelsEditor({
   canEdit: boolean;
 }) {
   const { patch, isPending } = useIssuePatch(issue.id);
+  const [adding, setAdding] = useState(false);
   const [draft, setDraft] = useState("");
 
   const setLabels = (labels: string[]) =>
     patch({ labels }, "Couldn't update the labels");
 
+  const close = () => {
+    setAdding(false);
+    setDraft("");
+  };
+
   const add = async () => {
     const label = draft.trim().toLowerCase();
     if (!label) return;
     if (issue.labels.includes(label)) {
-      setDraft("");
+      close();
       return;
     }
-    if (await setLabels([...issue.labels, label])) setDraft("");
+    if (await setLabels([...issue.labels, label])) close();
   };
 
   return (
     <div className="space-y-1.5">
-      <div className="flex flex-wrap gap-1">
-        {issue.labels.length === 0 && (
-          <span className="text-sm text-muted-foreground">None</span>
-        )}
-        {issue.labels.map((label) => (
-          <Badge key={label} variant="outline" className="gap-1 text-xs">
-            {label}
-            {canEdit && (
-              <button
-                type="button"
-                aria-label={`Remove label ${label}`}
-                className="hover:text-destructive"
-                disabled={isPending}
-                onClick={() =>
-                  void setLabels(issue.labels.filter((l) => l !== label))
-                }
-              >
-                <X className="h-3 w-3" />
-              </button>
-            )}
-          </Badge>
-        ))}
+      <div className="flex min-h-8 items-start justify-between gap-3 py-0.5 text-sm">
+        <span className="pt-0.5 text-muted-foreground">Labels</span>
+        <div className="flex flex-wrap items-center justify-end gap-1">
+          {issue.labels.length === 0 && (
+            <span className="text-muted-foreground">None</span>
+          )}
+          {issue.labels.map((label) => (
+            <Badge
+              key={label}
+              variant="outline"
+              className="gap-1 rounded-full px-2 py-px text-xs font-normal"
+            >
+              {label}
+              {canEdit && (
+                <button
+                  type="button"
+                  aria-label={`Remove label ${label}`}
+                  className="hover:text-destructive"
+                  disabled={isPending}
+                  onClick={() =>
+                    void setLabels(issue.labels.filter((l) => l !== label))
+                  }
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              )}
+            </Badge>
+          ))}
+          {canEdit && (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="h-6 px-2 text-xs"
+              aria-label="New label"
+              aria-expanded={adding}
+              onClick={() => (adding ? close() : setAdding(true))}
+            >
+              <span aria-hidden>＋</span>
+            </Button>
+          )}
+        </div>
       </div>
-      {canEdit && (
+      {canEdit && adding && (
         <div className="flex gap-1">
           <Input
             aria-label="Add label"
             value={draft}
+            autoFocus
             onChange={(e) => setDraft(e.target.value)}
             onKeyDown={(e) => {
               if (e.key === "Enter") {
                 e.preventDefault();
                 void add();
               }
+              if (e.key === "Escape") close();
             }}
             placeholder="Add a label"
             className="h-7 text-xs"
@@ -406,14 +435,14 @@ function WatchersSection({ issueId }: { issueId: string }) {
 
   return (
     <div>
-      <div className="mb-1.5 mt-4 flex items-center justify-between">
+      <div className="mb-1.5 mt-3.5 flex items-center justify-between">
         <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
           Watchers
         </h3>
         <Button
           variant="outline"
           size="sm"
-          className="h-7 gap-1 px-2 text-xs"
+          className="h-6 gap-1 px-2 text-xs"
           onClick={toggle}
           disabled={isPending}
         >
@@ -432,6 +461,80 @@ function WatchersSection({ issueId }: { issueId: string }) {
           ? "Nobody is watching yet."
           : items.map((w) => nameOf(w.user_id)).join(", ")}
       </p>
+    </div>
+  );
+}
+
+/**
+ * The issue's dataset, with a link to its page when a datasource has synced
+ * it. The issue names the dataset by its table's native path.
+ */
+function DatasetSection({ datasetId }: { datasetId: string }) {
+  const dataset = useDatasetByPath(datasetId);
+  return (
+    <div>
+      <SectionTitle>Dataset</SectionTitle>
+      <div className="text-sm">
+        <code className="break-all rounded bg-muted px-1.5 py-0.5 text-xs">
+          {datasetId}
+        </code>
+        {dataset.data && (
+          <Link
+            to={`/datasets/${dataset.data.id}`}
+            className={`mt-1 block text-xs ${LINK_CLASS}`}
+          >
+            open dataset page →
+          </Link>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/** The issue's runs: "#2 · standard" and how each ended, linking to its page. */
+function InvestigationsSection({ issueId }: { issueId: string }) {
+  const { isMember } = useRole();
+  const runs = useIssueInvestigationRuns(issueId);
+  const items = runs.data?.items ?? [];
+  const numbers = runNumbers(items);
+  const ordered = [...items].sort(
+    (a, b) => (numbers.get(a.id) ?? 0) - (numbers.get(b.id) ?? 0),
+  );
+
+  return (
+    <div>
+      <SectionTitle>Investigations</SectionTitle>
+      {runs.isLoading ? (
+        <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" />
+      ) : runs.error ? (
+        <p className="text-sm text-muted-foreground">
+          Couldn't load the investigations.
+        </p>
+      ) : ordered.length === 0 ? (
+        <p className="text-sm text-muted-foreground">
+          No investigations yet.
+          {isMember && " Investigate… hands the thread to one."}
+        </p>
+      ) : (
+        <ul aria-label="Investigations">
+          {ordered.map((run) => {
+            const pill = runPill(run);
+            return (
+              <li key={run.id}>
+                <Link
+                  to={`/investigations/${run.investigation_id}`}
+                  className="flex min-h-7 items-center justify-between gap-2 rounded py-0.5 text-sm hover:underline"
+                >
+                  <span>
+                    #{numbers.get(run.id)} · {run.execution_profile}
+                  </span>
+                  <Pill tone={pill.tone}>{pill.label}</Pill>
+                </Link>
+              </li>
+            );
+          })}
+        </ul>
+      )}
     </div>
   );
 }
@@ -476,115 +579,99 @@ export function IssueSidebar({ issue }: { issue: IssueResponse }) {
   }
 
   return (
-    <Card>
-      <CardContent className="pt-4">
-        <StatusSection issue={issue} canEdit={isMember} />
+    <aside
+      aria-label="Issue details"
+      className="h-fit rounded-[10px] border border-border bg-card px-3.5 py-3"
+    >
+      <StatusSection issue={issue} canEdit={isMember} />
 
-        <SectionTitle>Details</SectionTitle>
-        <Field label="Assignee">
-          {isMember ? (
-            <FieldSelect
-              label="Assignee"
-              value={issue.assignee_user_id ?? null}
-              options={assigneeOptions}
-              emptyLabel="Unassigned"
-              disabled={isPending}
-              onChange={(v) =>
-                void patch(
-                  { assignee_user_id: v },
-                  "Couldn't change the assignee",
-                )
-              }
-            />
-          ) : (
-            <span>
-              {issue.assignee_user_id
-                ? nameOf(issue.assignee_user_id)
-                : "Unassigned"}
-            </span>
-          )}
+      <SectionTitle>Details</SectionTitle>
+      <Field label="Assignee">
+        {isMember ? (
+          <FieldSelect
+            label="Assignee"
+            value={issue.assignee_user_id ?? null}
+            options={assigneeOptions}
+            emptyLabel="Unassigned"
+            disabled={isPending}
+            onChange={(v) =>
+              void patch(
+                { assignee_user_id: v },
+                "Couldn't change the assignee",
+              )
+            }
+          />
+        ) : (
+          <span>
+            {issue.assignee_user_id
+              ? nameOf(issue.assignee_user_id)
+              : "Unassigned"}
+          </span>
+        )}
+      </Field>
+      <Field label="Priority">
+        {isMember ? (
+          <FieldSelect
+            label="Priority"
+            value={issue.priority ?? null}
+            options={ISSUE_PRIORITIES.map((p) => ({ value: p, label: p }))}
+            emptyLabel="No priority"
+            disabled={isPending}
+            onChange={(v) =>
+              void patch({ priority: v }, "Couldn't change the priority")
+            }
+          />
+        ) : (
+          <span>{issue.priority ?? "None"}</span>
+        )}
+      </Field>
+      <Field label="Severity">
+        {isMember ? (
+          <FieldSelect
+            label="Severity"
+            value={issue.severity ?? null}
+            options={ISSUE_SEVERITIES.map((s) => ({
+              value: s,
+              label: getSeverityLabel(s),
+            }))}
+            emptyLabel="No severity"
+            disabled={isPending}
+            onChange={(v) =>
+              void patch({ severity: v }, "Couldn't change the severity")
+            }
+          />
+        ) : (
+          <span>
+            {issue.severity ? getSeverityLabel(issue.severity) : "None"}
+          </span>
+        )}
+      </Field>
+      <LabelsEditor issue={issue} canEdit={isMember} />
+      {observedAt && (
+        <Field label="Observed">
+          <span>{formatObservedAt(observedAt)}</span>
         </Field>
-        <Field label="Priority">
-          {isMember ? (
-            <FieldSelect
-              label="Priority"
-              value={issue.priority ?? null}
-              options={ISSUE_PRIORITIES.map((p) => ({ value: p, label: p }))}
-              emptyLabel="No priority"
-              disabled={isPending}
-              onChange={(v) =>
-                void patch({ priority: v }, "Couldn't change the priority")
-              }
-            />
-          ) : (
-            <span>{issue.priority ?? "None"}</span>
-          )}
+      )}
+      {column && (
+        <Field label="Column">
+          <code className="rounded bg-muted px-1.5 py-0.5 text-xs">
+            {column}
+          </code>
         </Field>
-        <Field label="Severity">
-          {isMember ? (
-            <FieldSelect
-              label="Severity"
-              value={issue.severity ?? null}
-              options={ISSUE_SEVERITIES.map((s) => ({
-                value: s,
-                label: getSeverityLabel(s),
-              }))}
-              emptyLabel="No severity"
-              disabled={isPending}
-              onChange={(v) =>
-                void patch({ severity: v }, "Couldn't change the severity")
-              }
-            />
-          ) : (
-            <span>
-              {issue.severity ? getSeverityLabel(issue.severity) : "None"}
-            </span>
-          )}
+      )}
+      {issue.due_at && (
+        <Field label="Due">
+          <span>{formatDate(issue.due_at)}</span>
         </Field>
-        {observedAt && (
-          <Field label="Observed">
-            <span>{formatObservedAt(observedAt)}</span>
-          </Field>
-        )}
-        {column && (
-          <Field label="Column">
-            <code className="rounded bg-muted px-1.5 py-0.5 text-xs">
-              {column}
-            </code>
-          </Field>
-        )}
-        {issue.due_at && (
-          <Field label="Due">
-            <span>{formatDate(issue.due_at)}</span>
-          </Field>
-        )}
+      )}
 
-        <SectionTitle>Labels</SectionTitle>
-        <LabelsEditor issue={issue} canEdit={isMember} />
+      {issue.dataset_id && <DatasetSection datasetId={issue.dataset_id} />}
 
-        {issue.dataset_id && (
-          <>
-            <SectionTitle>Dataset</SectionTitle>
-            <code className="break-all rounded bg-muted px-1.5 py-0.5 text-xs">
-              {issue.dataset_id}
-            </code>
-          </>
-        )}
+      <InvestigationsSection issueId={issue.id} />
 
-        <WatchersSection issueId={issue.id} />
+      <WatchersSection issueId={issue.id} />
 
-        <SectionTitle>Timeline</SectionTitle>
-        <div className="space-y-0.5 text-xs text-muted-foreground">
-          <p className="flex items-center gap-1.5">
-            <Clock className="h-3 w-3" />
-            Created {formatDate(issue.created_at)}
-          </p>
-          <p className="pl-[18px]">Updated {formatDate(issue.updated_at)}</p>
-          {issue.closed_at && (
-            <p className="pl-[18px]">Closed {formatDate(issue.closed_at)}</p>
-          )}
-        </div>
-      </CardContent>
-    </Card>
+      <ScratchChatsSection issueId={issue.id} />
+    </aside>
   );
 }

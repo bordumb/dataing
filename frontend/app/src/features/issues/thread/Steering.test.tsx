@@ -216,7 +216,8 @@ describe("Steer controls", () => {
       'Steer by Ada · add context: "v2 status enum changed" · pending',
     );
     const h3 = within(card).getByLabelText("Hypothesis late-arriving events");
-    expect(within(h3).getByText("by Raj Patel")).toBeInTheDocument();
+    expect(within(h3).getByText("ruled out by Raj Patel")).toBeInTheDocument();
+    expect(within(h3).getByText("stopped")).toBeInTheDocument();
   });
 
   it("shows the run's steers to viewers without the controls", async () => {

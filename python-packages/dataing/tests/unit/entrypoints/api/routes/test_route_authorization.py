@@ -78,6 +78,7 @@ POLICY: dict[tuple[str, str], str] = {
     ("POST", "/investigations/tests/run"): SCOPE_WRITE,
     ("POST", "/investigations/{investigation_id}/cancel"): SCOPE_WRITE,
     ("POST", "/investigations/{investigation_id}/outcome-review"): SCOPE_WRITE,
+    ("POST", "/investigations/{investigation_id}/steers"): SCOPE_WRITE,
     ("POST", "/investigations/{investigation_id}/codify"): SCOPE_WRITE,
     # issues.py: commenting and watching stay open to viewers
     ("POST", "/issues"): SCOPE_WRITE,

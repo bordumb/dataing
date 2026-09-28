@@ -4,8 +4,9 @@ from __future__ import annotations
 
 from temporalio.testing import ActivityEnvironment
 
+from dataing.adapters.db.investigation_steers import steer_outcome_text
 from dataing.core.domain_types import Hypothesis
-from dataing.temporal.activities.steering import formulate_hypothesis, steer_outcome_text
+from dataing.temporal.activities.steering import formulate_hypothesis
 
 
 async def test_formulated_hypothesis_is_a_valid_hypothesis() -> None:

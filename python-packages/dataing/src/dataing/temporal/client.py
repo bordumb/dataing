@@ -172,6 +172,16 @@ class TemporalInvestigationClient:
         handle = await self.get_handle(investigation_id)
         await handle.signal(InvestigationWorkflow.cancel_investigation)
 
+    async def steer_investigation(self, investigation_id: str, steer: dict[str, Any]) -> None:
+        """Send a person's steer to a running investigation.
+
+        Raises:
+            Exception: Temporal's error when the workflow isn't running, e.g. it
+                already finished; the caller records the steer as rejected.
+        """
+        handle = await self.get_handle(investigation_id)
+        await handle.signal(InvestigationWorkflow.steer, steer)
+
     async def enqueue_thread_request(self, request: dict[str, Any]) -> None:
         """Queue an agent request on its thread's workflow, starting it if needed.
 

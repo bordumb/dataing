@@ -7,7 +7,6 @@ is stored on the issue's run, sent to the feedback log, and shown in the thread.
 from __future__ import annotations
 
 from typing import Annotated, Literal
-from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field, model_validator
@@ -16,6 +15,7 @@ from dataing.adapters.db.app_db import AppDatabase
 from dataing.adapters.investigation_feedback import EventType, InvestigationFeedbackAdapter
 from dataing.entrypoints.api.deps import get_app_db, get_feedback_adapter
 from dataing.entrypoints.api.middleware.auth import ApiKeyContext, require_scope
+from dataing.entrypoints.api.routes.investigations import TenantInvestigationId
 from dataing.entrypoints.api.routes.issues import (
     RUN_COLUMNS,
     InvestigationRunResponse,
@@ -45,9 +45,9 @@ class OutcomeReview(BaseModel):
 
 @router.post("/{investigation_id}/outcome-review", response_model=InvestigationRunResponse)
 async def review_outcome(
-    investigation_id: UUID,
+    auth: WriteScopeDep,  # First, so a viewer is refused before the lookup
+    investigation_id: TenantInvestigationId,
     body: OutcomeReview,
-    auth: WriteScopeDep,
     db: AppDbDep,
     feedback: FeedbackDep,
 ) -> InvestigationRunResponse:

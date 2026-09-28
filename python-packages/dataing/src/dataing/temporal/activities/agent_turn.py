@@ -46,7 +46,11 @@ from dataing.agents.chat import (
 )
 from dataing.core.agent_query import AgentQueryService
 from dataing.core.investigation.brief import BriefDraft, brief_from_draft, brief_to_markdown
-from dataing.core.issue_chat import ThreadChatServices, resolve_chat_datasource
+from dataing.core.issue_chat import (
+    InvestigationStatusReader,
+    ThreadChatServices,
+    resolve_chat_datasource,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -94,6 +98,7 @@ def make_run_agent_turn_activity(
     app_db: AppDatabase,
     agent_factory: ChatAgentFactory,
     query_service: AgentQueryService | None = None,
+    investigation_status: InvestigationStatusReader | None = None,
 ) -> Any:
     """Return the run_agent_turn activity with its dependencies bound.
 
@@ -101,6 +106,7 @@ def make_run_agent_turn_activity(
         app_db: Application database.
         agent_factory: Builds the chat agent (a fresh one per turn).
         query_service: Runs queries as the asker; built from app_db if omitted.
+        investigation_status: Reads a running investigation's live hypotheses.
     """
     queries = query_service or AgentQueryService(app_db)
 
@@ -147,6 +153,7 @@ def make_run_agent_turn_activity(
             issue_id=issue_id,
             reply_message_id=reply_id,
             principal=principal,
+            investigation_status=investigation_status,
         )
         deps = ChatDeps(principal=principal, services=services)
         overview = await services.issue_context()

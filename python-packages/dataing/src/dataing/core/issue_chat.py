@@ -8,6 +8,7 @@ stores a snapshot of every query the agent ran on the reply message.
 from __future__ import annotations
 
 import json
+from collections.abc import Awaitable, Callable
 from typing import Any
 from uuid import UUID
 
@@ -49,6 +50,11 @@ async def resolve_chat_datasource(
     return None
 
 
+# Reads a running investigation's live state (current step, hypotheses with their
+# ids and statuses, pending steers); None when the run isn't running or can't be read
+InvestigationStatusReader = Callable[[str], Awaitable[dict[str, Any] | None]]
+
+
 class ThreadChatServices:
     """ChatServices for one turn in one thread."""
 
@@ -61,6 +67,7 @@ class ThreadChatServices:
         issue_id: UUID,
         reply_message_id: UUID,
         principal: UserPrincipal | None,
+        investigation_status: InvestigationStatusReader | None = None,
     ) -> None:
         """Initialize the services for one turn.
 
@@ -71,7 +78,10 @@ class ThreadChatServices:
             issue_id: The issue.
             reply_message_id: The agent reply that query snapshots belong to.
             principal: The asker and datasource, or None when no datasource is set.
+            investigation_status: Reads a running investigation's live hypotheses,
+                so the agent can name one in a rule_out proposal.
         """
+        self._investigation_status = investigation_status
         self._db = db
         self._queries = queries
         self._tenant_id = tenant_id
@@ -210,4 +220,8 @@ class ThreadChatServices:
             investigation_id,
         )
         row["steers"] = steers
-        return row
+        if self._investigation_status is not None and row.get("outcome") is None:
+            # Still running: the workflow knows the hypotheses and how each is going
+            row["live"] = await self._investigation_status(str(investigation_id))
+        result: dict[str, Any] = row
+        return result

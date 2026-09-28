@@ -36,6 +36,7 @@ from dataing.adapters.investigation.pattern_adapter import InMemoryPatternReposi
 from dataing.agents import AgentClient
 from dataing.agents.chat import build_brief_agent, build_chat_agent, build_chat_model
 from dataing.config import settings
+from dataing.core.issue_chat import InvestigationStatusReader
 from dataing.core.snapshot_store import LocalSnapshotStore
 from dataing.telemetry import configure_logging
 from dataing.temporal.activities import (
@@ -217,6 +218,25 @@ def _brief_agent_factory() -> Any:
     return lambda: build_brief_agent(model)
 
 
+def _investigation_status_reader(client: Client) -> InvestigationStatusReader:
+    """Return a reader of a running investigation's live hypotheses and steers."""
+
+    async def read(investigation_id: str) -> dict[str, Any] | None:
+        try:
+            handle = client.get_workflow_handle(investigation_id)
+            status = await handle.query(InvestigationWorkflow.get_status)
+        except Exception as e:  # Finished, not found, or Temporal unreachable
+            logger.debug(f"No live status for investigation {investigation_id}: {e}")
+            return None
+        return {
+            "current_step": status.current_step,
+            "hypotheses": status.hypotheses,
+            "pending_steers": status.pending_steers,
+        }
+
+    return read
+
+
 def create_activities(deps: dict[str, Any]) -> list[Any]:
     """Create all activity functions with injected dependencies.
 
@@ -263,7 +283,11 @@ def create_activities(deps: dict[str, Any]) -> list[Any]:
         formulate_hypothesis,
         make_record_steer_outcome_activity(app_db=app_db),
         # Issue chat agent turns
-        make_run_agent_turn_activity(app_db=app_db, agent_factory=_chat_agent_factory()),
+        make_run_agent_turn_activity(
+            app_db=app_db,
+            agent_factory=_chat_agent_factory(),
+            investigation_status=deps.get("investigation_status"),
+        ),
         make_run_brief_draft_activity(app_db=app_db, agent_factory=_brief_agent_factory()),
         make_mark_turn_failed_activity(app_db=app_db),
     ]
@@ -288,6 +312,7 @@ async def run_worker() -> None:
 
     # Initialize dependencies
     deps = await create_dependencies()
+    deps["investigation_status"] = _investigation_status_reader(client)
 
     # Create activities with dependencies
     activities = create_activities(deps)

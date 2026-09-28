@@ -115,7 +115,11 @@ async def run_query(ctx: RunContext[ChatDeps], sql: str, purpose: str) -> dict[s
 
 
 async def get_investigation(ctx: RunContext[ChatDeps], run_id: str) -> dict[str, Any]:
-    """Return a linked investigation's hypotheses, evidence summaries and synthesis.
+    """Return a linked investigation's brief, outcome and steers.
+
+    A finished run's outcome lists each hypothesis and how it ended. A running
+    run has `live` instead: its current step and each hypothesis's id and status;
+    use that id as propose_steer's hypothesis_id to rule one out.
 
     Args:
         ctx: Run context.

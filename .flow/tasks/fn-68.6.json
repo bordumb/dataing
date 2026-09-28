@@ -1,0 +1,29 @@
+{
+  "assignee": "bordumbb@gmail.com",
+  "claim_note": "",
+  "claimed_at": "2026-09-28T16:50:54.170566Z",
+  "created_at": "2026-09-28T16:50:53.862796Z",
+  "depends_on": [],
+  "epic": "fn-68",
+  "evidence": {
+    "commits": [
+      "c091d817"
+    ],
+    "prs": [
+      "https://github.com/bordumb/dataing/pull/227"
+    ],
+    "tests": [
+      "uv run pytest python-packages/dataing/tests",
+      "uv run pytest python-packages/dataing-ee/tests",
+      "pytest -m integration (CE 130, EE 16) on pgvector:pg16",
+      "workflow_runner() validates 3/3 workflows in worker import order",
+      "offline build_chat_model -> anthropic 1.8 smoke run"
+    ]
+  },
+  "id": "fn-68.6",
+  "priority": 6,
+  "spec_path": ".flow/tasks/fn-68.6.md",
+  "status": "done",
+  "title": "Migrate to pydantic-ai 2 (and anthropic 1.x)",
+  "updated_at": "2026-09-28T17:15:03.481195Z"
+}

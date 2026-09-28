@@ -579,7 +579,7 @@ The card shows a red "failed" pill, the message and **Retry**.
   - Symptom and at least one scope table are required. The datasource is required only when the tenant has more than one.
   - Findings, ruled out and leads start empty; there is no thread to draft from.
   - **Start investigation** calls `POST /investigations` (§7.11) and navigates to `/issues/{issue_id}`, where the card is already live.
-- **Hand off** mode (from a thread) is unchanged, except that its datasource option names the issue's datasource instead of "The issue's datasource".
+- **Hand off** mode (from a thread) is unchanged. Its datasource option stays "The issue's datasource": the server resolves it (explicit, then the brief's scope, then the tenant's only one), so the page can't name it in advance.
 
 ### 8.3 The run's details page (D14)
 

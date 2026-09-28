@@ -110,7 +110,7 @@ describe("IssueSidebar status", () => {
       screen.getByText("Only moves that will succeed are shown"),
     ).toBeInTheDocument();
     expect(items.map((i) => i.textContent)).toEqual([
-      "In Progress",
+      "In progress",
       "Blocked",
       "Closed",
     ]);
@@ -138,17 +138,17 @@ describe("IssueSidebar status", () => {
       await screen.findByRole("button", { name: /Change status/ }),
     );
     await user.click(
-      await screen.findByRole("menuitem", { name: "In Progress" }),
+      await screen.findByRole("menuitem", { name: "In progress" }),
     );
 
     expect(api.find("PATCH", ISSUE_URL)).toHaveLength(0);
     expect(
-      screen.getByText("In Progress needs an owner. Assign it to yourself?"),
+      screen.getByText("In progress needs an owner. Assign it to yourself?"),
     ).toBeInTheDocument();
 
     await user.click(
       screen.getByRole("button", {
-        name: "Assign to me and move to In Progress",
+        name: "Assign to me and move to In progress",
       }),
     );
 

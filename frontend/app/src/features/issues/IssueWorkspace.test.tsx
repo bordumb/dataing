@@ -185,7 +185,7 @@ describe("IssueWorkspace", () => {
     });
     const bar = title.parentElement!;
     expect(bar).toHaveTextContent(
-      "#7Null spike in orders.emailIn ProgressP1dataset analytics.public.orders",
+      "#7Null spike in orders.emailIn progressP1dataset analytics.public.orders",
     );
     expect(
       within(bar).getByRole("link", { name: "Back to issues" }),

@@ -1,17 +1,27 @@
 {
-  "assignee": null,
+  "assignee": "bordumbb@gmail.com",
   "claim_note": "",
-  "claimed_at": null,
+  "claimed_at": "2026-09-28T20:41:23.396318Z",
   "created_at": "2026-09-28T17:52:00.495921Z",
   "depends_on": [
     "fn-70.20",
     "fn-70.21"
   ],
   "epic": "fn-70",
+  "evidence": {
+    "commits": [
+      "049049dc"
+    ],
+    "prs": [],
+    "tests": [
+      "InvestigationDetail.test.tsx",
+      "llm-status-banner.test.tsx"
+    ]
+  },
   "id": "fn-70.24",
   "priority": null,
   "spec_path": ".flow/tasks/fn-70.24.md",
-  "status": "todo",
+  "status": "done",
   "title": "M5: frontend: run details page and LLM banner",
-  "updated_at": "2026-09-28T17:52:00.496129Z"
+  "updated_at": "2026-09-28T20:41:24.467832Z"
 }

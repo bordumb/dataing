@@ -250,7 +250,7 @@ export function getStatusLabel(status: string): string {
     case "triaged":
       return "Triaged";
     case "in_progress":
-      return "In Progress";
+      return "In progress";
     case "blocked":
       return "Blocked";
     case "resolved":

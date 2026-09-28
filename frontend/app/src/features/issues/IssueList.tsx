@@ -239,7 +239,7 @@ export function IssueList() {
               <SelectItem value="all">All Status</SelectItem>
               <SelectItem value="open">Open</SelectItem>
               <SelectItem value="triaged">Triaged</SelectItem>
-              <SelectItem value="in_progress">In Progress</SelectItem>
+              <SelectItem value="in_progress">In progress</SelectItem>
               <SelectItem value="blocked">Blocked</SelectItem>
               <SelectItem value="resolved">Resolved</SelectItem>
               <SelectItem value="closed">Closed</SelectItem>

@@ -1,16 +1,26 @@
 {
-  "assignee": null,
+  "assignee": "bordumbb@gmail.com",
   "claim_note": "",
-  "claimed_at": null,
+  "claimed_at": "2026-09-28T20:41:22.721926Z",
   "created_at": "2026-09-28T17:51:59.979116Z",
   "depends_on": [
     "fn-70.21"
   ],
   "epic": "fn-70",
+  "evidence": {
+    "commits": [
+      "3a71fb9b"
+    ],
+    "prs": [],
+    "tests": [
+      "StartInvestigation.test.tsx",
+      "frontend vitest 172 passed"
+    ]
+  },
   "id": "fn-70.22",
   "priority": null,
   "spec_path": ".flow/tasks/fn-70.22.md",
-  "status": "todo",
+  "status": "done",
   "title": "M5: frontend: Investigate\u2026 everywhere, remove /investigations/new",
-  "updated_at": "2026-09-28T17:51:59.979327Z"
+  "updated_at": "2026-09-28T20:41:23.797636Z"
 }

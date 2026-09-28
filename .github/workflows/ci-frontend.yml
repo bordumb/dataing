@@ -27,7 +27,9 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v6
         with:
-          node-version: '20'
+          # jsdom 30 needs Node 22 (on Node 20 its tests fail with
+          # "webidl.util.markAsUncloneable is not a function")
+          node-version: '22'
           cache: 'pnpm'
           cache-dependency-path: frontend/app/pnpm-lock.yaml
 

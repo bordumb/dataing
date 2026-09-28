@@ -1,10 +1,14 @@
 """Tests for JWT token service."""
 
+import warnings
+from datetime import UTC, datetime, timedelta
 from uuid import uuid4
 
+import jwt
 import pytest
 
 from dataing.core.auth.jwt import (
+    JWTSecretKeyError,
     TokenError,
     create_access_token,
     create_refresh_token,
@@ -92,3 +96,54 @@ class TestRefreshToken:
 
         # Refresh should expire later than access
         assert refresh_payload.exp > access_payload.exp
+
+
+class TestSecretKey:
+    """Tokens are only signed and verified with a configured key of 32+ bytes."""
+
+    @pytest.mark.parametrize(
+        "key",
+        [None, "", "k" * 31, "dev-secret-change-in-production"],
+        ids=["unset", "empty", "31-bytes", "old-default"],
+    )
+    def test_refuses_missing_or_short_key(
+        self, monkeypatch: pytest.MonkeyPatch, key: str | None
+    ) -> None:
+        """No token is issued or verified without a proper key."""
+        if key is None:
+            monkeypatch.delenv("JWT_SECRET_KEY", raising=False)
+        else:
+            monkeypatch.setenv("JWT_SECRET_KEY", key)
+
+        with pytest.raises(JWTSecretKeyError, match="openssl rand -hex 32"):
+            create_access_token(user_id="u", org_id="o", role="admin", teams=[])
+        with pytest.raises(JWTSecretKeyError):
+            create_refresh_token(user_id="u")
+        with pytest.raises(JWTSecretKeyError):
+            decode_token("header.payload.signature")
+
+    def test_accepts_a_32_byte_key(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """A key of exactly 32 bytes signs and verifies tokens."""
+        monkeypatch.setenv("JWT_SECRET_KEY", "k" * 32)
+
+        token = create_access_token(user_id="u", org_id="o", role="admin", teams=[])
+
+        assert decode_token(token).sub == "u"
+
+    def test_rejects_a_token_forged_with_the_old_default_key(self) -> None:
+        """A token signed with the key that used to ship in the source is refused."""
+        now = datetime.now(UTC)
+        claims = {
+            "sub": "attacker",
+            "org_id": str(uuid4()),
+            "role": "owner",
+            "teams": [],
+            "exp": int((now + timedelta(hours=1)).timestamp()),
+            "iat": int(now.timestamp()),
+        }
+        with warnings.catch_warnings():  # pyjwt warns that this old key is too short
+            warnings.simplefilter("ignore")
+            forged = jwt.encode(claims, "dev-secret-change-in-production", algorithm="HS256")
+
+        with pytest.raises(TokenError, match="Signature verification failed"):
+            decode_token(forged)

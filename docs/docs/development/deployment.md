@@ -69,6 +69,7 @@ this script already have that login.
 | Variable | Value |
 |----------|-------|
 | `ANTHROPIC_API_KEY` | Your Anthropic API key |
+| `JWT_SECRET_KEY` | 32+ random bytes that sign login tokens (`openssl rand -hex 32`); the API refuses to start without it |
 
 ### 6. Enable Public URL
 

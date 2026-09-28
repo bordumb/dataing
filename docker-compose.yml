@@ -9,6 +9,8 @@
 # Required environment variables:
 #   ANTHROPIC_API_KEY       - Anthropic API key for LLM features
 #   DATADR_ENCRYPTION_KEY   - Fernet key for encrypting datasource credentials
+#   JWT_SECRET_KEY          - 32+ random bytes that sign login tokens (openssl rand -hex 32);
+#                             the api refuses to start without it
 #
 # Access points:
 #   Frontend:     http://localhost:3000
@@ -133,6 +135,7 @@ services:
       INVESTIGATION_ENGINE: temporal
       DATADR_ENCRYPTION_KEY: ${DATADR_ENCRYPTION_KEY:-}
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY:-}
       REDIS_HOST: redis
       REDIS_PORT: 6379
       LLM_MODEL: ${LLM_MODEL:-claude-sonnet-4-20250514}

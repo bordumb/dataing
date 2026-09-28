@@ -220,7 +220,7 @@ async def test_failed_turn_is_marked_error(migrated_db: AppDatabase) -> None:
 
 async def test_brief_draft_fills_the_brief_message(migrated_db: AppDatabase) -> None:
     """The draft lands in the brief message with citations resolved to messages."""
-    from pydantic_ai.messages import ModelResponse, ToolCallPart
+    from pydantic_ai.messages import ModelResponse, TextPart
 
     from dataing.agents.chat import build_brief_agent
     from dataing.temporal.activities.agent_turn import make_run_brief_draft_activity
@@ -239,17 +239,17 @@ async def test_brief_draft_fills_the_brief_message(migrated_db: AppDatabase) -> 
     )
 
     def respond(messages: list[ModelMessage], info: AgentInfo) -> ModelResponse:
-        (output_tool,) = info.output_tools
         return ModelResponse(
             parts=[
-                ToolCallPart(
-                    output_tool.name,
-                    {
-                        "symptom": "Orders dropped",
-                        "findings": [
-                            {"statement": "Asked about regions", "source_seq": question["seq"]}
-                        ],
-                    },
+                TextPart(
+                    json.dumps(
+                        {
+                            "symptom": "Orders dropped",
+                            "findings": [
+                                {"statement": "Asked about regions", "source_seq": question["seq"]}
+                            ],
+                        }
+                    ),
                 )
             ]
         )
@@ -296,7 +296,7 @@ async def test_brief_draft_from_a_scratch_chat_reads_both_threads(
     migrated_db: AppDatabase,
 ) -> None:
     """Shared messages come first as #n, scratch ones as #sn; both kinds of citation resolve."""
-    from pydantic_ai.messages import ModelResponse, ToolCallPart
+    from pydantic_ai.messages import ModelResponse, TextPart
 
     from dataing.agents.chat import build_brief_agent
     from dataing.temporal.activities.agent_turn import make_run_brief_draft_activity
@@ -334,29 +334,29 @@ async def test_brief_draft_from_a_scratch_chat_reads_both_threads(
     def respond(messages: list[ModelMessage], info: AgentInfo) -> ModelResponse:
         for message in messages:
             seen.extend(str(getattr(part, "content", "")) for part in message.parts)
-        (output_tool,) = info.output_tools
         return ModelResponse(
             parts=[
-                ToolCallPart(
-                    output_tool.name,
-                    {
-                        "symptom": "Orders dropped",
-                        "findings": [
-                            {
-                                "statement": "Asked about regions",
-                                "source_seq": question["seq"],
-                                "query_result_id": str(shared_result),
-                            },
-                            {
-                                "statement": "New enum value",
-                                "source_seq": f"s{scratch_note['seq']}",
-                                "query_result_id": str(scratch_result),
-                            },
-                        ],
-                        "ruled_out": [
-                            {"statement": "Counted", "source_seq": f"#s{scratch_reply['seq']}"}
-                        ],
-                    },
+                TextPart(
+                    json.dumps(
+                        {
+                            "symptom": "Orders dropped",
+                            "findings": [
+                                {
+                                    "statement": "Asked about regions",
+                                    "source_seq": question["seq"],
+                                    "query_result_id": str(shared_result),
+                                },
+                                {
+                                    "statement": "New enum value",
+                                    "source_seq": f"s{scratch_note['seq']}",
+                                    "query_result_id": str(scratch_result),
+                                },
+                            ],
+                            "ruled_out": [
+                                {"statement": "Counted", "source_seq": f"#s{scratch_reply['seq']}"}
+                            ],
+                        }
+                    ),
                 )
             ]
         )

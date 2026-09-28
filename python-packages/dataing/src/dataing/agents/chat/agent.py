@@ -10,7 +10,7 @@ from __future__ import annotations
 from collections.abc import AsyncIterable, Callable, Sequence
 from typing import Any
 
-from pydantic_ai import Agent, RunContext
+from pydantic_ai import Agent, PromptedOutput, RunContext
 from pydantic_ai.messages import (
     AgentStreamEvent,
     ModelMessage,
@@ -36,7 +36,7 @@ def build_chat_model(model_name: str, api_key: str, effort: str | None) -> Model
     """Return the Anthropic model for chat turns with prompt caching turned on.
 
     Args:
-        model_name: Anthropic model id, e.g. "claude-opus-5".
+        model_name: Anthropic model id, e.g. "claude-opus-5-5".
         api_key: Anthropic API key.
         effort: "low", "medium" or "high"; empty or None leaves the model default.
     """
@@ -127,8 +127,17 @@ async def run_turn(
 
 
 def build_brief_agent(model: Model | str) -> Agent[None, BriefDraft]:
-    """Return the agent that drafts an investigation brief from a thread."""
-    return Agent(model, output_type=BriefDraft, instructions=SYSTEM_PROMPT, retries=TOOL_RETRIES)
+    """Return the agent that drafts an investigation brief from a thread.
+
+    The draft comes back as JSON text rather than through an output tool: an output
+    tool makes pydantic-ai force tool_choice, which Claude Opus 5.5 rejects.
+    """
+    return Agent(
+        model,
+        output_type=PromptedOutput(BriefDraft),
+        instructions=SYSTEM_PROMPT,
+        retries=TOOL_RETRIES,
+    )
 
 
 async def draft_brief(

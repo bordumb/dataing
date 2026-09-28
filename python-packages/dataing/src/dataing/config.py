@@ -19,7 +19,7 @@ class Settings:
         # Issue chat agent (docs/specs/0001_issue_chat.md): model and effort per route.
         # Speed comes from low effort, not a smaller model; an empty effort leaves
         # the model's default.
-        self.chat_agent_model = os.getenv("CHAT_AGENT_MODEL", "claude-opus-5")
+        self.chat_agent_model = os.getenv("CHAT_AGENT_MODEL", "claude-opus-5-5")
         self.chat_agent_effort = os.getenv("CHAT_AGENT_EFFORT", "low")
         self.chat_brief_effort = os.getenv("CHAT_BRIEF_EFFORT", "medium")
 

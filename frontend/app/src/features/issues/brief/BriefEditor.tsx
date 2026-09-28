@@ -2,9 +2,13 @@
  * The brief editor: what a thread hands to the investigation manager and its
  * subagents (spec 0001 §7.7). The agent drafts the brief from the thread; the
  * person edits it, picks the depth and datasource, and starts the run.
+ *
+ * BriefFormView is shared with "Start an investigation" (StartInvestigation),
+ * the same editor in new mode.
  */
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { Link } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import { Loader2, Play, Plus, X } from "lucide-react";
 import { toast } from "sonner";
@@ -74,7 +78,7 @@ function FieldLabel({
 // Source messages
 // ----------------------------------------------------------------------------
 
-type SourceLookup = (messageId: string) => ThreadMessage | undefined;
+export type SourceLookup = (messageId: string) => ThreadMessage | undefined;
 
 function useSourceLookup(
   issueId: string,
@@ -229,64 +233,78 @@ function ClaimList({
 // The form
 // ----------------------------------------------------------------------------
 
-interface BriefFormViewProps {
-  issueId: string;
-  datasetId: string | null;
+/**
+ * "handoff" edits a brief drafted from an issue's thread; "new" starts a run
+ * from any page, with nothing to draft from (spec 0001 §8.2).
+ */
+export type BriefMode = "handoff" | "new";
+
+export interface BriefFormViewProps {
+  mode: BriefMode;
   initial: BriefForm;
-  sourceThreadId: string | null;
-  sharedThreadId: string | null;
-  parentRunId: string | null;
-  onDone: () => void;
+  /** Finds the thread message a finding came from (hand-off only). */
+  lookup?: SourceLookup;
+  scratchThreadId?: string | null;
+  /** Focus the empty lead a follow-up run adds. */
+  focusNewLead?: boolean;
+  pending: boolean;
+  /** Set when the server couldn't tell which datasource to use. */
+  datasourcePrompt?: string | null;
+  onSubmit: (form: BriefForm) => void;
+  onCancel: () => void;
 }
 
-function BriefFormView({
-  issueId,
-  datasetId,
+const NO_SOURCE: SourceLookup = () => undefined;
+
+export function BriefFormView({
+  mode,
   initial,
-  sourceThreadId,
-  sharedThreadId,
-  parentRunId,
-  onDone,
+  lookup = NO_SOURCE,
+  scratchThreadId = null,
+  focusNewLead = false,
+  pending,
+  datasourcePrompt = null,
+  onSubmit,
+  onCancel,
 }: BriefFormViewProps) {
   const [form, setForm] = useState<BriefForm>(initial);
   const [touched, setTouched] = useState(false);
-  const start = useStartRun(issueId);
   const datasources = useDataSources();
-  const scratchThreadId =
-    sourceThreadId && sourceThreadId !== sharedThreadId ? sourceThreadId : null;
-  const lookup = useSourceLookup(issueId, [sharedThreadId, scratchThreadId]);
-  const problem = formProblem(form);
+  const datasourceList = datasources.data ?? [];
+  const isNew = mode === "new";
+  const problem = formProblem(form, {
+    requireTables: isNew,
+    requireDatasource: isNew && datasourceList.length > 1,
+  });
+  const datasourceRef = useRef<HTMLSelectElement>(null);
   const set = (patch: Partial<BriefForm>) =>
     setForm((f) => ({ ...f, ...patch }));
 
-  const submit = async (e: React.FormEvent) => {
+  // A new run on a tenant with one datasource needs no choice.
+  const onlyDatasource =
+    isNew && datasourceList.length === 1 ? datasourceList[0].id : null;
+  useEffect(() => {
+    if (onlyDatasource) {
+      setForm((f) =>
+        f.datasourceId ? f : { ...f, datasourceId: onlyDatasource },
+      );
+    }
+  }, [onlyDatasource]);
+
+  useEffect(() => {
+    if (datasourcePrompt) datasourceRef.current?.focus();
+  }, [datasourcePrompt]);
+
+  const submit = (e: React.FormEvent) => {
     e.preventDefault();
     setTouched(true);
     if (problem) return;
-    const brief = briefFromForm(form);
-    try {
-      await start.mutateAsync({
-        brief,
-        execution_profile: form.profile,
-        dataset_id: datasetId ?? undefined,
-        datasource_id: form.datasourceId || undefined,
-        source_thread_id: sourceThreadId ?? undefined,
-        parent_run_id: parentRunId ?? undefined,
-      });
-      toast.success("Investigation started", {
-        description: "Its card in the thread shows progress and steering.",
-      });
-      onDone();
-    } catch (error) {
-      toast.error("Couldn't start the investigation", {
-        description: errorText(error),
-      });
-    }
+    onSubmit(form);
   };
 
   const knownDatasource =
     !form.datasourceId ||
-    (datasources.data ?? []).some((d) => d.id === form.datasourceId);
+    datasourceList.some((d) => d.id === form.datasourceId);
 
   return (
     <form onSubmit={submit} aria-label="Investigation brief">
@@ -324,7 +342,7 @@ function BriefFormView({
               aria-label={`Lead ${i + 1}`}
               value={lead}
               maxLength={300}
-              autoFocus={i === form.leads.length - 1 && !lead && !!parentRunId}
+              autoFocus={i === form.leads.length - 1 && !lead && focusNewLead}
               placeholder="A suspected cause, or what to look at next"
               onChange={(e) =>
                 set({
@@ -416,12 +434,30 @@ function BriefFormView({
           <FieldLabel htmlFor="brief-datasource">Datasource</FieldLabel>
           <select
             id="brief-datasource"
-            className={selectClass}
+            ref={datasourceRef}
+            className={cn(
+              selectClass,
+              datasourcePrompt && "border-destructive ring-1 ring-destructive",
+            )}
             value={form.datasourceId}
+            aria-invalid={!!datasourcePrompt || undefined}
+            aria-describedby={
+              datasourcePrompt ? "brief-datasource-prompt" : undefined
+            }
             onChange={(e) => set({ datasourceId: e.target.value })}
           >
-            <option value="">The issue's datasource</option>
-            {(datasources.data ?? []).map((d) => (
+            {isNew ? (
+              !onlyDatasource && (
+                <option value="" disabled>
+                  {datasources.isLoading
+                    ? "Loading datasources…"
+                    : "Choose a datasource"}
+                </option>
+              )
+            ) : (
+              <option value="">The issue's datasource</option>
+            )}
+            {datasourceList.map((d) => (
               <option key={d.id} value={d.id}>
                 {d.name} ({d.type}){d.is_default ? " · default" : ""}
               </option>
@@ -432,6 +468,24 @@ function BriefFormView({
               </option>
             )}
           </select>
+          {datasourcePrompt && (
+            <p
+              id="brief-datasource-prompt"
+              role="alert"
+              className="mt-1 text-xs text-destructive"
+            >
+              {datasourcePrompt}
+            </p>
+          )}
+          {isNew && datasources.isSuccess && datasourceList.length === 0 && (
+            <p className="mt-1 text-xs text-muted-foreground">
+              No datasources yet.{" "}
+              <Link to="/datasources" className="text-primary underline">
+                Connect one
+              </Link>{" "}
+              to investigate its tables.
+            </p>
+          )}
         </div>
       </div>
 
@@ -442,11 +496,11 @@ function BriefFormView({
       )}
 
       <DialogFooter className="mt-4 gap-2">
-        <Button type="button" variant="outline" onClick={onDone}>
+        <Button type="button" variant="outline" onClick={onCancel}>
           Cancel
         </Button>
-        <Button type="submit" disabled={start.isPending} className="gap-1.5">
-          {start.isPending ? (
+        <Button type="submit" disabled={pending} className="gap-1.5">
+          {pending ? (
             <Loader2 className="h-4 w-4 animate-spin" />
           ) : (
             <Play className="h-4 w-4" />
@@ -455,6 +509,69 @@ function BriefFormView({
         </Button>
       </DialogFooter>
     </form>
+  );
+}
+
+// ----------------------------------------------------------------------------
+// Hand-off: start a run on the issue from its thread's brief
+// ----------------------------------------------------------------------------
+
+interface HandoffFormProps {
+  issueId: string;
+  datasetId: string | null;
+  initial: BriefForm;
+  sourceThreadId: string | null;
+  sharedThreadId: string | null;
+  parentRunId: string | null;
+  onDone: () => void;
+}
+
+function HandoffForm({
+  issueId,
+  datasetId,
+  initial,
+  sourceThreadId,
+  sharedThreadId,
+  parentRunId,
+  onDone,
+}: HandoffFormProps) {
+  const start = useStartRun(issueId);
+  const scratchThreadId =
+    sourceThreadId && sourceThreadId !== sharedThreadId ? sourceThreadId : null;
+  const lookup = useSourceLookup(issueId, [sharedThreadId, scratchThreadId]);
+
+  const submit = async (form: BriefForm) => {
+    try {
+      await start.mutateAsync({
+        brief: briefFromForm(form),
+        execution_profile: form.profile,
+        dataset_id: datasetId ?? undefined,
+        datasource_id: form.datasourceId || undefined,
+        source_thread_id: sourceThreadId ?? undefined,
+        parent_run_id: parentRunId ?? undefined,
+      });
+      toast.success("Investigation started", {
+        description: "Its card in the thread shows progress and steering.",
+      });
+      onDone();
+    } catch (error) {
+      toast.error("Couldn't start the investigation", {
+        description: errorText(error),
+      });
+    }
+  };
+
+  return (
+    <BriefFormView
+      mode="handoff"
+      initial={initial}
+      lookup={lookup}
+      scratchThreadId={scratchThreadId}
+      focusNewLead={!!parentRunId}
+      pending={start.isPending}
+      onSubmit={(form) => void submit(form)}
+      onCancel={onDone}
+    />
   );
 }
 
@@ -573,7 +690,7 @@ export function BriefEditorDialog({
               </p>
             )}
             {initialBrief && (
-              <BriefFormView
+              <HandoffForm
                 key={formKey}
                 issueId={issueId}
                 datasetId={datasetId}

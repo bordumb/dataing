@@ -16,6 +16,26 @@ export interface RequestConfig {
   signal?: AbortSignal;
 }
 
+/**
+ * A failed API response. The message is readable (apiErrorMessage); `code` is
+ * the machine-readable `detail.error` when the server sends one, such as
+ * "ambiguous_datasource".
+ */
+export class ApiError extends Error {
+  readonly status: number;
+  readonly detail: unknown;
+  readonly code: string | null;
+
+  constructor(message: string, status: number, detail: unknown) {
+    super(message);
+    this.name = "ApiError";
+    this.status = status;
+    this.detail = detail;
+    const code = (detail as { error?: unknown } | null | undefined)?.error;
+    this.code = typeof code === "string" ? code : null;
+  }
+}
+
 export const customInstance = async <T>(config: RequestConfig): Promise<T> => {
   const { url, method, params, data, headers, signal } = config;
 
@@ -69,7 +89,11 @@ export const customInstance = async <T>(config: RequestConfig): Promise<T> => {
       }
     }
 
-    throw new Error(apiErrorMessage(errorData, response.status));
+    throw new ApiError(
+      apiErrorMessage(errorData, response.status),
+      response.status,
+      errorData?.detail,
+    );
   }
 
   // No Content (e.g. DELETE): there is no body to parse.

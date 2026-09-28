@@ -26,7 +26,6 @@ import {
 import { DashboardPage } from "@/features/dashboard/dashboard-page";
 import { InvestigationList } from "@/features/investigation/InvestigationList";
 import { InvestigationDetail } from "@/features/investigation/InvestigationDetail";
-import { NewInvestigation } from "@/features/investigation/NewInvestigation";
 import { DataSourcePage } from "@/features/datasources/datasource-page";
 import { DatasetListPage, DatasetDetailPage } from "@/features/datasets";
 import { SettingsPage } from "@/features/settings/settings-page";
@@ -142,19 +141,6 @@ function AppWithEntitlements() {
                     element={
                       <FeatureErrorBoundary feature="investigations">
                         <InvestigationList />
-                      </FeatureErrorBoundary>
-                    }
-                  />
-                  <Route
-                    path="investigations/new"
-                    element={
-                      <FeatureErrorBoundary feature="new investigation">
-                        <RoleGuard
-                          minRole="member"
-                          redirectTo="/investigations"
-                        >
-                          <NewInvestigation />
-                        </RoleGuard>
                       </FeatureErrorBoundary>
                     }
                   />

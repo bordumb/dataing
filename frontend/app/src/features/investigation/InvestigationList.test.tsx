@@ -1,6 +1,8 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 
+import { stubApi, stubRadixDom } from "@/test/api";
 import { renderAsRole } from "@/test/auth";
 import { InvestigationList } from "./InvestigationList";
 
@@ -14,7 +16,12 @@ vi.mock("@/lib/api/investigations", async (importOriginal) => ({
   }),
 }));
 
-afterEach(() => localStorage.clear());
+beforeAll(() => stubRadixDom());
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+  localStorage.clear();
+});
 
 describe("InvestigationList", () => {
   it("does not offer viewers a way to start an investigation", async () => {
@@ -23,18 +30,24 @@ describe("InvestigationList", () => {
     expect(
       await screen.findByText("No investigations yet."),
     ).toBeInTheDocument();
-    expect(screen.queryByText("New Investigation")).not.toBeInTheDocument();
-    expect(
-      screen.queryByText("Create your first investigation"),
-    ).not.toBeInTheDocument();
+    expect(screen.queryByText("Investigate…")).not.toBeInTheDocument();
   });
 
-  it("offers members a way to start an investigation", async () => {
+  it.each([
+    ["the header", 0],
+    ["the empty state", 1],
+  ])("opens the brief editor from %s", async (_where, index) => {
+    stubApi({ "GET /api/v1/datasources": { body: { items: [], total: 0 } } });
     renderAsRole(<InvestigationList />, "member");
 
-    expect(await screen.findByText("New Investigation")).toBeInTheDocument();
+    const buttons = await screen.findAllByRole("button", {
+      name: "Investigate…",
+    });
+    expect(buttons).toHaveLength(2);
+    await userEvent.click(buttons[index]);
+
     expect(
-      screen.getByText("Create your first investigation"),
+      await screen.findByRole("dialog", { name: "Start an investigation" }),
     ).toBeInTheDocument();
   });
 });

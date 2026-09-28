@@ -1,9 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
-import { Link } from "react-router-dom";
-import { Plus } from "lucide-react";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
-import { Button } from "@/components/ui/Button";
+import { InvestigateButton } from "@/features/issues/brief/StartInvestigation";
 import { fetchDashboardStats } from "@/lib/api/dashboard";
 import { DashboardStatsCards } from "./dashboard-stats";
 import { RecentInvestigations } from "./recent-investigations";
@@ -25,16 +23,7 @@ export function DashboardPage() {
     <div className="space-y-6">
       <PageHeader
         title="Dashboard"
-        action={
-          isMember ? (
-            <Button asChild>
-              <Link to="/investigations/new">
-                <Plus className="mr-2 h-4 w-4" />
-                New Investigation
-              </Link>
-            </Button>
-          ) : undefined
-        }
+        action={isMember ? <InvestigateButton /> : undefined}
       />
 
       <DashboardStatsCards

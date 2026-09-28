@@ -4,6 +4,10 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { customInstance } from "./client";
+import type {
+  ExecutionProfile,
+  InvestigationBrief,
+} from "./investigation-runs";
 import { queryKeys } from "./query-keys";
 
 // Types
@@ -47,29 +51,23 @@ export interface InvestigationListItem {
   dataset_id: string;
 }
 
-export interface AlertData {
-  dataset_ids: string[];
-  metric_spec: {
-    metric_type: string;
-    expression: string;
-    display_name: string;
-    columns_referenced: string[];
-    source_url?: string;
-  };
-  anomaly_type: string;
-  expected_value: number;
-  actual_value: number;
-  deviation_pct: number;
-  anomaly_date: string;
-  severity?: string;
-  source_system?: string;
-  source_alert_id?: string;
-  source_url?: string;
-  metadata?: Record<string, unknown>;
+/**
+ * Start a run from a brief (spec 0001 §7.11). Without `issue_id` the server
+ * opens an issue for it, titled with the symptom.
+ */
+export interface StartInvestigationBody {
+  brief: InvestigationBrief;
+  execution_profile: ExecutionProfile;
+  datasource_id?: string | null;
+  issue_id?: string | null;
 }
 
 export interface StartInvestigationResponse {
   investigation_id: string;
+  run_id: string;
+  issue_id: string;
+  issue_number: number;
+  status: string;
   main_branch_id: string;
 }
 
@@ -108,13 +106,13 @@ async function getInvestigation(
   });
 }
 
-async function startInvestigation(
-  alert: AlertData,
+export async function startInvestigation(
+  body: StartInvestigationBody,
 ): Promise<StartInvestigationResponse> {
   return customInstance<StartInvestigationResponse>({
     url: API_BASE,
     method: "POST",
-    data: { alert },
+    data: body,
   });
 }
 
@@ -163,7 +161,10 @@ export function useStartInvestigation() {
   return useMutation({
     mutationFn: startInvestigation,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.investigations.all });
+      void queryClient.invalidateQueries({
+        queryKey: queryKeys.investigations.all,
+      });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.issues.all });
     },
   });
 }

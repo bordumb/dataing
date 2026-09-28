@@ -28,8 +28,16 @@ export interface BriefForm {
   to: string;
   notes: string;
   profile: ExecutionProfile;
-  /** "" means the issue's datasource (the server resolves it). */
+  /** "" leaves the datasource to the server (hand-off mode only). */
   datasourceId: string;
+}
+
+/** What a brief needs beyond a symptom before it can start a run. */
+export interface BriefRules {
+  /** Name at least one table: a new run has no thread to draft scope from. */
+  requireTables?: boolean;
+  /** Pick a datasource: the tenant has more than one. */
+  requireDatasource?: boolean;
 }
 
 let claimCounter = 0;
@@ -84,8 +92,15 @@ export function parseTables(text: string): string[] {
 }
 
 /** Why the form can't be sent yet, or null when it can. */
-export function formProblem(form: BriefForm): string | null {
+export function formProblem(
+  form: BriefForm,
+  rules: BriefRules = {},
+): string | null {
   if (!form.symptom.trim()) return "Say what's wrong: the symptom is required.";
+  if (rules.requireTables && parseTables(form.tables).length === 0)
+    return "Name at least one table to investigate.";
+  if (rules.requireDatasource && !form.datasourceId)
+    return "Pick the datasource to investigate.";
   if (!!form.from !== !!form.to)
     return "Set both ends of the time window, or neither.";
   if (form.from && form.to && form.from >= form.to)

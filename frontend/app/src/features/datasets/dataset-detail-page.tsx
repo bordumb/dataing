@@ -29,9 +29,9 @@ import { LoadingSpinner } from "@/components/shared/loading-spinner";
 import { EmptyState } from "@/components/shared/empty-state";
 import { useDataset, useDatasetInvestigations } from "@/lib/api/datasets";
 import { useSchemaComments } from "@/lib/api/schema-comments";
-import { useRole } from "@/lib/auth";
 import { formatNumber, formatRelativeTime } from "@/lib/utils";
 import { LineagePanel } from "@/features/investigation/components/lineage-panel";
+import { InvestigateButton } from "@/features/issues/brief/StartInvestigation";
 import { SchemaCommentIndicator } from "./components/schema-comment-indicator";
 import { CommentSlidePanel } from "./components/comment-slide-panel";
 import { KnowledgeTab } from "./components/knowledge-tab";
@@ -76,7 +76,6 @@ export function DatasetDetailPage() {
   } = useDataset(datasetId ?? null);
   const { data: investigationsResponse, isLoading: investigationsLoading } =
     useDatasetInvestigations(datasetId ?? null);
-  const { isMember } = useRole();
   const [selectedField, setSelectedField] = useState<string | null>(null);
 
   // Fetch all comments for the dataset once (no fieldName filter) to avoid N+1 queries
@@ -170,6 +169,14 @@ export function DatasetDetailPage() {
             {dataset.datasource_type && (
               <Badge variant="secondary">{dataset.datasource_type}</Badge>
             )}
+            <InvestigateButton
+              label="Investigate this dataset"
+              className="ml-2"
+              prefill={{
+                tables: [dataset.native_path],
+                datasourceId: dataset.datasource_id,
+              }}
+            />
           </div>
         </div>
 
@@ -332,16 +339,6 @@ export function DatasetDetailPage() {
               icon={Search}
               title="No investigations"
               description="No investigations have been run on this dataset yet."
-              action={
-                isMember ? (
-                  <Link to="/investigations/new">
-                    <Button>
-                      <Search className="mr-2 h-4 w-4" />
-                      Start Investigation
-                    </Button>
-                  </Link>
-                ) : undefined
-              }
             />
           ) : (
             <div className="rounded-md border">

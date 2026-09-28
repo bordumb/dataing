@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import {
   Search,
@@ -35,6 +36,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/Badge";
+import { StartInvestigationDialog } from "@/features/issues/brief/StartInvestigation";
 import { useJwtAuth } from "@/lib/auth/jwt-context";
 import { useRole } from "@/lib/auth";
 import { useNotifications } from "@/lib/notifications";
@@ -80,6 +82,7 @@ export function AppSidebar() {
   const { logout, org } = useJwtAuth();
   const { isAdmin, isMember } = useRole();
   const { unreadCount } = useNotifications();
+  const [startOpen, setStartOpen] = useState(false);
 
   // Build settings nav items based on role
   // Admin link only visible to admin/owner roles
@@ -133,19 +136,24 @@ export function AppSidebar() {
       </SidebarHeader>
 
       <SidebarContent>
-        {/* Quick Action */}
+        {/* Quick action: the brief editor in new mode, over this page */}
         {isMember && (
           <SidebarGroup>
             <SidebarMenu>
               <SidebarMenuItem>
-                <SidebarMenuButton asChild tooltip="New Investigation">
-                  <Link to="/investigations/new">
-                    <Plus className="size-4" />
-                    <span>New Investigation</span>
-                  </Link>
+                <SidebarMenuButton
+                  tooltip="Investigate…"
+                  onClick={() => setStartOpen(true)}
+                >
+                  <Plus className="size-4" />
+                  <span>Investigate…</span>
                 </SidebarMenuButton>
               </SidebarMenuItem>
             </SidebarMenu>
+            <StartInvestigationDialog
+              open={startOpen}
+              onOpenChange={setStartOpen}
+            />
           </SidebarGroup>
         )}
 

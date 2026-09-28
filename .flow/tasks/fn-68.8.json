@@ -1,0 +1,26 @@
+{
+  "assignee": "bordumbb@gmail.com",
+  "claim_note": "",
+  "claimed_at": "2026-09-28T20:31:06.555957Z",
+  "created_at": "2026-09-28T20:31:06.221291Z",
+  "depends_on": [],
+  "epic": "fn-68",
+  "evidence": {
+    "commits": [
+      "920dc739"
+    ],
+    "prs": [],
+    "tests": [
+      "just worktrees --branches (output identical to the scratch version; worktree index mtimes unchanged)",
+      ".venv/bin/ruff check scripts/worktree_status.py",
+      ".venv/bin/ruff format --check scripts/worktree_status.py",
+      ".venv/bin/mypy scripts/worktree_status.py"
+    ]
+  },
+  "id": "fn-68.8",
+  "priority": null,
+  "spec_path": ".flow/tasks/fn-68.8.md",
+  "status": "done",
+  "title": "Add just worktrees to list work not yet on main",
+  "updated_at": "2026-09-28T20:38:06.239060Z"
+}

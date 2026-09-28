@@ -53,6 +53,16 @@ async def until(condition: Callable[[], bool]) -> None:
     raise AssertionError("condition never held")
 
 
+async def until_statuses(handle: WorkflowHandle[Any, Any], expected: dict[str, str]) -> None:
+    """Wait until the run reports exactly these hypothesis statuses."""
+    for _ in range(500):
+        status = await handle.query(InvestigationWorkflow.get_status)
+        if {h["id"]: h["status"] for h in status.hypotheses} == expected:
+            return
+        await asyncio.sleep(0.02)
+    raise AssertionError(f"status never showed {expected}")
+
+
 def outcomes(fake: FakeInvestigation) -> dict[str, dict[str, Any]]:
     """Return the recorded outcome of each steer, by steer id."""
     return {o["steer_id"]: o for o in fake.inputs("record_steer_outcome")}
@@ -96,14 +106,7 @@ async def test_rule_out_cancels_that_subagent_only(env: WorkflowEnvironment) -> 
     fake = FakeInvestigation(hold={"h3"})
 
     async def steer_run(handle: WorkflowHandle[Any, Any]) -> None:
-        expected = {"h1": "supported", "h2": "refuted", "h3": "running"}
-        for _ in range(500):
-            status = await handle.query(InvestigationWorkflow.get_status)
-            if {h["id"]: h["status"] for h in status.hypotheses} == expected:
-                break
-            await asyncio.sleep(0.02)
-        else:
-            raise AssertionError(f"status never showed {expected}")
+        await until_statuses(handle, {"h1": "supported", "h2": "refuted", "h3": "running"})
         await handle.signal(
             InvestigationWorkflow.steer,
             steer("s1", "rule_out", "Events land within minutes", "h3"),
@@ -162,7 +165,8 @@ async def test_stop_and_synthesize_concludes_with_the_rest_untested(
     fake = FakeInvestigation(hold={"h2", "h3"})
 
     async def steer_run(handle: WorkflowHandle[Any, Any]) -> None:
-        await until(lambda: {"h2", "h3"} <= set(queried_ids(fake)))
+        # h1 must have finished, or stopping cancels it too and it also goes untested
+        await until_statuses(handle, {"h1": "supported", "h2": "running", "h3": "running"})
         await handle.signal(InvestigationWorkflow.steer, steer("s1", "stop_and_synthesize"))
 
     result = await run_steered(env, fake, steer_run)

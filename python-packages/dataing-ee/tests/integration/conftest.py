@@ -14,5 +14,6 @@ assert _spec is not None and _spec.loader is not None
 _ce_conftest = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(_ce_conftest)
 
+psql = _ce_conftest.psql
 migrated_dsn = _ce_conftest.migrated_dsn
 migrated_db = _ce_conftest.migrated_db

@@ -744,3 +744,35 @@ class TestQueryResults:
         )
 
         assert response.status_code == 404
+
+
+class TestBriefDrafts:
+    """Asking for a brief creates a brief message and queues a draft_brief request."""
+
+    def test_member_requests_a_draft(self, threads: FakeThreads) -> None:
+        """The brief message starts queued and the workflow gets a draft_brief request."""
+        agent = FakeAgent()
+        client = _client_with_agent(threads, agent)
+
+        response = client.post(
+            f"/issues/{ISSUE_ID}/threads/{threads.shared['id']}/brief-drafts",
+            **_auth(OrgRole.MEMBER, MAYA),
+        )
+
+        assert response.status_code == 201
+        body = response.json()
+        assert (body["kind"], body["status"], body["author_kind"]) == ("brief", "queued", "agent")
+        (request,) = agent.requests
+        assert request["kind"] == "draft_brief"
+        assert request["message_id"] == body["id"]
+
+    def test_viewer_cannot_request_a_draft(self, threads: FakeThreads) -> None:
+        """Drafting leads to starting an investigation, which needs write."""
+        client = _client_with_agent(threads, FakeAgent())
+
+        response = client.post(
+            f"/issues/{ISSUE_ID}/threads/{threads.shared['id']}/brief-drafts",
+            **_auth(OrgRole.VIEWER, RAJ),
+        )
+
+        assert response.status_code == 403

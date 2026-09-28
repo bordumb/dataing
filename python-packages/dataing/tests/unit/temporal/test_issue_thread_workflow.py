@@ -52,11 +52,16 @@ class Turns:
             self.ran.append(message_id)
             return {"status": "complete"}
 
+        @activity.defn(name="run_brief_draft")
+        async def run_brief_draft(request: dict[str, Any]) -> dict[str, Any]:
+            self.ran.append(f"brief:{request['message_id']}")
+            return {"status": "complete"}
+
         @activity.defn(name="mark_turn_failed")
         async def mark_turn_failed(request: dict[str, Any]) -> None:
             self.failed.append(request["message_id"])
 
-        return [run_agent_turn, mark_turn_failed]
+        return [run_agent_turn, run_brief_draft, mark_turn_failed]
 
 
 @pytest.fixture
@@ -66,10 +71,10 @@ async def env() -> AsyncIterator[WorkflowEnvironment]:
         yield environment
 
 
-def _request(message_id: str, thread_id: str) -> dict[str, Any]:
+def _request(message_id: str, thread_id: str, kind: str = "answer") -> dict[str, Any]:
     return {
         "message_id": message_id,
-        "kind": "answer",
+        "kind": kind,
         "thread_id": thread_id,
         "tenant_id": str(uuid.uuid4()),
         "issue_id": str(uuid.uuid4()),
@@ -205,6 +210,31 @@ async def test_failed_turn_is_marked_and_the_queue_moves_on(env: WorkflowEnviron
             await _wait_for(lambda: turns.ran == ["b"], timeout=30)
 
     assert turns.failed == ["a"]
+
+
+async def test_brief_requests_run_the_draft_activity(env: WorkflowEnvironment) -> None:
+    """draft_brief requests go to run_brief_draft, in queue order with answers."""
+    turns = Turns()
+    thread_id = str(uuid.uuid4())
+    async with Worker(
+        env.client,
+        task_queue=TASK_QUEUE,
+        workflows=[IssueThreadWorkflow],
+        activities=turns.activities(),
+    ):
+        with env.auto_time_skipping_disabled():
+            await _enqueue(env.client, thread_id, "a")
+            await env.client.start_workflow(
+                IssueThreadWorkflow.run,
+                IssueThreadInput(thread_id=thread_id),
+                id=thread_workflow_id(thread_id),
+                task_queue=TASK_QUEUE,
+                start_signal="enqueue",
+                start_signal_args=[_request("b", thread_id, kind="draft_brief")],
+            )
+            await _wait_for(lambda: len(turns.ran) == 2)
+
+    assert turns.ran == ["a", "brief:b"]
 
 
 async def test_workflow_id_is_per_thread() -> None:

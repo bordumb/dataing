@@ -292,3 +292,47 @@ class TestPrompt:
 @pytest.fixture(autouse=True)
 def _no_model_requests(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(models, "ALLOW_MODEL_REQUESTS", False)
+
+
+class TestBriefDrafting:
+    """The drafting agent returns a structured BriefDraft from the thread."""
+
+    async def test_draft_is_structured_output(self) -> None:
+        """The model's final_result call becomes a BriefDraft."""
+        from pydantic_ai.messages import ModelResponse, ToolCallPart
+
+        from dataing.agents.chat import build_brief_agent, draft_brief
+
+        def respond(messages: list[ModelMessage], info: AgentInfo) -> ModelResponse:
+            (output_tool,) = info.output_tools
+            return ModelResponse(
+                parts=[
+                    ToolCallPart(
+                        output_tool.name,
+                        {
+                            "symptom": "Orders dropped",
+                            "findings": [{"statement": "Only app_v2", "source_seq": 4}],
+                            "leads": ["app_v2 deploy"],
+                        },
+                    )
+                ]
+            )
+
+        agent = build_brief_agent(FunctionModel(respond))
+        history = build_history(
+            [{"author_kind": "user", "author_name": "Maya", "body_md": "only app_v2?", "seq": 4}]
+        )
+
+        draft, usage = await draft_brief(agent, history, instructions="issue block")
+
+        assert draft.symptom == "Orders dropped"
+        assert draft.findings[0].source_seq == 4
+        assert usage.requests == 1
+
+    def test_history_numbers_messages_for_citation(self) -> None:
+        """Messages with a seq are labelled #seq so the draft can cite them."""
+        history = build_history(
+            [{"author_kind": "user", "author_name": "Maya", "body_md": "hi", "seq": 7}]
+        )
+
+        assert "#7 Maya: hi" in str(history)

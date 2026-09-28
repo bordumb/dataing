@@ -31,6 +31,10 @@ TURN_RETRY = RetryPolicy(
 )
 
 
+# Which activity serves each request kind
+ACTIVITY_FOR_KIND = {"answer": "run_agent_turn", "draft_brief": "run_brief_draft"}
+
+
 def thread_workflow_id(thread_id: str) -> str:
     """Return the workflow id for a thread."""
     return f"issue-thread-{thread_id}"
@@ -117,8 +121,9 @@ class IssueThreadWorkflow:
     async def _run_turn(self, request: dict[str, Any]) -> None:
         """Run one turn; mark its reply failed if every attempt fails."""
         self._current = str(request["message_id"])
+        activity_name = ACTIVITY_FOR_KIND.get(str(request.get("kind")), "run_agent_turn")
         self._current_turn = workflow.start_activity(
-            "run_agent_turn",
+            activity_name,
             request,
             start_to_close_timeout=TURN_TIMEOUT,
             heartbeat_timeout=TURN_HEARTBEAT_TIMEOUT,

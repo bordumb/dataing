@@ -20,6 +20,20 @@ from pydantic_ai.messages import (
 
 DEFAULT_MAX_MESSAGES = 40
 
+BRIEF_PROMPT = """\
+Draft an investigation brief from this thread for the investigation manager.
+
+- symptom: what is wrong, in one or two sentences.
+- findings: what the thread established. Cite the #number of the message it came
+  from as source_seq, and the query's result id if a query shows it.
+- ruled_out: causes the thread already excluded, cited the same way.
+- leads: suspected causes to test first.
+- tables: tables the investigation should look at.
+- notes: anything else the team said that matters (definitions, deploy times).
+
+Only include what the thread supports. Leave a list empty rather than guess.
+"""
+
 SYSTEM_PROMPT = """\
 You are the dataing agent, working inside one data-quality issue with a team.
 
@@ -61,7 +75,8 @@ def _is_deleted(message: dict[str, Any]) -> bool:
 
 def _agent_text(message: dict[str, Any]) -> str:
     """Return an agent reply as text, with its tool calls summarized after it."""
-    lines = [message.get("body_md") or ""]
+    body = message.get("body_md") or ""
+    lines = [f"{_label(message)}{body}" if body else ""]
     payload = message.get("payload") or {}
     for call in payload.get("tool_calls") or []:
         ref = f" (result {call['query_result_id']})" if call.get("query_result_id") else ""
@@ -69,11 +84,17 @@ def _agent_text(message: dict[str, Any]) -> str:
     return "\n".join(line for line in lines if line)
 
 
+def _label(message: dict[str, Any]) -> str:
+    """Return the #seq prefix that lets a brief draft cite this message."""
+    seq = message.get("seq")
+    return f"#{seq} " if seq is not None else ""
+
+
 def _human_text(message: dict[str, Any]) -> str:
     if message.get("author_kind") == "system":
-        return f"[event] {message.get('body_md', '')}"
+        return f"{_label(message)}[event] {message.get('body_md', '')}"
     name = message.get("author_name") or "Someone"
-    return f"{name}: {message.get('body_md', '')}"
+    return f"{_label(message)}{name}: {message.get('body_md', '')}"
 
 
 def build_history(

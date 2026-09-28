@@ -444,6 +444,61 @@ async def cancel_answer(
     return message_response(reply)
 
 
+@router.post(
+    "/{issue_id}/threads/{thread_id}/brief-drafts",
+    response_model=MessageResponse,
+    status_code=201,
+)
+async def request_brief_draft(
+    issue_id: UUID,
+    thread_id: UUID,
+    auth: WriteScopeDep,
+    threads: ThreadsDep,
+    agent: ThreadAgentDep,
+) -> MessageResponse:
+    """Ask the agent to draft an investigation brief from this thread.
+
+    The draft streams into a new ``brief`` message; people edit it before it
+    starts an investigation.
+    """
+    thread = await _thread_for_caller(threads, issue_id, thread_id, auth)
+    user_id = _require_user(auth)
+    if await threads.count_running_turns(user_id) >= MAX_RUNNING_TURNS_PER_PERSON:
+        raise HTTPException(
+            status_code=429, detail="You already have three agent answers in progress"
+        )
+    brief = await threads.append_message(
+        thread_id,
+        author_kind="agent",
+        kind="brief",
+        requested_by_user_id=user_id,
+        status="queued",
+    )
+    request = {
+        "message_id": str(brief["id"]),
+        "kind": "draft_brief",
+        "thread_id": str(thread_id),
+        "tenant_id": str(thread["tenant_id"]),
+        "issue_id": str(issue_id),
+        "requested_by": str(user_id),
+    }
+    try:
+        if agent is None:
+            raise RuntimeError("no workflow client connected")
+        await agent.enqueue_thread_request(request)
+    except Exception as e:
+        logger.error(f"Could not queue brief draft {brief['id']}: {e}")
+        brief = (
+            await threads.update_message(
+                brief["id"],
+                status="error",
+                payload={"error": "The agent is unavailable right now. Try again shortly."},
+            )
+            or brief
+        )
+    return message_response(brief)
+
+
 @router.get(
     "/{issue_id}/threads/{thread_id}/query-results/{result_id}",
     response_model=QueryResultResponse,

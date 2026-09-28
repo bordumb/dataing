@@ -216,3 +216,57 @@ async def test_failed_turn_is_marked_error(migrated_db: AppDatabase) -> None:
     assert reply is not None
     assert reply["status"] == "error"
     assert reply["payload"]["error"] == "model unavailable"
+
+
+async def test_brief_draft_fills_the_brief_message(migrated_db: AppDatabase) -> None:
+    """The draft lands in the brief message with citations resolved to messages."""
+    from pydantic_ai.messages import ModelResponse, ToolCallPart
+
+    from dataing.agents.chat import build_brief_agent
+    from dataing.temporal.activities.agent_turn import make_run_brief_draft_activity
+
+    request = await _thread_with_question(migrated_db)
+    threads = IssueThreadRepository(migrated_db)
+    thread_id = uuid.UUID(request["thread_id"])
+    question = await threads.get_message(uuid.UUID(request["message_id"]))
+    assert question is not None
+    brief_msg = await threads.append_message(
+        thread_id,
+        author_kind="agent",
+        kind="brief",
+        requested_by_user_id=uuid.UUID(request["requested_by"]),
+        status="queued",
+    )
+
+    def respond(messages: list[ModelMessage], info: AgentInfo) -> ModelResponse:
+        (output_tool,) = info.output_tools
+        return ModelResponse(
+            parts=[
+                ToolCallPart(
+                    output_tool.name,
+                    {
+                        "symptom": "Orders dropped",
+                        "findings": [
+                            {"statement": "Asked about regions", "source_seq": question["seq"]}
+                        ],
+                    },
+                )
+            ]
+        )
+
+    activity_fn = make_run_brief_draft_activity(
+        migrated_db, lambda: build_brief_agent(FunctionModel(respond)), FakeQueries()
+    )
+    result = await ActivityEnvironment().run(
+        activity_fn, {**request, "message_id": str(brief_msg["id"]), "kind": "draft_brief"}
+    )
+
+    assert result["status"] == "complete"
+    stored = await threads.get_message(brief_msg["id"])
+    assert stored is not None
+    assert stored["status"] == "complete"
+    brief = stored["payload"]["brief"]
+    assert brief["symptom"] == "Orders dropped"
+    assert brief["findings"][0]["message_id"] == str(question["id"])
+    assert brief["scope"]["datasource_id"] == str(request["datasource_id"])
+    assert stored["body_md"].startswith("**Investigation brief**")

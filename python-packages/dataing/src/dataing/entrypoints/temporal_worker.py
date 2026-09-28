@@ -34,7 +34,7 @@ from dataing.adapters.datasource.base import BaseAdapter
 from dataing.adapters.db.app_db import AppDatabase
 from dataing.adapters.investigation.pattern_adapter import InMemoryPatternRepository
 from dataing.agents import AgentClient
-from dataing.agents.chat import build_chat_agent, build_chat_model
+from dataing.agents.chat import build_brief_agent, build_chat_agent, build_chat_model
 from dataing.config import settings
 from dataing.core.snapshot_store import LocalSnapshotStore
 from dataing.telemetry import configure_logging
@@ -53,6 +53,7 @@ from dataing.temporal.activities import (
 from dataing.temporal.activities.agent_turn import (
     make_mark_turn_failed_activity,
     make_run_agent_turn_activity,
+    make_run_brief_draft_activity,
 )
 from dataing.temporal.adapters import TemporalAgentAdapter
 from dataing.temporal.workflows import (
@@ -203,6 +204,14 @@ def _chat_agent_factory() -> Any:
     return lambda: build_chat_agent(model)
 
 
+def _brief_agent_factory() -> Any:
+    """Return a factory for the brief-drafting agent (medium effort by default)."""
+    model = build_chat_model(
+        settings.chat_agent_model, settings.anthropic_api_key, settings.chat_brief_effort
+    )
+    return lambda: build_brief_agent(model)
+
+
 def create_activities(deps: dict[str, Any]) -> list[Any]:
     """Create all activity functions with injected dependencies.
 
@@ -245,6 +254,7 @@ def create_activities(deps: dict[str, Any]) -> list[Any]:
         make_finalize_evidence_chain_activity(app_db=app_db),
         # Issue chat agent turns
         make_run_agent_turn_activity(app_db=app_db, agent_factory=_chat_agent_factory()),
+        make_run_brief_draft_activity(app_db=app_db, agent_factory=_brief_agent_factory()),
         make_mark_turn_failed_activity(app_db=app_db),
     ]
 

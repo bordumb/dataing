@@ -10,7 +10,11 @@ run_agent_turn answers one request message:
 3. It ends the reply as ``complete`` with the tool calls, steer proposals and
    token usage in its payload, or ``cancelled`` (partial text kept).
 
-mark_turn_failed marks the reply ``error`` once every attempt has failed.
+run_brief_draft fills a ``brief`` message (created by the API when someone asked
+for a draft) with an InvestigationBrief drafted from the thread.
+
+mark_turn_failed marks the reply (or the brief) ``error`` once every attempt has
+failed.
 """
 
 from __future__ import annotations
@@ -19,8 +23,8 @@ import asyncio
 import contextlib
 import json
 import logging
-from collections.abc import Callable
-from typing import Any
+from collections.abc import Awaitable, Callable
+from typing import Any, TypeVar
 from uuid import UUID
 
 from pydantic_ai import Agent
@@ -29,16 +33,27 @@ from temporalio import activity
 from dataing.adapters.datasource.gateway import UserPrincipal
 from dataing.adapters.db.app_db import AppDatabase
 from dataing.adapters.db.issue_threads import IssueThreadRepository
-from dataing.agents.chat import ChatDeps, build_history, build_instructions, run_turn
+from dataing.agents.chat import (
+    ChatDeps,
+    build_history,
+    build_instructions,
+    draft_brief,
+    run_turn,
+)
 from dataing.core.agent_query import AgentQueryService
+from dataing.core.investigation.brief import BriefDraft, brief_from_draft, brief_to_markdown
 from dataing.core.issue_chat import ThreadChatServices, resolve_chat_datasource
 
 logger = logging.getLogger(__name__)
 
+T = TypeVar("T")
+
 FLUSH_SECONDS = 0.25
+HEARTBEAT_SECONDS = 5.0
 HISTORY_LIMIT = 200
 
 ChatAgentFactory = Callable[[], Agent[ChatDeps, str]]
+BriefAgentFactory = Callable[[], Agent[None, BriefDraft]]
 
 
 async def _author_names(db: AppDatabase, user_ids: set[UUID]) -> dict[UUID, str]:
@@ -199,7 +214,11 @@ def make_mark_turn_failed_activity(app_db: AppDatabase) -> Any:
     async def mark_turn_failed(request: dict[str, Any]) -> None:
         """Mark the reply to a request as failed after its last attempt."""
         threads = IssueThreadRepository(app_db)
-        reply = await threads.get_reply_for_request(UUID(str(request["message_id"])))
+        message_id = UUID(str(request["message_id"]))
+        if request.get("kind") == "draft_brief":
+            reply = await threads.get_message(message_id)
+        else:
+            reply = await threads.get_reply_for_request(message_id)
         if reply is None or reply["status"] in ("complete", "cancelled"):
             return
         error = str(request.get("error") or "The agent could not answer")
@@ -210,3 +229,120 @@ def make_mark_turn_failed_activity(app_db: AppDatabase) -> Any:
         )
 
     return mark_turn_failed
+
+
+async def _with_heartbeats(work: Awaitable[T]) -> T:
+    """Await work while heartbeating, so long model calls don't time out."""
+    task = asyncio.ensure_future(work)
+    try:
+        while not task.done():
+            await asyncio.wait({task}, timeout=HEARTBEAT_SECONDS)
+            activity.heartbeat()
+    except asyncio.CancelledError:
+        task.cancel()
+        with contextlib.suppress(asyncio.CancelledError, Exception):
+            await task
+        raise
+    return task.result()
+
+
+async def _labelled_messages(
+    db: AppDatabase, threads: IssueThreadRepository, thread_id: UUID, before_seq: int
+) -> list[dict[str, Any]]:
+    """Return a thread's finished messages before a seq, with author names."""
+    messages = [
+        m
+        for m in await threads.list_messages(thread_id, after_seq=0, limit=10_000)
+        if m["seq"] < before_seq and m["status"] in ("complete", "cancelled")
+    ][-HISTORY_LIMIT:]
+    names = await _author_names(
+        db, {m["author_user_id"] for m in messages if m.get("author_user_id")}
+    )
+    for message in messages:
+        message["author_name"] = names.get(message.get("author_user_id") or UUID(int=0))
+    return messages
+
+
+async def _thread_query_results(db: AppDatabase, thread_id: UUID) -> set[UUID]:
+    rows = await db.fetch_all(
+        """
+        SELECT r.id FROM agent_query_results r
+        JOIN issue_thread_messages m ON m.id = r.message_id
+        WHERE m.thread_id = $1
+        """,
+        thread_id,
+    )
+    return {row["id"] for row in rows}
+
+
+def make_run_brief_draft_activity(
+    app_db: AppDatabase,
+    agent_factory: BriefAgentFactory,
+    query_service: AgentQueryService | None = None,
+) -> Any:
+    """Return the run_brief_draft activity with its dependencies bound.
+
+    Args:
+        app_db: Application database.
+        agent_factory: Builds the brief-drafting agent.
+        query_service: Only used to describe the issue; built from app_db if omitted.
+    """
+    queries = query_service or AgentQueryService(app_db)
+
+    @activity.defn(name="run_brief_draft")
+    async def run_brief_draft(request: dict[str, Any]) -> dict[str, Any]:
+        """Draft an investigation brief into the requested brief message."""
+        threads = IssueThreadRepository(app_db)
+        brief_id = UUID(str(request["message_id"]))
+        tenant_id = UUID(str(request["tenant_id"]))
+        issue_id = UUID(str(request["issue_id"]))
+        thread_id = UUID(str(request["thread_id"]))
+
+        message = await threads.get_message(brief_id)
+        if message is None or message["status"] == "cancelled":
+            return {"status": "cancelled"}
+        await threads.update_message(brief_id, status="streaming")
+        activity.heartbeat()
+
+        issue_row = await app_db.fetch_one(
+            "SELECT context FROM issues WHERE id = $1 AND tenant_id = $2", issue_id, tenant_id
+        )
+        context_raw = issue_row["context"] if issue_row else "{}"
+        issue_context = json.loads(context_raw) if isinstance(context_raw, str) else context_raw
+        datasource_id = await resolve_chat_datasource(app_db, tenant_id, issue_context or {})
+        services = ThreadChatServices(
+            app_db,
+            queries,
+            tenant_id=tenant_id,
+            issue_id=issue_id,
+            reply_message_id=brief_id,
+            principal=None,
+        )
+        overview = await services.issue_context()
+        messages = await _labelled_messages(app_db, threads, thread_id, message["seq"])
+
+        draft, usage = await _with_heartbeats(
+            draft_brief(
+                agent_factory(),
+                build_history(messages, max_messages=HISTORY_LIMIT),
+                instructions=build_instructions(overview),
+            )
+        )
+        brief = brief_from_draft(
+            draft,
+            seq_to_message={m["seq"]: m["id"] for m in messages},
+            known_query_results=await _thread_query_results(app_db, thread_id),
+            datasource_id=datasource_id,
+        )
+        await threads.update_message(
+            brief_id,
+            body_md=brief_to_markdown(brief),
+            payload={
+                "brief": brief.model_dump(mode="json", by_alias=True),
+                "usage": usage.to_payload(),
+            },
+            status="complete",
+        )
+        return {"status": "complete", "brief_id": str(brief_id)}
+
+    return run_brief_draft

@@ -24,8 +24,9 @@ from pydantic_ai.models.anthropic import AnthropicModel, AnthropicModelSettings
 from pydantic_ai.providers.anthropic import AnthropicProvider
 
 from dataing.agents.chat.deps import ChatDeps, TurnResult, TurnUsage
-from dataing.agents.chat.prompt import SYSTEM_PROMPT
+from dataing.agents.chat.prompt import BRIEF_PROMPT, SYSTEM_PROMPT
 from dataing.agents.chat.tools import CHAT_TOOLS
+from dataing.core.investigation.brief import BriefDraft
 
 TOOL_RETRIES = 2
 MAX_OUTPUT_TOKENS = 16_000
@@ -123,3 +124,31 @@ async def run_turn(
     return TurnResult(
         text=text, tool_calls=list(deps.tool_calls), proposals=list(deps.proposals), usage=usage
     )
+
+
+def build_brief_agent(model: Model | str) -> Agent[None, BriefDraft]:
+    """Return the agent that drafts an investigation brief from a thread."""
+    return Agent(model, output_type=BriefDraft, instructions=SYSTEM_PROMPT, retries=TOOL_RETRIES)
+
+
+async def draft_brief(
+    agent: Agent[None, BriefDraft],
+    history: Sequence[ModelMessage],
+    *,
+    instructions: str | None = None,
+) -> tuple[BriefDraft, TurnUsage]:
+    """Draft a brief from the thread history (no tools; structured output).
+
+    Returns:
+        The draft and the token usage of the call.
+    """
+    result = await agent.run(BRIEF_PROMPT, message_history=list(history), instructions=instructions)
+    run_usage = result.usage()
+    usage = TurnUsage(
+        requests=run_usage.requests,
+        input_tokens=run_usage.input_tokens,
+        output_tokens=run_usage.output_tokens,
+        cache_read_tokens=run_usage.cache_read_tokens,
+        cache_write_tokens=run_usage.cache_write_tokens,
+    )
+    return result.output, usage

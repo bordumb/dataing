@@ -471,7 +471,7 @@
           "investigations"
         ],
         "summary": "Start Investigation",
-        "description": "Start a new investigation for an alert.\n\nCreates a new investigation with Temporal workflow for durable execution.\n\nArgs:\n    http_request: The HTTP request for accessing app state.\n    request: The investigation request containing alert data.\n    auth: Authentication context from API key/JWT.\n    db: Application database.\n    temporal_client: Temporal client for durable execution.\n\nReturns:\n    StartInvestigationResponse with investigation and branch IDs.",
+        "description": "Start an investigation, in an issue.\n\nWithout issue_id this opens the issue: titled with the symptom, attributed to the\ncaller, or to dataing for an API key without a person. The run's card is in the\nissue's thread and its outcome is written back there.",
         "operationId": "start_investigation_api_v1_investigations_post",
         "requestBody": {
           "content": {
@@ -573,7 +573,7 @@
           "investigations"
         ],
         "summary": "Get Investigation",
-        "description": "Get investigation state from Temporal workflow.\n\nReturns the current state of the investigation including progress\nand any available results.\n\nArgs:\n    investigation_id: UUID of the investigation.\n    auth: Authentication context from API key/JWT.\n    temporal_client: Temporal client for durable execution.\n\nReturns:\n    InvestigationStateResponse with main branch state.\n\nRaises:\n    HTTPException: If investigation not found.",
+        "description": "Get investigation state from Temporal workflow.\n\nReturns the current state of the investigation including progress\nand any available results.\n\nArgs:\n    investigation_id: UUID of the investigation.\n    auth: Authentication context from API key/JWT.\n    db: Application database, for the run's issue, number, brief and outcome.\n    temporal_client: Temporal client for durable execution.\n\nReturns:\n    InvestigationStateResponse with main branch state.\n\nRaises:\n    HTTPException: If investigation not found.",
         "operationId": "get_investigation_api_v1_investigations__investigation_id__get",
         "security": [
           {
@@ -9241,6 +9241,36 @@
           }
         }
       }
+    },
+    "/api/v1/system/llm": {
+      "get": {
+        "tags": [
+          "system"
+        ],
+        "summary": "Get Llm Status",
+        "description": "Return the startup check of the Anthropic key and models.\n\nEvery page shows a banner while this reports a problem. A transient problem\n(Anthropic unreachable, overloaded) is checked again when it is over a minute old.",
+        "operationId": "get_llm_status_api_v1_system_llm_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LLMStatusResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "APIKeyHeader": []
+          },
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
     }
   },
   "components": {
@@ -11975,6 +12005,25 @@
               }
             ],
             "title": "Outcome Reviewed At"
+          },
+          "number": {
+            "type": "integer",
+            "title": "Number"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
           }
         },
         "type": "object",
@@ -11992,7 +12041,9 @@
           "root_cause_tag",
           "synthesis_summary",
           "created_at",
-          "completed_at"
+          "completed_at",
+          "number",
+          "status"
         ],
         "title": "InvestigationRunResponse",
         "description": "Response for an investigation run."
@@ -12031,6 +12082,94 @@
               }
             ],
             "title": "Root Hash"
+          },
+          "issue_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Issue Id"
+          },
+          "issue_number": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Issue Number"
+          },
+          "issue_title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Issue Title"
+          },
+          "run_number": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Run Number"
+          },
+          "brief": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Brief"
+          },
+          "execution_profile": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Execution Profile"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          },
+          "hypotheses": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Hypotheses"
           }
         },
         "type": "object",
@@ -12040,7 +12179,7 @@
           "main_branch"
         ],
         "title": "InvestigationStateResponse",
-        "description": "Full investigation state for API responses."
+        "description": "Full investigation state for API responses.\n\nThe run's details page links back to its issue's thread, so the state carries\nthe issue, the run's number among its runs, its brief and, for a failed run,\nwhy it failed (docs/specs/0001_issue_chat.md \u00a78.3)."
       },
       "InvestigationSummary": {
         "properties": {
@@ -15140,10 +15279,25 @@
       },
       "StartInvestigationRequest": {
         "properties": {
+          "brief": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/InvestigationBrief"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "alert": {
-            "additionalProperties": true,
-            "type": "object",
-            "title": "Alert"
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AnomalyAlert"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "datasource_id": {
             "anyOf": [
@@ -15156,14 +15310,33 @@
               }
             ],
             "title": "Datasource Id"
+          },
+          "execution_profile": {
+            "type": "string",
+            "enum": [
+              "safe",
+              "standard",
+              "deep"
+            ],
+            "title": "Execution Profile",
+            "default": "standard"
+          },
+          "issue_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Issue Id"
           }
         },
         "type": "object",
-        "required": [
-          "alert"
-        ],
         "title": "StartInvestigationRequest",
-        "description": "Request body for starting an investigation."
+        "description": "Start a run from a brief (the UI) or an alert (SDK, CLI, notebook).\n\nEvery run lives in an issue: the one named by issue_id, or one opened for it\n(docs/specs/0001_issue_chat.md \u00a77.11)."
       },
       "StartInvestigationResponse": {
         "properties": {
@@ -15181,15 +15354,32 @@
             "type": "string",
             "title": "Status",
             "default": "queued"
+          },
+          "run_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Run Id"
+          },
+          "issue_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Issue Id"
+          },
+          "issue_number": {
+            "type": "integer",
+            "title": "Issue Number"
           }
         },
         "type": "object",
         "required": [
           "investigation_id",
-          "main_branch_id"
+          "main_branch_id",
+          "run_id",
+          "issue_id",
+          "issue_number"
         ],
         "title": "StartInvestigationResponse",
-        "description": "Response for starting an investigation."
+        "description": "The started run and the issue it lives in."
       },
       "StatsRequest": {
         "properties": {
@@ -17002,6 +17192,205 @@
         ],
         "title": "WeeklyUsageResponse",
         "description": "Weekly usage statistics response."
+      },
+      "AnomalyAlert": {
+        "properties": {
+          "dataset_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Dataset Ids"
+          },
+          "metric_spec": {
+            "$ref": "#/components/schemas/MetricSpec"
+          },
+          "anomaly_type": {
+            "type": "string",
+            "title": "Anomaly Type"
+          },
+          "expected_value": {
+            "type": "number",
+            "title": "Expected Value"
+          },
+          "actual_value": {
+            "type": "number",
+            "title": "Actual Value"
+          },
+          "deviation_pct": {
+            "type": "number",
+            "title": "Deviation Pct"
+          },
+          "anomaly_date": {
+            "type": "string",
+            "title": "Anomaly Date"
+          },
+          "severity": {
+            "type": "string",
+            "title": "Severity"
+          },
+          "source_system": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source System"
+          },
+          "source_alert_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Alert Id"
+          },
+          "source_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Url"
+          },
+          "metadata": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "integer"
+                    },
+                    {
+                      "type": "number"
+                    },
+                    {
+                      "type": "boolean"
+                    }
+                  ]
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Metadata"
+          }
+        },
+        "type": "object",
+        "required": [
+          "dataset_ids",
+          "metric_spec",
+          "anomaly_type",
+          "expected_value",
+          "actual_value",
+          "deviation_pct",
+          "anomaly_date",
+          "severity"
+        ],
+        "title": "AnomalyAlert",
+        "description": "Input: The anomaly that triggered the investigation.\n\nThis system performs ROOT CAUSE ANALYSIS, not anomaly detection.\nThe upstream anomaly detector provides structured metric specification.\n\nAttributes:\n    dataset_ids: The affected tables in \"schema.table_name\" format.\n        First table is the primary target; additional tables are reference context.\n    metric_spec: Structured specification of what metric is anomalous.\n    anomaly_type: What kind of anomaly (null_rate, row_count, freshness, custom).\n    expected_value: The expected metric value based on historical data.\n    actual_value: The actual observed metric value.\n    deviation_pct: Percentage deviation from expected.\n    anomaly_date: Date of the anomaly in \"YYYY-MM-DD\" format.\n    severity: Alert severity level.\n    source_system: Origin system (monte_carlo, great_expectations, dbt, etc.).\n    source_alert_id: ID for linking back to source system.\n    source_url: Deep link to alert in source system.\n    metadata: Optional additional context."
+      },
+      "LLMStatusResponse": {
+        "properties": {
+          "state": {
+            "type": "string",
+            "title": "State"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          },
+          "models": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Models"
+          },
+          "checked_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Checked At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "state",
+          "message",
+          "models"
+        ],
+        "title": "LLMStatusResponse",
+        "description": "Whether the Anthropic key and models work."
+      },
+      "MetricSpec": {
+        "properties": {
+          "metric_type": {
+            "type": "string",
+            "enum": [
+              "column",
+              "sql_expression",
+              "dbt_metric",
+              "description"
+            ],
+            "title": "Metric Type"
+          },
+          "expression": {
+            "type": "string",
+            "title": "Expression"
+          },
+          "display_name": {
+            "type": "string",
+            "title": "Display Name"
+          },
+          "columns_referenced": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Columns Referenced",
+            "default": []
+          },
+          "source_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Url"
+          }
+        },
+        "type": "object",
+        "required": [
+          "metric_type",
+          "expression",
+          "display_name"
+        ],
+        "title": "MetricSpec",
+        "description": "Specification of what metric is anomalous.\n\nProvides structure for LLM prompt generation while remaining flexible\nenough to accept input from various anomaly detection systems.\n\nAttributes:\n    metric_type: How to interpret the expression field.\n    expression: The metric definition (column name, SQL, metric ref, or description).\n    display_name: Human-readable name for logs and UI.\n    columns_referenced: Columns involved in this metric (for schema filtering).\n    source_url: Link to metric definition in source system."
       }
     },
     "securitySchemes": {

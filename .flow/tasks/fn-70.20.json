@@ -7,10 +7,23 @@
     "fn-70.19"
   ],
   "epic": "fn-70",
+  "evidence": {
+    "commits": [
+      "784d88d6"
+    ],
+    "prs": [],
+    "tests": [
+      "tests/unit/services/test_llm_status.py",
+      "tests/unit/entrypoints/api/routes/test_system.py",
+      "tests/unit/temporal/test_issue_thread_workflow.py",
+      "tests/integration/test_agent_turn_activity.py",
+      "CE unit 3186, CE integration 145, EE unit 714"
+    ]
+  },
   "id": "fn-70.20",
   "priority": null,
   "spec_path": ".flow/tasks/fn-70.20.md",
-  "status": "in_progress",
+  "status": "done",
   "title": "M5: LLM key check at startup, GET /system/llm, readable chat errors",
-  "updated_at": "2026-09-28T19:34:45.513545Z"
+  "updated_at": "2026-09-28T20:10:32.733100Z"
 }

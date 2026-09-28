@@ -25,7 +25,7 @@ jobs:
           package_json_file: frontend/app/package.json
 
       - name: Set up Node.js
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@v7
         with:
           # jsdom 30 needs Node 22 (on Node 20 its tests fail with
           # "webidl.util.markAsUncloneable is not a function")

@@ -81,8 +81,8 @@ TRINO_CONFIG_SCHEMA = ConfigSchema(
             description="Default schema to use",
         ),
         ConfigField(
-            name="user",
-            label="User",
+            name="username",
+            label="Username",
             type="string",
             required=True,
             group="auth",
@@ -156,7 +156,7 @@ class TrinoAdapter(SQLAdapter):
                 - port: Coordinator port
                 - catalog: Default catalog
                 - schema: Default schema (optional)
-                - user: Username
+                - username: Username
                 - password: Password (optional)
                 - http_scheme: http or https (optional)
                 - verify: Verify SSL certificates (optional)
@@ -192,19 +192,19 @@ class TrinoAdapter(SQLAdapter):
             port = self._config.get("port", 8080)
             catalog = self._config.get("catalog", "hive")
             schema = self._config.get("schema", "default")
-            user = self._config.get("user", "trino")
+            username = self._config.get("username", "trino")
             password = self._config.get("password")
             http_scheme = self._config.get("http_scheme", "http")
             verify = self._config.get("verify", True)
 
             auth = None
             if password:
-                auth = BasicAuthentication(user, password)
+                auth = BasicAuthentication(username, password)
 
             self._conn = connect(
                 host=host,
                 port=port,
-                user=user,
+                user=username,
                 catalog=catalog,
                 schema=schema,
                 http_scheme=http_scheme,

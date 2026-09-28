@@ -48,7 +48,7 @@ Trino (formerly PrestoSQL) enables:
         "port": 8080,
         "catalog": "hive",
         "schema": "default",
-        "user": "dataing",
+        "username": "dataing",
     })
 
     # With authentication
@@ -57,7 +57,7 @@ Trino (formerly PrestoSQL) enables:
         "port": 443,
         "catalog": "iceberg",
         "schema": "analytics",
-        "user": "dataing",
+        "username": "dataing",
         "password": "secure-password",  # pragma: allowlist secret
         "http_scheme": "https",
         "verify": True,
@@ -72,7 +72,7 @@ Trino (formerly PrestoSQL) enables:
 | `port` | Yes | 8080 | Coordinator port |
 | `catalog` | Yes | - | Default catalog (e.g., hive, iceberg) |
 | `schema` | No | default | Default schema |
-| `user` | Yes | - | Trino username |
+| `username` | Yes | - | Trino username |
 | `password` | No | - | Password (if auth enabled) |
 | `http_scheme` | No | http | Protocol (http or https) |
 | `verify` | No | true | Verify SSL certificates |
@@ -160,7 +160,7 @@ adapter = TrinoAdapter({
     "host": "localhost",
     "port": 8080,
     "catalog": "hive",
-    "user": "dev",
+    "username": "dev",
 })
 ```
 
@@ -171,7 +171,7 @@ adapter = TrinoAdapter({
     "host": "trino.example.com",
     "port": 443,
     "catalog": "hive",
-    "user": "dataing",
+    "username": "dataing",
     "password": "secure-password",  # pragma: allowlist secret
     "http_scheme": "https",
 })

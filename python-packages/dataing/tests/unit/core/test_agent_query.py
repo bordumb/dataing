@@ -37,7 +37,7 @@ from dataing.core.agent_query import (
 from dataing.core.credentials import DecryptedCredentials
 
 KEY = Fernet.generate_key()
-STORED_CONFIG = {"host": "db.internal", "port": 5432, "database": "analytics", "user": "svc"}
+STORED_CONFIG = {"host": "db.internal", "port": 5432, "database": "analytics", "username": "svc"}
 
 
 class FakeAdapter:
@@ -347,7 +347,7 @@ class TestExecution:
         await service.run(principal, "SELECT 1", purpose="check")
 
         (adapter,) = registry.created
-        assert adapter.config["user"] == "alice"
+        assert adapter.config["username"] == "alice"
         assert adapter.config["password"] == "alice-pw"
         assert adapter.config["host"] == "db.internal"
         assert adapter.timeouts == [QUERY_TIMEOUT_SECONDS]
@@ -387,6 +387,16 @@ class TestExecution:
 
         assert exc.value.code == AgentQueryErrorCode.CREDENTIALS_INVALID
         assert "action_url" in exc.value.details
+
+    def test_source_without_a_login_is_credentials_not_supported(self) -> None:
+        """A source the asker can't log in to is its own error, not a failed query."""
+        from dataing.adapters.datasource.errors import CredentialsNotSupportedError
+        from dataing.core.agent_query import _to_agent_error
+
+        error = _to_agent_error(CredentialsNotSupportedError("duckdb"))
+
+        assert error.code == AgentQueryErrorCode.CREDENTIALS_NOT_SUPPORTED
+        assert error.details == {"source_type": "duckdb"}
 
     async def test_no_datasource(self, principal: UserPrincipal) -> None:
         """A datasource the tenant does not have is no_datasource."""
@@ -552,7 +562,7 @@ class TestSchemaTools:
         listing = await service.list_tables(principal, None)
 
         (adapter,) = registry.created
-        assert adapter.config["user"] == "alice"
+        assert adapter.config["username"] == "alice"
         assert adapter.connect_count == 1
         assert [t.native_path for t in listing.tables] == [
             "analytics.public.orders",
@@ -595,7 +605,7 @@ class TestSchemaTools:
         desc = await service.describe_table(principal, "public.orders")
 
         (adapter,) = registry.created
-        assert adapter.config["user"] == "alice"
+        assert adapter.config["username"] == "alice"
         assert desc.native_path == "analytics.public.orders"
         assert desc.row_count == 1200
         assert [(c["name"], c["type"], c["nullable"]) for c in desc.columns] == [

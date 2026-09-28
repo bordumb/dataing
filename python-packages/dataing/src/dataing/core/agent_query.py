@@ -34,6 +34,7 @@ from dataing.adapters.datasource.errors import (
     AdapterError,
     CredentialsInvalidError,
     CredentialsNotConfiguredError,
+    CredentialsNotSupportedError,
     DatasourceNotFoundError,
     QueryTimeoutError,
 )
@@ -64,6 +65,8 @@ class AgentQueryErrorCode(StrEnum):
 
     CREDENTIALS_MISSING = "credentials_missing"
     CREDENTIALS_INVALID = "credentials_invalid"
+    # The source has no database login, so it can't be queried as the asker
+    CREDENTIALS_NOT_SUPPORTED = "credentials_not_supported"
     VALIDATION_FAILED = "validation_failed"
     TIMEOUT = "timeout"
     NO_DATASOURCE = "no_datasource"
@@ -376,6 +379,10 @@ def _to_agent_error(error: Exception) -> AgentQueryError:
     if isinstance(error, CredentialsInvalidError):
         return AgentQueryError(
             AgentQueryErrorCode.CREDENTIALS_INVALID, error.message, dict(error.details)
+        )
+    if isinstance(error, CredentialsNotSupportedError):
+        return AgentQueryError(
+            AgentQueryErrorCode.CREDENTIALS_NOT_SUPPORTED, error.message, dict(error.details)
         )
     if isinstance(error, DatasourceNotFoundError):
         return AgentQueryError(

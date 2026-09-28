@@ -28,6 +28,7 @@ from dataing.adapters.datasource.errors import (
     AuthenticationFailedError,
     CredentialsInvalidError,
     CredentialsNotConfiguredError,
+    CredentialsNotSupportedError,
     DatasourceNotFoundError,
     QueryTimeoutError,
 )
@@ -59,6 +60,25 @@ _AUTH_ERROR_KEYWORDS = (
     "access denied for user",
     "login failed",
 )
+
+
+def ensure_user_credentials_supported(source_type: SourceType) -> None:
+    """Refuse per-user credentials for a source type that has no database login.
+
+    A user's own credentials replace the stored login under ``username`` (see
+    ``DecryptedCredentials.apply_to``). A source type whose config schema has no
+    ``username`` field ignores them and connects with its stored config.
+
+    Args:
+        source_type: The datasource's source type.
+
+    Raises:
+        CredentialsNotSupportedError: If the source type's config has no ``username``.
+    """
+    definition = get_registry().get_definition(source_type)
+    fields = definition.config_schema.fields if definition else []
+    if not any(field.name == "username" for field in fields):
+        raise CredentialsNotSupportedError(source_type.value)
 
 
 @dataclass(frozen=True)
@@ -172,6 +192,7 @@ class QueryGateway:
             DatasourceNotFoundError: The tenant has no such datasource.
             CredentialsNotConfiguredError: User hasn't configured credentials.
             CredentialsInvalidError: User's credentials were rejected.
+            CredentialsNotSupportedError: The datasource has no database login.
             QueryTimeoutError: The query did not finish within timeout_seconds.
         """
         ctx = context or QueryContext()
@@ -253,6 +274,7 @@ class QueryGateway:
             DatasourceNotFoundError: The tenant has no such datasource.
             CredentialsNotConfiguredError: User hasn't configured credentials.
             CredentialsInvalidError: User's credentials were rejected.
+            CredentialsNotSupportedError: The datasource has no database login.
             QueryTimeoutError: Discovery did not finish within timeout_seconds.
         """
         adapter = await self._open_user_adapter(principal)
@@ -313,6 +335,7 @@ class QueryGateway:
 
         Raises:
             DatasourceNotFoundError: The tenant has no such datasource.
+            CredentialsNotSupportedError: The datasource has no database login.
             CredentialsNotConfiguredError: User hasn't configured credentials.
         """
         ds_info = await self._app_db.get_data_source(
@@ -324,6 +347,10 @@ class QueryGateway:
                 datasource_id=str(principal.datasource_id),
                 tenant_id=str(principal.tenant_id),
             )
+
+        # Configuring credentials can't help a source type with no login
+        source_type = SourceType(ds_info["type"])
+        ensure_user_credentials_supported(source_type)
 
         credentials = await self._credentials_service.get_credentials(
             principal.user_id,
@@ -356,22 +383,9 @@ class QueryGateway:
             ds_info["connection_config_encrypted"],
             self._encryption_key,
         )
-
         # The user's login replaces the stored one
-        connection_config = {
-            **base_config,
-            "user": credentials.username,
-            "password": credentials.password,
-        }
-        if credentials.role:
-            connection_config["role"] = credentials.role
-        if credentials.warehouse:
-            connection_config["warehouse"] = credentials.warehouse
-        if credentials.extra:
-            connection_config.update(credentials.extra)
-
-        source_type = SourceType(ds_info["type"])
-        return self._registry.create(source_type, connection_config)
+        connection_config = credentials.apply_to(base_config)
+        return self._registry.create(SourceType(ds_info["type"]), connection_config)
 
     @staticmethod
     def _credentials_url(principal: UserPrincipal) -> str:

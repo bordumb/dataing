@@ -31,7 +31,7 @@ def test_config() -> dict:
         "host": "localhost",
         "port": 5432,
         "database": "test_db",
-        "user": "test_user",
+        "username": "test_user",
         "password": "secret_password",
     }
 

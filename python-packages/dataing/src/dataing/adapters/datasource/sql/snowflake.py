@@ -79,8 +79,8 @@ SNOWFLAKE_CONFIG_SCHEMA = ConfigSchema(
             default_value="PUBLIC",
         ),
         ConfigField(
-            name="user",
-            label="User",
+            name="username",
+            label="Username",
             type="string",
             required=True,
             group="auth",
@@ -151,7 +151,7 @@ class SnowflakeAdapter(SQLAdapter):
                 - warehouse: Virtual warehouse
                 - database: Database name
                 - schema: Schema name (optional)
-                - user: Username
+                - username: Username
                 - password: Password
                 - role: Role (optional)
                 - login_timeout: Timeout in seconds (optional)
@@ -182,7 +182,7 @@ class SnowflakeAdapter(SQLAdapter):
 
         try:
             account = self._config.get("account", "")
-            user = self._config.get("user", "")
+            username = self._config.get("username", "")
             password = self._config.get("password", "")
             warehouse = self._config.get("warehouse", "")
             database = self._config.get("database", "")
@@ -192,7 +192,7 @@ class SnowflakeAdapter(SQLAdapter):
 
             connect_params = {
                 "account": account,
-                "user": user,
+                "user": username,
                 "password": password,
                 "warehouse": warehouse,
                 "database": database,

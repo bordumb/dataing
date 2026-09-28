@@ -77,9 +77,7 @@ class TestAssetInstancesSearch:
         assert data["next_cursor"] is None
         assert data["total_hint"] == 1
 
-    def test_search_with_pagination_cursor(
-        self, client: TestClient, mock_db: AsyncMock
-    ) -> None:
+    def test_search_with_pagination_cursor(self, client: TestClient, mock_db: AsyncMock) -> None:
         """Test search respects pagination cursor."""
         datasource_id = uuid4()
         dataset_id = uuid4()
@@ -119,9 +117,7 @@ class TestAssetInstancesSearch:
         assert data["next_cursor"] == next_cursor
         assert data["total_hint"] == 10
 
-    def test_search_with_datasource_filter(
-        self, client: TestClient, mock_db: AsyncMock
-    ) -> None:
+    def test_search_with_datasource_filter(self, client: TestClient, mock_db: AsyncMock) -> None:
         """Test search can be filtered to a single datasource."""
         datasource_id = uuid4()
 
@@ -138,9 +134,7 @@ class TestAssetInstancesSearch:
         call_kwargs = mock_db.search_asset_instances.call_args
         assert call_kwargs.kwargs.get("datasource_id") == datasource_id
 
-    def test_search_requires_query_param(
-        self, client: TestClient, mock_db: AsyncMock
-    ) -> None:
+    def test_search_requires_query_param(self, client: TestClient, mock_db: AsyncMock) -> None:
         """Test search requires q parameter."""
         response = client.get(
             "/api/v1/asset-instances/search",
@@ -149,9 +143,7 @@ class TestAssetInstancesSearch:
 
         assert response.status_code == 422  # Validation error
 
-    def test_search_query_min_length(
-        self, client: TestClient, mock_db: AsyncMock
-    ) -> None:
+    def test_search_query_min_length(self, client: TestClient, mock_db: AsyncMock) -> None:
         """Test search query must be at least 1 character."""
         response = client.get(
             "/api/v1/asset-instances/search?q=",
@@ -160,9 +152,7 @@ class TestAssetInstancesSearch:
 
         assert response.status_code == 422
 
-    def test_search_limit_max_100(
-        self, client: TestClient, mock_db: AsyncMock
-    ) -> None:
+    def test_search_limit_max_100(self, client: TestClient, mock_db: AsyncMock) -> None:
         """Test search limit is capped at 100."""
         mock_db.search_asset_instances.return_value = ([], None, 0)
 

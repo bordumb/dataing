@@ -24,20 +24,14 @@ pip install "dataing-sdk[all]"
 from dataing_sdk import DataingClient, AssetRef
 
 # Create client
-client = DataingClient(
-    base_url="https://api.dataing.io",
-    api_key="your-api-key"
-)
+client = DataingClient(base_url="https://api.dataing.io", api_key="your-api-key")
 
 # Reference assets
 orders = AssetRef(platform="postgres", name="ecommerce.public.orders")
 customers = AssetRef(platform="postgres", name="ecommerce.public.customers")
 
 # Run investigation
-run = client.run(
-    assets=[orders, customers],
-    goal="Why did order counts drop 40% yesterday?"
-)
+run = client.run(assets=[orders, customers], goal="Why did order counts drop 40% yesterday?")
 
 # Stream events
 for event in run.events():

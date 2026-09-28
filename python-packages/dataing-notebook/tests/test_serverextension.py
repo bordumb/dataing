@@ -2,16 +2,14 @@
 
 import json
 import os
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 import pytest
 import tornado.testing
 import tornado.web
-from tornado.httpclient import HTTPResponse
 
 from dataing_notebook.serverextension.handlers import (
     HandshakeHandler,
-    ProxyHandler,
     TokenHandler,
     get_api_key,
     get_backend_url,
@@ -74,6 +72,7 @@ def make_test_app(handlers: list) -> tornado.web.Application:
         class TestHandler(handler):  # type: ignore[valid-type,misc]
             def get_current_user(self) -> str:
                 return "test_user"
+
         test_handlers.append((pattern, TestHandler))
 
     return tornado.web.Application(
@@ -87,9 +86,11 @@ class TestHandshakeHandler(tornado.testing.AsyncHTTPTestCase):
 
     def get_app(self) -> tornado.web.Application:
         """Create test application."""
-        return make_test_app([
-            (r"/dataing/handshake", HandshakeHandler),
-        ])
+        return make_test_app(
+            [
+                (r"/dataing/handshake", HandshakeHandler),
+            ]
+        )
 
     def test_handshake_response(self) -> None:
         """Test handshake returns expected fields."""
@@ -104,10 +105,13 @@ class TestHandshakeHandler(tornado.testing.AsyncHTTPTestCase):
 
     def test_handshake_with_env(self) -> None:
         """Test handshake with environment variables."""
-        with patch.dict(os.environ, {
-            "DATAING_BACKEND_URL": "https://api.test.com",
-            "DATAING_API_KEY": "test-key",
-        }):
+        with patch.dict(
+            os.environ,
+            {
+                "DATAING_BACKEND_URL": "https://api.test.com",
+                "DATAING_API_KEY": "test-key",
+            },
+        ):
             response = self.fetch("/dataing/handshake")
             data = json.loads(response.body)
 
@@ -120,9 +124,11 @@ class TestTokenHandler(tornado.testing.AsyncHTTPTestCase):
 
     def get_app(self) -> tornado.web.Application:
         """Create test application."""
-        return make_test_app([
-            (r"/dataing/token", TokenHandler),
-        ])
+        return make_test_app(
+            [
+                (r"/dataing/token", TokenHandler),
+            ]
+        )
 
     def test_get_token_no_key(self) -> None:
         """Test GET token when no API key configured."""

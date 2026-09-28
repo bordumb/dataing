@@ -544,6 +544,6 @@ class TestRendererIntegration:
 
             # Each should reference the investigation ID in some form
             inv_id = str(not_null_test.source_investigation_id)
-            assert (
-                inv_id in result or inv_id[:8] in result
-            ), f"{renderer.__class__.__name__} missing provenance"
+            assert inv_id in result or inv_id[:8] in result, (
+                f"{renderer.__class__.__name__} missing provenance"
+            )

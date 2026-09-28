@@ -6,8 +6,8 @@ from datetime import datetime
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
-
 from bond.tools.schema import SchemaLookupProtocol
+
 from dataing.adapters.context.schema_lookup import SchemaLookupAdapter
 from dataing.adapters.datasource.types import (
     Catalog,

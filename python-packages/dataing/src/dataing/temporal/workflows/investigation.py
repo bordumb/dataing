@@ -896,9 +896,11 @@ class InvestigationWorkflow:
 
         while self._running and not self._cancelled:
             await workflow.wait_condition(
-                lambda: self._cancelled
-                or bool(self._steers)
-                or any(handle.done() for handle in self._running.values())
+                lambda: (
+                    self._cancelled
+                    or bool(self._steers)
+                    or any(handle.done() for handle in self._running.values())
+                )
             )
             for hypothesis_id, handle in list(self._running.items()):
                 if handle.done():

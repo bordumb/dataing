@@ -67,7 +67,8 @@ src = ["src", "tests"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "D", "B", "UP"]
-ignore = ["D100", "D104"]
+# UP042 (StrEnum) changes str()/format() of members; see the root pyproject
+ignore = ["D100", "D104", "UP042"]
 
 [tool.ruff.lint.pydocstyle]
 convention = "google"

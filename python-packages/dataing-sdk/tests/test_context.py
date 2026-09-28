@@ -1,9 +1,8 @@
 """Tests for SDK Context object."""
 
-from datetime import datetime, UTC
+from datetime import UTC, datetime
 
 import pytest
-
 from dataing_sdk import (
     AssetRef,
     Context,

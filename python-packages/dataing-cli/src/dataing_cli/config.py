@@ -271,8 +271,7 @@ def get_client(
 
     if not key:
         raise ConfigError(
-            "No API key configured. "
-            "Run 'dataing init' or set DATAING_API_KEY environment variable."
+            "No API key configured. Run 'dataing init' or set DATAING_API_KEY environment variable."
         )
 
     return DataingClient(base_url=url, api_key=key)

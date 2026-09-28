@@ -1,4 +1,5 @@
 import { apiErrorMessage } from "./error-message";
+import { notifySessionExpired } from "./session-expired";
 
 // API base URL - empty for same-origin (dev), set VITE_API_URL for production
 const API_BASE_URL = import.meta.env.VITE_API_URL || "";
@@ -77,6 +78,16 @@ export const customInstance = async <T>(config: RequestConfig): Promise<T> => {
 
   if (!response.ok) {
     const errorData = await response.json().catch(() => ({}));
+
+    // A signed-in request the API rejects means the session is over. A failed
+    // sign-in is a 401 too, so auth routes don't count.
+    if (
+      response.status === 401 &&
+      accessToken &&
+      !url.startsWith("/api/v1/auth/")
+    ) {
+      notifySessionExpired();
+    }
 
     // Check for upgrade-required errors
     if (response.status === 403 && errorData.detail?.error) {

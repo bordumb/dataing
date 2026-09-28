@@ -14,6 +14,7 @@ from fastapi.security import HTTPAuthorizationCredentials
 from dataing.core.auth.jwt import create_access_token
 from dataing.core.auth.types import OrgRole
 from dataing.entrypoints.api.middleware.auth import (
+    SESSION_EXPIRED,
     ApiKeyContext,
     optional_api_key,
     require_scope,
@@ -82,6 +83,19 @@ class TestVerifyApiKey:
 
         assert exc_info.value.status_code == 401
         assert "Missing" in exc_info.value.detail
+
+    @pytest.mark.parametrize("via", ["bearer", "query"])
+    async def test_a_rejected_session_says_to_sign_in_again(self, via: str) -> None:
+        """A signed-in caller whose token the API rejects is told their session ended.
+
+        "Missing API key" sent people looking for an Anthropic key when it was their
+        login that had expired (e.g. a token from another deployment's secret).
+        """
+        with pytest.raises(HTTPException) as exc_info:
+            await _verify_jwt("not-a-token-this-server-signed", via)
+
+        assert exc_info.value.status_code == 401
+        assert exc_info.value.detail == SESSION_EXPIRED
 
     async def test_verify_invalid_api_key(
         self,

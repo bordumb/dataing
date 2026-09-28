@@ -20,6 +20,11 @@ logger = structlog.get_logger()
 API_KEY_HEADER = APIKeyHeader(name="X-API-Key", auto_error=False)
 BEARER_SCHEME = HTTPBearer(auto_error=False)
 
+# The 401 detail for a login token the API rejects (expired, or signed with another
+# secret). The frontend signs the person out on it; "Missing API key" misled people
+# into looking for an Anthropic key.
+SESSION_EXPIRED = "Your session has expired. Sign in again."
+
 # Scopes granted to JWT callers, by org role
 _ROLE_SCOPES: dict[OrgRole, tuple[str, ...]] = {
     OrgRole.VIEWER: ("read",),
@@ -122,6 +127,8 @@ async def verify_api_key(
 
     # Try API key
     if not api_key:
+        if bearer or token_param:
+            raise HTTPException(status_code=401, detail=SESSION_EXPIRED)
         raise HTTPException(status_code=401, detail="Missing API key")
 
     # Hash the key to look it up

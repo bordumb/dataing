@@ -16,7 +16,7 @@ import os
 from datetime import UTC, datetime
 from functools import lru_cache
 from typing import Annotated, Any
-from uuid import UUID, uuid4
+from uuid import UUID
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Request, status
 from jsonschema import Draft7Validator
@@ -24,10 +24,13 @@ from jsonschema.exceptions import SchemaError
 from pydantic import BaseModel, Field
 
 from dataing.adapters.db.app_db import AppDatabase
+from dataing.adapters.db.issues import open_issue
 from dataing.adapters.db.team_policy_repository import PolicyAction, TeamPolicyRepository
+from dataing.core.domain_types import AnomalyAlert, MetricSpec
 from dataing.core.json_utils import to_json_string
 from dataing.entrypoints.api.deps import get_app_db
 from dataing.entrypoints.api.middleware.auth import ApiKeyContext, require_scope
+from dataing.services.investigation import InvestigationStarterService
 from dataing.services.notification import NotificationEvent, NotificationService
 from dataing.services.policy import IssueContext, PolicyService
 
@@ -312,67 +315,23 @@ async def receive_generic_webhook(
                 created=False,
             )
 
-    # Get next issue number
-    number_row = await db.fetch_one(
-        "SELECT next_issue_number($1) as num",
-        auth.tenant_id,
+    row = await open_issue(
+        db,
+        tenant_id=auth.tenant_id,
+        title=payload.title,
+        description=payload.description,
+        priority=payload.priority,
+        severity=payload.severity,
+        dataset_id=payload.dataset_id,
+        labels=payload.labels or [],
+        author_type="integration",
+        source_provider=payload.source_provider,
+        source_external_id=payload.source_external_id,
+        source_external_url=payload.source_external_url,
+        event_payload={"source": "webhook", "provider": payload.source_provider},
     )
-    issue_number = number_row["num"] if number_row else 1
-
-    # Create the issue
-    row = await db.fetch_one(
-        """
-        INSERT INTO issues (
-            tenant_id, number, title, description, status,
-            priority, severity, dataset_id,
-            author_type, source_provider, source_external_id, source_external_url
-        )
-        VALUES ($1, $2, $3, $4, 'open', $5, $6, $7, 'integration', $8, $9, $10)
-        RETURNING id, number, status
-        """,
-        auth.tenant_id,
-        issue_number,
-        payload.title,
-        payload.description,
-        payload.priority,
-        payload.severity,
-        payload.dataset_id,
-        payload.source_provider,
-        payload.source_external_id,
-        payload.source_external_url,
-    )
-
-    if not row:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to create issue",
-        )
-
     issue_id = row["id"]
-
-    # Add labels if provided
-    if payload.labels:
-        for label in payload.labels:
-            await db.execute(
-                "INSERT INTO issue_labels (issue_id, label) VALUES ($1, $2)",
-                issue_id,
-                label,
-            )
-
-    # Record creation event
-    await db.execute(
-        """
-        INSERT INTO issue_events (issue_id, event_type, actor_user_id, payload)
-        VALUES ($1, 'created', NULL, $2)
-        """,
-        issue_id,
-        to_json_string(
-            {
-                "source": "webhook",
-                "provider": payload.source_provider,
-            }
-        ),
-    )
+    issue_number = row["number"]
 
     logger.info(
         f"Webhook issue created: id={issue_id}, number={issue_number}, "
@@ -508,9 +467,6 @@ async def _start_auto_investigation(
         )
         return None
 
-    investigation_id = uuid4()
-    now = datetime.now(UTC)
-
     # Resolve the tenant's own datasource. There is no fallback ID: a fixed ID
     # would point the investigation at a datasource owned by another tenant.
     try:
@@ -522,71 +478,41 @@ async def _start_auto_investigation(
         )
         return None
 
-    # Build alert data
-    alert_data: dict[str, Any] = {
-        "dataset_ids": [payload.dataset_id] if payload.dataset_id else [],
-        "metric_spec": {
-            "metric_type": "description",
-            "expression": payload.title,
-            "display_name": "Integration Alert",
-            "columns_referenced": [],
-        },
-        "anomaly_type": "integration_alert",
-        "expected_value": 0.0,
-        "actual_value": 0.0,
-        "deviation_pct": 0.0,
-        "anomaly_date": now.date().isoformat(),
-        "severity": payload.severity or "medium",
-        "datasource_id": str(datasource_id),
-        "issue_id": str(issue_id),
-    }
-
+    alert = AnomalyAlert(
+        dataset_ids=[payload.dataset_id] if payload.dataset_id else [],
+        metric_spec=MetricSpec(
+            metric_type="description",
+            expression=payload.title,
+            display_name="Integration Alert",
+        ),
+        anomaly_type="integration_alert",
+        expected_value=0.0,
+        actual_value=0.0,
+        deviation_pct=0.0,
+        anomaly_date=datetime.now(UTC).date().isoformat(),
+        severity=payload.severity or "medium",
+        source_system=payload.source_provider,
+        source_alert_id=payload.source_external_id,
+        source_url=payload.source_external_url,
+    )
+    starter = InvestigationStarterService(db=db, temporal_client=temporal_client)
     try:
-        # Create investigation record (issue_id is stored in alert JSONB)
-        await db.execute(
-            """
-            INSERT INTO investigations (id, tenant_id, alert)
-            VALUES ($1, $2, $3)
-            """,
-            investigation_id,
-            auth.tenant_id,
-            json.dumps(alert_data),
+        started = await starter.start(
+            tenant_id=auth.tenant_id,
+            datasource_id=datasource_id,
+            trigger_type="webhook",
+            alert=alert,
+            issue_id=issue_id,
+            trigger_ref={"source": "auto_policy", "provider": payload.source_provider},
         )
-
-        # Start Temporal workflow
-        alert_summary = f"Auto investigation: {payload.title}"
-        await temporal_client.start_investigation(
-            investigation_id=str(investigation_id),
-            tenant_id=str(auth.tenant_id),
-            datasource_id=str(datasource_id),
-            alert_data=alert_data,
-            alert_summary=alert_summary,
-        )
-
-        # Record event on issue
-        await db.execute(
-            """
-            INSERT INTO issue_events (issue_id, event_type, actor_user_id, payload)
-            VALUES ($1, 'investigation_started', NULL, $2)
-            """,
-            issue_id,
-            to_json_string(
-                {
-                    "investigation_id": str(investigation_id),
-                    "trigger": "auto_policy",
-                }
-            ),
-        )
-
-        logger.info(
-            f"Auto investigation started: investigation={investigation_id}, issue={issue_id}"
-        )
-
-        return investigation_id
-
     except Exception as e:
         logger.error(f"Failed to start auto investigation for issue={issue_id}: {e}")
         return None
+
+    logger.info(
+        f"Auto investigation started: investigation={started.investigation_id}, issue={issue_id}"
+    )
+    return started.investigation_id
 
 
 async def _send_review_notification(

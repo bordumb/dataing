@@ -422,32 +422,24 @@ class ActionExecutor:
                 error="No single datasource to investigate; set the datasource_id param",
             )
 
-        alert = _issue_alert(issue_data, dataset_id)
-        started = await ctx.investigation_starter.start_investigation(
-            tenant_id=ctx.tenant_id,
-            datasource_id=datasource_id,
-            alert_data=alert.model_dump(mode="json"),
-            alert_summary=f"Issue #{issue_data['number']} on {dataset_id}: {issue_data['title']}",
-        )
-
-        await ctx.db.execute(
-            """
-            INSERT INTO issue_investigation_runs (
-                issue_id, investigation_id, trigger_type, trigger_ref, execution_profile
+        try:
+            started = await ctx.investigation_starter.start(
+                tenant_id=ctx.tenant_id,
+                datasource_id=datasource_id,
+                trigger_type="rule",
+                alert=_issue_alert(issue_data, dataset_id),
+                issue_id=ctx.issue_id,
+                dataset_id=dataset_id,
+                trigger_ref={"rule_id": str(ctx.rule_id)},
+                execution_profile=profile,
             )
-            VALUES ($1, $2, 'rule', $3, $4)
-            """,
-            ctx.issue_id,
-            started.investigation_id,
-            to_json_string({"rule_id": str(ctx.rule_id)}),
-            profile,
-        )
-
-        await self._record_event(
-            ctx,
-            "investigation_started",
-            {"investigation_id": str(started.investigation_id), "source": "automation"},
-        )
+        except Exception as e:
+            logger.error(f"Rule {ctx.rule_id} could not start an investigation: {e}")
+            return ActionResult(
+                action_type=ActionType.SPAWN_INVESTIGATION,
+                success=False,
+                error=f"Could not start the investigation: {e}",
+            )
 
         return ActionResult(
             action_type=ActionType.SPAWN_INVESTIGATION,

@@ -138,10 +138,16 @@ def start_run(
         )
 
     frontend_url = get_frontend_url()
-    inv_url = f"{frontend_url}/investigations/{investigation.investigation_id}"
     inv_id = investigation.investigation_id
     console.print(f"[green]+[/green] Started investigation: [cyan]{inv_id}[/cyan]")
-    console.print(f"[green]+[/green] View at: [link={inv_url}]{inv_url}[/link]")
+    if investigation.issue_id:
+        # Every run lives in an issue; its thread is where to follow and steer it
+        issue_url = f"{frontend_url}/issues/{investigation.issue_id}"
+        console.print(f"[green]+[/green] In issue #{investigation.issue_number}")
+        console.print(f"[green]+[/green] View at: [link={issue_url}]{issue_url}[/link]")
+    else:
+        inv_url = f"{frontend_url}/investigations/{inv_id}"
+        console.print(f"[green]+[/green] View at: [link={inv_url}]{inv_url}[/link]")
 
     # Handle --no-watch (deprecated): exit immediately after showing URL
     if no_watch:

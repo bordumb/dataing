@@ -11,11 +11,14 @@ manager reads it as prompt text.
 
 from __future__ import annotations
 
-from datetime import datetime
-from typing import Literal
+from datetime import UTC, date, datetime, time, timedelta
+from typing import TYPE_CHECKING, Literal
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
+
+if TYPE_CHECKING:
+    from dataing.core.domain_types import AnomalyAlert
 
 
 class BriefClaim(BaseModel):
@@ -150,6 +153,45 @@ def brief_from_draft(
         leads=[lead[:300] for lead in draft.leads[:10]],
         notes=draft.notes[:2000],
     )
+
+
+def brief_from_alert(alert: AnomalyAlert, datasource_id: UUID | None = None) -> InvestigationBrief:
+    """Describe an alert as the brief its run starts from (SDK, webhooks, rules).
+
+    A measured alert's symptom names the metric, the expected and actual values and
+    the date; a described one (a webhook title, an issue) is its own text. The time
+    window is the anomaly's day, with a day either side.
+    """
+    tables = [table for table in alert.dataset_ids if table and table != "unknown"]
+    return InvestigationBrief(
+        symptom=_alert_symptom(alert, tables)[:1000],
+        scope=BriefScope(
+            datasource_id=datasource_id,
+            tables=tables[:20],
+            time_window=_around(alert.anomaly_date),
+        ),
+    )
+
+
+def _alert_symptom(alert: AnomalyAlert, tables: list[str]) -> str:
+    spec = alert.metric_spec
+    measured = spec.metric_type != "description" and (alert.expected_value or alert.actual_value)
+    if not measured:
+        return spec.expression or spec.display_name or "Investigate this alert"
+    where = f" on {tables[0]}" if tables else ""
+    return (
+        f"{spec.display_name or spec.expression}{where}: expected {alert.expected_value:g}, "
+        f"got {alert.actual_value:g} ({alert.deviation_pct:+.1f}%) on {alert.anomaly_date}"
+    )
+
+
+def _around(anomaly_date: str) -> TimeWindow | None:
+    try:
+        day = date.fromisoformat(anomaly_date[:10])
+    except ValueError:
+        return None
+    start = datetime.combine(day - timedelta(days=1), time(), tzinfo=UTC)
+    return TimeWindow(from_=start, to=start + timedelta(days=2))
 
 
 def _section(title: str, items: list[str]) -> str:

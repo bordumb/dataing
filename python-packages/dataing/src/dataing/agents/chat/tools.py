@@ -27,6 +27,8 @@ def _record(
     *,
     error: AgentQueryError | None = None,
     query_result_id: Any = None,
+    duration_ms: int | None = None,
+    row_count: int | None = None,
 ) -> None:
     ctx.deps.tool_calls.append(
         ToolCallRecord(
@@ -37,6 +39,8 @@ def _record(
             summary=summary,
             query_result_id=query_result_id,
             error_code=error.code.value if error else None,
+            duration_ms=duration_ms,
+            row_count=row_count,
         )
     )
 
@@ -107,7 +111,15 @@ async def run_query(ctx: RunContext[ChatDeps], sql: str, purpose: str) -> dict[s
         return e.to_dict()
     snapshot_id = await services.save_query_result(call_id, result.sql, result, None)
     summary = _plural(result.row_count, "row") + (" (truncated)" if result.truncated else "")
-    _record(ctx, "run_query", args, summary, query_result_id=snapshot_id)
+    _record(
+        ctx,
+        "run_query",
+        args,
+        summary,
+        query_result_id=snapshot_id,
+        duration_ms=result.duration_ms,
+        row_count=result.row_count,
+    )
     view = result.model_view.to_dict()
     view["query_result_id"] = str(snapshot_id)
     view["sql"] = result.sql

@@ -1,7 +1,7 @@
 {
-  "assignee": null,
+  "assignee": "bordumbb@gmail.com",
   "claim_note": "",
-  "claimed_at": null,
+  "claimed_at": "2026-09-28T18:22:06.382549Z",
   "created_at": "2026-09-28T17:51:59.729817Z",
   "depends_on": [
     "fn-70.18"
@@ -10,7 +10,7 @@
   "id": "fn-70.21",
   "priority": null,
   "spec_path": ".flow/tasks/fn-70.21.md",
-  "status": "todo",
+  "status": "in_progress",
   "title": "M5: one starter and open_issue() for every start path",
-  "updated_at": "2026-09-28T17:51:59.730075Z"
+  "updated_at": "2026-09-28T18:22:06.382808Z"
 }

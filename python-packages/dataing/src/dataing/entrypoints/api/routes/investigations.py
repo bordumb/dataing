@@ -13,18 +13,26 @@ import logging
 from collections.abc import AsyncIterator, Iterator
 from datetime import UTC, datetime
 from enum import Enum
-from typing import Annotated, Any
+from typing import Annotated, Any, Literal
 from uuid import UUID, uuid4
 
 from fastapi import APIRouter, Depends, File, Header, HTTPException, Query, Request
 from fastapi.responses import Response
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 from sse_starlette.sse import EventSourceResponse
 
 from dataing.adapters.db.app_db import AppDatabase
-from dataing.core.domain_types import AnomalyAlert, MetricSpec
+from dataing.core.domain_types import AnomalyAlert
+from dataing.core.investigation.brief import InvestigationBrief
 from dataing.core.json_utils import to_json_string
+from dataing.entrypoints.api.deps import get_investigation_starter
 from dataing.entrypoints.api.middleware.auth import ApiKeyContext, require_scope, verify_api_key
+from dataing.services.investigation import (
+    DatasetRequiredError,
+    InvestigationStarterService,
+    InvestigationStartFailed,
+    IssueNotFoundError,
+)
 from dataing.temporal.client import TemporalInvestigationClient
 
 logger = logging.getLogger(__name__)
@@ -34,21 +42,39 @@ router = APIRouter(prefix="/investigations", tags=["investigations"])
 # Annotated types for dependency injection
 AuthDep = Annotated[ApiKeyContext, Depends(verify_api_key)]
 WriteScopeDep = Annotated[ApiKeyContext, Depends(require_scope("write"))]
+InvestigationStarterDep = Annotated[InvestigationStarterService, Depends(get_investigation_starter)]
 
 
 class StartInvestigationRequest(BaseModel):
-    """Request body for starting an investigation."""
+    """Start a run from a brief (the UI) or an alert (SDK, CLI, notebook).
 
-    alert: dict[str, Any]  # AnomalyAlert data
-    datasource_id: UUID | None = None  # Optional datasource ID for durable execution
+    Every run lives in an issue: the one named by issue_id, or one opened for it
+    (docs/specs/0001_issue_chat.md §7.11).
+    """
+
+    brief: InvestigationBrief | None = None
+    alert: AnomalyAlert | None = None
+    datasource_id: UUID | None = None  # Else the brief's scope, else the tenant's only one
+    execution_profile: Literal["safe", "standard", "deep"] = "standard"
+    issue_id: UUID | None = None
+
+    @model_validator(mode="after")
+    def _one_source(self) -> StartInvestigationRequest:
+        """Require exactly one of brief and alert."""
+        if (self.brief is None) == (self.alert is None):
+            raise ValueError("Send exactly one of brief and alert")
+        return self
 
 
 class StartInvestigationResponse(BaseModel):
-    """Response for starting an investigation."""
+    """The started run and the issue it lives in."""
 
     investigation_id: UUID
-    main_branch_id: UUID
+    main_branch_id: UUID  # The investigation id; the SDK reads it
     status: str = "queued"
+    run_id: UUID
+    issue_id: UUID
+    issue_number: int
 
 
 class CancelInvestigationResponse(BaseModel):
@@ -91,13 +117,27 @@ class BranchStateResponse(BaseModel):
 
 
 class InvestigationStateResponse(BaseModel):
-    """Full investigation state for API responses."""
+    """Full investigation state for API responses.
+
+    The run's details page links back to its issue's thread, so the state carries
+    the issue, the run's number among its runs, its brief and, for a failed run,
+    why it failed (docs/specs/0001_issue_chat.md §8.3).
+    """
 
     investigation_id: UUID
     status: str
     main_branch: BranchStateResponse
     user_branch: BranchStateResponse | None = None
     root_hash: str | None = None
+    issue_id: UUID | None = None  # None only for an imported snapshot
+    issue_number: int | None = None
+    issue_title: str | None = None
+    run_number: int | None = None
+    brief: dict[str, Any] | None = None
+    execution_profile: str | None = None
+    error: dict[str, Any] | None = None  # {code, message, step} for a failed run
+    # Each hypothesis's id, title, status and reasoning, as far as the run got
+    hypotheses: list[dict[str, Any]] = Field(default_factory=list)
 
 
 class ChainVerificationResponse(BaseModel):
@@ -333,68 +373,23 @@ async def start_investigation(
     http_request: Request,
     request: StartInvestigationRequest,
     auth: WriteScopeDep,
-    db: AppDbDep,
-    temporal_client: TemporalClientDep,
+    starter: InvestigationStarterDep,
 ) -> StartInvestigationResponse:
-    """Start a new investigation for an alert.
+    """Start an investigation, in an issue.
 
-    Creates a new investigation with Temporal workflow for durable execution.
-
-    Args:
-        http_request: The HTTP request for accessing app state.
-        request: The investigation request containing alert data.
-        auth: Authentication context from API key/JWT.
-        db: Application database.
-        temporal_client: Temporal client for durable execution.
-
-    Returns:
-        StartInvestigationResponse with investigation and branch IDs.
+    Without issue_id this opens the issue: titled with the symptom, attributed to the
+    caller, or to dataing for an API key without a person. The run's card is in the
+    issue's thread and its outcome is written back there.
     """
     from dataing.entrypoints.api.deps import resolve_datasource_id
 
-    # Parse alert from request
-    alert_data = request.alert
-    metric_spec_data = alert_data.get("metric_spec", {})
-
-    metric_spec = MetricSpec(
-        metric_type=metric_spec_data.get("metric_type", "column"),
-        expression=metric_spec_data.get("expression", ""),
-        display_name=metric_spec_data.get("display_name", ""),
-        columns_referenced=metric_spec_data.get("columns_referenced", []),
-        source_url=metric_spec_data.get("source_url"),
-    )
-
-    # Handle both dataset_id (singular) and dataset_ids (plural) for backward compatibility
-    dataset_ids = alert_data.get("dataset_ids")
-    if dataset_ids is None:
-        # Convert singular to list
-        dataset_id = alert_data.get("dataset_id", "unknown")
-        dataset_ids = [dataset_id] if isinstance(dataset_id, str) else dataset_id
-
-    alert = AnomalyAlert(
-        dataset_ids=dataset_ids,
-        metric_spec=metric_spec,
-        anomaly_type=alert_data["anomaly_type"],
-        expected_value=alert_data["expected_value"],
-        actual_value=alert_data["actual_value"],
-        deviation_pct=alert_data["deviation_pct"],
-        anomaly_date=alert_data["anomaly_date"],
-        severity=alert_data.get("severity", "medium"),
-        source_system=alert_data.get("source_system"),
-        source_alert_id=alert_data.get("source_alert_id"),
-        source_url=alert_data.get("source_url"),
-        metadata=alert_data.get("metadata"),
-    )
-
-    # Resolve datasource_id (use provided or get default)
+    scope_datasource = request.brief.scope.datasource_id if request.brief else None
     try:
         datasource_id = await resolve_datasource_id(
-            http_request, auth.tenant_id, explicit_id=request.datasource_id
+            http_request, auth.tenant_id, explicit_id=request.datasource_id or scope_datasource
         )
     except ValueError as e:
-        error_msg = str(e)
-        if error_msg.startswith("ambiguous_datasource:"):
-            # Parse the ambiguous datasource error for 409 response
+        if str(e).startswith("ambiguous_datasource:"):
             raise HTTPException(
                 status_code=409,
                 detail={
@@ -403,62 +398,40 @@ async def start_investigation(
                     "hint": "Specify datasource_id or use %dataing attach",
                 },
             ) from e
-        raise HTTPException(
-            status_code=400,
-            detail=error_msg,
-        ) from e
+        raise HTTPException(status_code=400, detail=str(e)) from e
 
-    investigation_id = uuid4()
-    # Build rich alert summary with all critical information (matches main branch)
-    metric_name = alert.metric_spec.display_name
-    columns = ", ".join(alert.metric_spec.columns_referenced) or "unknown column"
-    alert_summary = (
-        f"{alert.anomaly_type} anomaly on {columns} in {alert.dataset_id}: "
-        f"expected {alert.expected_value}, actual {alert.actual_value} "
-        f"({alert.deviation_pct:.1f}% deviation). "
-        f"Metric: {metric_name}. Date: {alert.anomaly_date}."
-    )
-
+    person = auth.user_id is not None
     try:
-        # Save investigation to database first (so GET /investigations/{id} works)
-        # Note: The unified schema stores datasource_id in alert metadata
-        # Use mode="json" to ensure dates are serialized as ISO strings
-        alert_dict = alert.model_dump(mode="json")
-        alert_dict["datasource_id"] = str(datasource_id)
-        await db.execute(
-            """
-            INSERT INTO investigations (id, tenant_id, alert)
-            VALUES ($1, $2, $3)
-            """,
-            investigation_id,
-            auth.tenant_id,
-            json.dumps(alert_dict),
+        started = await starter.start(
+            tenant_id=auth.tenant_id,
+            datasource_id=datasource_id,
+            trigger_type="human" if person else "api",
+            brief=request.brief,
+            alert=request.alert,
+            issue_id=request.issue_id,
+            actor_user_id=auth.user_id,
+            trigger_ref=(
+                {"user_id": str(auth.user_id)} if person else {"api_key_id": str(auth.key_id)}
+            ),
+            execution_profile=request.execution_profile,
         )
+    except IssueNotFoundError as e:
+        raise HTTPException(status_code=404, detail="Issue not found") from e
+    except DatasetRequiredError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    except InvestigationStartFailed as e:
+        raise HTTPException(status_code=503, detail=str(e)) from e
+    except RuntimeError as e:
+        raise HTTPException(status_code=503, detail=str(e)) from e
 
-        # Start the Temporal workflow
-        # Use mode="json" to ensure all values are JSON-serializable for Temporal
-        await temporal_client.start_investigation(
-            investigation_id=str(investigation_id),
-            tenant_id=str(auth.tenant_id),
-            datasource_id=str(datasource_id),
-            alert_data=alert.model_dump(mode="json"),
-            alert_summary=alert_summary,
-        )
-        logger.info(
-            f"Started Temporal investigation: investigation_id={investigation_id}, "
-            f"tenant_id={auth.tenant_id}"
-        )
-        return StartInvestigationResponse(
-            investigation_id=investigation_id,
-            main_branch_id=investigation_id,  # Temporal uses single workflow ID
-            status="queued",
-        )
-    except Exception as e:
-        logger.error(f"Failed to start Temporal investigation: {e}")
-        raise HTTPException(
-            status_code=500,
-            detail=f"Failed to start investigation: {e}",
-        ) from e
+    return StartInvestigationResponse(
+        investigation_id=started.investigation_id,
+        main_branch_id=started.investigation_id,
+        status=started.status,
+        run_id=started.run_id,
+        issue_id=started.issue_id,
+        issue_number=started.issue_number,
+    )
 
 
 @router.post("/{investigation_id}/cancel", response_model=CancelInvestigationResponse)
@@ -503,6 +476,7 @@ async def cancel_investigation(
 async def get_investigation(
     investigation_id: TenantInvestigationId,
     auth: AuthDep,
+    db: AppDbDep,
     temporal_client: TemporalClientDep,
 ) -> InvestigationStateResponse:
     """Get investigation state from Temporal workflow.
@@ -513,6 +487,7 @@ async def get_investigation(
     Args:
         investigation_id: UUID of the investigation.
         auth: Authentication context from API key/JWT.
+        db: Application database, for the run's issue, number, brief and outcome.
         temporal_client: Temporal client for durable execution.
 
     Returns:
@@ -538,20 +513,82 @@ async def get_investigation(
         )
 
         root_hash = getattr(status.result, "root_hash", None) if status.result else None
-
-        return InvestigationStateResponse(
-            investigation_id=investigation_id,
-            status=status.workflow_status,
-            main_branch=main_branch,
-            user_branch=None,
-            root_hash=root_hash,
-        )
     except Exception as e:
         logger.error(f"Failed to get Temporal investigation: {e}")
         raise HTTPException(
             status_code=404,
             detail=f"Investigation not found: {e}",
         ) from e
+
+    run = await _run_context(db, auth.tenant_id, investigation_id) or {}
+    outcome = _json(run.get("outcome")) or {}
+    return InvestigationStateResponse(
+        investigation_id=investigation_id,
+        status=status.workflow_status,
+        main_branch=main_branch,
+        user_branch=None,
+        root_hash=root_hash,
+        issue_id=run.get("issue_id"),
+        issue_number=run.get("issue_number"),
+        issue_title=run.get("issue_title"),
+        run_number=run.get("run_number"),
+        brief=_json(run.get("brief")),
+        execution_profile=run.get("execution_profile"),
+        error=outcome.get("error") if outcome.get("status") == "failed" else None,
+        hypotheses=_hypotheses(outcome, status),
+    )
+
+
+async def _run_context(
+    db: AppDatabase, tenant_id: UUID, investigation_id: UUID
+) -> dict[str, Any] | None:
+    """Return a run's outcome, issue, number among the issue's runs and brief."""
+    return await db.fetch_one(
+        """
+        SELECT i.outcome, r.issue_id, r.brief, r.execution_profile,
+               s.number AS issue_number, s.title AS issue_title,
+               (SELECT COUNT(*)::int FROM issue_investigation_runs earlier
+                WHERE earlier.issue_id = r.issue_id
+                  AND (earlier.created_at, earlier.id) <= (r.created_at, r.id)) AS run_number
+        FROM investigations i
+        LEFT JOIN issue_investigation_runs r ON r.investigation_id = i.id
+        LEFT JOIN issues s ON s.id = r.issue_id
+        WHERE i.id = $1 AND i.tenant_id = $2
+        """,
+        investigation_id,
+        tenant_id,
+    )
+
+
+def _json(value: Any) -> dict[str, Any] | None:
+    """Decode a JSONB column, which comes back as text without a codec."""
+    if isinstance(value, str):
+        decoded: dict[str, Any] = json.loads(value)
+        return decoded
+    return value if isinstance(value, dict) else None
+
+
+def _hypotheses(outcome: dict[str, Any], status: Any) -> list[dict[str, Any]]:
+    """Return each hypothesis's id, title, status and reasoning.
+
+    A finished run's outcome has how each ended; a running one's live status has
+    where each is. The run's own hypotheses add the reasoning when the result has it.
+    """
+    listed = outcome.get("hypotheses") or status.hypotheses or []
+    reasoning = {
+        str(h.get("id")): h.get("reasoning")
+        for h in (status.result.hypotheses if status.result else [])
+        if isinstance(h, dict)
+    }
+    return [
+        {
+            "id": str(h.get("id")),
+            "title": h.get("title", ""),
+            "status": h.get("status", "pending"),
+            "reasoning": reasoning.get(str(h.get("id"))),
+        }
+        for h in listed
+    ]
 
 
 @router.get("/{investigation_id}/verify", response_model=ChainVerificationResponse)

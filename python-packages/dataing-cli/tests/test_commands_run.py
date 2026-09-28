@@ -52,6 +52,37 @@ class TestRunStartCommand:
         assert "Started investigation" in result.output
         assert "inv-xyz123" in result.output
 
+    def test_run_start_links_the_issue_it_runs_in(
+        self,
+        runner: CliRunner,
+        configured_env: Path,
+        mock_client_patch: MagicMock,
+    ) -> None:
+        """The run's issue thread is where to follow it."""
+        mock_investigation = MagicMock()
+        mock_investigation.investigation_id = "inv-xyz123"
+        mock_investigation.issue_id = "issue-7"
+        mock_investigation.issue_number = 7
+        mock_client_patch.start_investigation.return_value = mock_investigation
+
+        result = runner.invoke(
+            app,
+            [
+                "run",
+                "start",
+                "schema.table",
+                "--anomaly-type",
+                "null_rate",
+                "--goal",
+                "investigate null spike",
+                "--no-watch",
+            ],
+        )
+
+        assert result.exit_code == 0
+        assert "In issue #7" in result.output
+        assert "/issues/issue-7" in result.output
+
     def test_run_start_with_datasource(
         self,
         runner: CliRunner,

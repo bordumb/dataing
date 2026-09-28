@@ -59,6 +59,9 @@ class ToolCallRecord:
     summary: str
     query_result_id: UUID | None = None
     error_code: str | None = None
+    # A query's totals, for the collapsed line ("Ran 1 query · 212 ms · 4 rows")
+    duration_ms: int | None = None
+    row_count: int | None = None
 
     def to_payload(self) -> dict[str, Any]:
         """Return the record as JSON-safe payload data."""
@@ -70,6 +73,8 @@ class ToolCallRecord:
             "summary": self.summary,
             "query_result_id": str(self.query_result_id) if self.query_result_id else None,
             "error_code": self.error_code,
+            "duration_ms": self.duration_ms,
+            "row_count": self.row_count,
         }
 
 

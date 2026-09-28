@@ -20,10 +20,13 @@ from pydantic import BaseModel, Field, field_validator, model_validator
 from sse_starlette.sse import EventSourceResponse
 
 from dataing.adapters.db.app_db import AppDatabase
-from dataing.adapters.db.issue_threads import IssueThreadRepository
-from dataing.agents.prompts.brief import BRIEF_METADATA_KEY
-from dataing.core.domain_types import AnomalyAlert, MetricSpec
-from dataing.core.investigation.brief import InvestigationBrief, brief_to_prompt
+from dataing.adapters.db.issues import (
+    ISSUE_COLUMNS,
+    list_runs,
+    open_issue,
+    record_issue_event,
+)
+from dataing.core.investigation.brief import InvestigationBrief
 from dataing.core.json_utils import to_json_safe, to_json_string
 from dataing.entrypoints.api.deps import (
     get_app_db,
@@ -32,7 +35,12 @@ from dataing.entrypoints.api.deps import (
 )
 from dataing.entrypoints.api.middleware.auth import ApiKeyContext, require_scope, verify_api_key
 from dataing.models.issue import IssueStatus
-from dataing.services.investigation import InvestigationStarterService
+from dataing.services.investigation import (
+    DatasetRequiredError,
+    InvestigationStarterService,
+    InvestigationStartFailed,
+    IssueNotFoundError,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -289,11 +297,6 @@ class IssueListResponse(BaseModel):
 # Helper Functions
 # ============================================================================
 
-ISSUE_COLUMNS = """id, number, title, description, status, priority, severity,
-               dataset_id, due_at, assignee_user_id, acknowledged_by, created_by_user_id,
-               author_type, source_provider, source_external_id, source_external_url,
-               resolution_note, context, created_at, updated_at, closed_at"""
-
 
 def _encode_cursor(created_at: datetime, issue_id: UUID) -> str:
     """Encode pagination cursor."""
@@ -426,35 +429,6 @@ async def _issue_response(db: AppDatabase, row: dict[str, Any]) -> IssueResponse
     return _build_issue_response(row, labels, row["id"] in synthesized)
 
 
-THREAD_SILENT_EVENTS = frozenset({"comment_added", "investigation_spawned"})
-
-
-async def _record_issue_event(
-    db: AppDatabase,
-    issue_id: UUID,
-    event_type: str,
-    actor_user_id: UUID | None,
-    payload: dict[str, Any] | None = None,
-) -> None:
-    """Record an issue event and show it in the issue's shared thread.
-
-    A new comment and a new investigation are already messages in the thread (a
-    comment, an investigation card), so those events are only in the event log.
-    """
-    await db.execute(
-        """
-        INSERT INTO issue_events (issue_id, event_type, actor_user_id, payload)
-        VALUES ($1, $2, $3, $4)
-        """,
-        issue_id,
-        event_type,
-        actor_user_id,
-        to_json_string(payload or {}),
-    )
-    if event_type not in THREAD_SILENT_EVENTS:
-        await IssueThreadRepository(db).append_event(issue_id, event_type, actor_user_id, payload)
-
-
 async def _record_confirmed_cause(
     db: AppDatabase, issue_id: UUID, actor_user_id: UUID | None
 ) -> None:
@@ -469,7 +443,7 @@ async def _record_confirmed_cause(
     )
     if confirmed is None:
         return
-    await _record_issue_event(
+    await record_issue_event(
         db,
         issue_id,
         "resolved_with_cause",
@@ -655,54 +629,18 @@ async def create_issue(
 
     Issues are created in OPEN status. Number is auto-assigned per-tenant.
     """
-    # Get next issue number
-    number_row = await db.fetch_one(
-        "SELECT next_issue_number($1) as number",
-        auth.tenant_id,
-    )
-    number = number_row["number"] if number_row else 1
-
-    # Insert issue
-    row = await db.execute_returning(
-        f"""
-        INSERT INTO issues (
-            tenant_id, number, title, description, status, priority, severity,
-            dataset_id, created_by_user_id, author_type, context
-        )
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
-        RETURNING {ISSUE_COLUMNS}
-        """,
-        auth.tenant_id,
-        number,
-        body.title,
-        body.description,
-        IssueStatus.OPEN.value,
-        body.priority,
-        body.severity,
-        body.dataset_id,
-        auth.user_id,
-        "human",
-        to_json_string(body.context),
-    )
-
-    if not row:
-        raise HTTPException(status_code=500, detail="Failed to create issue")
-
-    issue_id = row["id"]
-
-    # Set labels
-    if body.labels:
-        await _set_issue_labels(db, issue_id, body.labels)
-
-    # Record creation event
-    await _record_issue_event(
+    row = await open_issue(
         db,
-        issue_id,
-        "created",
-        auth.user_id,
-        {"title": body.title},
+        tenant_id=auth.tenant_id,
+        title=body.title,
+        description=body.description,
+        priority=body.priority,
+        severity=body.severity,
+        dataset_id=body.dataset_id,
+        labels=body.labels,
+        context=body.context,
+        created_by=auth.user_id,
     )
-
     return await _issue_response(db, row)
 
 
@@ -807,7 +745,7 @@ async def update_issue(
         for field, value in changes.items():
             old = _decode_json_object(current[field]) if field == "context" else current[field]
             event_type, payload = _field_change_event(field, old, value)
-            await _record_issue_event(db, issue_id, event_type, auth.user_id, payload)
+            await record_issue_event(db, issue_id, event_type, auth.user_id, payload)
 
         if changes.get("status") == IssueStatus.RESOLVED.value:
             await _record_confirmed_cause(db, issue_id, auth.user_id)
@@ -816,9 +754,9 @@ async def update_issue(
         new_labels = sorted(set(body.labels or []))
         await _set_issue_labels(db, issue_id, new_labels)
         for label in sorted(set(new_labels) - set(old_labels)):
-            await _record_issue_event(db, issue_id, "label_added", auth.user_id, {"label": label})
+            await record_issue_event(db, issue_id, "label_added", auth.user_id, {"label": label})
         for label in sorted(set(old_labels) - set(new_labels)):
-            await _record_issue_event(db, issue_id, "label_removed", auth.user_id, {"label": label})
+            await record_issue_event(db, issue_id, "label_removed", auth.user_id, {"label": label})
 
     return await _issue_response(db, row)
 
@@ -1017,14 +955,9 @@ class InvestigationRunResponse(BaseModel):
     outcome_note: str | None = None
     outcome_reviewed_by: UUID | None = None
     outcome_reviewed_at: datetime | None = None
-
-
-RUN_COLUMNS = """
-    id, issue_id, investigation_id, trigger_type, brief, source_thread_id, parent_run_id,
-    execution_profile, approval_status, confidence, root_cause_tag, synthesis_summary,
-    created_at, completed_at, outcome_verdict, outcome_note, outcome_reviewed_by,
-    outcome_reviewed_at
-"""
+    number: int  # The run's position among the issue's runs, by start time
+    status: str  # running, completed or failed, from the investigation's outcome
+    error: str | None = None  # Why a failed run failed
 
 
 def _run_response(row: dict[str, Any]) -> InvestigationRunResponse:
@@ -1059,16 +992,7 @@ async def list_investigation_runs(
     """List investigation runs for an issue."""
     await _verify_issue_access(db, issue_id, auth.tenant_id)
 
-    rows = await db.fetch_all(
-        f"""
-        SELECT {RUN_COLUMNS}
-        FROM issue_investigation_runs
-        WHERE issue_id = $1
-        ORDER BY created_at DESC
-        """,
-        issue_id,
-    )
-    items = [_run_response(row) for row in rows]
+    items = [_run_response(row) for row in await list_runs(db, issue_id)]
 
     return InvestigationRunListResponse(items=items, total=len(items))
 
@@ -1095,31 +1019,14 @@ async def spawn_investigation(
 
     Requires user identity (JWT auth or user-scoped API key).
     """
-    issue = await db.fetch_one(
-        """
-        SELECT id, tenant_id, dataset_id, title, severity, created_at
-        FROM issues
-        WHERE id = $1 AND tenant_id = $2
-        """,
-        issue_id,
-        auth.tenant_id,
-    )
-    if not issue:
-        raise HTTPException(status_code=404, detail="Issue not found")
     if auth.user_id is None:
         raise HTTPException(
             status_code=403,
             detail="User identity required to spawn investigations",
         )
+    await _verify_issue_access(db, issue_id, auth.tenant_id)
 
     brief = body.brief
-    dataset_id = body.dataset_id or issue["dataset_id"] or next(iter(brief.scope.tables), None)
-    if not dataset_id:
-        raise HTTPException(
-            status_code=400,
-            detail="dataset_id required - not set on issue, request or brief scope",
-        )
-
     if body.parent_run_id is not None:
         parent = await db.fetch_one(
             "SELECT id FROM issue_investigation_runs WHERE id = $1 AND issue_id = $2",
@@ -1148,116 +1055,30 @@ async def spawn_investigation(
             ) from e
         raise HTTPException(status_code=400, detail=error_msg) from e
 
-    approval_status = "approved" if body.execution_profile == "deep" else None
-    brief = brief.model_copy(
-        update={"scope": brief.scope.model_copy(update={"datasource_id": datasource_id})}
-    )
-    brief_json = brief.model_dump(mode="json", by_alias=True)
-
-    # The issue's dataset comes first; the brief's other tables become reference tables
-    dataset_ids = [dataset_id] + [t for t in brief.scope.tables if t != dataset_id]
-    alert = AnomalyAlert(
-        dataset_ids=dataset_ids,
-        metric_spec=MetricSpec(
-            metric_type="description",
-            expression=brief.symptom,
-            display_name=issue["title"],
-        ),
-        anomaly_type="custom",
-        expected_value=0.0,
-        actual_value=0.0,
-        deviation_pct=0.0,
-        anomaly_date=issue["created_at"].date().isoformat(),
-        severity=issue["severity"] or "medium",
-        # Every prompt that renders the alert adds this as its "Team brief" section
-        metadata={BRIEF_METADATA_KEY: brief_to_prompt(brief)},
-    )
-    alert_data = {
-        **alert.model_dump(mode="json"),
-        "issue_id": str(issue_id),
-        "brief": brief_json,
-    }
-    alert_summary = (
-        f"Investigation spawned from issue: {issue.get('title', 'Untitled')}. "
-        f"Dataset: {dataset_id}. Symptom: {brief.symptom}"
-    )
-
     try:
-        result = await investigation_starter.start_investigation(
+        started = await investigation_starter.start(
             tenant_id=auth.tenant_id,
             datasource_id=datasource_id,
-            alert_data=alert_data,
-            alert_summary=alert_summary,
-            created_by=auth.user_id,
+            trigger_type="human",
+            brief=brief,
+            issue_id=issue_id,
+            dataset_id=body.dataset_id,
+            actor_user_id=auth.user_id,
+            trigger_ref={"user_id": str(auth.user_id)},
+            execution_profile=body.execution_profile,
+            source_thread_id=body.source_thread_id,
+            parent_run_id=body.parent_run_id,
         )
-        investigation_id = result.investigation_id
-    except RuntimeError as e:
+    except IssueNotFoundError as e:
+        raise HTTPException(status_code=404, detail="Issue not found") from e
+    except DatasetRequiredError as e:
+        raise HTTPException(
+            status_code=400,
+            detail="dataset_id required - not set on issue, request or brief scope",
+        ) from e
+    except (InvestigationStartFailed, RuntimeError) as e:
         raise HTTPException(status_code=503, detail=str(e)) from e
-    except Exception as e:
-        logger.error(f"Failed to start investigation: {e}")
-        raise HTTPException(status_code=500, detail=f"Failed to start investigation: {e}") from e
-
-    trigger_ref = {"user_id": str(auth.user_id), "dataset_id": dataset_id}
-    row = await db.execute_returning(
-        f"""
-        INSERT INTO issue_investigation_runs (
-            issue_id, investigation_id, trigger_type, trigger_ref, brief,
-            source_thread_id, parent_run_id, execution_profile, approval_status
-        )
-        VALUES ($1, $2, 'human', $3, $4, $5, $6, $7, $8)
-        RETURNING {RUN_COLUMNS}
-        """,
-        issue_id,
-        investigation_id,
-        to_json_string(trigger_ref),
-        to_json_string(brief_json),
-        body.source_thread_id,
-        body.parent_run_id,
-        body.execution_profile,
-        approval_status,
-    )
-    if not row:
-        raise HTTPException(status_code=500, detail="Failed to create investigation run")
-
-    await _record_issue_event(
-        db,
-        issue_id,
-        "investigation_spawned",
-        auth.user_id,
-        {
-            "investigation_id": str(investigation_id),
-            "run_id": str(row["id"]),
-            "symptom": brief.symptom,
-            "execution_profile": body.execution_profile,
-        },
-    )
-
-    # The run's card in the shared thread (from a scratch chat too)
-    threads = IssueThreadRepository(db)
-    shared = await threads.ensure_shared_thread(issue_id)
-    started_from = (
-        " from a scratch chat"
-        if body.source_thread_id and body.source_thread_id != shared["id"]
-        else ""
-    )
-    await threads.append_message(
-        shared["id"],
-        author_kind="user",
-        kind="investigation",
-        author_user_id=auth.user_id,
-        body_md=f"Started an investigation{started_from}: {brief.symptom}",
-        payload={
-            "investigation_id": str(investigation_id),
-            "run_id": str(row["id"]),
-            "execution_profile": body.execution_profile,
-            "brief": brief_json,
-            "source_thread_id": str(body.source_thread_id) if body.source_thread_id else None,
-            "parent_run_id": str(body.parent_run_id) if body.parent_run_id else None,
-        },
-    )
-
-    await db.execute("UPDATE issues SET updated_at = NOW() WHERE id = $1", issue_id)
-    return _run_response(row)
+    return _run_response(started.run)
 
 
 # ============================================================================

@@ -78,8 +78,33 @@ class TestStartInvestigationRoute:
         )
 
         request = StartInvestigationRequest(alert=sample_alert)
-        assert request.alert["dataset_ids"] == ["analytics.events"]
-        assert request.alert["anomaly_type"] == "null_rate"
+        assert request.alert is not None
+        assert request.alert.dataset_ids == ["analytics.events"]
+        assert request.alert.anomaly_type == "null_rate"
+        assert (request.execution_profile, request.issue_id) == ("standard", None)
+
+    @pytest.mark.parametrize(
+        "body",
+        [
+            pytest.param({}, id="neither"),
+            pytest.param({"brief": {"symptom": "Orders dropped"}, "alert": None}, id="brief-only"),
+        ],
+    )
+    def test_request_needs_exactly_one_of_brief_and_alert(
+        self, body: dict[str, Any], sample_alert: dict[str, Any]
+    ) -> None:
+        """A run starts from a brief or from an alert, never both or neither."""
+        from pydantic import ValidationError
+
+        from dataing.entrypoints.api.routes.investigations import StartInvestigationRequest
+
+        if "brief" in body:
+            assert StartInvestigationRequest.model_validate(body).brief is not None
+            with pytest.raises(ValidationError):
+                StartInvestigationRequest.model_validate({**body, "alert": sample_alert})
+        else:
+            with pytest.raises(ValidationError):
+                StartInvestigationRequest.model_validate(body)
 
     def test_response_model(self) -> None:
         """Test response model structure."""
@@ -90,13 +115,22 @@ class TestStartInvestigationRoute:
         investigation_id = uuid.uuid4()
         branch_id = uuid.uuid4()
 
+        issue_id = uuid.uuid4()
         response = StartInvestigationResponse(
             investigation_id=investigation_id,
             main_branch_id=branch_id,
+            run_id=uuid.uuid4(),
+            issue_id=issue_id,
+            issue_number=42,
         )
 
         assert response.investigation_id == investigation_id
         assert response.main_branch_id == branch_id
+        assert (response.issue_id, response.issue_number, response.status) == (
+            issue_id,
+            42,
+            "queued",
+        )
 
 
 class TestGetInvestigationRoute:
@@ -338,25 +372,15 @@ class TestInvestigationServiceIntegration:
 
         request = StartInvestigationRequest(alert=sample_alert)
 
-        # Verify the request parsing works
-        alert = AnomalyAlert(
-            dataset_ids=request.alert["dataset_ids"],
-            metric_spec=MetricSpec(
-                metric_type=request.alert["metric_spec"]["metric_type"],
-                expression=request.alert["metric_spec"]["expression"],
-                display_name=request.alert["metric_spec"]["display_name"],
-                columns_referenced=request.alert["metric_spec"].get("columns_referenced", []),
-            ),
-            anomaly_type=request.alert["anomaly_type"],
-            expected_value=request.alert["expected_value"],
-            actual_value=request.alert["actual_value"],
-            deviation_pct=request.alert["deviation_pct"],
-            anomaly_date=request.alert["anomaly_date"],
-            severity=request.alert["severity"],
-        )
-
+        alert = request.alert
+        assert isinstance(alert, AnomalyAlert)
         assert alert.dataset_id == "analytics.events"
-        assert alert.metric_spec.display_name == "NULL rate"
+        assert alert.metric_spec == MetricSpec(
+            metric_type="column",
+            expression="user_id",
+            display_name="NULL rate",
+            columns_referenced=["user_id"],
+        )
 
     @pytest.mark.asyncio
     async def test_get_investigation_returns_state(

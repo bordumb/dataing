@@ -12,16 +12,12 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field, model_validator
 
 from dataing.adapters.db.app_db import AppDatabase
+from dataing.adapters.db.issues import get_run, record_issue_event
 from dataing.adapters.investigation_feedback import EventType, InvestigationFeedbackAdapter
 from dataing.entrypoints.api.deps import get_app_db, get_feedback_adapter
 from dataing.entrypoints.api.middleware.auth import ApiKeyContext, require_scope
 from dataing.entrypoints.api.routes.investigations import TenantInvestigationId
-from dataing.entrypoints.api.routes.issues import (
-    RUN_COLUMNS,
-    InvestigationRunResponse,
-    _record_issue_event,
-    _run_response,
-)
+from dataing.entrypoints.api.routes.issues import InvestigationRunResponse, _run_response
 
 router = APIRouter(prefix="/investigations", tags=["investigations"])
 
@@ -68,19 +64,19 @@ async def review_outcome(
     if run["outcome"] is None:
         raise HTTPException(status_code=409, detail="The investigation has no outcome yet")
 
-    updated = await db.execute_returning(
-        f"""
+    await db.execute(
+        """
         UPDATE issue_investigation_runs
         SET outcome_verdict = $2, outcome_note = $3,
             outcome_reviewed_by = $4, outcome_reviewed_at = NOW()
         WHERE id = $1
-        RETURNING {RUN_COLUMNS}
         """,
         run["id"],
         body.verdict,
         body.note,
         auth.user_id,
     )
+    updated = await get_run(db, run["id"])
     assert updated is not None
 
     await feedback.emit(
@@ -96,7 +92,7 @@ async def review_outcome(
         actor_id=auth.user_id,
         actor_type="user",
     )
-    await _record_issue_event(
+    await record_issue_event(
         db,
         run["issue_id"],
         "outcome_reviewed",

@@ -37,6 +37,7 @@ from dataing.entrypoints.api.deps import get_app_db
 from dataing.entrypoints.api.middleware.auth import ApiKeyContext, verify_api_key
 
 TENANT_ID = UUID("5f0c2a9e-0000-0000-0000-000000000001")
+ISSUE_ID = UUID("5f0c2a9e-0000-0000-0000-000000000042")
 
 
 class TestIntegrationCreateSchema:
@@ -878,17 +879,23 @@ def _post_raw(db: AsyncMock, provider: str, body: bytes, headers: dict[str, str]
 
 
 def _processing_db(provider: str) -> AsyncMock:
-    """App DB that takes a signed webhook all the way to new issue #7."""
+    """App DB that takes a signed webhook up to opening its issue."""
     db = AsyncMock()
     db.fetch_one.side_effect = [
         _integration_row(provider, WEBHOOK_SECRET),
         None,  # not delivered before
         {"id": uuid4()},  # integration event recorded
-        {"num": 7},  # next issue number
-        {"id": uuid4(), "number": 7},  # issue created
     ]
     db.fetch_all.return_value = []
     return db
+
+
+@pytest.fixture
+def opened(monkeypatch: pytest.MonkeyPatch) -> AsyncMock:
+    """Open webhook issues as #7, capturing what open_issue was given."""
+    open_issue = AsyncMock(return_value={"id": uuid4(), "number": 7})
+    monkeypatch.setattr("dataing_ee.entrypoints.api.routes.integrations.open_issue", open_issue)
+    return open_issue
 
 
 @pytest.fixture
@@ -912,7 +919,7 @@ class TestFormEncodedWebhooks:
     """Webhook bodies are decoded once authenticated, JSON or form-encoded."""
 
     @pytest.mark.usefixtures("no_auto_investigation")
-    def test_processes_signed_block_action(self) -> None:
+    def test_processes_signed_block_action(self, opened: AsyncMock) -> None:
         body = urlencode({"payload": json.dumps(SLACK_BLOCK_ACTION)}).encode()
         db = _processing_db("slack")
 
@@ -921,10 +928,14 @@ class TestFormEncodedWebhooks:
 
         assert response.status_code == 200
         assert response.json()["status"] == "processed"
-        assert "Slack Action: flag_issue = orders" in db.fetch_one.await_args.args
+        issue = opened.await_args.kwargs
+        assert issue["title"] == "Slack Action: flag_issue = orders"
+        assert (issue["author_type"], issue["source_provider"]) == ("integration", "slack")
 
     @pytest.mark.usefixtures("no_auto_investigation")
-    def test_slash_command_is_acknowledged_then_answered(self, replies: AsyncMock) -> None:
+    def test_slash_command_is_acknowledged_then_answered(
+        self, replies: AsyncMock, opened: AsyncMock
+    ) -> None:
         # Slack gives a slash command 3 seconds: acknowledge, then report back
         body = urlencode(SLACK_SLASH_COMMAND).encode()
         db = _processing_db("slack")
@@ -935,7 +946,7 @@ class TestFormEncodedWebhooks:
         ack = {"response_type": "ephemeral", "text": "Creating a dataing issue..."}
         assert response.status_code == 200
         assert response.json() == ack
-        assert "orders has nulls" in db.fetch_one.await_args.args
+        assert opened.await_args.kwargs["title"] == "orders has nulls"
         replies.assert_awaited_once_with(
             SLACK_SLASH_COMMAND["response_url"],
             {"response_type": "ephemeral", "text": "Created dataing issue #7."},
@@ -962,7 +973,7 @@ class TestFormEncodedWebhooks:
             },
         )
 
-    @pytest.mark.usefixtures("no_auto_investigation")
+    @pytest.mark.usefixtures("no_auto_investigation", "opened")
     def test_untrusted_response_url_is_never_posted_to(self, replies: AsyncMock) -> None:
         command = {**SLACK_SLASH_COMMAND, "response_url": "https://attacker.example/hook"}
         body = urlencode(command).encode()
@@ -1029,7 +1040,9 @@ class TestEvaluateAndStartInvestigation:
 
     MODULE = "dataing_ee.entrypoints.api.routes.integrations"
 
-    async def _run(self, resolve_datasource: AsyncMock) -> tuple[object, AsyncMock, AsyncMock]:
+    async def _run(
+        self, resolve_datasource: AsyncMock
+    ) -> tuple[object, AsyncMock, AsyncMock, MagicMock]:
         from dataing_ee.entrypoints.api.routes.integrations import (
             _evaluate_and_start_investigation,
         )
@@ -1047,7 +1060,9 @@ class TestEvaluateAndStartInvestigation:
             patch(f"{self.MODULE}.TeamPolicyRepository") as repo,
             patch(f"{self.MODULE}.PolicyService") as policy_service,
             patch(f"{self.MODULE}.resolve_datasource_id", resolve_datasource),
+            patch(f"{self.MODULE}.InvestigationStarterService") as starter,
         ):
+            starter.return_value.start = AsyncMock(return_value=MagicMock(investigation_id=uuid4()))
             repo.return_value.get_default_team_for_tenant = AsyncMock(return_value=team_id)
             policy_service.return_value.evaluate = AsyncMock(
                 return_value=PolicyResult(
@@ -1061,26 +1076,26 @@ class TestEvaluateAndStartInvestigation:
                 request=request,
                 db=db,
                 tenant_id=TENANT_ID,
-                issue_id=uuid4(),
+                issue_id=ISSUE_ID,
                 issue_data={"title": "orders volume drop", "severity": "high"},
                 adapter=None,
                 webhook_request=None,
                 idempotency_key="jira_1_created",
                 provider="jira",
             )
-        return investigation_id, db, temporal
+        return investigation_id, db, temporal, starter
 
     async def test_starts_investigation_on_tenant_datasource(self) -> None:
-        """The resolved tenant datasource is what the workflow receives."""
+        """The run starts in the webhook's issue, on the tenant's resolved datasource."""
         datasource_id = uuid4()
 
-        investigation_id, _, temporal = await self._run(AsyncMock(return_value=datasource_id))
+        investigation_id, _, _, starter = await self._run(AsyncMock(return_value=datasource_id))
 
         assert investigation_id is not None
-        temporal.start_investigation.assert_awaited_once()
-        kwargs = temporal.start_investigation.await_args.kwargs
-        assert kwargs["tenant_id"] == str(TENANT_ID)
-        assert kwargs["datasource_id"] == str(datasource_id)
+        start = starter.return_value.start.await_args.kwargs
+        assert (start["tenant_id"], start["datasource_id"]) == (TENANT_ID, datasource_id)
+        assert (start["issue_id"], start["trigger_type"]) == (ISSUE_ID, "webhook")
+        assert start["alert"].metric_spec.expression == "orders volume drop"
 
     @pytest.mark.parametrize(
         "resolve_error",
@@ -1091,11 +1106,12 @@ class TestEvaluateAndStartInvestigation:
     )
     async def test_unresolvable_datasource_skips_investigation(self, resolve_error: str) -> None:
         """No datasource of the tenant's own means no investigation (no fallback ID)."""
-        investigation_id, db, temporal = await self._run(
+        investigation_id, db, temporal, starter = await self._run(
             AsyncMock(side_effect=ValueError(resolve_error))
         )
 
         assert investigation_id is None
+        starter.return_value.start.assert_not_called()
         temporal.start_investigation.assert_not_called()
         executed_sql = [call.args[0] for call in db.execute.call_args_list]
         assert not any("INSERT INTO investigations" in sql for sql in executed_sql)

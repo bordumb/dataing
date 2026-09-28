@@ -370,10 +370,15 @@ class TestEvaluateAndApplyPolicy:
         mock_temporal.start_investigation = AsyncMock()
         mock_request.app.state.temporal_client = mock_temporal
 
+        issue_id = uuid4()
+        investigation_id = uuid4()
         with (
             patch("dataing.entrypoints.api.routes.integrations.TeamPolicyRepository") as MockRepo,
             patch("dataing.entrypoints.api.routes.integrations.PolicyService") as MockPolicyService,
             patch("dataing.entrypoints.api.deps.resolve_datasource_id") as mock_resolve_ds,
+            patch(
+                "dataing.entrypoints.api.routes.integrations.InvestigationStarterService"
+            ) as MockStarter,
         ):
             mock_repo = MockRepo.return_value
             mock_repo.get_default_team_for_tenant = AsyncMock(return_value=team_id)
@@ -390,18 +395,24 @@ class TestEvaluateAndApplyPolicy:
 
             mock_resolve_ds.return_value = uuid4()
             mock_db.execute = AsyncMock()
+            MockStarter.return_value.start = AsyncMock(
+                return_value=MagicMock(investigation_id=investigation_id)
+            )
 
             action, inv_id = await _evaluate_and_apply_policy(
                 request=mock_request,
                 db=mock_db,
                 auth=mock_auth,
-                issue_id=uuid4(),
+                issue_id=issue_id,
                 payload=sample_payload,
             )
 
             assert action == "auto"
-            assert inv_id is not None
-            mock_temporal.start_investigation.assert_called_once()
+            assert inv_id == investigation_id
+            # The run is started in the issue the webhook opened, like every run
+            start = MockStarter.return_value.start.await_args.kwargs
+            assert (start["issue_id"], start["trigger_type"]) == (issue_id, "webhook")
+            assert start["alert"].metric_spec.expression == "Test Issue"
 
     @pytest.mark.parametrize(
         "resolve_error",

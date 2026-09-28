@@ -1,3 +1,10 @@
+## [1.25.3](https://github.com/bordumb/dataing/compare/v1.25.2...v1.25.3) (2026-09-28)
+
+
+### Bug Fixes
+
+* **core:** bump trino to 0.340 ([#228](https://github.com/bordumb/dataing/issues/228)) ([c76d83b](https://github.com/bordumb/dataing/commit/c76d83b2ae794061945e902c2158720de5f2d215)), closes [#224](https://github.com/bordumb/dataing/issues/224)
+
 ## [1.25.2](https://github.com/bordumb/dataing/compare/v1.25.1...v1.25.2) (2026-09-28)
 
 

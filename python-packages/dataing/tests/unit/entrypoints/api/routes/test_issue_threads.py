@@ -45,6 +45,7 @@ class FakeThreads:
         self.threads: dict[uuid.UUID, dict[str, Any]] = {}
         self.messages: dict[uuid.UUID, dict[str, Any]] = {}
         self.running: dict[uuid.UUID, int] = {}
+        self.snapshots: dict[uuid.UUID, dict[str, Any]] = {}
         self.shared = self._thread("shared", None)
 
     def _thread(self, kind: str, owner: uuid.UUID | None) -> dict[str, Any]:
@@ -148,6 +149,13 @@ class FakeThreads:
 
     async def append_event(self, *args: Any, **kwargs: Any) -> dict[str, Any]:
         return {}
+
+    async def get_query_result(self, result_id: uuid.UUID) -> dict[str, Any] | None:
+        snapshot = self.snapshots.get(result_id)
+        if snapshot is None:
+            return None
+        message = self.messages[snapshot["message_id"]]
+        return {**snapshot, "thread_id": message["thread_id"]}
 
 
 @pytest.fixture
@@ -667,3 +675,72 @@ class TestCancellingATurn:
         )
 
         assert response.status_code == 409
+
+
+class TestQueryResults:
+    """A query snapshot is readable by whoever can read its thread."""
+
+    def _snapshot(self, threads: FakeThreads, thread_id: uuid.UUID) -> dict[str, Any]:
+        reply = {
+            "id": uuid.uuid4(),
+            "thread_id": thread_id,
+            "kind": "agent_reply",
+        }
+        threads.messages[reply["id"]] = {**reply, "deleted_at": None}
+        snapshot = {
+            "id": uuid.uuid4(),
+            "message_id": reply["id"],
+            "tool_call_id": "call-1",
+            "sql": "SELECT 1",
+            "dialect": "postgres",
+            "columns": [{"name": "n"}],
+            "rows": [{"n": 1}],
+            "row_count": 1,
+            "truncated": False,
+            "duration_ms": 3,
+            "error": None,
+            "created_at": datetime.now(UTC),
+        }
+        threads.snapshots[snapshot["id"]] = snapshot
+        return snapshot
+
+    def test_viewer_reads_a_shared_snapshot(self, client: TestClient, threads: FakeThreads) -> None:
+        """The SQL and rows come back."""
+        snapshot = self._snapshot(threads, threads.shared["id"])
+
+        response = client.get(
+            f"/issues/{ISSUE_ID}/threads/{threads.shared['id']}/query-results/{snapshot['id']}",
+            **_auth(OrgRole.VIEWER, RAJ),
+        )
+
+        assert response.status_code == 200
+        assert response.json()["rows"] == [{"n": 1}]
+        assert response.json()["sql"] == "SELECT 1"
+
+    def test_snapshot_from_someone_elses_scratch_thread_is_not_found(
+        self, client: TestClient, threads: FakeThreads
+    ) -> None:
+        """Scratch snapshots stay private."""
+        theirs = threads._thread("scratch", RAJ)
+        snapshot = self._snapshot(threads, theirs["id"])
+
+        response = client.get(
+            f"/issues/{ISSUE_ID}/threads/{theirs['id']}/query-results/{snapshot['id']}",
+            **_auth(OrgRole.ADMIN, MAYA),
+        )
+
+        assert response.status_code == 404
+
+    def test_snapshot_must_belong_to_the_thread(
+        self, client: TestClient, threads: FakeThreads
+    ) -> None:
+        """A snapshot id from another thread is not found here."""
+        mine = threads._thread("scratch", MAYA)
+        snapshot = self._snapshot(threads, mine["id"])
+
+        response = client.get(
+            f"/issues/{ISSUE_ID}/threads/{threads.shared['id']}/query-results/{snapshot['id']}",
+            **_auth(OrgRole.MEMBER, MAYA),
+        )
+
+        assert response.status_code == 404

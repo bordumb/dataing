@@ -3,7 +3,7 @@
 Every issue has one shared thread and any number of private scratch threads.
 Messages hold comments, agent replies and system events in one timeline:
 
-- ``seq`` orders messages inside a thread. It is assigned in the same statement
+- ``seq`` orders messages inside a thread. It is assigned in the transaction
   that locks the thread row, so concurrent posts never collide.
 - ``rev`` moves on every insert and update (a trigger bumps it), so a stream can
   resume from the last ``rev`` it sent. ``touched_at`` is clock time, so a
@@ -330,6 +330,26 @@ class IssueThreadRepository:
             float(overlap_seconds),
         )
         return [_decode_message(r) for r in rows]
+
+    async def get_query_result(self, result_id: UUID) -> dict[str, Any] | None:
+        """Return a query snapshot with the thread its message belongs to."""
+        row = await self._db.fetch_one(
+            """
+            SELECT r.id, r.message_id, r.tool_call_id, r.datasource_id, r.sql, r.dialect,
+                   r.columns, r.rows, r.row_count, r.truncated, r.duration_ms, r.error,
+                   r.created_at, m.thread_id
+            FROM agent_query_results r
+            JOIN issue_thread_messages m ON m.id = r.message_id
+            WHERE r.id = $1
+            """,
+            result_id,
+        )
+        if row is None:
+            return None
+        for key in ("columns", "rows"):
+            if isinstance(row[key], str):
+                row[key] = json.loads(row[key])
+        return row
 
     async def count_running_turns(self, user_id: UUID) -> int:
         """Count agent turns the person has queued or streaming, across threads."""

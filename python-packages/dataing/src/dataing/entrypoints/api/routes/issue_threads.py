@@ -126,6 +126,23 @@ class MessageListResponse(BaseModel):
     items: list[MessageResponse]
 
 
+class QueryResultResponse(BaseModel):
+    """What the agent saw when it ran a query."""
+
+    id: UUID
+    message_id: UUID
+    tool_call_id: str
+    sql: str
+    dialect: str
+    columns: list[dict[str, Any]]
+    rows: list[dict[str, Any]]
+    row_count: int
+    truncated: bool
+    duration_ms: int
+    error: str | None
+    created_at: datetime
+
+
 class MessageCreate(BaseModel):
     """Request body for posting a message."""
 
@@ -425,6 +442,27 @@ async def cancel_answer(
     if agent is not None:
         await agent.cancel_thread_request(str(thread_id), str(reply["request_message_id"]))
     return message_response(reply)
+
+
+@router.get(
+    "/{issue_id}/threads/{thread_id}/query-results/{result_id}",
+    response_model=QueryResultResponse,
+)
+async def get_query_result(
+    issue_id: UUID,
+    thread_id: UUID,
+    result_id: UUID,
+    auth: AuthDep,
+    threads: ThreadsDep,
+) -> QueryResultResponse:
+    """Return a query snapshot: the SQL the agent ran and the rows it saw."""
+    await _thread_for_caller(threads, issue_id, thread_id, auth)
+    snapshot = await threads.get_query_result(result_id)
+    if snapshot is None or snapshot["thread_id"] != thread_id:
+        raise HTTPException(status_code=404, detail="Query result not found")
+    return QueryResultResponse(
+        **{field: snapshot.get(field) for field in QueryResultResponse.model_fields}
+    )
 
 
 # ============================================================================

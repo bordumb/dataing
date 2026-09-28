@@ -12,6 +12,8 @@ export const queryKeys = {
     detail: (id: string) => [`/api/v1/investigations/${id}`] as const,
     stream: (id: string) => [`/api/v1/investigations/${id}/stream`] as const,
     events: (id: string) => [`/api/v1/investigations/${id}/events`] as const,
+    status: (id: string) => [`/api/v1/investigations/${id}/status`] as const,
+    steers: (id: string) => [`/api/v1/investigations/${id}/steers`] as const,
   },
 
   // Data Sources

@@ -94,7 +94,9 @@ describe("IssueWorkspace", () => {
         "Write a comment for the team (Markdown)",
       ),
     ).toBeInTheDocument();
-    expect(screen.queryByText("Run Investigation")).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: /Investigate…/ }),
+    ).not.toBeInTheDocument();
     expect(
       screen.queryByRole("button", { name: /Change status/ }),
     ).not.toBeInTheDocument();
@@ -103,7 +105,10 @@ describe("IssueWorkspace", () => {
   it("lets members run investigations and change status", async () => {
     renderWorkspace("member");
 
-    expect(await screen.findByText("Run Investigation")).toBeInTheDocument();
+    // The thread's composer and the Investigations card both hand off.
+    expect(
+      await screen.findAllByRole("button", { name: /Investigate…/ }),
+    ).toHaveLength(2);
     expect(
       screen.getByRole("button", { name: /Change status/ }),
     ).toBeInTheDocument();

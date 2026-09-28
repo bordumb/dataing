@@ -46,6 +46,7 @@ import {
   getSeverityLabel,
   getStatusLabel,
   getStatusVariant,
+  useIssueInvestigationRuns,
   useIssueWatchers,
   useInvalidateIssues,
   useUnwatchIssue,
@@ -108,6 +109,19 @@ interface StatusSectionProps {
   canEdit: boolean;
 }
 
+/** The root cause of the issue's most recently confirmed run, if any. */
+function useConfirmedCause(issueId: string): string | null {
+  const runs = useIssueInvestigationRuns(issueId);
+  const confirmed = (runs.data?.items ?? [])
+    .filter((r) => r.outcome_verdict === "confirmed" && r.synthesis_summary)
+    .sort((a, b) =>
+      String(b.outcome_reviewed_at ?? "").localeCompare(
+        String(a.outcome_reviewed_at ?? ""),
+      ),
+    );
+  return confirmed[0]?.synthesis_summary ?? null;
+}
+
 function StatusSection({ issue, canEdit }: StatusSectionProps) {
   const { patch, isPending } = useIssuePatch(issue.id);
   const { user } = useJwtAuth();
@@ -117,6 +131,9 @@ function StatusSection({ issue, canEdit }: StatusSectionProps) {
   const needs = target ? (issue.transition_requirements[target] ?? []) : [];
   const needsAssignee = needs.includes("assignee_user_id");
   const needsNote = needs.includes("resolution_note");
+  const confirmedCause = useConfirmedCause(issue.id);
+  // Resolving after a confirmed outcome always asks for the note, pre-filled.
+  const asksNote = needsNote || (target === "resolved" && !!confirmedCause);
 
   const move = async (status: string, extra: IssueUpdate = {}) => {
     const ok = await patch(
@@ -130,8 +147,10 @@ function StatusSection({ issue, canEdit }: StatusSectionProps) {
   };
 
   const choose = (status: string) => {
-    if ((issue.transition_requirements[status] ?? []).length > 0) {
+    const prefill = status === "resolved" ? confirmedCause : null;
+    if ((issue.transition_requirements[status] ?? []).length > 0 || prefill) {
       setTarget(status);
+      setNote(prefill ?? "");
       return;
     }
     setTarget(null);
@@ -142,7 +161,7 @@ function StatusSection({ issue, canEdit }: StatusSectionProps) {
     if (!target) return;
     const extra: IssueUpdate = {};
     if (needsAssignee && user) extra.assignee_user_id = user.id;
-    if (needsNote) extra.resolution_note = note.trim();
+    if (asksNote && note.trim()) extra.resolution_note = note.trim();
     void move(target, extra);
   };
 
@@ -195,7 +214,7 @@ function StatusSection({ issue, canEdit }: StatusSectionProps) {
               {getStatusLabel(target)} needs an owner. Assign it to yourself?
             </p>
           )}
-          {needsNote && (
+          {asksNote && (
             <div className="space-y-1">
               <label
                 htmlFor="resolution-note"

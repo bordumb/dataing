@@ -2,16 +2,23 @@
  * The issue's shared thread: comments, agent answers and events, live.
  */
 
-import { Loader2, MessageSquare } from "lucide-react";
+import { useMemo } from "react";
+import { Loader2, MessageSquare, Search } from "lucide-react";
 
+import { Button } from "@/components/ui/Button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
 import { useIssueThreads, useThreadMessages } from "@/lib/api/issue-threads";
 import { useUserDirectory } from "@/lib/api/users";
 import { useJwtAuth } from "@/lib/auth/jwt-context";
 import { useRole } from "@/lib/auth/use-role";
 
+import { useIssueHub } from "../hub/hub-context";
 import { Composer } from "./Composer";
-import { ThreadMessageItem, type ThreadViewer } from "./ThreadMessageItem";
+import {
+  ThreadMessageItem,
+  threadFacts,
+  type ThreadViewer,
+} from "./ThreadMessageItem";
 import { useThreadStream } from "./use-thread-stream";
 
 interface ThreadViewProps {
@@ -27,10 +34,16 @@ function ThreadView({ issueId, threadId }: ThreadViewProps) {
   const { user } = useJwtAuth();
   const { isMember, isAdmin } = useRole();
   const { nameOf } = useUserDirectory();
+  const hub = useIssueHub();
+  const facts = useMemo(
+    () => threadFacts(messages.data ?? []),
+    [messages.data],
+  );
 
   const viewer: ThreadViewer = {
     userId: user?.id ?? null,
     isAdmin,
+    canWrite: isMember,
     nameOf: (id) =>
       id && id === user?.id && user.name ? user.name : nameOf(id),
   };
@@ -72,6 +85,7 @@ function ThreadView({ issueId, threadId }: ThreadViewProps) {
                 issueId={issueId}
                 threadId={threadId}
                 viewer={viewer}
+                facts={facts}
               />
             ))}
           </div>
@@ -81,6 +95,26 @@ function ThreadView({ issueId, threadId }: ThreadViewProps) {
             issueId={issueId}
             threadId={threadId}
             canAskAgent={isMember}
+            actions={
+              hub?.canWrite ? (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="gap-1.5"
+                  disabled={hub.isRequestingDraft}
+                  onClick={() => void hub.investigateFrom(threadId)}
+                  title="The agent drafts a brief from this thread for you to edit"
+                >
+                  {hub.isRequestingDraft ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Search className="h-4 w-4" />
+                  )}
+                  Investigate…
+                </Button>
+              ) : null
+            }
           />
         </div>
       </CardContent>

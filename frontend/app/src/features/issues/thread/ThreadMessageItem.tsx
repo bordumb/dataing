@@ -4,7 +4,7 @@
 
 import { useState } from "react";
 import { format, isToday } from "date-fns";
-import { AlertCircle, Loader2, Square } from "lucide-react";
+import { AlertCircle, FileText, Loader2, Square } from "lucide-react";
 import { toast } from "sonner";
 
 import { Markdown } from "@/components/markdown";
@@ -19,14 +19,47 @@ import {
   type ThreadMessage,
 } from "@/lib/api/issue-threads";
 import { errorText } from "@/lib/api/error-message";
+import {
+  asBrief,
+  type InvestigationOutcome,
+} from "@/lib/api/investigation-runs";
 import { cn } from "@/lib/utils";
 
+import { useIssueHub } from "../hub/hub-context";
+import {
+  InvestigationCard,
+  type InvestigationPayload,
+} from "./InvestigationCard";
+import { OutcomeCard } from "./OutcomeCard";
 import { ToolCalls } from "./ToolCalls";
 
 export interface ThreadViewer {
   userId: string | null;
   isAdmin: boolean;
+  /** Members hand off, steer and review; viewers read and comment. */
+  canWrite: boolean;
   nameOf: (userId: string | null | undefined) => string;
+}
+
+/** Facts about the whole thread that single messages need. */
+export interface ThreadFacts {
+  /** Each finished run's outcome, by investigation id. */
+  outcomes: Map<string, InvestigationOutcome>;
+}
+
+export const EMPTY_FACTS: ThreadFacts = { outcomes: new Map() };
+
+/** Collect the facts messages need from the thread's messages. */
+export function threadFacts(messages: ThreadMessage[]): ThreadFacts {
+  const outcomes = new Map<string, InvestigationOutcome>();
+  for (const m of messages) {
+    if (m.kind !== "investigation" || m.payload.phase !== "outcome") continue;
+    const id = m.payload.investigation_id;
+    if (typeof id === "string" && m.payload.outcome) {
+      outcomes.set(id, m.payload.outcome as InvestigationOutcome);
+    }
+  }
+  return { outcomes };
 }
 
 interface MessageProps {
@@ -34,6 +67,7 @@ interface MessageProps {
   issueId: string;
   threadId: string;
   viewer: ThreadViewer;
+  facts?: ThreadFacts;
 }
 
 function formatTime(iso: string): string {
@@ -318,33 +352,15 @@ function EventMessage({ message }: { message: ThreadMessage }) {
 }
 
 const KIND_LABEL: Record<string, string> = {
-  brief: "Investigation brief",
-  steer: "Steer",
-  investigation: "Investigation",
-  published: "Shared from a scratch chat",
+  steer: "steer",
+  published: "shared from a scratch chat",
 };
 
 function CardMessage({ message, viewer }: MessageProps) {
-  const author =
-    message.author_kind === "agent"
-      ? "Agent"
-      : message.author_kind === "system"
-        ? "dataing"
-        : viewer.nameOf(message.author_user_id);
+  const author = authorName(message, viewer);
   return (
     <div className="flex gap-2.5 py-2.5">
-      {message.author_kind === "agent" ? (
-        <Avatar label="AI" className="bg-violet-600" />
-      ) : (
-        <Avatar
-          label={author.charAt(0).toUpperCase()}
-          className={
-            message.author_kind === "system"
-              ? "bg-zinc-500"
-              : colorFor(message.author_user_id ?? author)
-          }
-        />
-      )}
+      <AuthorAvatar message={message} author={author} />
       <div className="min-w-0 flex-1">
         <Meta>
           <span className="font-semibold text-foreground">{author}</span> ·{" "}
@@ -355,11 +371,7 @@ function CardMessage({ message, viewer }: MessageProps) {
           {message.body_md ? (
             <Markdown>{message.body_md}</Markdown>
           ) : (
-            <p className="text-sm text-muted-foreground">
-              {message.status === "streaming" || message.status === "queued"
-                ? "Drafting…"
-                : "No details."}
-            </p>
+            <p className="text-sm text-muted-foreground">No details.</p>
           )}
         </div>
       </div>
@@ -367,7 +379,146 @@ function CardMessage({ message, viewer }: MessageProps) {
   );
 }
 
-export function ThreadMessageItem(props: MessageProps) {
+// ----------------------------------------------------------------------------
+// Investigations and briefs
+// ----------------------------------------------------------------------------
+
+function AuthorAvatar({
+  message,
+  author,
+}: {
+  message: ThreadMessage;
+  author: string;
+}) {
+  if (message.author_kind === "agent") {
+    return <Avatar label="AI" className="bg-violet-600" />;
+  }
+  return (
+    <Avatar
+      label={author.charAt(0).toUpperCase()}
+      className={
+        message.author_kind === "system"
+          ? "bg-zinc-500"
+          : colorFor(message.author_user_id ?? author)
+      }
+    />
+  );
+}
+
+function authorName(message: ThreadMessage, viewer: ThreadViewer): string {
+  if (message.author_kind === "agent") return "Agent";
+  if (message.author_kind === "system") return "dataing";
+  return viewer.nameOf(message.author_user_id);
+}
+
+function InvestigationMessage({
+  message,
+  issueId,
+  viewer,
+  facts = EMPTY_FACTS,
+}: MessageProps) {
+  const isOutcome = message.payload.phase === "outcome";
+  const payload = message.payload as InvestigationPayload;
+  const author = authorName(message, viewer);
+  const fromScratch =
+    !!payload.source_thread_id &&
+    payload.source_thread_id !== message.thread_id;
+  return (
+    <div className="flex gap-2.5 py-2.5">
+      <AuthorAvatar message={message} author={author} />
+      <div className="min-w-0 flex-1">
+        <Meta>
+          <span className="font-semibold text-foreground">{author}</span> ·{" "}
+          {isOutcome
+            ? "investigation finished"
+            : payload.parent_run_id
+              ? "continued investigating"
+              : fromScratch
+                ? "started an investigation from a scratch chat"
+                : "started an investigation"}{" "}
+          · {formatTime(message.created_at)}
+        </Meta>
+        {isOutcome ? (
+          <OutcomeCard
+            message={message}
+            issueId={issueId}
+            canWrite={viewer.canWrite}
+            nameOf={viewer.nameOf}
+          />
+        ) : (
+          <InvestigationCard
+            message={message}
+            outcome={
+              payload.investigation_id
+                ? facts.outcomes.get(payload.investigation_id)
+                : null
+            }
+          />
+        )}
+      </div>
+    </div>
+  );
+}
+
+function BriefMessage({ message, threadId, viewer }: MessageProps) {
+  const hub = useIssueHub();
+  const brief = asBrief(message.payload.brief);
+  const asker = message.requested_by_user_id;
+  const drafting =
+    message.status === "queued" || message.status === "streaming";
+  const error =
+    typeof message.payload.error === "string" ? message.payload.error : null;
+
+  return (
+    <div className="flex gap-2.5 py-2.5" aria-busy={drafting}>
+      <Avatar label="AI" className="bg-violet-600" />
+      <div className="min-w-0 flex-1">
+        <Meta>
+          <span className="font-semibold text-foreground">Agent</span> ·
+          investigation brief
+          {asker ? ` for ${viewer.nameOf(asker)}` : ""} ·{" "}
+          {formatTime(message.created_at)}
+        </Meta>
+        <div className="rounded-lg border border-border px-3 py-2">
+          {drafting ? (
+            <p className="flex items-center gap-2 text-sm text-muted-foreground">
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              Drafting a brief from the thread…
+            </p>
+          ) : message.status === "error" ? (
+            <p className="flex items-start gap-1.5 text-sm text-destructive">
+              <AlertCircle className="mt-0.5 h-3.5 w-3.5 flex-none" />
+              {error || "The agent couldn't draft a brief."}
+            </p>
+          ) : message.status === "cancelled" ? (
+            <p className="text-xs italic text-muted-foreground">Cancelled.</p>
+          ) : (
+            <Markdown>{message.body_md}</Markdown>
+          )}
+          {brief && hub?.canWrite && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="mt-2 h-7 gap-1 text-xs"
+              onClick={() =>
+                hub.openBriefEditor({
+                  kind: "brief",
+                  brief,
+                  sourceThreadId: threadId,
+                })
+              }
+            >
+              <FileText className="h-3 w-3" />
+              Edit and start
+            </Button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function renderMessage(props: MessageProps) {
   switch (props.message.kind) {
     case "comment":
       return <CommentMessage {...props} />;
@@ -375,7 +526,19 @@ export function ThreadMessageItem(props: MessageProps) {
       return <AgentReplyMessage {...props} />;
     case "event":
       return <EventMessage message={props.message} />;
+    case "investigation":
+      return <InvestigationMessage {...props} />;
+    case "brief":
+      return <BriefMessage {...props} />;
     default:
       return <CardMessage {...props} />;
   }
+}
+
+export function ThreadMessageItem(props: MessageProps) {
+  return (
+    <div id={`message-${props.message.id}`} className="scroll-mt-20">
+      {renderMessage(props)}
+    </div>
+  );
 }

@@ -227,6 +227,18 @@ export function getQueryResult(
   });
 }
 
+/**
+ * Ask the agent to draft an investigation brief from a thread. The draft
+ * streams into the returned `brief` message; its payload.brief holds the
+ * draft once the message is complete.
+ */
+export function requestBriefDraft(issueId: string, threadId: string) {
+  return customInstance<ThreadMessage>({
+    url: `${threadsUrl(issueId)}/${threadId}/brief-drafts`,
+    method: "POST",
+  });
+}
+
 /** SSE URL for a thread. EventSource can't send headers, so the JWT rides along. */
 export function threadStreamUrl(
   issueId: string,
@@ -339,6 +351,15 @@ export function usePostMessage(issueId: string, threadId: string) {
     mutationFn: (body: PostMessageBody) => postMessage(issueId, threadId, body),
     onSuccess: (message) =>
       mergeIntoCache(queryClient, issueId, threadId, [message]),
+  });
+}
+
+export function useRequestBriefDraft(issueId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (threadId: string) => requestBriefDraft(issueId, threadId),
+    onSuccess: (message) =>
+      mergeIntoCache(queryClient, issueId, message.thread_id, [message]),
   });
 }
 

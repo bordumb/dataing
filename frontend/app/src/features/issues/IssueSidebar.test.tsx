@@ -1,5 +1,5 @@
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
-import { screen, waitFor } from "@testing-library/react";
+import { act, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { toast } from "sonner";
 
@@ -183,6 +183,63 @@ describe("IssueSidebar status", () => {
     expect(api.find("PATCH", ISSUE_URL)[0].body).toEqual({
       status: "resolved",
       resolution_note: "app_v2 wrote COMPLETE; backfilled.",
+    });
+  });
+
+  it("pre-fills the resolution note from the confirmed root cause", async () => {
+    const issue: IssueResponse = {
+      ...baseIssue,
+      status: "in_progress",
+      assignee_user_id: "user-1",
+      allowed_transitions: ["blocked", "resolved", "closed"],
+      // A confirmed, synthesized run means the server needs no note...
+      transition_requirements: {},
+    };
+    const api = stubApi({
+      "GET /api/v1/users/": { body: { users: [], total: 0 } },
+      [`GET ${ISSUE_URL}/watchers`]: { body: { items: [], total: 0 } },
+      [`GET ${ISSUE_URL}/investigation-runs`]: {
+        body: {
+          items: [
+            {
+              id: "run-1",
+              investigation_id: "inv-1",
+              synthesis_summary: "app_v2 writes COMPLETE instead of completed",
+              outcome_verdict: "confirmed",
+              outcome_reviewed_at: "2026-09-14T08:50:00Z",
+            },
+          ],
+          total: 1,
+        },
+      },
+      [`PATCH ${ISSUE_URL}`]: { body: { ...issue, status: "resolved" } },
+    });
+    const user = userEvent.setup();
+    renderSidebar("member", issue);
+
+    await waitFor(() =>
+      expect(api.find("GET", `${ISSUE_URL}/investigation-runs`)).toHaveLength(
+        1,
+      ),
+    );
+    await act(() => new Promise((resolve) => setTimeout(resolve, 0)));
+    await user.click(
+      await screen.findByRole("button", { name: /Change status/ }),
+    );
+    // ...but the person still sees the note, pre-filled, before resolving.
+    await user.click(await screen.findByRole("menuitem", { name: "Resolved" }));
+    expect(screen.getByLabelText("Resolution note")).toHaveValue(
+      "app_v2 writes COMPLETE instead of completed",
+    );
+    await user.click(screen.getByLabelText("Resolution note"));
+    await user.paste("; backfilled");
+    await user.click(screen.getByRole("button", { name: "Move to Resolved" }));
+
+    await waitFor(() => expect(api.find("PATCH", ISSUE_URL)).toHaveLength(1));
+    expect(api.find("PATCH", ISSUE_URL)[0].body).toEqual({
+      status: "resolved",
+      resolution_note:
+        "app_v2 writes COMPLETE instead of completed; backfilled",
     });
   });
 

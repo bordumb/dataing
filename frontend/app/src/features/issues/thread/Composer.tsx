@@ -34,9 +34,16 @@ interface ComposerProps {
   issueId: string;
   threadId: string;
   canAskAgent: boolean;
+  /** Extra buttons beside Send, such as Investigate…. */
+  actions?: React.ReactNode;
 }
 
-export function Composer({ issueId, threadId, canAskAgent }: ComposerProps) {
+export function Composer({
+  issueId,
+  threadId,
+  canAskAgent,
+  actions,
+}: ComposerProps) {
   const [mode, setMode] = useState<Mode>("comment");
   const [body, setBody] = useState("");
   const post = usePostMessage(issueId, threadId);
@@ -134,6 +141,7 @@ export function Composer({ issueId, threadId, canAskAgent }: ComposerProps) {
           <span className="hidden text-xs text-muted-foreground sm:inline">
             ⌘/Ctrl+Enter
           </span>
+          {actions}
           <Button
             type="submit"
             size="sm"

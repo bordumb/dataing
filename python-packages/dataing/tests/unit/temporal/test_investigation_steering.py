@@ -19,6 +19,7 @@ from temporalio.client import WorkflowHandle
 from temporalio.testing import WorkflowEnvironment
 from temporalio.worker import Worker
 
+from dataing.temporal.sandbox import workflow_runner
 from dataing.temporal.workflows import (
     EvaluateHypothesisWorkflow,
     InvestigationInput,
@@ -83,6 +84,7 @@ async def run_steered(
     workflow_id = f"steer-{len(fake.calls)}-{id(fake)}"
     async with Worker(
         env.client,
+        workflow_runner=workflow_runner(),
         task_queue=INVESTIGATION_TASK_QUEUE,
         workflows=[InvestigationWorkflow, EvaluateHypothesisWorkflow],
         activities=fake.activities(),

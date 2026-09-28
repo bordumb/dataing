@@ -17,6 +17,7 @@ from temporalio.client import Client, WorkflowExecutionStatus
 from temporalio.testing import WorkflowEnvironment
 from temporalio.worker import Worker
 
+from dataing.temporal.sandbox import workflow_runner
 from dataing.temporal.workflows.issue_thread import (
     IssueThreadInput,
     IssueThreadWorkflow,
@@ -108,6 +109,7 @@ async def test_turns_run_in_order_and_duplicates_are_ignored(env: WorkflowEnviro
     turns.block.add("a")
     async with Worker(
         env.client,
+        workflow_runner=workflow_runner(),
         task_queue=TASK_QUEUE,
         workflows=[IssueThreadWorkflow],
         activities=turns.activities(),
@@ -130,6 +132,7 @@ async def test_cancelled_queued_request_is_skipped(env: WorkflowEnvironment) -> 
     turns.block.add("a")
     async with Worker(
         env.client,
+        workflow_runner=workflow_runner(),
         task_queue=TASK_QUEUE,
         workflows=[IssueThreadWorkflow],
         activities=turns.activities(),
@@ -151,6 +154,7 @@ async def test_workflow_ends_after_idling(env: WorkflowEnvironment) -> None:
     thread_id = str(uuid.uuid4())
     async with Worker(
         env.client,
+        workflow_runner=workflow_runner(),
         task_queue=TASK_QUEUE,
         workflows=[IssueThreadWorkflow],
         activities=turns.activities(),
@@ -170,6 +174,7 @@ async def test_continue_as_new_carries_pending_requests(env: WorkflowEnvironment
     turns.block.add("a")
     async with Worker(
         env.client,
+        workflow_runner=workflow_runner(),
         task_queue=TASK_QUEUE,
         workflows=[IssueThreadWorkflow],
         activities=turns.activities(),
@@ -200,6 +205,7 @@ async def test_failed_turn_is_marked_and_the_queue_moves_on(env: WorkflowEnviron
     turns.fail.add("a")
     async with Worker(
         env.client,
+        workflow_runner=workflow_runner(),
         task_queue=TASK_QUEUE,
         workflows=[IssueThreadWorkflow],
         activities=turns.activities(),
@@ -218,6 +224,7 @@ async def test_brief_requests_run_the_draft_activity(env: WorkflowEnvironment) -
     thread_id = str(uuid.uuid4())
     async with Worker(
         env.client,
+        workflow_runner=workflow_runner(),
         task_queue=TASK_QUEUE,
         workflows=[IssueThreadWorkflow],
         activities=turns.activities(),

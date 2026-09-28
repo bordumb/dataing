@@ -15,6 +15,7 @@ import pytest
 from temporalio.client import WorkflowHistory
 from temporalio.worker import Replayer
 
+from dataing.temporal.sandbox import workflow_runner
 from dataing.temporal.workflows import EvaluateHypothesisWorkflow, InvestigationWorkflow
 
 HISTORIES = sorted((Path(__file__).parents[2] / "fixtures" / "temporal_histories").glob("*.json"))
@@ -26,7 +27,10 @@ async def test_recorded_history_replays(path: Path) -> None:
     # Recorded as workflow id "replay-<outcome>"; child ids derive from it
     workflow_id = f"replay-{path.stem.rsplit('_', 1)[1]}"
     history = WorkflowHistory.from_json(workflow_id, json.loads(path.read_text()))
-    replayer = Replayer(workflows=[InvestigationWorkflow, EvaluateHypothesisWorkflow])
+    replayer = Replayer(
+        workflow_runner=workflow_runner(),
+        workflows=[InvestigationWorkflow, EvaluateHypothesisWorkflow],
+    )
 
     await replayer.replay_workflow(history)
 

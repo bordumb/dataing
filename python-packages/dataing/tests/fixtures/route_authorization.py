@@ -16,7 +16,7 @@ from typing import Any
 
 from fastapi import FastAPI
 from fastapi.dependencies.models import Dependant
-from fastapi.routing import APIRoute
+from fastapi.routing import APIRoute, RouteContext, iter_route_contexts
 
 from dataing.core.auth.jwt import create_access_token
 from dataing.core.auth.types import OrgRole
@@ -66,7 +66,7 @@ def _is_gate(call: Callable[..., Any], extra_gates: GateMap) -> bool:
     )
 
 
-def route_gate(route: APIRoute, extra_gates: GateMap | None = None) -> str:
+def route_gate(route: APIRoute | RouteContext, extra_gates: GateMap | None = None) -> str:
     """Return the strongest gate a route's dependencies enforce.
 
     Args:
@@ -97,12 +97,22 @@ def route_gate(route: APIRoute, extra_gates: GateMap | None = None) -> str:
     return ANY_USER if authenticated else PUBLIC
 
 
-def mutating_routes(app: FastAPI) -> dict[tuple[str, str], APIRoute]:
+def _api_routes(app: FastAPI) -> Iterator[RouteContext]:
+    """Yield every API route the app serves, with its effective path and dependencies.
+
+    FastAPI keeps included routers nested (``app.routes`` holds one entry per
+    ``include_router`` call), so walk the effective routes instead.
+    """
+    for route in iter_route_contexts(app.routes):
+        if isinstance(route.original_route, APIRoute):
+            yield route
+
+
+def mutating_routes(app: FastAPI) -> dict[tuple[str, str], RouteContext]:
     """Map (method, path) to its route for every POST/PUT/PATCH/DELETE route."""
     return {
         (method, route.path): route
-        for route in app.routes
-        if isinstance(route, APIRoute)
+        for route in _api_routes(app)
         for method in route.methods & MUTATING_METHODS
     }
 
@@ -127,9 +137,8 @@ def stub_service_dependencies(
             else:
                 app.dependency_overrides[sub.call] = lambda: stub
 
-    for route in app.routes:
-        if isinstance(route, APIRoute):
-            visit(route.dependant)
+    for route in _api_routes(app):
+        visit(route.dependant)
 
 
 def scope_denied_detail(gate: str) -> str:

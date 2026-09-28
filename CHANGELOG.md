@@ -1,3 +1,10 @@
+# [1.25.0](https://github.com/bordumb/dataing/compare/v1.24.10...v1.25.0) (2026-09-28)
+
+
+### Features
+
+* **api:** issue hub with shared agent chat, investigation briefs and steering ([#209](https://github.com/bordumb/dataing/issues/209)) ([b7c26b3](https://github.com/bordumb/dataing/commit/b7c26b3aea295cdfc11a8b87801dc34e73b2746f)), closes [#n](https://github.com/bordumb/dataing/issues/n) [#sn](https://github.com/bordumb/dataing/issues/sn)
+
 ## [1.24.10](https://github.com/bordumb/dataing/compare/v1.24.9...v1.24.10) (2026-09-28)
 
 

@@ -11,7 +11,9 @@ run_agent_turn answers one request message:
    token usage in its payload, or ``cancelled`` (partial text kept).
 
 run_brief_draft fills a ``brief`` message (created by the API when someone asked
-for a draft) with an InvestigationBrief drafted from the thread.
+for a draft) with an InvestigationBrief drafted from the thread. A draft asked for
+in a scratch chat reads the shared thread first (messages numbered #n), then the
+scratch chat (numbered #sn), and may cite query results from both.
 
 mark_turn_failed marks the reply (or the brief) ``error`` once every attempt has
 failed.
@@ -23,7 +25,9 @@ import asyncio
 import contextlib
 import json
 import logging
+import sys
 from collections.abc import Awaitable, Callable
+from dataclasses import dataclass
 from typing import Any, TypeVar
 from uuid import UUID
 
@@ -275,6 +279,56 @@ async def _thread_query_results(db: AppDatabase, thread_id: UUID) -> set[UUID]:
     return {row["id"] for row in rows}
 
 
+@dataclass
+class BriefSources:
+    """What a brief draft reads, and how its citations resolve."""
+
+    history: list[dict[str, Any]]
+    seq_to_message: dict[int, UUID]
+    known_query_results: set[UUID]
+    scratch_seq_to_message: dict[int, UUID] | None = None
+
+
+async def _brief_sources(
+    db: AppDatabase,
+    threads: IssueThreadRepository,
+    issue_id: UUID,
+    thread_id: UUID,
+    before_seq: int,
+) -> BriefSources:
+    """Collect the messages and query results a brief draft may cite.
+
+    For the shared thread that is its own messages before the brief. For a
+    scratch chat it is the whole shared thread, then a marker, then the scratch
+    messages before the brief relabelled ``s<seq>``, so no citation is ambiguous.
+    """
+    messages = await _labelled_messages(db, threads, thread_id, before_seq)
+    known = await _thread_query_results(db, thread_id)
+    thread = await threads.get_thread(thread_id)
+    if thread is None or thread["kind"] != "scratch":
+        return BriefSources(messages, {m["seq"]: m["id"] for m in messages}, known)
+
+    shared = await threads.ensure_shared_thread(issue_id)
+    shared_messages = await _labelled_messages(db, threads, shared["id"], sys.maxsize)
+    owner = (await _author_names(db, {thread["owner_user_id"]})).get(thread["owner_user_id"])
+    marker = {
+        "author_kind": "system",
+        "seq": None,
+        "body_md": (
+            f"The shared thread ends here. What follows is {owner or 'the requester'}'s "
+            "private scratch chat. Its messages are numbered #s1, #s2, ...; cite them "
+            "with source_seq s1, s2, ..."
+        ),
+    }
+    scratch = [{**m, "seq": f"s{m['seq']}"} for m in messages]
+    return BriefSources(
+        history=[*shared_messages, marker, *scratch],
+        seq_to_message={m["seq"]: m["id"] for m in shared_messages},
+        known_query_results=known | await _thread_query_results(db, shared["id"]),
+        scratch_seq_to_message={m["seq"]: m["id"] for m in messages},
+    )
+
+
 def make_run_brief_draft_activity(
     app_db: AppDatabase,
     agent_factory: BriefAgentFactory,
@@ -319,19 +373,20 @@ def make_run_brief_draft_activity(
             principal=None,
         )
         overview = await services.issue_context()
-        messages = await _labelled_messages(app_db, threads, thread_id, message["seq"])
+        sources = await _brief_sources(app_db, threads, issue_id, thread_id, message["seq"])
 
         draft, usage = await _with_heartbeats(
             draft_brief(
                 agent_factory(),
-                build_history(messages, max_messages=HISTORY_LIMIT),
+                build_history(sources.history, max_messages=len(sources.history)),
                 instructions=build_instructions(overview),
             )
         )
         brief = brief_from_draft(
             draft,
-            seq_to_message={m["seq"]: m["id"] for m in messages},
-            known_query_results=await _thread_query_results(app_db, thread_id),
+            seq_to_message=sources.seq_to_message,
+            scratch_seq_to_message=sources.scratch_seq_to_message,
+            known_query_results=sources.known_query_results,
             datasource_id=datasource_id,
         )
         await threads.update_message(

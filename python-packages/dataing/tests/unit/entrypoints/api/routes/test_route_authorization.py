@@ -92,6 +92,7 @@ POLICY: dict[tuple[str, str], str] = {
     ("DELETE", "/issues/{issue_id}/threads/{thread_id}/messages/{message_id}"): ANY_USER,
     ("POST", "/issues/{issue_id}/threads/{thread_id}/messages/{message_id}/cancel"): ANY_USER,
     ("POST", "/issues/{issue_id}/threads/{thread_id}/brief-drafts"): SCOPE_WRITE,
+    ("POST", "/issues/{issue_id}/threads/{thread_id}/publish"): ANY_USER,
     ("POST", "/issues/{issue_id}/investigation-runs"): SCOPE_WRITE,
     ("DELETE", "/issues/{issue_id}/watch"): ANY_USER,
     ("POST", "/issues/{issue_id}/watch"): ANY_USER,

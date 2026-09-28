@@ -150,6 +150,31 @@ class FakeThreads:
     async def append_event(self, *args: Any, **kwargs: Any) -> dict[str, Any]:
         return {}
 
+    async def get_messages(self, message_ids: list[uuid.UUID]) -> list[dict[str, Any]]:
+        return [self.messages[i] for i in message_ids if i in self.messages]
+
+    async def publish_messages(
+        self,
+        shared_thread_id: uuid.UUID,
+        *,
+        source_thread_id: uuid.UUID,
+        author_user_id: uuid.UUID,
+        body_md: str,
+        messages: list[dict[str, Any]],
+    ) -> dict[str, Any]:
+        self.published_from = messages
+        return await self.append_message(
+            shared_thread_id,
+            author_kind="user",
+            kind="published",
+            author_user_id=author_user_id,
+            body_md=body_md,
+            payload={
+                "source_thread_id": str(source_thread_id),
+                "source_message_ids": [str(m["id"]) for m in messages],
+            },
+        )
+
     async def get_query_result(self, result_id: uuid.UUID) -> dict[str, Any] | None:
         snapshot = self.snapshots.get(result_id)
         if snapshot is None:
@@ -776,3 +801,174 @@ class TestBriefDrafts:
         )
 
         assert response.status_code == 403
+
+
+class TestPublishing:
+    """The owner of a scratch chat copies selected messages into the shared thread."""
+
+    def _client(self, threads: FakeThreads) -> tuple[TestClient, AsyncMock]:
+        db = AsyncMock()
+        db.fetch_one.return_value = {"id": ISSUE_ID, "tenant_id": TENANT_ID}
+        app = FastAPI()
+        app.include_router(router)
+        app.dependency_overrides[get_app_db] = lambda: db
+        app.dependency_overrides[get_issue_thread_repository] = lambda: threads
+        return TestClient(app), db
+
+    async def _scratch_chat(self, threads: FakeThreads) -> tuple[dict[str, Any], list[Any]]:
+        scratch = threads._thread("scratch", MAYA)
+        question = await threads.append_message(
+            scratch["id"],
+            author_kind="user",
+            kind="comment",
+            author_user_id=MAYA,
+            body_md="are the enum values new?",
+        )
+        answer = await threads.append_message(
+            scratch["id"],
+            author_kind="agent",
+            kind="agent_reply",
+            requested_by_user_id=MAYA,
+            body_md="Yes: `app_v2` appeared on the 14th.",
+        )
+        aside = await threads.append_message(
+            scratch["id"], author_kind="user", kind="comment", author_user_id=MAYA, body_md="hmm"
+        )
+        return scratch, [question, answer, aside]
+
+    def _publish(
+        self, client: TestClient, thread_id: uuid.UUID, body: dict[str, Any], role: OrgRole
+    ) -> Any:
+        return client.post(
+            f"/issues/{ISSUE_ID}/threads/{thread_id}/publish",
+            json=body,
+            **_auth(role, MAYA),
+        )
+
+    async def test_owner_publishes_selected_messages(self, threads: FakeThreads) -> None:
+        """One published message lands in the shared thread: note, then texts in seq order."""
+        client, db = self._client(threads)
+        scratch, (question, answer, _) = await self._scratch_chat(threads)
+
+        response = self._publish(
+            client,
+            scratch["id"],
+            {"message_ids": [str(answer["id"]), str(question["id"])], "note": "Found it"},
+            OrgRole.MEMBER,
+        )
+
+        assert response.status_code == 201
+        body = response.json()
+        assert body["thread_id"] == str(threads.shared["id"])
+        assert (body["kind"], body["author_kind"], body["author_user_id"]) == (
+            "published",
+            "user",
+            str(MAYA),
+        )
+        agent_text = "**Agent:** Yes: `app_v2` appeared on the 14th."
+        assert body["body_md"] == f"Found it\n\nare the enum values new?\n\n{agent_text}"
+        assert [m["id"] for m in threads.published_from] == [question["id"], answer["id"]]
+        statements = [str(c.args[0]) for c in db.execute.call_args_list]
+        assert any("UPDATE issues SET updated_at" in sql for sql in statements)
+
+    async def test_deleted_messages_are_skipped(self, threads: FakeThreads) -> None:
+        """A deleted comment isn't copied; publishing only deleted ones is refused."""
+        client, _ = self._client(threads)
+        scratch, (question, answer, _) = await self._scratch_chat(threads)
+        await threads.soft_delete_message(question["id"])
+
+        response = self._publish(
+            client,
+            scratch["id"],
+            {"message_ids": [str(question["id"]), str(answer["id"])]},
+            OrgRole.MEMBER,
+        )
+        assert response.status_code == 201
+        assert [m["id"] for m in threads.published_from] == [answer["id"]]
+
+        only_deleted = self._publish(
+            client, scratch["id"], {"message_ids": [str(question["id"])]}, OrgRole.MEMBER
+        )
+        assert only_deleted.status_code == 400
+
+    async def test_someone_elses_scratch_chat_is_not_found(self, threads: FakeThreads) -> None:
+        """Even an admin can't publish from Raj's scratch chat."""
+        client, _ = self._client(threads)
+        theirs = threads._thread("scratch", RAJ)
+        message = await threads.append_message(
+            theirs["id"], author_kind="user", kind="comment", author_user_id=RAJ, body_md="x"
+        )
+
+        response = self._publish(
+            client, theirs["id"], {"message_ids": [str(message["id"])]}, OrgRole.ADMIN
+        )
+
+        assert response.status_code == 404
+
+    async def test_shared_thread_cannot_be_published(self, threads: FakeThreads) -> None:
+        """Publishing is only from a scratch chat into the shared thread."""
+        client, _ = self._client(threads)
+        message = await threads.append_message(
+            threads.shared["id"], author_kind="user", kind="comment", author_user_id=MAYA
+        )
+
+        response = self._publish(
+            client, threads.shared["id"], {"message_ids": [str(message["id"])]}, OrgRole.MEMBER
+        )
+
+        assert response.status_code == 400
+
+    async def test_messages_must_belong_to_the_scratch_chat(self, threads: FakeThreads) -> None:
+        """A message id from another thread (or an unknown one) is refused."""
+        client, _ = self._client(threads)
+        scratch, (question, _, _) = await self._scratch_chat(threads)
+        elsewhere = await threads.append_message(
+            threads.shared["id"], author_kind="user", kind="comment", author_user_id=RAJ
+        )
+
+        for foreign in (elsewhere["id"], uuid.uuid4()):
+            response = self._publish(
+                client,
+                scratch["id"],
+                {"message_ids": [str(question["id"]), str(foreign)]},
+                OrgRole.MEMBER,
+            )
+            assert response.status_code == 400
+
+    async def test_unfinished_answers_cannot_be_published(self, threads: FakeThreads) -> None:
+        """An answer still streaming has no final text to copy."""
+        client, _ = self._client(threads)
+        scratch, (_, answer, _) = await self._scratch_chat(threads)
+        answer["status"] = "streaming"
+
+        response = self._publish(
+            client, scratch["id"], {"message_ids": [str(answer["id"])]}, OrgRole.MEMBER
+        )
+
+        assert response.status_code == 400
+
+    async def test_viewer_cannot_publish(self, threads: FakeThreads) -> None:
+        """Publishing writes to the shared thread, so it needs the write scope."""
+        client, _ = self._client(threads)
+        scratch, (question, _, _) = await self._scratch_chat(threads)
+
+        response = self._publish(
+            client, scratch["id"], {"message_ids": [str(question["id"])]}, OrgRole.VIEWER
+        )
+
+        assert response.status_code == 403
+
+    @pytest.mark.parametrize(
+        "body",
+        [
+            {"message_ids": []},
+            {"message_ids": [str(uuid.uuid4()) for _ in range(51)]},
+            {"message_ids": [str(uuid.uuid4())], "note": "x" * 2001},
+        ],
+    )
+    async def test_request_limits(self, threads: FakeThreads, body: dict[str, Any]) -> None:
+        """One to fifty messages and a note of at most 2000 characters."""
+        client, _ = self._client(threads)
+        scratch, _ = await self._scratch_chat(threads)
+
+        assert self._publish(client, scratch["id"], body, OrgRole.MEMBER).status_code == 422

@@ -164,3 +164,91 @@ async def test_running_turns_are_counted_per_person(migrated_db: AppDatabase) ->
         )
 
     assert await repo.count_running_turns(user_id) == 2
+
+
+async def _snapshot(db: AppDatabase, tenant_id: UUID, message_id: UUID, sql: str) -> UUID:
+    row = await db.execute_returning(
+        """
+        INSERT INTO agent_query_results (
+            tenant_id, message_id, tool_call_id, sql, dialect, columns, rows, row_count
+        )
+        VALUES ($1, $2, 'call-1', $3, 'postgres', '[{"name": "n"}]', '[{"n": 7}]', 1)
+        RETURNING id
+        """,
+        tenant_id,
+        message_id,
+        sql,
+    )
+    assert row is not None
+    result_id: UUID = row["id"]
+    return result_id
+
+
+async def test_publish_copies_messages_and_snapshots(migrated_db: AppDatabase) -> None:
+    """The published message carries copies of the snapshots, so the scratch chat can go."""
+    tenant_id, user_id, issue_id = await _issue(migrated_db)
+    repo = IssueThreadRepository(migrated_db)
+    shared = await repo.ensure_shared_thread(issue_id)
+    scratch = await repo.create_scratch_thread(tenant_id, issue_id, user_id, "enum check")
+    question = await repo.append_message(
+        scratch["id"], author_kind="user", kind="comment", author_user_id=user_id, body_md="q"
+    )
+    answer = await repo.append_message(
+        scratch["id"], author_kind="agent", kind="agent_reply", body_md="seven"
+    )
+    original = await _snapshot(migrated_db, tenant_id, answer["id"], "SELECT 7 AS n")
+    tool_calls = [
+        {"id": "call-1", "tool": "run_query", "summary": "1 row", "query_result_id": str(original)},
+        {"id": "call-2", "tool": "list_tables", "summary": "3 tables", "query_result_id": None},
+    ]
+    answer = await repo.update_message(answer["id"], payload={"tool_calls": tool_calls})
+    assert answer is not None
+
+    published = await repo.publish_messages(
+        shared["id"],
+        source_thread_id=scratch["id"],
+        author_user_id=user_id,
+        body_md="note\n\nq\n\n**Agent:** seven",
+        messages=[question, answer],
+    )
+
+    assert published["thread_id"] == shared["id"]
+    assert (published["kind"], published["author_kind"]) == ("published", "user")
+    assert published["author_user_id"] == user_id
+    payload = published["payload"]
+    assert payload["source_thread_id"] == str(scratch["id"])
+    assert payload["source_message_ids"] == [str(question["id"]), str(answer["id"])]
+    (copy_id,) = payload["query_results"]
+    assert copy_id != str(original)
+    copied_calls = payload["tool_calls"]
+    assert [c["id"] for c in copied_calls] == ["call-1", "call-2"]
+    assert copied_calls[0]["query_result_id"] == copy_id
+    assert copied_calls[1]["query_result_id"] is None
+    assert copied_calls[0]["source_message_id"] == str(answer["id"])
+
+    await repo.delete_thread(scratch["id"])
+
+    assert await repo.get_query_result(original) is None
+    copy = await repo.get_query_result(UUID(copy_id))
+    assert copy is not None
+    assert copy["thread_id"] == shared["id"]
+    assert copy["message_id"] == published["id"]
+    assert (copy["sql"], copy["rows"], copy["row_count"]) == ("SELECT 7 AS n", [{"n": 7}], 1)
+    stored = await repo.get_message(published["id"])
+    assert stored is not None
+    assert stored["body_md"].startswith("note")
+
+
+async def test_get_messages_returns_the_requested_rows(migrated_db: AppDatabase) -> None:
+    """Unknown ids are simply absent."""
+    _, user_id, issue_id = await _issue(migrated_db)
+    repo = IssueThreadRepository(migrated_db)
+    thread = await repo.ensure_shared_thread(issue_id)
+    message = await repo.append_message(
+        thread["id"], author_kind="user", kind="comment", author_user_id=user_id, body_md="x"
+    )
+
+    rows = await repo.get_messages([message["id"], uuid4()])
+
+    assert [r["id"] for r in rows] == [message["id"]]
+    assert rows[0]["payload"] == {}

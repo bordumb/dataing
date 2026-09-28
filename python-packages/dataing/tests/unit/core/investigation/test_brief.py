@@ -87,6 +87,49 @@ def test_draft_citations_resolve_to_messages_and_known_query_results() -> None:
     assert brief.scope.tables == ["analytics.public.orders"]
 
 
+@pytest.mark.parametrize(
+    ("source_seq", "expected"),
+    [
+        (4, "shared"),
+        ("4", "shared"),
+        ("#4", "shared"),
+        ("s4", "scratch"),
+        ("#S4", "scratch"),
+        ("s99", None),
+        ("x4", None),
+        ("s", None),
+    ],
+)
+def test_scratch_citations_resolve_against_the_scratch_thread(
+    source_seq: int | str, expected: str | None
+) -> None:
+    """A draft from a scratch chat cites shared messages as #n and scratch ones as #sn."""
+    shared_id, scratch_id = uuid.uuid4(), uuid.uuid4()
+    draft = BriefDraft(symptom="x", findings=[DraftClaim(statement="claim", source_seq=source_seq)])
+
+    brief = brief_from_draft(
+        draft,
+        seq_to_message={4: shared_id},
+        scratch_seq_to_message={4: scratch_id},
+        known_query_results=set(),
+        datasource_id=None,
+    )
+
+    ids = {"shared": shared_id, "scratch": scratch_id, None: None}
+    assert brief.findings[0].message_id == ids[expected]
+
+
+def test_scratch_citations_are_dropped_without_a_scratch_thread() -> None:
+    """A shared-thread draft has no s-numbers to resolve."""
+    draft = BriefDraft(symptom="x", findings=[DraftClaim(statement="claim", source_seq="s4")])
+
+    brief = brief_from_draft(
+        draft, seq_to_message={4: uuid.uuid4()}, known_query_results=set(), datasource_id=None
+    )
+
+    assert brief.findings[0].message_id is None
+
+
 def test_prompt_text_separates_findings_exclusions_and_leads() -> None:
     """The manager sees facts, exclusions and leads as labelled sections."""
     brief = InvestigationBrief.model_validate(

@@ -270,3 +270,122 @@ async def test_brief_draft_fills_the_brief_message(migrated_db: AppDatabase) -> 
     assert brief["findings"][0]["message_id"] == str(question["id"])
     assert brief["scope"]["datasource_id"] == str(request["datasource_id"])
     assert stored["body_md"].startswith("**Investigation brief**")
+
+
+async def _reply_with_snapshot(
+    db: AppDatabase, threads: IssueThreadRepository, thread_id: uuid.UUID, tenant_id: str
+) -> tuple[dict[str, Any], uuid.UUID]:
+    reply = await threads.append_message(
+        thread_id, author_kind="agent", kind="agent_reply", body_md="counted rows"
+    )
+    row = await db.execute_returning(
+        """
+        INSERT INTO agent_query_results (tenant_id, message_id, tool_call_id, sql, dialect)
+        VALUES ($1, $2, 'call-1', 'SELECT 1', 'postgres')
+        RETURNING id
+        """,
+        uuid.UUID(tenant_id),
+        reply["id"],
+    )
+    assert row is not None
+    result_id: uuid.UUID = row["id"]
+    return reply, result_id
+
+
+async def test_brief_draft_from_a_scratch_chat_reads_both_threads(
+    migrated_db: AppDatabase,
+) -> None:
+    """Shared messages come first as #n, scratch ones as #sn; both kinds of citation resolve."""
+    from pydantic_ai.messages import ModelResponse, ToolCallPart
+
+    from dataing.agents.chat import build_brief_agent
+    from dataing.temporal.activities.agent_turn import make_run_brief_draft_activity
+
+    request = await _thread_with_question(migrated_db)
+    threads = IssueThreadRepository(migrated_db)
+    user_id = uuid.UUID(request["requested_by"])
+    question = await threads.get_message(uuid.UUID(request["message_id"]))
+    assert question is not None
+    _, shared_result = await _reply_with_snapshot(
+        migrated_db, threads, uuid.UUID(request["thread_id"]), request["tenant_id"]
+    )
+    scratch = await threads.create_scratch_thread(
+        uuid.UUID(request["tenant_id"]), uuid.UUID(request["issue_id"]), user_id, "enums"
+    )
+    scratch_note = await threads.append_message(
+        scratch["id"],
+        author_kind="user",
+        kind="comment",
+        author_user_id=user_id,
+        body_md="app_v2 is a new enum value",
+    )
+    scratch_reply, scratch_result = await _reply_with_snapshot(
+        migrated_db, threads, scratch["id"], request["tenant_id"]
+    )
+    brief_msg = await threads.append_message(
+        scratch["id"],
+        author_kind="agent",
+        kind="brief",
+        requested_by_user_id=user_id,
+        status="queued",
+    )
+    seen: list[str] = []
+
+    def respond(messages: list[ModelMessage], info: AgentInfo) -> ModelResponse:
+        for message in messages:
+            seen.extend(str(getattr(part, "content", "")) for part in message.parts)
+        (output_tool,) = info.output_tools
+        return ModelResponse(
+            parts=[
+                ToolCallPart(
+                    output_tool.name,
+                    {
+                        "symptom": "Orders dropped",
+                        "findings": [
+                            {
+                                "statement": "Asked about regions",
+                                "source_seq": question["seq"],
+                                "query_result_id": str(shared_result),
+                            },
+                            {
+                                "statement": "New enum value",
+                                "source_seq": f"s{scratch_note['seq']}",
+                                "query_result_id": str(scratch_result),
+                            },
+                        ],
+                        "ruled_out": [
+                            {"statement": "Counted", "source_seq": f"#s{scratch_reply['seq']}"}
+                        ],
+                    },
+                )
+            ]
+        )
+
+    activity_fn = make_run_brief_draft_activity(
+        migrated_db, lambda: build_brief_agent(FunctionModel(respond)), FakeQueries()
+    )
+    result = await ActivityEnvironment().run(
+        activity_fn,
+        {
+            **request,
+            "message_id": str(brief_msg["id"]),
+            "thread_id": str(scratch["id"]),
+            "kind": "draft_brief",
+        },
+    )
+
+    assert result["status"] == "complete"
+    history = "\n".join(seen)
+    assert "earlier" in history
+    assert f"#s{scratch_note['seq']} Maya: app_v2 is a new enum value" in history
+    assert history.index("is it every region?") < history.index("app_v2 is a new enum value")
+    stored = await threads.get_message(brief_msg["id"])
+    assert stored is not None
+    assert stored["thread_id"] == scratch["id"]
+    brief = stored["payload"]["brief"]
+    shared_claim, scratch_claim = brief["findings"]
+    assert shared_claim["message_id"] == str(question["id"])
+    assert shared_claim["query_result_id"] == str(shared_result)
+    assert scratch_claim["message_id"] == str(scratch_note["id"])
+    assert scratch_claim["query_result_id"] == str(scratch_result)
+    assert brief["ruled_out"][0]["message_id"] == str(scratch_reply["id"])

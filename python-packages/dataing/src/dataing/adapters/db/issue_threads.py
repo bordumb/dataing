@@ -82,6 +82,40 @@ def _change_text(field: str, before: Any, after: Any) -> str:
     return f"{field} changed from {show(before)} to {show(after)}"
 
 
+def published_payload(
+    source_thread_id: UUID, messages: list[dict[str, Any]], copy_of: dict[str, str]
+) -> dict[str, Any]:
+    """Return the payload of a published message.
+
+    Tool calls of the copied messages are merged in order, each pointing at the
+    copy of its query snapshot (or at nothing when the snapshot wasn't copied).
+    ``query_results`` lists every copied snapshot, those the tool calls cite first.
+
+    Args:
+        source_thread_id: The scratch chat the messages come from.
+        messages: The copied messages, in the order they are shown.
+        copy_of: Copied snapshot ids by original snapshot id.
+    """
+    tool_calls: list[dict[str, Any]] = []
+    query_results: list[str] = []
+    for message in messages:
+        for call in (message.get("payload") or {}).get("tool_calls") or []:
+            original = call.get("query_result_id")
+            copy = copy_of.get(str(original)) if original else None
+            if copy:
+                query_results.append(copy)
+            tool_calls.append(
+                {**call, "query_result_id": copy, "source_message_id": str(message["id"])}
+            )
+    query_results += [copy for copy in copy_of.values() if copy not in query_results]
+    return {
+        "source_thread_id": str(source_thread_id),
+        "source_message_ids": [str(m["id"]) for m in messages],
+        "tool_calls": tool_calls,
+        "query_results": query_results,
+    }
+
+
 class IssueThreadRepository:
     """Reads and writes issue threads and thread messages."""
 
@@ -242,6 +276,101 @@ class IssueThreadRepository:
             f"SELECT {MESSAGE_COLUMNS} FROM issue_thread_messages WHERE id = $1", message_id
         )
         return _decode_message(row) if row else None
+
+    async def get_messages(self, message_ids: list[UUID]) -> list[dict[str, Any]]:
+        """Return the messages with these ids; unknown ids are absent."""
+        rows = await self._db.fetch_all(
+            f"SELECT {MESSAGE_COLUMNS} FROM issue_thread_messages WHERE id = ANY($1::uuid[])",
+            list(message_ids),
+        )
+        return [_decode_message(r) for r in rows]
+
+    async def publish_messages(
+        self,
+        shared_thread_id: UUID,
+        *,
+        source_thread_id: UUID,
+        author_user_id: UUID,
+        body_md: str,
+        messages: list[dict[str, Any]],
+    ) -> dict[str, Any]:
+        """Copy scratch-chat messages into one ``published`` message in the shared thread.
+
+        The query snapshots of the copied messages are copied too and attached to
+        the published message, and its tool calls point at the copies, so deleting
+        the scratch chat leaves the shared thread intact. Everything happens in one
+        transaction.
+
+        Args:
+            shared_thread_id: The issue's shared thread.
+            source_thread_id: The scratch chat the messages come from.
+            author_user_id: The owner publishing them.
+            body_md: The published text.
+            messages: The copied messages, in the order they are shown.
+        """
+        async with self._db.acquire() as conn, conn.transaction():
+            thread = await conn.fetchrow(
+                "SELECT id, tenant_id FROM issue_threads WHERE id = $1 FOR UPDATE",
+                shared_thread_id,
+            )
+            if thread is None:
+                raise LookupError(f"Thread not found: {shared_thread_id}")
+            published = await conn.fetchrow(
+                """
+                INSERT INTO issue_thread_messages (
+                    tenant_id, thread_id, seq, author_kind, author_user_id, kind, body_md
+                )
+                SELECT $1, $2,
+                       COALESCE(
+                           (SELECT MAX(seq) FROM issue_thread_messages WHERE thread_id = $2),
+                           0
+                       ) + 1,
+                       'user', $3, 'published', $4
+                RETURNING id
+                """,
+                thread["tenant_id"],
+                shared_thread_id,
+                author_user_id,
+                body_md,
+            )
+            if published is None:
+                raise RuntimeError("Failed to publish messages")
+            copies = await conn.fetch(
+                """
+                WITH source AS (
+                    SELECT gen_random_uuid() AS new_id, r.*
+                    FROM agent_query_results r
+                    WHERE r.message_id = ANY($1::uuid[]) AND r.tenant_id = $3
+                ),
+                copied AS (
+                    INSERT INTO agent_query_results (
+                        id, tenant_id, message_id, tool_call_id, datasource_id, sql, dialect,
+                        columns, rows, row_count, truncated, duration_ms, error, created_at
+                    )
+                    SELECT new_id, tenant_id, $2, tool_call_id, datasource_id, sql, dialect,
+                           columns, rows, row_count, truncated, duration_ms, error, created_at
+                    FROM source
+                )
+                SELECT id AS old_id, new_id FROM source
+                """,
+                [m["id"] for m in messages],
+                published["id"],
+                thread["tenant_id"],
+            )
+            copy_of = {str(row["old_id"]): str(row["new_id"]) for row in copies}
+            payload = published_payload(source_thread_id, messages, copy_of)
+            row = await conn.fetchrow(
+                f"""
+                UPDATE issue_thread_messages SET payload = $2::jsonb
+                WHERE id = $1
+                RETURNING {MESSAGE_COLUMNS}
+                """,
+                published["id"],
+                to_json_string(payload),
+            )
+        if row is None:
+            raise RuntimeError("Failed to publish messages")
+        return _decode_message(dict(row))
 
     async def get_reply_for_request(self, request_message_id: UUID) -> dict[str, Any] | None:
         """Return the agent reply created for a request message, if any."""

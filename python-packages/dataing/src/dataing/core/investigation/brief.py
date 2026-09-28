@@ -1,9 +1,12 @@
 """The investigation brief: what a thread hands to the manager (spec 0001 §7.7).
 
 The agent drafts a BriefDraft from the thread, citing messages by their ``#seq``
-number. brief_from_draft turns it into an InvestigationBrief, keeping only
-citations that point at real messages and query results of that thread. People
-edit the brief before it starts a run; the manager reads it as prompt text.
+number. A draft made from a scratch chat also sees the shared thread: shared
+messages keep their ``#seq`` and scratch messages are numbered ``#s<seq>``, so a
+citation is never ambiguous. brief_from_draft turns the draft into an
+InvestigationBrief, keeping only citations that point at real messages and query
+results of the threads it read. People edit the brief before it starts a run; the
+manager reads it as prompt text.
 """
 
 from __future__ import annotations
@@ -56,8 +59,12 @@ class DraftClaim(BaseModel):
     """A claim as the drafting model writes it: cited by message number."""
 
     statement: str = Field(..., description="One sentence.")
-    source_seq: int | None = Field(
-        default=None, description="The #number of the thread message this came from."
+    source_seq: int | str | None = Field(
+        default=None,
+        description=(
+            "The #number of the thread message this came from; for a scratch-chat "
+            'message, its s-number such as "s3".'
+        ),
     )
     query_result_id: str | None = Field(
         default=None, description="The result id of the query that shows it, if any."
@@ -88,27 +95,50 @@ def _parse_uuid(value: str | None) -> UUID | None:
         return None
 
 
+def _cited_message(
+    source_seq: int | str | None,
+    shared: dict[int, UUID],
+    scratch: dict[int, UUID],
+) -> UUID | None:
+    """Resolve a citation: 4, "4" or "#4" is shared; "s4" or "#s4" is scratch."""
+    if source_seq is None or isinstance(source_seq, bool):
+        return None
+    if isinstance(source_seq, int):
+        return shared.get(source_seq)
+    text = source_seq.strip().lstrip("#").strip().lower()
+    messages = shared
+    if text.startswith("s"):
+        messages, text = scratch, text[1:]
+    if not text.isdigit():
+        return None
+    return messages.get(int(text))
+
+
 def brief_from_draft(
     draft: BriefDraft,
     *,
     seq_to_message: dict[int, UUID],
     known_query_results: set[UUID],
     datasource_id: UUID | None,
+    scratch_seq_to_message: dict[int, UUID] | None = None,
 ) -> InvestigationBrief:
     """Turn a model draft into a brief, dropping citations that don't resolve.
 
     Args:
         draft: The model's draft.
-        seq_to_message: Message ids of the thread by seq.
-        known_query_results: Query result ids that belong to the thread.
+        seq_to_message: Message ids of the shared thread (or the only thread) by seq.
+        known_query_results: Query result ids that belong to the threads read.
         datasource_id: The datasource the thread queried, if any.
+        scratch_seq_to_message: Message ids of the scratch chat by seq, when the
+            draft was made from one; its messages are cited as ``s<seq>``.
     """
+    scratch = scratch_seq_to_message or {}
 
     def claim(item: DraftClaim) -> BriefClaim:
         result_id = _parse_uuid(item.query_result_id)
         return BriefClaim(
             statement=item.statement[:500],
-            message_id=seq_to_message.get(item.source_seq) if item.source_seq else None,
+            message_id=_cited_message(item.source_seq, seq_to_message, scratch),
             query_result_id=result_id if result_id in known_query_results else None,
         )
 

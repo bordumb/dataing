@@ -8,6 +8,7 @@ route dependencies:
 - Asking the agent runs queries, so it needs the write scope.
 - Scratch threads answer 404 to everyone but their owner, admins included.
 - Only a message's author edits it; its author or an admin deletes it.
+- Only a scratch thread's owner publishes from it, and that needs the write scope.
 """
 
 from __future__ import annotations
@@ -155,6 +156,13 @@ class MessageUpdate(BaseModel):
     """Request body for editing a comment."""
 
     body_md: str = Field(..., min_length=1, max_length=20_000)
+
+
+class PublishRequest(BaseModel):
+    """Request body for publishing scratch-chat messages to the shared thread."""
+
+    message_ids: list[UUID] = Field(..., min_length=1, max_length=50)
+    note: str | None = Field(default=None, max_length=2000)
 
 
 def _thread_response(row: dict[str, Any]) -> ThreadResponse:
@@ -497,6 +505,70 @@ async def request_brief_draft(
             or brief
         )
     return message_response(brief)
+
+
+def published_body(note: str | None, messages: list[dict[str, Any]]) -> str:
+    """Return the text of a published message: the note, then each message's text.
+
+    Agent messages are labelled; the owner's own comments are copied as written.
+    """
+    parts = [note.strip()] if note and note.strip() else []
+    for message in messages:
+        text = (message.get("body_md") or "").strip()
+        if message["author_kind"] == "agent":
+            parts.append(f"**Agent:** {text}" if text else "**Agent:** (no text)")
+        elif text:
+            parts.append(text)
+    return "\n\n".join(parts)
+
+
+@router.post(
+    "/{issue_id}/threads/{thread_id}/publish",
+    response_model=MessageResponse,
+    status_code=201,
+)
+async def publish_from_scratch(
+    issue_id: UUID,
+    thread_id: UUID,
+    body: PublishRequest,
+    auth: AuthDep,
+    db: AppDbDep,
+    threads: ThreadsDep,
+) -> MessageResponse:
+    """Copy selected scratch-chat messages into one message in the shared thread.
+
+    Only the scratch chat's owner can publish, and it needs the write scope. The
+    query snapshots behind the selected answers are copied with them, so deleting
+    the scratch chat later leaves the published message intact. Deleted messages
+    are skipped.
+    """
+    thread = await _thread_for_caller(threads, issue_id, thread_id, auth)
+    user_id = _require_user(auth)
+    if not auth.has_scope("write"):
+        raise HTTPException(status_code=403, detail="Scope 'write' required")
+    if thread["kind"] != "scratch":
+        raise HTTPException(status_code=400, detail="Only scratch chats can be published")
+
+    wanted = set(body.message_ids)
+    found = await threads.get_messages(list(wanted))
+    if len(found) != len(wanted) or any(m["thread_id"] != thread_id for m in found):
+        raise HTTPException(status_code=400, detail="Messages must belong to this scratch chat")
+    if any(m["status"] in ("queued", "streaming") for m in found):
+        raise HTTPException(status_code=400, detail="Wait for the agent to finish answering")
+    selected = sorted((m for m in found if m["deleted_at"] is None), key=lambda m: m["seq"])
+    if not selected:
+        raise HTTPException(status_code=400, detail="Nothing left to publish")
+
+    shared = await threads.ensure_shared_thread(issue_id)
+    row = await threads.publish_messages(
+        shared["id"],
+        source_thread_id=thread_id,
+        author_user_id=user_id,
+        body_md=published_body(body.note, selected),
+        messages=selected,
+    )
+    await db.execute("UPDATE issues SET updated_at = NOW() WHERE id = $1", issue_id)
+    return message_response(row)
 
 
 @router.get(

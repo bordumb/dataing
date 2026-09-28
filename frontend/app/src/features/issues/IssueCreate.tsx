@@ -45,6 +45,15 @@ interface FormData {
   labels: string[];
 }
 
+/** Today in the person's time zone; toISOString() gives the UTC day, which is
+ * yesterday or tomorrow around midnight. */
+function localToday(): string {
+  const now = new Date();
+  const month = String(now.getMonth() + 1).padStart(2, "0");
+  const day = String(now.getDate()).padStart(2, "0");
+  return `${now.getFullYear()}-${month}-${day}`;
+}
+
 export function IssueCreate() {
   const navigate = useNavigate();
   const createIssue = useCreateIssue();
@@ -57,7 +66,7 @@ export function IssueCreate() {
   ]);
 
   const [issueDate, setIssueDate] = useState<DatePickerValue>(() =>
-    stringToDatePickerValue(new Date().toISOString().split("T")[0]),
+    stringToDatePickerValue(localToday()),
   );
 
   const [formData, setFormData] = useState<FormData>({

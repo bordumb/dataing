@@ -5,6 +5,7 @@
  * Autonomous Data Quality Investigation
  * OpenAPI spec version: 2.0.0
  */
+import type { IssueCreateContext } from "./issueCreateContext";
 import type { IssueCreateDatasetId } from "./issueCreateDatasetId";
 import type { IssueCreateDescription } from "./issueCreateDescription";
 import type { IssueCreatePriority } from "./issueCreatePriority";
@@ -14,6 +15,8 @@ import type { IssueCreateSeverity } from "./issueCreateSeverity";
  * Request body for creating an issue.
  */
 export interface IssueCreate {
+  /** Where the problem was seen, e.g. observed_at and column */
+  context?: IssueCreateContext;
   dataset_id?: IssueCreateDatasetId;
   description?: IssueCreateDescription;
   labels?: string[];

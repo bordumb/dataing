@@ -8,28 +8,35 @@
 import type { IssueResponseAcknowledgedBy } from "./issueResponseAcknowledgedBy";
 import type { IssueResponseAssigneeUserId } from "./issueResponseAssigneeUserId";
 import type { IssueResponseClosedAt } from "./issueResponseClosedAt";
+import type { IssueResponseContext } from "./issueResponseContext";
 import type { IssueResponseCreatedByUserId } from "./issueResponseCreatedByUserId";
 import type { IssueResponseDatasetId } from "./issueResponseDatasetId";
 import type { IssueResponseDescription } from "./issueResponseDescription";
+import type { IssueResponseDueAt } from "./issueResponseDueAt";
 import type { IssueResponsePriority } from "./issueResponsePriority";
 import type { IssueResponseResolutionNote } from "./issueResponseResolutionNote";
 import type { IssueResponseSeverity } from "./issueResponseSeverity";
 import type { IssueResponseSourceExternalId } from "./issueResponseSourceExternalId";
 import type { IssueResponseSourceExternalUrl } from "./issueResponseSourceExternalUrl";
 import type { IssueResponseSourceProvider } from "./issueResponseSourceProvider";
+import type { IssueResponseTransitionRequirements } from "./issueResponseTransitionRequirements";
 
 /**
  * Single issue response.
  */
 export interface IssueResponse {
   acknowledged_by: IssueResponseAcknowledgedBy;
+  /** Statuses this issue may move to (the state machine's moves) */
+  allowed_transitions: string[];
   assignee_user_id: IssueResponseAssigneeUserId;
   author_type: string;
   closed_at: IssueResponseClosedAt;
+  context: IssueResponseContext;
   created_at: string;
   created_by_user_id: IssueResponseCreatedByUserId;
   dataset_id: IssueResponseDatasetId;
   description: IssueResponseDescription;
+  due_at: IssueResponseDueAt;
   id: string;
   labels: string[];
   number: number;
@@ -41,5 +48,7 @@ export interface IssueResponse {
   source_provider: IssueResponseSourceProvider;
   status: string;
   title: string;
+  /** For allowed moves whose guard the issue does not yet satisfy, the fields to send in the same PATCH (assignee_user_id or resolution_note) */
+  transition_requirements: IssueResponseTransitionRequirements;
   updated_at: string;
 }

@@ -102,6 +102,12 @@ function InvestigationSummaryCard({ issueId }: InvestigationSummaryCardProps) {
   );
 }
 
+/** The symptom a run's brief states, for its one-line label. */
+function briefSymptom(run: InvestigationRunResponse): string {
+  const symptom = run.brief?.symptom;
+  return typeof symptom === "string" ? symptom : "";
+}
+
 interface InvestigationRunsSectionProps {
   issueId: string;
   datasetId?: string | null;
@@ -127,7 +133,7 @@ function InvestigationRunsSection({
       await spawnInvestigation.mutateAsync({
         issueId,
         data: {
-          focus_prompt: focusPrompt.trim(),
+          brief: { version: 1, symptom: focusPrompt.trim() },
           execution_profile: executionProfile as "safe" | "standard" | "deep",
           dataset_id: datasetId || undefined,
         },
@@ -183,8 +189,8 @@ function InvestigationRunsSection({
                     >
                       <div className="flex items-center justify-between mb-1">
                         <span className="text-sm font-medium">
-                          {run.focus_prompt?.slice(0, 50)}
-                          {(run.focus_prompt?.length ?? 0) > 50 ? "..." : ""}
+                          {briefSymptom(run).slice(0, 50)}
+                          {briefSymptom(run).length > 50 ? "..." : ""}
                         </span>
                         <Badge variant="outline" className="text-xs">
                           {run.execution_profile}

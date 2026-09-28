@@ -7,11 +7,12 @@
  */
 import type { TemporalStatusResponseCurrentStep } from "./temporalStatusResponseCurrentStep";
 import type { TemporalStatusResponseEvidenceCount } from "./temporalStatusResponseEvidenceCount";
+import type { TemporalStatusResponseHypotheses } from "./temporalStatusResponseHypotheses";
 import type { TemporalStatusResponseHypothesesCount } from "./temporalStatusResponseHypothesesCount";
 import type { TemporalStatusResponseHypothesesEvaluated } from "./temporalStatusResponseHypothesesEvaluated";
-import type { TemporalStatusResponseIsAwaitingUser } from "./temporalStatusResponseIsAwaitingUser";
 import type { TemporalStatusResponseIsCancelled } from "./temporalStatusResponseIsCancelled";
 import type { TemporalStatusResponseIsComplete } from "./temporalStatusResponseIsComplete";
+import type { TemporalStatusResponsePendingSteers } from "./temporalStatusResponsePendingSteers";
 import type { TemporalStatusResponseProgress } from "./temporalStatusResponseProgress";
 
 /**
@@ -20,12 +21,13 @@ import type { TemporalStatusResponseProgress } from "./temporalStatusResponsePro
 export interface TemporalStatusResponse {
   current_step?: TemporalStatusResponseCurrentStep;
   evidence_count?: TemporalStatusResponseEvidenceCount;
+  hypotheses?: TemporalStatusResponseHypotheses;
   hypotheses_count?: TemporalStatusResponseHypothesesCount;
   hypotheses_evaluated?: TemporalStatusResponseHypothesesEvaluated;
   investigation_id: string;
-  is_awaiting_user?: TemporalStatusResponseIsAwaitingUser;
   is_cancelled?: TemporalStatusResponseIsCancelled;
   is_complete?: TemporalStatusResponseIsComplete;
+  pending_steers?: TemporalStatusResponsePendingSteers;
   progress?: TemporalStatusResponseProgress;
   workflow_status: string;
 }

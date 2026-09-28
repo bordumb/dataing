@@ -293,7 +293,10 @@ export const useGetIssueApiV1IssuesIssueIdGet = <
 /**
  * Update issue fields.
 
-Enforces state machine transitions when status is changed.
+A field sent as null clears it; a field left out is unchanged. A status
+change is validated against the issue as it will be after this PATCH, so
+status and assignee (or resolution_note) can be sent together. Every
+changed field is recorded as an issue event.
  * @summary Update Issue
  */
 export const updateIssueApiV1IssuesIssueIdPatch = (
@@ -765,13 +768,14 @@ export const useListInvestigationRunsApiV1IssuesIssueIdInvestigationRunsGet = <
 };
 
 /**
- * Spawn an investigation from an issue.
+ * Start an investigation from an issue with an editable brief.
 
-Creates a new investigation linked to this issue. The focus_prompt
-guides the investigation direction.
+The manager and its subagents start from the brief: its symptom is what they
+investigate, its findings are facts, its exclusions are not proposed again and
+its leads are tested first. The brief's scope tables join the issue's dataset
+as reference tables. The run appears in the issue's shared thread.
 
 Requires user identity (JWT auth or user-scoped API key).
-Deep profile may require approval depending on tenant settings.
  * @summary Spawn Investigation
  */
 export const spawnInvestigationApiV1IssuesIssueIdInvestigationRunsPost = (

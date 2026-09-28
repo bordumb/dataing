@@ -6,4 +6,4 @@
  * OpenAPI spec version: 2.0.0
  */
 
-export type TemporalStatusResponseIsAwaitingUser = boolean | null;
+export type IssueResponseContext = { [key: string]: unknown };

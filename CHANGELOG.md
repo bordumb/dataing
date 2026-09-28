@@ -1,3 +1,10 @@
+## [1.25.4](https://github.com/bordumb/dataing/compare/v1.25.3...v1.25.4) (2026-09-28)
+
+
+### Bug Fixes
+
+* **api:** refuse to run without a strong JWT secret ([#230](https://github.com/bordumb/dataing/issues/230)) ([58e44b0](https://github.com/bordumb/dataing/commit/58e44b0e76579077753933d51f5b2583b7f6580b))
+
 ## [1.25.3](https://github.com/bordumb/dataing/compare/v1.25.2...v1.25.3) (2026-09-28)
 
 

@@ -1,3 +1,10 @@
+## [1.25.1](https://github.com/bordumb/dataing/compare/v1.25.0...v1.25.1) (2026-09-28)
+
+
+### Bug Fixes
+
+* **core:** run the issue chat agent on Claude Opus 5.5 ([#211](https://github.com/bordumb/dataing/issues/211)) ([1a31082](https://github.com/bordumb/dataing/commit/1a31082c7f5b72040b55cb4df8f1e48e7c7a1d9c))
+
 # [1.25.0](https://github.com/bordumb/dataing/compare/v1.24.10...v1.25.0) (2026-09-28)
 
 

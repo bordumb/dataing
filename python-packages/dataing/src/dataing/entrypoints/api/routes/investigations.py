@@ -131,10 +131,12 @@ class TemporalStatusResponse(BaseModel):
     progress: float | None = None
     is_complete: bool | None = None
     is_cancelled: bool | None = None
-    is_awaiting_user: bool | None = None
     hypotheses_count: int | None = None
     hypotheses_evaluated: int | None = None
     evidence_count: int | None = None
+    # Each hypothesis's id, title and status, and steers the run hasn't applied yet
+    hypotheses: list[dict[str, Any]] | None = None
+    pending_steers: list[dict[str, Any]] | None = None
 
 
 class CodifyFormat(str, Enum):
@@ -948,10 +950,11 @@ async def get_investigation_status(
             progress=status.progress,
             is_complete=status.is_complete,
             is_cancelled=status.is_cancelled,
-            is_awaiting_user=status.is_awaiting_user,
             hypotheses_count=status.hypotheses_count,
             hypotheses_evaluated=status.hypotheses_evaluated,
             evidence_count=status.evidence_count,
+            hypotheses=status.hypotheses,
+            pending_steers=status.pending_steers,
         )
     except Exception as e:
         logger.error(f"Failed to get Temporal investigation status: {e}")
@@ -1017,7 +1020,6 @@ async def stream_updates(
                                 {
                                     "status": current_status,
                                     "investigation_id": str(investigation_id),
-                                    "is_awaiting_user": status.is_awaiting_user,
                                 }
                             ),
                         }

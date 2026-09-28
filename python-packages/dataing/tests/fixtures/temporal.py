@@ -90,6 +90,12 @@ class FakeAgent:
         }
 
 
+async def wait_condition(condition: Callable[[], bool], **_: Any) -> None:
+    """Wait until a condition holds, yielding to the event loop between checks."""
+    while not condition():
+        await asyncio.sleep(0)
+
+
 class InProcessTemporal:
     """Replaces Temporal's workflow-side dispatch with in-process execution.
 
@@ -116,6 +122,7 @@ class InProcessTemporal:
         monkeypatch.setattr(workflow, "logger", logging.getLogger("workflow"))
         # A new run takes every patched code path
         monkeypatch.setattr(workflow, "patched", lambda _patch_id: True)
+        monkeypatch.setattr(workflow, "wait_condition", wait_condition)
 
     async def execute_activity(self, activity: str, arg: Any, **options: Any) -> Any:
         # Typed decoding (result_type=...) of these dataclasses fails inside Temporal's

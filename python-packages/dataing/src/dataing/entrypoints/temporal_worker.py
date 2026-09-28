@@ -56,6 +56,10 @@ from dataing.temporal.activities.agent_turn import (
     make_run_brief_draft_activity,
 )
 from dataing.temporal.activities.publish_outcome import make_publish_investigation_outcome_activity
+from dataing.temporal.activities.steering import (
+    formulate_hypothesis,
+    make_record_steer_outcome_activity,
+)
 from dataing.temporal.adapters import TemporalAgentAdapter
 from dataing.temporal.workflows import (
     EvaluateHypothesisWorkflow,
@@ -255,6 +259,9 @@ def create_activities(deps: dict[str, Any]) -> list[Any]:
         make_finalize_evidence_chain_activity(app_db=app_db),
         # Outcome write-back to the investigation, its issue run and thread
         make_publish_investigation_outcome_activity(app_db=app_db),
+        # Steering a running investigation
+        formulate_hypothesis,
+        make_record_steer_outcome_activity(app_db=app_db),
         # Issue chat agent turns
         make_run_agent_turn_activity(app_db=app_db, agent_factory=_chat_agent_factory()),
         make_run_brief_draft_activity(app_db=app_db, agent_factory=_brief_agent_factory()),

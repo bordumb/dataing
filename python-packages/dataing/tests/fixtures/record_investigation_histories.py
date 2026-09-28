@@ -60,8 +60,11 @@ def investigation_input(investigation_id: str, *, brief: bool = True) -> Investi
     )
 
 
-async def record(label: str) -> None:
-    """Run a completed and a cancelled investigation and save their histories."""
+async def record(label: str, *, steer: bool = True) -> None:
+    """Run a completed, a cancelled and a steered investigation and save their histories.
+
+    Pass steer=False for code from before the steer signal existed.
+    """
     HISTORY_DIR.mkdir(exist_ok=True)
     fake = FakeInvestigation()
     async with await WorkflowEnvironment.start_time_skipping() as env:
@@ -92,11 +95,44 @@ async def record(label: str) -> None:
             fake.released.set()
             await cancelled.result()
 
-            for handle, name in ((completed, "completed"), (cancelled, "cancelled")):
-                history = await handle.fetch_history()
-                path = HISTORY_DIR / f"investigation_{label}_{name}.json"
-                path.write_text(json.dumps(json.loads(history.to_json()), indent=1) + "\n")
-                print(f"wrote {path}")
+        handles = [(completed, "completed"), (cancelled, "cancelled")]
+        if steer:
+            handles.append((await record_steered(env), "steered"))
+        for handle, name in handles:
+            history = await handle.fetch_history()
+            path = HISTORY_DIR / f"investigation_{label}_{name}.json"
+            path.write_text(json.dumps(json.loads(history.to_json()), indent=1) + "\n")
+            print(f"wrote {path}")
+
+
+async def record_steered(env: WorkflowEnvironment) -> Any:
+    """Run an investigation a person steers mid-evaluation: context, then a rule-out."""
+    fake = FakeInvestigation(hold={"h3"})
+    async with Worker(
+        env.client,
+        task_queue=INVESTIGATION_TASK_QUEUE,
+        workflows=[InvestigationWorkflow, EvaluateHypothesisWorkflow],
+        activities=fake.activities(),
+    ):
+        handle = await env.client.start_workflow(
+            InvestigationWorkflow.run,
+            investigation_input("replay-steered"),
+            id="replay-steered",
+            task_queue=INVESTIGATION_TASK_QUEUE,
+        )
+        while "h3" not in [p["hypothesis"]["id"] for p in fake.inputs("generate_query")]:
+            await asyncio.sleep(0.05)
+        await handle.signal(
+            InvestigationWorkflow.steer,
+            {"steer_id": "s1", "kind": "add_context", "text": "app_v2 shipped at 09:00"},
+        )
+        await handle.signal(
+            InvestigationWorkflow.steer,
+            {"steer_id": "s2", "kind": "rule_out", "text": "lands fast", "hypothesis_id": "h3"},
+        )
+        await handle.result()
+        fake.released.set()
+    return handle
 
 
 if __name__ == "__main__":

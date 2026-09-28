@@ -70,6 +70,11 @@ class FakeWorkflowApi:
         """Behave like a new run: every patch applies."""
         return True
 
+    async def wait_condition(self, condition: Any, **_: Any) -> None:
+        """Wait until a condition holds, yielding to the event loop between checks."""
+        while not condition():
+            await asyncio.sleep(0)
+
 
 async def test_gather_context_resolves_adapter_for_input_tenant() -> None:
     """gather_context asks for the adapter of the investigation's tenant."""

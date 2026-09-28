@@ -20,6 +20,7 @@ from dataing.core.domain_types import (
     Hypothesis,
     InvestigationContext,
     RelevantCodeChange,
+    RuledOutHypothesis,
     UntestedHypothesis,
 )
 from dataing.core.exceptions import LLMError
@@ -299,6 +300,7 @@ class AgentClient:
         handlers: StreamHandlers | None = None,
         code_changes: list[RelevantCodeChange] | None = None,
         untested_hypotheses: list[UntestedHypothesis] | None = None,
+        ruled_out_hypotheses: list[RuledOutHypothesis] | None = None,
     ) -> SynthesisResponse:
         """Synthesize all evidence into a root cause finding (raw response).
 
@@ -308,6 +310,7 @@ class AgentClient:
             handlers: Optional streaming handlers for real-time updates.
             code_changes: Optional list of code changes related to the investigation.
             untested_hypotheses: Optional hypotheses whose evaluation failed.
+            ruled_out_hypotheses: Optional hypotheses a person ruled out.
 
         Returns:
             Raw SynthesisResponse with all fields from LLM.
@@ -320,6 +323,7 @@ class AgentClient:
             evidence=evidence,
             code_changes=code_changes,
             untested_hypotheses=untested_hypotheses,
+            ruled_out_hypotheses=ruled_out_hypotheses,
         )
         system = synthesis.build_system()
 

@@ -178,6 +178,22 @@ class UntestedHypothesis(BaseModel):
     error: str
 
 
+class RuledOutHypothesis(BaseModel):
+    """A hypothesis a person ruled out while the investigation ran.
+
+    Attributes:
+        hypothesis_id: ID of the hypothesis.
+        title: Short description of the hypothesis.
+        reason: Why the person ruled it out.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    hypothesis_id: str
+    title: str
+    reason: str
+
+
 class Finding(BaseModel):
     """The final output of an investigation.
 

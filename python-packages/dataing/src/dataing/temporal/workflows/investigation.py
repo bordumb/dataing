@@ -8,6 +8,7 @@ from typing import Any
 from temporalio import workflow
 from temporalio.common import RetryPolicy
 from temporalio.exceptions import ActivityError, CancelledError, ChildWorkflowError
+from temporalio.workflow import ChildWorkflowCancellationType, ChildWorkflowHandle
 
 with workflow.unsafe.imports_passed_through():
     from dataing.temporal.activities import (
@@ -22,6 +23,18 @@ with workflow.unsafe.imports_passed_through():
     from dataing.temporal.workflows.evaluate_hypothesis import (
         EvaluateHypothesisInput,
         EvaluateHypothesisWorkflow,
+    )
+    from dataing.temporal.workflows.steering import (
+        RULED_OUT,
+        Action,
+        Decision,
+        Phase,
+        RunState,
+        Steer,
+        decide,
+        next_hypothesis_id,
+        steering_note,
+        with_steering_notes,
     )
 
 
@@ -64,10 +77,13 @@ class InvestigationQueryStatus:
     progress: float  # 0.0 to 1.0
     is_complete: bool
     is_cancelled: bool
-    is_awaiting_user: bool
     hypotheses_count: int
     hypotheses_evaluated: int
     evidence_count: int
+    # Each hypothesis's id, title and status (pending, running, supported, refuted,
+    # untested, ruled_out), and steers not applied yet, for the steering controls
+    hypotheses: list[dict[str, Any]] = field(default_factory=list)
+    pending_steers: list[dict[str, Any]] = field(default_factory=list)
 
 
 @workflow.defn
@@ -84,14 +100,13 @@ class InvestigationWorkflow:
 
     Signals:
     - cancel_investigation: Gracefully cancel the investigation
-    - user_input: Provide user feedback when AWAIT_USER is triggered
+    - steer: A person's steer, applied at the next checkpoint (runs with the
+      steering-v1 patch; see steering.py)
     """
 
     def __init__(self) -> None:
         """Initialize workflow state."""
         self._cancelled = False
-        self._user_input: dict[str, Any] | None = None
-        self._awaiting_user = False
         self._child_handles: list[Any] = []
         # Progress tracking
         self._investigation_id = ""
@@ -105,6 +120,24 @@ class InvestigationWorkflow:
         # Snapshot tracking
         self._enable_snapshots = True
         self._snapshot_paths: list[str] = []
+        # Hypotheses and how each ended, for get_status and steering
+        self._hypotheses: list[dict[str, Any]] = []
+        self._statuses: dict[str, str] = {}
+        # Steering (docs/specs/0001_issue_chat.md §7.8), on for runs with steering-v1
+        self._steering = False
+        self._steers: list[Steer] = []
+        self._notes: list[str] = []  # Context and exclusions added to later prompts
+        self._ruled_out: dict[str, str] = {}  # Hypothesis id -> the person's reason
+        self._synthesized = False
+        self._resynthesize = False
+        self._max_hypotheses = 5
+        # Set while evaluating with steering
+        self._running: dict[str, ChildWorkflowHandle[Any, Any]] = {}
+        self._evidence: list[dict[str, Any]] = []
+        self._untested: list[dict[str, Any]] = []
+        self._input: InvestigationInput | None = None
+        self._schema_info: dict[str, Any] = {}
+        self._alert_summary = ""
 
     @workflow.signal
     def cancel_investigation(self) -> None:
@@ -116,13 +149,9 @@ class InvestigationWorkflow:
         self._cancelled = True
 
     @workflow.signal
-    def user_input(self, payload: dict[str, Any]) -> None:
-        """Signal to provide user input when awaiting feedback.
-
-        Args:
-            payload: User feedback data (e.g., {"feedback": "...", "action": "..."}).
-        """
-        self._user_input = payload
+    def steer(self, payload: dict[str, Any]) -> None:
+        """Queue a person's steer; the run applies it at its next checkpoint."""
+        self._steers.append(Steer.from_payload(payload))
 
     @workflow.query
     def get_status(self) -> InvestigationQueryStatus:
@@ -137,10 +166,20 @@ class InvestigationWorkflow:
             progress=self._progress,
             is_complete=self._is_complete,
             is_cancelled=self._cancelled,
-            is_awaiting_user=self._awaiting_user,
             hypotheses_count=self._hypotheses_count,
             hypotheses_evaluated=self._hypotheses_evaluated,
             evidence_count=self._evidence_count,
+            hypotheses=[
+                {
+                    "id": _hypothesis_id(hypothesis, index),
+                    "title": hypothesis.get("title", ""),
+                    "status": self._statuses.get(_hypothesis_id(hypothesis, index), "pending"),
+                }
+                for index, hypothesis in enumerate(self._hypotheses)
+            ],
+            pending_steers=[
+                {"steer_id": steer.steer_id, "kind": steer.kind} for steer in self._steers
+            ],
         )
 
     def _check_cancelled(self, investigation_id: str) -> InvestigationResult | None:
@@ -167,31 +206,6 @@ class InvestigationWorkflow:
                 handle.cancel()
             except Exception as e:
                 workflow.logger.warning(f"Failed to cancel child workflow: {e}")
-
-    async def _await_user_input(self, timeout_minutes: int = 60) -> dict[str, Any] | None:
-        """Wait for user input signal.
-
-        Args:
-            timeout_minutes: Maximum time to wait for user input.
-
-        Returns:
-            User input payload or None if cancelled/timed out.
-        """
-        self._awaiting_user = True
-        self._user_input = None
-
-        try:
-            # Wait for user input or cancellation
-            await workflow.wait_condition(
-                lambda: self._user_input is not None or self._cancelled,
-                timeout=timedelta(minutes=timeout_minutes),
-            )
-        except TimeoutError:
-            self._awaiting_user = False
-            return None
-
-        self._awaiting_user = False
-        return self._user_input
 
     async def _capture_snapshot(
         self,
@@ -259,6 +273,16 @@ class InvestigationWorkflow:
         Returns:
             InvestigationResult with status and findings.
         """
+        result = await self._investigate(input)
+        if self._steering:
+            # Steers the run never reached end here, so none stays pending
+            rejection = "The investigation was cancelled" if result.status == "cancelled" else None
+            while self._steers:
+                await self._apply_steers(Phase.FINISHED, rejection=rejection)
+        return result
+
+    async def _investigate(self, input: InvestigationInput) -> InvestigationResult:
+        """Run the investigation's steps and return its result."""
         # Initialize progress tracking
         self._investigation_id = input.investigation_id
         self._tenant_id = input.tenant_id
@@ -266,6 +290,8 @@ class InvestigationWorkflow:
         self._progress = 0.0
         self._enable_snapshots = input.enable_snapshots
         self._snapshot_paths = []
+        self._max_hypotheses = input.max_hypotheses
+        self._steering = workflow.patched("steering-v1")
 
         alert_summary = input.alert_summary or str(input.alert_data)
 
@@ -343,6 +369,10 @@ class InvestigationWorkflow:
                 snapshot_paths=self._snapshot_paths,
             )
 
+        # Steers sent before hypotheses exist shape their generation
+        if self._steering:
+            await self._apply_steers(Phase.BEFORE_HYPOTHESES)
+
         # Step 3: Generate hypotheses based on context and patterns
         self._current_step = "generate_hypotheses"
         try:
@@ -354,7 +384,7 @@ class InvestigationWorkflow:
             hypotheses_input = GenerateHypothesesInput(
                 investigation_id=input.investigation_id,
                 alert_summary=alert_summary,
-                alert=input.alert_data,
+                alert=self._alert(input.alert_data),
                 schema_info=context.get("schema"),
                 lineage_info=context.get("lineage"),
                 matched_patterns=matched_patterns,
@@ -377,6 +407,11 @@ class InvestigationWorkflow:
                 snapshot_paths=self._snapshot_paths,
             )
         self._hypotheses_count = len(hypotheses) if hypotheses else 0
+        self._hypotheses = list(hypotheses or [])
+        self._statuses = {
+            _hypothesis_id(hypothesis, index): "pending"
+            for index, hypothesis in enumerate(self._hypotheses)
+        }
         self._progress = 0.4
 
         # Capture HYPOTHESIS_GENERATED snapshot
@@ -400,15 +435,22 @@ class InvestigationWorkflow:
 
         # Step 4: Evaluate hypotheses in parallel via child workflows
         self._current_step = "evaluate_hypotheses"
-        evidence, untested_hypotheses = await self._evaluate_hypotheses_parallel(
-            investigation_id=input.investigation_id,
-            hypotheses=hypotheses,
-            schema_info=context.get("schema", {}),
-            alert_summary=alert_summary,
-            tenant_id=input.tenant_id,
-            datasource_id=input.datasource_id,
-            alert=input.alert_data,
-        )
+        if self._steering:
+            evidence, untested_hypotheses = await self._evaluate_with_steering(
+                input, context.get("schema", {}), alert_summary
+            )
+            hypotheses = self._hypotheses
+            self._hypotheses_count = len(hypotheses)
+        else:
+            evidence, untested_hypotheses = await self._evaluate_hypotheses_parallel(
+                investigation_id=input.investigation_id,
+                hypotheses=hypotheses,
+                schema_info=context.get("schema", {}),
+                alert_summary=alert_summary,
+                tenant_id=input.tenant_id,
+                datasource_id=input.datasource_id,
+                alert=input.alert_data,
+            )
         self._evidence_count = len(evidence) if evidence else 0
         self._progress = 0.7
 
@@ -425,19 +467,20 @@ class InvestigationWorkflow:
         # Step 5: Synthesize findings
         self._current_step = "synthesize"
         try:
-            synthesize_input = SynthesizeInput(
-                investigation_id=input.investigation_id,
-                evidence=evidence,
-                hypotheses=hypotheses,
-                alert_summary=alert_summary,
-                confidence_threshold=input.confidence_threshold,
-                untested_hypotheses=untested_hypotheses,
+            if self._steering:
+                await self._apply_steers(Phase.SYNTHESIS)
+            synthesize_result = await self._synthesize(
+                input, alert_summary, hypotheses, evidence, untested_hypotheses
             )
-            synthesize_result = await workflow.execute_activity(
-                "synthesize",
-                synthesize_input,
-                start_to_close_timeout=timedelta(minutes=5),
-            )
+            if self._steering:
+                # Steers sent during synthesis: one re-synthesis covers all of them
+                self._synthesized = True
+                await self._apply_steers(Phase.SYNTHESIS)
+                if self._resynthesize:
+                    self._resynthesize = False
+                    synthesize_result = await self._synthesize(
+                        input, alert_summary, hypotheses, evidence, untested_hypotheses
+                    )
             # Build synthesis dict from result fields
             synthesis = {
                 "root_cause": synthesize_result.get("root_cause", ""),
@@ -596,7 +639,9 @@ class InvestigationWorkflow:
             "tenant_id": input.tenant_id,
             "issue_id": (input.alert_data or {}).get("issue_id"),
             "synthesis": synthesis,
-            "hypotheses": hypothesis_statuses(hypotheses, evidence, untested),
+            "hypotheses": hypothesis_statuses(
+                hypotheses, evidence, untested, ruled_out=set(self._ruled_out)
+            ),
             "counter_analysis": counter_analysis,
         }
         try:
@@ -608,6 +653,264 @@ class InvestigationWorkflow:
             )
         except Exception as e:
             workflow.logger.warning(f"Publishing the outcome failed (non-fatal): {e}")
+
+    def _alert(self, alert: dict[str, Any]) -> dict[str, Any]:
+        """Return the alert with the steering notes so far in its team brief."""
+        steered: dict[str, Any] = with_steering_notes(alert, self._notes)
+        return steered
+
+    async def _synthesize(
+        self,
+        input: InvestigationInput,
+        alert_summary: str,
+        hypotheses: list[dict[str, Any]],
+        evidence: list[dict[str, Any]],
+        untested: list[dict[str, Any]],
+    ) -> dict[str, Any]:
+        """Run the synthesize activity, keeping what people ruled out apart."""
+        ruled_out = [
+            {
+                "hypothesis_id": _hypothesis_id(hypothesis, index),
+                "title": hypothesis.get("title", ""),
+                "reason": self._ruled_out[_hypothesis_id(hypothesis, index)],
+            }
+            for index, hypothesis in enumerate(hypotheses)
+            if _hypothesis_id(hypothesis, index) in self._ruled_out
+        ]
+        synthesize_input = SynthesizeInput(
+            investigation_id=input.investigation_id,
+            evidence=[e for e in evidence if e.get("hypothesis_id") not in self._ruled_out],
+            hypotheses=hypotheses,
+            alert_summary=alert_summary,
+            confidence_threshold=input.confidence_threshold,
+            untested_hypotheses=[
+                u for u in untested if u.get("hypothesis_id") not in self._ruled_out
+            ],
+            alert=self._alert(input.alert_data),
+            ruled_out_hypotheses=ruled_out,
+        )
+        result: dict[str, Any] = await workflow.execute_activity(
+            "synthesize",
+            synthesize_input,
+            start_to_close_timeout=timedelta(minutes=5),
+        )
+        return result
+
+    def _run_state(self) -> RunState:
+        """Return what steer decisions need to know about the run."""
+        return RunState(
+            statuses=dict(self._statuses),
+            titles={
+                _hypothesis_id(hypothesis, index): hypothesis.get("title", "")
+                for index, hypothesis in enumerate(self._hypotheses)
+            },
+            max_hypotheses=self._max_hypotheses,
+            synthesized=self._synthesized,
+        )
+
+    async def _apply_steers(self, phase: Phase, *, rejection: str | None = None) -> None:
+        """Apply every queued steer for the phase the run is in, recording each outcome.
+
+        Steers that arrive while an outcome is being recorded are applied in the same
+        pass. An add_hypothesis sent before hypotheses exist stays queued for the
+        evaluation phase.
+
+        Args:
+            phase: Where the run is.
+            rejection: Overrides the outcome of a rejected steer (e.g. cancelled).
+        """
+        deferred: list[Steer] = []
+        while self._steers:
+            steer = self._steers.pop(0)
+            decision = decide(steer, phase, self._run_state())
+            if decision.action is Action.DEFER:
+                deferred.append(steer)
+                continue
+            applied, outcome = decision.applied, decision.outcome
+            if applied:
+                applied, outcome = await self._carry_out(steer, decision)
+            elif rejection:
+                outcome = rejection
+            await self._record_steer(steer, phase, applied=applied, outcome=outcome)
+        self._steers[:0] = deferred
+
+    async def _carry_out(self, steer: Steer, decision: Decision) -> tuple[bool, str]:
+        """Carry out an applied steer; return whether it applied and its outcome."""
+        hypothesis_id = steer.hypothesis_id or ""
+        if decision.action in (Action.NOTE, Action.EXCLUDE):
+            self._notes.append(steering_note(steer))
+        elif decision.action in (Action.CANCEL, Action.SET_ASIDE):
+            self._statuses[hypothesis_id] = RULED_OUT
+            self._ruled_out[hypothesis_id] = steer.text or "Ruled out by a person"
+            handle = self._running.pop(hypothesis_id, None)
+            if handle is not None:
+                handle.cancel()
+        elif decision.action is Action.ADD:
+            return await self._add_hypothesis(steer)
+        elif decision.action is Action.STOP:
+            for running_id, handle in list(self._running.items()):
+                handle.cancel()
+                self._statuses[running_id] = "untested"
+                index = self._index(running_id)
+                self._untested.append(
+                    _untested(
+                        self._hypotheses[index],
+                        index,
+                        "Not tested: a person stopped the investigation before it finished",
+                    )
+                )
+            self._running.clear()
+        if decision.resynthesize:
+            self._resynthesize = True
+        return True, decision.outcome
+
+    async def _add_hypothesis(self, steer: Steer) -> tuple[bool, str]:
+        """Turn a person's text into a hypothesis and start a subagent for it."""
+        hypothesis_id = next_hypothesis_id(list(self._statuses))
+        try:
+            formulated = await workflow.execute_activity(
+                "formulate_hypothesis",
+                {
+                    "investigation_id": self._investigation_id,
+                    "hypothesis_id": hypothesis_id,
+                    "text": steer.text,
+                    "alert_summary": self._alert_summary,
+                },
+                start_to_close_timeout=timedelta(minutes=2),
+                retry_policy=RetryPolicy(maximum_attempts=3),
+            )
+        except ActivityError as e:
+            return False, f"Could not add the hypothesis: {_describe_failure(e)}"
+        hypothesis = {**formulated["hypothesis"], "id": hypothesis_id}
+        self._hypotheses.append(hypothesis)
+        self._statuses[hypothesis_id] = "pending"
+        self._hypotheses_count = len(self._hypotheses)
+        await self._start_child(len(self._hypotheses) - 1, hypothesis)
+        return True, f"Started {hypothesis_id} '{hypothesis.get('title', '')}'"
+
+    async def _record_steer(
+        self, steer: Steer, phase: Phase, *, applied: bool, outcome: str
+    ) -> None:
+        """Record a steer's outcome on its row and in the issue thread. Non-fatal."""
+        try:
+            await workflow.execute_activity(
+                "record_steer_outcome",
+                {
+                    "steer_id": steer.steer_id,
+                    "investigation_id": self._investigation_id,
+                    "kind": steer.kind,
+                    "hypothesis_id": steer.hypothesis_id,
+                    "status": "applied" if applied else "rejected",
+                    "phase": phase.value,
+                    "outcome": outcome,
+                },
+                start_to_close_timeout=timedelta(minutes=1),
+                retry_policy=RetryPolicy(maximum_attempts=5),
+            )
+        except Exception as e:
+            workflow.logger.warning(f"Recording steer {steer.steer_id} failed (non-fatal): {e}")
+
+    def _index(self, hypothesis_id: str) -> int:
+        """Return the position of a hypothesis in the run's list."""
+        for index, hypothesis in enumerate(self._hypotheses):
+            if _hypothesis_id(hypothesis, index) == hypothesis_id:
+                return index
+        raise KeyError(hypothesis_id)
+
+    async def _start_child(self, index: int, hypothesis: dict[str, Any]) -> None:
+        """Start the subagent that evaluates one hypothesis."""
+        assert self._input is not None
+        child_input = EvaluateHypothesisInput(
+            investigation_id=self._input.investigation_id,
+            hypothesis_index=index,
+            hypothesis=hypothesis,
+            schema_info=self._schema_info,
+            alert_summary=self._alert_summary,
+            tenant_id=self._input.tenant_id,
+            datasource_id=self._input.datasource_id,
+            alert=self._alert(self._input.alert_data),
+        )
+        handle = await workflow.start_child_workflow(
+            EvaluateHypothesisWorkflow.run,
+            child_input,
+            id=f"{workflow.info().workflow_id}-hypothesis-{index}",
+            # A ruled-out subagent is left to stop on its own; the run moves on
+            cancellation_type=ChildWorkflowCancellationType.TRY_CANCEL,
+        )
+        self._child_handles.append(handle)
+        self._running[_hypothesis_id(hypothesis, index)] = handle
+        self._statuses[_hypothesis_id(hypothesis, index)] = "running"
+
+    def _collect(self, hypothesis_id: str, handle: ChildWorkflowHandle[Any, Any]) -> None:
+        """Record how a finished subagent's hypothesis ended."""
+        index = self._index(hypothesis_id)
+        hypothesis = self._hypotheses[index]
+        try:
+            result = handle.result()
+        except BaseException as e:  # A failed or cancelled child leaves it untested
+            reason = _describe_failure(e)
+            workflow.logger.warning(f"Child workflow failed: {reason}")
+            self._untested.append(_untested(hypothesis, index, f"Evaluation failed: {reason}"))
+            self._statuses[hypothesis_id] = "untested"
+            return
+        self._hypotheses_evaluated += 1
+        if result.error:
+            workflow.logger.warning(f"Hypothesis {hypothesis_id} evaluation error: {result.error}")
+            self._untested.append(_untested(hypothesis, index, result.error))
+            self._statuses[hypothesis_id] = "untested"
+            return
+        self._evidence.extend(result.evidence)
+        if not result.evidence:
+            self._statuses[hypothesis_id] = "untested"
+        elif any(e.get("supports_hypothesis") for e in result.evidence):
+            self._statuses[hypothesis_id] = "supported"
+        else:
+            self._statuses[hypothesis_id] = "refuted"
+
+    async def _evaluate_with_steering(
+        self, input: InvestigationInput, schema_info: dict[str, Any], alert_summary: str
+    ) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+        """Evaluate hypotheses in child workflows, applying steers as they arrive.
+
+        The loop wakes when a subagent finishes or a steer is queued, so a person
+        can rule out, add or stop hypotheses while the others keep running.
+
+        Returns:
+            Tuple of (evidence from successful evaluations, untested hypotheses).
+        """
+        self._input = input
+        self._schema_info = schema_info
+        self._alert_summary = alert_summary
+        self._child_handles = []
+        self._running = {}
+        self._evidence = []
+        self._untested = []
+
+        # Steers queued so far apply before any subagent starts
+        await self._apply_steers(Phase.EVALUATION)
+        for index, hypothesis in enumerate(list(self._hypotheses)):
+            if self._cancelled:
+                break
+            if self._statuses.get(_hypothesis_id(hypothesis, index)) == "pending":
+                await self._start_child(index, hypothesis)
+
+        while self._running and not self._cancelled:
+            await workflow.wait_condition(
+                lambda: self._cancelled
+                or bool(self._steers)
+                or any(handle.done() for handle in self._running.values())
+            )
+            for hypothesis_id, handle in list(self._running.items()):
+                if handle.done():
+                    del self._running[hypothesis_id]
+                    self._collect(hypothesis_id, handle)
+            if self._steers and not self._cancelled:
+                await self._apply_steers(Phase.EVALUATION)
+
+        if self._cancelled:
+            await self._cancel_children()
+            return [], []
+        return self._evidence, self._untested
 
     async def _evaluate_hypotheses_parallel(
         self,
@@ -701,14 +1004,20 @@ def hypothesis_statuses(
     hypotheses: list[dict[str, Any]],
     evidence: list[dict[str, Any]],
     untested: list[dict[str, Any]],
+    ruled_out: set[str] | frozenset[str] = frozenset(),
 ) -> list[dict[str, Any]]:
-    """Return each hypothesis with how it ended: supported, refuted or untested."""
+    """Return each hypothesis with how it ended.
+
+    That is supported or refuted by evidence, ruled out by a person, or untested.
+    """
     untested_ids = {u["hypothesis_id"] for u in untested}
     results: list[dict[str, Any]] = []
     for index, hypothesis in enumerate(hypotheses):
-        hypothesis_id = hypothesis.get("id", f"h-{index}")
+        hypothesis_id = _hypothesis_id(hypothesis, index)
         found = [e for e in evidence if e.get("hypothesis_id") == hypothesis_id]
-        if hypothesis_id in untested_ids or not found:
+        if hypothesis_id in ruled_out:
+            status = RULED_OUT
+        elif hypothesis_id in untested_ids or not found:
             status = "untested"
         elif any(e.get("supports_hypothesis") for e in found):
             status = "supported"
@@ -720,10 +1029,15 @@ def hypothesis_statuses(
     return results
 
 
+def _hypothesis_id(hypothesis: dict[str, Any], index: int) -> str:
+    """Return a hypothesis's id, or a positional one when it has none."""
+    return str(hypothesis.get("id", f"h-{index}"))
+
+
 def _untested(hypothesis: dict[str, Any], index: int, error: str) -> dict[str, Any]:
     """Describe a hypothesis whose evaluation failed, for synthesis."""
     return {
-        "hypothesis_id": hypothesis.get("id", f"h-{index}"),
+        "hypothesis_id": _hypothesis_id(hypothesis, index),
         "title": hypothesis.get("title", ""),
         "error": error,
     }

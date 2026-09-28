@@ -36,6 +36,7 @@ from dataing.core.domain_types import (
     LineageContext,
     MetricSpec,
     RelevantCodeChange,
+    RuledOutHypothesis,
     UntestedHypothesis,
 )
 
@@ -105,6 +106,8 @@ class TemporalAgentAdapter:
         alert_summary: str,
         untested_hypotheses: list[dict[str, Any]],
         code_changes: list[dict[str, Any]] | None = None,
+        alert: dict[str, Any] | None = None,
+        ruled_out_hypotheses: list[dict[str, Any]] | None = None,
     ) -> dict[str, Any]:
         """Synthesize findings from dict inputs.
 
@@ -114,13 +117,16 @@ class TemporalAgentAdapter:
             alert_summary: Summary of the alert.
             untested_hypotheses: Hypotheses whose evaluation failed, as dicts.
             code_changes: Optional list of code changes related to the investigation.
+            alert: The alert, carrying the team brief; falls back to the summary.
+            ruled_out_hypotheses: Hypotheses a person ruled out, as dicts.
 
         Returns:
             Synthesis result as dict.
         """
         evidence_objs = [self._to_evidence(e) for e in evidence]
         untested_objs = [UntestedHypothesis.model_validate(u) for u in untested_hypotheses]
-        alert_obj = self._to_alert(None, alert_summary)
+        ruled_out_objs = [RuledOutHypothesis.model_validate(r) for r in ruled_out_hypotheses or []]
+        alert_obj = self._to_alert(alert, alert_summary)
         code_changes_obj = self._to_code_changes(code_changes)
 
         result = await self._client.synthesize_findings_raw(
@@ -128,6 +134,7 @@ class TemporalAgentAdapter:
             evidence_objs,
             code_changes=code_changes_obj,
             untested_hypotheses=untested_objs,
+            ruled_out_hypotheses=ruled_out_objs,
         )
 
         return {

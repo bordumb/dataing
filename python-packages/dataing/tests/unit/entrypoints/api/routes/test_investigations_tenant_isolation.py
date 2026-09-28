@@ -116,7 +116,6 @@ def _completed_status(investigation_id: str) -> InvestigationStatus:
         progress=1.0,
         is_complete=True,
         is_cancelled=False,
-        is_awaiting_user=False,
     )
 
 

@@ -34,10 +34,11 @@ class InvestigationStatus:
     progress: float | None = None
     is_complete: bool | None = None
     is_cancelled: bool | None = None
-    is_awaiting_user: bool | None = None
     hypotheses_count: int | None = None
     hypotheses_evaluated: int | None = None
     evidence_count: int | None = None
+    hypotheses: list[dict[str, Any]] | None = None  # id, title, status
+    pending_steers: list[dict[str, Any]] | None = None
 
 
 class TemporalInvestigationClient:
@@ -46,7 +47,7 @@ class TemporalInvestigationClient:
     This client provides a high-level interface for:
     - Starting investigations
     - Cancelling investigations
-    - Sending user input signals
+    - Steering running investigations
     - Querying investigation status
 
     Usage:
@@ -274,10 +275,11 @@ class TemporalInvestigationClient:
             progress=query_status.progress if query_status else None,
             is_complete=query_status.is_complete if query_status else None,
             is_cancelled=query_status.is_cancelled if query_status else None,
-            is_awaiting_user=query_status.is_awaiting_user if query_status else None,
             hypotheses_count=query_status.hypotheses_count if query_status else None,
             hypotheses_evaluated=query_status.hypotheses_evaluated if query_status else None,
             evidence_count=query_status.evidence_count if query_status else None,
+            hypotheses=query_status.hypotheses if query_status else None,
+            pending_steers=query_status.pending_steers if query_status else None,
         )
 
     async def query_status(self, investigation_id: str) -> InvestigationQueryStatus:

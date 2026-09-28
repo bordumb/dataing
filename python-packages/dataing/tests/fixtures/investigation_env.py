@@ -39,6 +39,7 @@ class FakeInvestigation:
         ]
     )
     confidence: float = 0.9
+    # Hypothesis ids whose query generation, or activity names, wait for `released`
     hold: set[str] = field(default_factory=set)
     released: asyncio.Event = field(default_factory=asyncio.Event)
     calls: list[tuple[str, dict[str, Any]]] = field(default_factory=list)
@@ -51,6 +52,13 @@ class FakeInvestigation:
         """Return the inputs of every call to one activity."""
         return [payload for called, payload in self.calls if called == name]
 
+    async def wait_if_held(self, name: str) -> None:
+        """Keep an activity running until released, heartbeating so it can be cancelled."""
+        if name in self.hold:
+            while not self.released.is_set():
+                activity.heartbeat()
+                await asyncio.sleep(0.02)
+
     def activities(self) -> list[Any]:
         """Return the fake activities."""
         fake = self
@@ -61,6 +69,7 @@ class FakeInvestigation:
         @activity.defn(name="gather_context")
         async def gather_context(payload: dict[str, Any]) -> dict[str, Any]:
             record("gather_context", payload)
+            await fake.wait_if_held("gather_context")
             return {"schema_info": {"tables": ["orders"]}, "lineage_info": None}
 
         @activity.defn(name="check_patterns")
@@ -81,10 +90,7 @@ class FakeInvestigation:
         async def generate_query(payload: dict[str, Any]) -> dict[str, Any]:
             record("generate_query", payload)
             hypothesis_id = payload["hypothesis"]["id"]
-            if hypothesis_id in fake.hold:
-                while not fake.released.is_set():
-                    activity.heartbeat()
-                    await asyncio.sleep(0.02)
+            await fake.wait_if_held(hypothesis_id)
             return {"query": f"SELECT 1 -- {hypothesis_id}"}
 
         @activity.defn(name="execute_query")
@@ -105,6 +111,7 @@ class FakeInvestigation:
         @activity.defn(name="synthesize")
         async def synthesize(payload: dict[str, Any]) -> dict[str, Any]:
             record("synthesize", payload)
+            await fake.wait_if_held("synthesize")
             return {
                 "root_cause": "app_v2 writes COMPLETE instead of completed",
                 "confidence": fake.confidence,
@@ -120,6 +127,7 @@ class FakeInvestigation:
         @activity.defn(name="counter_analyze")
         async def counter_analyze(payload: dict[str, Any]) -> dict[str, Any]:
             record("counter_analyze", payload)
+            await fake.wait_if_held("counter_analyze")
             return {"alternative_explanations": [], "weaknesses": [], "recommendation": "accept"}
 
         @activity.defn(name="publish_investigation_outcome")

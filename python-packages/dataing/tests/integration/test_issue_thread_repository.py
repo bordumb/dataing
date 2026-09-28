@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+from datetime import timedelta
 from uuid import UUID, uuid4
 
 import pytest
@@ -252,3 +253,43 @@ async def test_get_messages_returns_the_requested_rows(migrated_db: AppDatabase)
 
     assert [r["id"] for r in rows] == [message["id"]]
     assert rows[0]["payload"] == {}
+
+
+async def test_stale_streaming_replies_are_marked_failed(migrated_db: AppDatabase) -> None:
+    """A reply a crashed worker left streaming ends as an error; live and queued ones stay."""
+    _, user_id, issue_id = await _issue(migrated_db)
+    repo = IssueThreadRepository(migrated_db)
+    thread = await repo.ensure_shared_thread(issue_id)
+
+    async def reply(status: str) -> UUID:
+        message = await repo.append_message(
+            thread["id"], author_kind="agent", kind="agent_reply", status=status
+        )
+        return UUID(str(message["id"]))
+
+    stale, live, queued = await reply("streaming"), await reply("streaming"), await reply("queued")
+    await migrated_db.execute(
+        "UPDATE issue_thread_messages SET body_md = 'partial' WHERE id = ANY($1::uuid[])",
+        [stale, queued],
+    )
+    # Age two rows past the cutoff (the trigger sets touched_at, so disable it for this)
+    await migrated_db.execute("ALTER TABLE issue_thread_messages DISABLE TRIGGER USER")
+    try:
+        await migrated_db.execute(
+            "UPDATE issue_thread_messages SET touched_at = NOW() - INTERVAL '1 hour' "
+            "WHERE id = ANY($1::uuid[])",
+            [stale, queued],
+        )
+    finally:
+        await migrated_db.execute("ALTER TABLE issue_thread_messages ENABLE TRIGGER USER")
+
+    failed = await repo.fail_stale_turns(timedelta(minutes=15))
+
+    assert failed == 1
+    statuses = {
+        m["id"]: (m["status"], m["payload"].get("error"))
+        for m in await repo.list_messages(thread["id"])
+    }
+    assert statuses[stale] == ("error", "The agent stopped before it finished")
+    assert statuses[live] == ("streaming", None)
+    assert statuses[queued] == ("queued", None)

@@ -16,6 +16,7 @@ on the way out.
 from __future__ import annotations
 
 import json
+from datetime import timedelta
 from typing import Any
 from uuid import UUID
 
@@ -380,6 +381,31 @@ class IssueThreadRepository:
             raise RuntimeError("Failed to publish messages")
         return _decode_message(dict(row))
 
+    async def fail_stale_turns(self, older_than: timedelta) -> int:
+        """Mark agent replies stuck streaming with no update as failed.
+
+        A live turn updates its reply as it streams, and a turn's attempts end well
+        within `older_than`, so a streaming reply untouched for longer lost its
+        worker or workflow and would otherwise show a spinner forever. Queued
+        replies are left alone: they wait in their thread workflow's queue.
+
+        Returns:
+            How many replies were marked failed.
+        """
+        rows = await self._db.fetch_all(
+            """
+            UPDATE issue_thread_messages
+            SET status = 'error',
+                payload = payload || '{"error": "The agent stopped before it finished"}'
+            WHERE status = 'streaming'
+              AND author_kind = 'agent'
+              AND touched_at < clock_timestamp() - make_interval(secs => $1)
+            RETURNING id
+            """,
+            older_than.total_seconds(),
+        )
+        return len(rows)
+
     async def get_reply_for_request(self, request_message_id: UUID) -> dict[str, Any] | None:
         """Return the agent reply created for a request message, if any."""
         row = await self._db.fetch_one(
@@ -499,20 +525,3 @@ class IssueThreadRepository:
             list(RUNNING_STATUSES),
         )
         return int(row["n"]) if row else 0
-
-    async def fail_stale_turns(self, reason: str) -> int:
-        """Mark every queued or streaming turn as failed (worker restart)."""
-        status = await self._db.execute(
-            """
-            UPDATE issue_thread_messages
-            SET status = 'error',
-                payload = payload || jsonb_build_object('error', $1::text)
-            WHERE status = ANY($2::text[])
-            """,
-            reason,
-            list(RUNNING_STATUSES),
-        )
-        try:
-            return int(status.split()[-1])
-        except (ValueError, IndexError):
-            return 0

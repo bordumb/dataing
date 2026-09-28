@@ -21,6 +21,7 @@ import json
 import logging
 import os
 import sys
+from datetime import timedelta
 from typing import Any
 from uuid import UUID
 
@@ -32,6 +33,7 @@ from dataing.adapters.context import ContextEngine
 from dataing.adapters.datasource import get_registry
 from dataing.adapters.datasource.base import BaseAdapter
 from dataing.adapters.db.app_db import AppDatabase
+from dataing.adapters.db.issue_threads import IssueThreadRepository
 from dataing.adapters.investigation.pattern_adapter import InMemoryPatternRepository
 from dataing.agents import AgentClient
 from dataing.agents.chat import build_brief_agent, build_chat_agent, build_chat_model
@@ -218,6 +220,21 @@ def _brief_agent_factory() -> Any:
     return lambda: build_brief_agent(model)
 
 
+# A turn's attempts (2 x TURN_TIMEOUT plus backoff) end well within this
+STALE_TURN_AFTER = timedelta(minutes=15)
+
+
+async def _fail_stale_turns(app_db: AppDatabase) -> None:
+    """Mark replies a crashed worker left streaming as failed. Non-fatal."""
+    try:
+        failed = await IssueThreadRepository(app_db).fail_stale_turns(STALE_TURN_AFTER)
+    except Exception as e:
+        logger.warning(f"Could not sweep stale agent turns: {e}")
+        return
+    if failed:
+        logger.info(f"Marked {failed} stale agent replies as failed")
+
+
 def _investigation_status_reader(client: Client) -> InvestigationStatusReader:
     """Return a reader of a running investigation's live hypotheses and steers."""
 
@@ -312,6 +329,7 @@ async def run_worker() -> None:
 
     # Initialize dependencies
     deps = await create_dependencies()
+    await _fail_stale_turns(deps["app_db"])
     deps["investigation_status"] = _investigation_status_reader(client)
 
     # Create activities with dependencies

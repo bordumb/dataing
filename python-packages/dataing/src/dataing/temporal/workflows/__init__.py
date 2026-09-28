@@ -11,6 +11,10 @@ from dataing.temporal.workflows.investigation import (
     InvestigationResult,
     InvestigationWorkflow,
 )
+from dataing.temporal.workflows.issue_thread import (
+    IssueThreadInput,
+    IssueThreadWorkflow,
+)
 
 __all__ = [
     "InvestigationWorkflow",
@@ -20,4 +24,6 @@ __all__ = [
     "EvaluateHypothesisWorkflow",
     "EvaluateHypothesisInput",
     "EvaluateHypothesisResult",
+    "IssueThreadWorkflow",
+    "IssueThreadInput",
 ]

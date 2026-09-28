@@ -110,10 +110,12 @@ def _send_one_shot(
     """
     is_tty = sys.stdout.isatty()
 
-    console.print(f"\n[dim]Sending message to investigation {investigation_id[:8]}...[/dim]\n")
+    console.print(f"\n[dim]Adding context to investigation {investigation_id[:8]}...[/dim]\n")
 
-    # Send message to investigation
-    client.send_message(investigation_id, question)
+    steer = client.steer(investigation_id, question)
+    if steer.status == "rejected":
+        console.print(f"[yellow]Not applied:[/yellow] {steer.outcome}")
+        return
 
     # Stream response events
     panels: list[Any] = []

@@ -1,0 +1,27 @@
+{
+  "assignee": "bordumbb@gmail.com",
+  "claim_note": "",
+  "claimed_at": "2026-09-28T00:23:15.029950Z",
+  "created_at": "2026-09-27T23:20:32.845034Z",
+  "depends_on": [
+    "fn-70.9"
+  ],
+  "epic": "fn-70",
+  "evidence": {
+    "commits": [
+      "8f1b6421"
+    ],
+    "prs": [],
+    "tests": [
+      "unit temporal 69 pass",
+      "unit CE baseline (22F/62E duckdb only)",
+      "integration 116 pass"
+    ]
+  },
+  "id": "fn-70.10",
+  "priority": null,
+  "spec_path": ".flow/tasks/fn-70.10.md",
+  "status": "done",
+  "title": "M2: outcome write-back, outcome review, continue investigating",
+  "updated_at": "2026-09-28T00:41:55.683219Z"
+}

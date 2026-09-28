@@ -66,3 +66,46 @@ async def test_untested_hypotheses_reach_synthesis_prompt(
         "- h-2 (Schema change renamed amount): Query execution failed: connection refused"
     ) in prompt
     assert result["root_cause"] is None
+
+
+async def test_team_brief_and_ruled_out_hypotheses_reach_synthesis_prompt(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Synthesis sees the brief with steering notes and what people ruled out."""
+    synthesis_agent = RecordingAgent(INCONCLUSIVE)
+    monkeypatch.setattr("dataing.agents.client.BondAgent", lambda **_: synthesis_agent)
+    alert = {
+        "dataset_ids": ["public.orders"],
+        "metric_spec": {
+            "metric_type": "description",
+            "expression": "Completed orders dropped",
+            "display_name": "Orders dropped",
+        },
+        "anomaly_type": "custom",
+        "expected_value": 0.0,
+        "actual_value": 0.0,
+        "deviation_pct": 0.0,
+        "anomaly_date": "2026-09-14",
+        "severity": "high",
+        "metadata": {"brief": "Context from the team: app_v2 shipped at 09:00"},
+    }
+
+    await TemporalAgentAdapter(AgentClient(api_key="test-key")).synthesize_findings_for_temporal(
+        evidence=[],
+        hypotheses=[],
+        alert_summary="Completed orders dropped",
+        untested_hypotheses=[],
+        alert=alert,
+        ruled_out_hypotheses=[
+            {"hypothesis_id": "h3", "title": "late events", "reason": "Events land in minutes"}
+        ],
+    )
+
+    [prompt] = synthesis_agent.prompts
+    [system_prompt] = synthesis_agent.system_prompts
+    assert "## Team brief" in prompt
+    assert "Context from the team: app_v2 shipped at 09:00" in prompt
+    assert "## Ruled Out by the Team" in prompt
+    assert "- h3 (late events): Events land in minutes" in prompt
+    assert system_prompt is not None
+    assert "Ruled Out by the Team" in system_prompt

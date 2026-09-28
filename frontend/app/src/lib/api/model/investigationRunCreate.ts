@@ -5,17 +5,21 @@
  * Autonomous Data Quality Investigation
  * OpenAPI spec version: 2.0.0
  */
+import type { InvestigationBrief } from "./investigationBrief";
 import type { InvestigationRunCreateDatasetId } from "./investigationRunCreateDatasetId";
 import type { InvestigationRunCreateDatasourceId } from "./investigationRunCreateDatasourceId";
+import type { InvestigationRunCreateParentRunId } from "./investigationRunCreateParentRunId";
+import type { InvestigationRunCreateSourceThreadId } from "./investigationRunCreateSourceThreadId";
 
 /**
- * Request body for spawning an investigation from an issue.
+ * Request body for starting an investigation from an issue with a brief.
  */
 export interface InvestigationRunCreate {
+  brief: InvestigationBrief;
   dataset_id?: InvestigationRunCreateDatasetId;
   datasource_id?: InvestigationRunCreateDatasourceId;
   /** @pattern ^(safe|standard|deep)$ */
   execution_profile?: string;
-  /** @minLength 1 */
-  focus_prompt: string;
+  parent_run_id?: InvestigationRunCreateParentRunId;
+  source_thread_id?: InvestigationRunCreateSourceThreadId;
 }

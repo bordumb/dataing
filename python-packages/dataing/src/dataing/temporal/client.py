@@ -6,12 +6,18 @@ from dataclasses import dataclass
 from typing import Any
 
 from temporalio.client import Client
+from temporalio.service import RPCError, RPCStatusCode
 
 from dataing.temporal.workflows.investigation import (
     InvestigationInput,
     InvestigationQueryStatus,
     InvestigationResult,
     InvestigationWorkflow,
+)
+from dataing.temporal.workflows.issue_thread import (
+    IssueThreadInput,
+    IssueThreadWorkflow,
+    thread_workflow_id,
 )
 
 
@@ -28,10 +34,11 @@ class InvestigationStatus:
     progress: float | None = None
     is_complete: bool | None = None
     is_cancelled: bool | None = None
-    is_awaiting_user: bool | None = None
     hypotheses_count: int | None = None
     hypotheses_evaluated: int | None = None
     evidence_count: int | None = None
+    hypotheses: list[dict[str, Any]] | None = None  # id, title, status
+    pending_steers: list[dict[str, Any]] | None = None
 
 
 class TemporalInvestigationClient:
@@ -40,7 +47,7 @@ class TemporalInvestigationClient:
     This client provides a high-level interface for:
     - Starting investigations
     - Cancelling investigations
-    - Sending user input signals
+    - Steering running investigations
     - Querying investigation status
 
     Usage:
@@ -60,9 +67,6 @@ class TemporalInvestigationClient:
 
         # Cancel if needed
         await client.cancel_investigation("inv-123")
-
-        # Send user input
-        await client.send_user_input("inv-123", {"feedback": "..."})
     """
 
     def __init__(
@@ -168,19 +172,46 @@ class TemporalInvestigationClient:
         handle = await self.get_handle(investigation_id)
         await handle.signal(InvestigationWorkflow.cancel_investigation)
 
-    async def send_user_input(
-        self,
-        investigation_id: str,
-        payload: dict[str, Any],
-    ) -> None:
-        """Send user input to an investigation awaiting feedback.
+    async def steer_investigation(self, investigation_id: str, steer: dict[str, Any]) -> None:
+        """Send a person's steer to a running investigation.
 
-        Args:
-            investigation_id: ID of the investigation.
-            payload: User feedback data (e.g., {"feedback": "...", "action": "..."}).
+        Raises:
+            Exception: Temporal's error when the workflow isn't running, e.g. it
+                already finished; the caller records the steer as rejected.
         """
         handle = await self.get_handle(investigation_id)
-        await handle.signal(InvestigationWorkflow.user_input, payload)
+        await handle.signal(InvestigationWorkflow.steer, steer)
+
+    async def enqueue_thread_request(self, request: dict[str, Any]) -> None:
+        """Queue an agent request on its thread's workflow, starting it if needed.
+
+        Uses signal-with-start, so concurrent requests for the same thread reach
+        one workflow and run in order.
+
+        Args:
+            request: message_id, kind, thread_id, tenant_id, issue_id, requested_by.
+        """
+        thread_id = str(request["thread_id"])
+        await self._client.start_workflow(
+            IssueThreadWorkflow.run,
+            IssueThreadInput(thread_id=thread_id),
+            id=thread_workflow_id(thread_id),
+            task_queue=self._task_queue,
+            start_signal="enqueue",
+            start_signal_args=[request],
+        )
+
+    async def cancel_thread_request(self, thread_id: str, message_id: str) -> None:
+        """Drop a queued agent request or cancel the running turn.
+
+        A thread whose workflow already finished has nothing to cancel.
+        """
+        handle = self._client.get_workflow_handle(thread_workflow_id(thread_id))
+        try:
+            await handle.signal(IssueThreadWorkflow.cancel_request, message_id)
+        except RPCError as e:
+            if e.status != RPCStatusCode.NOT_FOUND:
+                raise
 
     async def get_result(self, investigation_id: str) -> InvestigationResult:
         """Get the result of a completed investigation.
@@ -254,10 +285,11 @@ class TemporalInvestigationClient:
             progress=query_status.progress if query_status else None,
             is_complete=query_status.is_complete if query_status else None,
             is_cancelled=query_status.is_cancelled if query_status else None,
-            is_awaiting_user=query_status.is_awaiting_user if query_status else None,
             hypotheses_count=query_status.hypotheses_count if query_status else None,
             hypotheses_evaluated=query_status.hypotheses_evaluated if query_status else None,
             evidence_count=query_status.evidence_count if query_status else None,
+            hypotheses=query_status.hypotheses if query_status else None,
+            pending_steers=query_status.pending_steers if query_status else None,
         )
 
     async def query_status(self, investigation_id: str) -> InvestigationQueryStatus:

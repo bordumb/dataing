@@ -1,0 +1,378 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Issue Hub Mockup</title>
+<!-- Static mockup of docs/specs/0001_issue_chat.md. No backend; all data is fake. -->
+<style>
+:root{
+  --bg:#f7f7f8;--panel:#fff;--text:#18181b;--muted:#71717a;--border:#e4e4e7;
+  --accent:#2563eb;--accent-soft:#eff6ff;--agent:#7c3aed;--agent-soft:#f5f3ff;
+  --ok:#16a34a;--ok-soft:#f0fdf4;--warn:#d97706;--warn-soft:#fffbeb;--bad:#dc2626;--bad-soft:#fef2f2;
+  --code:#f4f4f5;
+}
+@media (prefers-color-scheme:dark){:root{
+  --bg:#09090b;--panel:#18181b;--text:#fafafa;--muted:#a1a1aa;--border:#27272a;
+  --accent:#60a5fa;--accent-soft:#172554;--agent:#a78bfa;--agent-soft:#2e1065;
+  --ok:#4ade80;--ok-soft:#052e16;--warn:#fbbf24;--warn-soft:#451a03;--bad:#f87171;--bad-soft:#450a0a;
+  --code:#27272a;}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font:14px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Inter,sans-serif}
+button{font:inherit;cursor:pointer}
+code,pre{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12.5px}
+.top{display:flex;align-items:center;gap:12px;padding:12px 20px;border-bottom:1px solid var(--border);background:var(--panel)}
+.top h1{font-size:16px;margin:0}
+.muted{color:var(--muted)}
+.pill{display:inline-flex;align-items:center;gap:4px;padding:1px 8px;border-radius:999px;font-size:12px;border:1px solid var(--border)}
+.p-blue{background:var(--accent-soft);color:var(--accent);border-color:transparent}
+.p-purple{background:var(--agent-soft);color:var(--agent);border-color:transparent}
+.p-ok{background:var(--ok-soft);color:var(--ok);border-color:transparent}
+.p-warn{background:var(--warn-soft);color:var(--warn);border-color:transparent}
+.p-bad{background:var(--bad-soft);color:var(--bad);border-color:transparent}
+.layout{display:grid;grid-template-columns:1fr 300px;gap:16px;max-width:1200px;margin:16px auto;padding:0 16px}
+@media (max-width:900px){.layout{grid-template-columns:1fr}}
+.panel{background:var(--panel);border:1px solid var(--border);border-radius:10px}
+.thread-head{display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-bottom:1px solid var(--border)}
+.tabs button{background:none;border:0;padding:6px 10px;border-radius:6px;color:var(--muted)}
+.tabs button.on{background:var(--code);color:var(--text);font-weight:600}
+.msgs{padding:8px 14px}
+.msg{display:flex;gap:10px;padding:10px 0;border-bottom:1px dashed var(--border)}
+.msg:last-child{border-bottom:0}
+.av{width:28px;height:28px;border-radius:50%;flex:none;display:grid;place-items:center;font-size:12px;font-weight:700;color:#fff}
+.a-maya{background:#0ea5e9}.a-raj{background:#f97316}.a-agent{background:var(--agent)}.a-sys{background:#71717a}
+.body{flex:1;min-width:0}
+.meta{font-size:12px;color:var(--muted);margin-bottom:2px}
+.meta b{color:var(--text)}
+.event{font-size:12.5px;color:var(--muted);padding:6px 0 6px 38px}
+.tool{margin-top:6px;border:1px solid var(--border);border-radius:8px;overflow:hidden}
+.tool summary{list-style:none;padding:6px 10px;cursor:pointer;font-size:12.5px;color:var(--muted);background:var(--code)}
+.tool summary::-webkit-details-marker{display:none}
+.tool pre{margin:0;padding:8px 10px;border-bottom:1px solid var(--border);white-space:pre-wrap}
+table{border-collapse:collapse;width:100%;font-size:12.5px}
+th,td{text-align:left;padding:4px 10px;border-bottom:1px solid var(--border)}
+th{color:var(--muted);font-weight:600}
+.tool .foot{padding:4px 10px;font-size:12px;color:var(--muted)}
+.card{margin-top:8px;border:1px solid var(--border);border-radius:10px;padding:10px 12px}
+.card h4{margin:0 0 6px;font-size:13.5px;display:flex;align-items:center;gap:8px}
+.bar{height:6px;background:var(--code);border-radius:999px;overflow:hidden;margin:6px 0 10px}
+.bar i{display:block;height:100%;width:62%;background:var(--agent)}
+.hyp{display:flex;align-items:center;gap:8px;padding:5px 0;border-top:1px solid var(--border);font-size:13px}
+.hyp span.t{flex:1}
+.btn{border:1px solid var(--border);background:var(--panel);color:var(--text);border-radius:6px;padding:3px 10px;font-size:12.5px}
+.btn:hover{background:var(--code)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+.btn.agent{background:var(--agent);border-color:var(--agent);color:#fff}
+.btn.sm{padding:1px 8px;font-size:12px}
+.row{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
+.steer{font-size:12.5px;padding:4px 8px;border-left:3px solid var(--agent);background:var(--agent-soft);border-radius:4px;margin-top:6px}
+.proposal{border:1px dashed var(--agent);border-radius:8px;padding:8px 10px;margin-top:8px;font-size:13px}
+.composer{border-top:1px solid var(--border);padding:10px 14px}
+.mode{display:inline-flex;border:1px solid var(--border);border-radius:8px;overflow:hidden;margin-bottom:6px}
+.mode button{border:0;background:none;padding:4px 12px;color:var(--muted)}
+.mode button.on{background:var(--code);color:var(--text);font-weight:600}
+textarea{width:100%;min-height:60px;resize:vertical;border:1px solid var(--border);border-radius:8px;padding:8px;background:var(--panel);color:var(--text);font:inherit}
+.hint{font-size:12px;color:var(--muted);margin-top:4px;display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap}
+.side{padding:12px 14px}
+.side h3{font-size:12px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);margin:14px 0 6px}
+.side h3:first-child{margin-top:0}
+.field{display:flex;justify-content:space-between;align-items:center;padding:4px 0;font-size:13px}
+.menu{position:relative}
+.dropdown{display:none;position:absolute;right:0;top:28px;z-index:5;background:var(--panel);border:1px solid var(--border);border-radius:8px;min-width:210px;box-shadow:0 8px 24px rgba(0,0,0,.12);padding:4px}
+.dropdown.open{display:block}
+.dropdown div{padding:6px 10px;border-radius:6px;font-size:13px}
+.dropdown div.ok:hover{background:var(--code);cursor:pointer}
+.dropdown .note{font-size:11.5px;color:var(--muted)}
+.scrim{display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:10}
+.scrim.open{display:block}
+.modal{position:fixed;z-index:11;top:50%;left:50%;transform:translate(-50%,-50%);width:min(640px,94vw);max-height:88vh;overflow:auto;display:none}
+.modal.open{display:block}
+.modal .in{padding:16px 18px}
+.modal h2{margin:0 0 4px;font-size:16px}
+label{display:block;font-size:12px;font-weight:600;color:var(--muted);margin:10px 0 4px}
+input,select{width:100%;border:1px solid var(--border);border-radius:6px;padding:6px 8px;background:var(--panel);color:var(--text);font:inherit}
+.li{display:flex;gap:6px;align-items:flex-start;font-size:13px;padding:3px 0}
+.li a{color:var(--accent);font-size:12px;white-space:nowrap}
+.drawer{position:fixed;z-index:11;top:0;right:0;height:100vh;width:min(420px,94vw);transform:translateX(100%);transition:transform .2s;display:flex;flex-direction:column;border-radius:0}
+.drawer.open{transform:none}
+.drawer .msgs{flex:1;overflow:auto}
+.check{margin-right:6px}
+.legend{max-width:1200px;margin:0 auto 24px;padding:0 16px;font-size:12.5px;color:var(--muted)}
+</style>
+</head>
+<body>
+
+<div class="top">
+  <span class="pill">#42</span>
+  <h1>Completed orders dropped ~30% on 2026-09-14</h1>
+  <span class="pill p-warn">In progress</span>
+  <span class="pill">P1</span>
+  <span class="muted" style="margin-left:auto">dataset <code>analytics.public.orders</code></span>
+</div>
+
+<div class="layout">
+  <!-- THREAD -->
+  <section class="panel">
+    <div class="thread-head">
+      <div class="tabs">
+        <button class="on">Shared thread</button>
+        <button onclick="openDrawer()">My scratch chats (2)</button>
+      </div>
+      <span class="muted" style="font-size:12px">4 watching · live</span>
+    </div>
+
+    <div class="msgs">
+      <div class="event">⚑ Check <code>orders.completed_daily_count</code> failed · issue opened by dataing · 08:02</div>
+
+      <div class="msg">
+        <div class="av a-agent">AI</div>
+        <div class="body">
+          <div class="meta"><b>Agent</b> · opening summary · 08:02</div>
+          <div>Completed orders on the 14th: <b>41,210</b> vs a 7-day median of <b>58,900</b> (−30%). Upstream: <code>raw.app_events</code>. 3 commits touched the build code in the last 7 days. 1 similar past issue (#17, resolved).</div>
+        </div>
+      </div>
+
+      <div class="msg">
+        <div class="av a-maya">M</div>
+        <div class="body">
+          <div class="meta"><b>Maya</b> · asked the agent · 08:10</div>
+          <div><span class="pill p-purple">@agent</span> is it every region?</div>
+        </div>
+      </div>
+
+      <div class="msg">
+        <div class="av a-agent">AI</div>
+        <div class="body">
+          <div class="meta"><b>Agent</b> · replying to Maya · ran as Maya · 08:10</div>
+          <div>Yes. Every region dropped by 28–32%, so this isn't regional.</div>
+          <details class="tool">
+            <summary>▸ Ran 1 query · 212 ms · 4 rows</summary>
+            <pre>SELECT region, count(*) AS completed
+FROM analytics.public.orders
+WHERE status = 'completed' AND order_date = '2026-09-14'
+GROUP BY region ORDER BY completed DESC LIMIT 1000</pre>
+            <table><tr><th>region</th><th>completed</th><th>vs median</th></tr>
+              <tr><td>us</td><td>18,402</td><td>−29%</td></tr>
+              <tr><td>eu</td><td>12,115</td><td>−31%</td></tr>
+              <tr><td>apac</td><td>7,340</td><td>−28%</td></tr>
+              <tr><td>latam</td><td>3,353</td><td>−32%</td></tr></table>
+            <div class="foot">Snapshot saved with this message · <a href="#">copy SQL</a></div>
+          </details>
+        </div>
+      </div>
+
+      <div class="msg">
+        <div class="av a-raj">R</div>
+        <div class="body">
+          <div class="meta"><b>Raj</b> · comment · 08:14</div>
+          <div>FYI my revenue dashboard only counts <code>status = 'completed'</code>. <span class="pill p-purple">@agent</span> can you split by source app?</div>
+        </div>
+      </div>
+
+      <div class="msg">
+        <div class="av a-agent">AI</div>
+        <div class="body">
+          <div class="meta"><b>Agent</b> · replying to Raj · ran as Raj · 08:15</div>
+          <div>The drop is only in orders from <code>app_v2</code>: completed orders from v2 went from ~17k/day to 0 on the 14th. <code>app_v1</code> and <code>web</code> are flat.</div>
+          <details class="tool">
+            <summary>▸ Ran 2 queries · 480 ms</summary>
+            <pre>SELECT source, order_date, count(*) FILTER (WHERE status='completed') ...</pre>
+            <table><tr><th>source</th><th>09-13</th><th>09-14</th></tr>
+              <tr><td>web</td><td>24,901</td><td>24,655</td></tr>
+              <tr><td>app_v1</td><td>16,720</td><td>16,555</td></tr>
+              <tr><td>app_v2</td><td>17,130</td><td>0</td></tr></table>
+            <div class="foot">Truncated: no · 2 snapshots saved</div>
+          </details>
+        </div>
+      </div>
+
+      <div class="event">● Maya assigned herself · status Triaged → In progress · 08:16</div>
+
+      <div class="msg">
+        <div class="av a-maya">M</div>
+        <div class="body">
+          <div class="meta"><b>Maya</b> · started an investigation · 08:20</div>
+          <div class="card">
+            <h4>Investigation #7 <span class="pill p-purple">running · evaluating</span> <span class="pill">standard</span></h4>
+            <div class="muted" style="font-size:12.5px">Brief: completed orders −30% on 09-14 · only <code>app_v2</code> · ruled out: region · lead: app_v2 deploy. <a href="#" onclick="openBrief();return false">view brief</a></div>
+            <div class="bar"><i></i></div>
+            <div class="hyp"><span class="pill p-ok">supported</span><span class="t">H1 · app_v2 writes a different status value</span><span class="muted">2 queries</span></div>
+            <div class="hyp"><span class="pill p-purple">testing</span><span class="t">H2 · app_v2 events not landing in raw.app_events</span><button class="btn sm">Rule out</button></div>
+            <div class="hyp"><span class="pill">ruled out by Maya</span><span class="t" style="text-decoration:line-through">H3 · late-arriving events</span><span class="muted">stopped</span></div>
+            <div class="hyp"><span class="pill p-purple">testing</span><span class="t">H4 · dedup step drops v2 order ids <span class="pill p-blue">added by Raj</span></span><button class="btn sm">Rule out</button></div>
+            <div class="steer">Steer by Raj · add context: "app_v2 shipped 2026-09-14 09:00 UTC" · <b>applied</b> during evaluation</div>
+            <div class="steer">Steer by Maya · rule out H3: "events arrive within 5 min" · <b>applied</b>: cancelled subagent H3</div>
+            <div class="row">
+              <button class="btn">＋ Add context</button>
+              <button class="btn">＋ Add hypothesis</button>
+              <button class="btn">Stop and conclude</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="msg">
+        <div class="av a-raj">R</div>
+        <div class="body">
+          <div class="meta"><b>Raj</b> · asked the agent · 08:31</div>
+          <div><span class="pill p-purple">@agent</span> tell the investigation to check the v2 status enum</div>
+        </div>
+      </div>
+      <div class="msg">
+        <div class="av a-agent">AI</div>
+        <div class="body">
+          <div class="meta"><b>Agent</b> · replying to Raj · 08:31</div>
+          <div>I can't change the run myself. Here's a steer you can send:</div>
+          <div class="proposal"><b>Proposed steer</b> · add context · #7<br>"Check whether app_v2 writes status values other than lowercase <code>completed</code>."
+            <div class="row"><button class="btn agent">Send steer</button><button class="btn">Edit</button><button class="btn">Dismiss</button></div></div>
+        </div>
+      </div>
+
+      <div class="msg">
+        <div class="av a-agent">AI</div>
+        <div class="body">
+          <div class="meta"><b>Agent</b> · investigation #7 finished · 08:44</div>
+          <div class="card">
+            <h4>Root cause <span class="pill p-ok">confidence 0.91</span></h4>
+            <div>Since the 09-14 deploy, <code>app_v2</code> writes <code>status = 'COMPLETE'</code> instead of <code>'completed'</code>. 18,400 orders are affected; none are lost.</div>
+            <div class="row" style="font-size:12.5px">
+              <span class="pill p-ok">H1 supported</span><span class="pill p-bad">H2 refuted by evidence</span><span class="pill">H3 ruled out by a person</span><span class="pill p-warn">H4 untested</span>
+            </div>
+            <div class="row">
+              <button class="btn primary">Confirm</button><button class="btn">Reject</button>
+              <button class="btn">Continue investigating</button><button class="btn">Add as check</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="msg">
+        <div class="av a-maya">M</div>
+        <div class="body">
+          <div class="meta"><b>Maya</b> · shared from her scratch chat · 08:47</div>
+          <div>Count of affected rows by hour, in case the backfill needs it.</div>
+          <details class="tool"><summary>▸ 1 query result (copied snapshot) · 24 rows</summary>
+            <pre>SELECT date_trunc('hour', created_at) ... WHERE source='app_v2' AND status='COMPLETE'</pre></details>
+        </div>
+      </div>
+    </div>
+
+    <div class="composer">
+      <div class="mode" id="mode">
+        <button onclick="setMode(0)">Comment</button>
+        <button class="on" onclick="setMode(1)">Ask agent</button>
+      </div>
+      <textarea id="ta" placeholder="Ask the agent. It runs read-only queries as you."></textarea>
+      <div class="hint">
+        <span id="hintText">⚠ Agent replies are visible to everyone on this issue. Use a scratch chat to explore privately.</span>
+        <span><button class="btn" onclick="openBrief()">Investigate…</button> <button class="btn primary">Send</button></span>
+      </div>
+    </div>
+  </section>
+
+  <!-- SIDEBAR -->
+  <aside class="panel side">
+    <h3>Status</h3>
+    <div class="field">
+      <span class="pill p-warn">In progress</span>
+      <div class="menu">
+        <button class="btn sm" onclick="toggleMenu()">Change ▾</button>
+        <div class="dropdown" id="dd">
+          <div class="note">Only moves that will succeed are shown</div>
+          <div class="ok">Blocked</div>
+          <div class="ok">Resolved <span class="note">· asks for a note, pre-filled from the confirmed cause</span></div>
+          <div class="ok">Closed</div>
+        </div>
+      </div>
+    </div>
+    <h3>Details</h3>
+    <div class="field"><span class="muted">Assignee</span><button class="btn sm">Maya Chen ▾</button></div>
+    <div class="field"><span class="muted">Priority</span><button class="btn sm">P1 ▾</button></div>
+    <div class="field"><span class="muted">Severity</span><button class="btn sm">High ▾</button></div>
+    <div class="field"><span class="muted">Labels</span><span><span class="pill">orders</span> <span class="pill">app_v2</span> <button class="btn sm">＋</button></span></div>
+    <div class="field"><span class="muted">Observed</span><span>2026-09-14</span></div>
+    <div class="field"><span class="muted">Column</span><code>status</code></div>
+    <h3>Dataset</h3>
+    <div style="font-size:13px"><code>analytics.public.orders</code><br><a href="#" style="color:var(--accent);font-size:12px">open dataset page →</a></div>
+    <h3>Investigations</h3>
+    <div class="field"><span>#7 · standard</span><span class="pill p-ok">done · 0.91</span></div>
+    <h3>Watchers</h3>
+    <div style="font-size:13px">Maya Chen, Raj Patel, Ana Ruiz, Tom Lee</div>
+    <h3>Your scratch chats</h3>
+    <div class="field"><a href="#" onclick="openDrawer();return false" style="color:var(--accent)">Backfill sizing</a><span class="muted">08:40</span></div>
+    <div class="field"><a href="#" onclick="openDrawer();return false" style="color:var(--accent)">v2 enum check</a><span class="muted">08:33</span></div>
+    <button class="btn" style="margin-top:6px;width:100%" onclick="openDrawer()">＋ New scratch chat</button>
+  </aside>
+</div>
+
+<p class="legend">Static mockup of <code>docs/specs/0001_issue_chat.md</code>. Try: the composer's Comment / Ask agent toggle, <b>Investigate…</b> (brief editor), the status <b>Change</b> menu, the query rows ("Ran 1 query"), and <b>My scratch chats</b>.</p>
+
+<!-- BRIEF EDITOR -->
+<div class="scrim" id="scrim" onclick="closeAll()"></div>
+<div class="panel modal" id="brief">
+  <div class="in">
+    <h2>Hand off to an investigation</h2>
+    <div class="muted" style="font-size:12.5px">The agent drafted this brief from the thread. Edit anything. Only this brief is sent to the manager and its subagents.</div>
+    <label>Symptom</label>
+    <input value="Completed orders dropped ~30% on 2026-09-14">
+    <label>Findings</label>
+    <div class="li"><input type="checkbox" class="check" checked>The drop is only in orders with source = app_v2 <a href="#">from Raj's question ↗</a></div>
+    <label>Ruled out</label>
+    <div class="li"><input type="checkbox" class="check" checked>Not region-specific <a href="#">from Maya's question ↗</a></div>
+    <label>Leads (tested first)</label>
+    <input value="app_v2 deploy on 2026-09-14">
+    <label>Scope: tables</label>
+    <input value="analytics.public.orders, raw.app_events">
+    <label>Time window</label>
+    <input value="2026-09-10 → 2026-09-16">
+    <label>Notes</label>
+    <textarea>The dashboard counts status = 'completed' only</textarea>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+      <div><label>Depth</label><select><option>safe</option><option selected>standard</option><option>deep</option></select></div>
+      <div><label>Datasource</label><select><option>warehouse (postgres)</option></select></div>
+    </div>
+    <div class="row" style="justify-content:flex-end;margin-top:14px">
+      <button class="btn" onclick="closeAll()">Cancel</button>
+      <button class="btn primary" onclick="closeAll()">Start investigation</button>
+    </div>
+  </div>
+</div>
+
+<!-- SCRATCH DRAWER -->
+<div class="panel drawer" id="drawer">
+  <div class="thread-head">
+    <div><b>Scratch: v2 enum check</b> <span class="pill">private</span></div>
+    <button class="btn sm" onclick="closeAll()">✕</button>
+  </div>
+  <div class="muted" style="font-size:12px;padding:6px 14px">Only you can see this chat. Queries still run as you and are audited.</div>
+  <div class="msgs">
+    <div class="msg"><input type="checkbox" class="check"><div class="av a-maya">M</div><div class="body"><div class="meta"><b>You</b> · 08:33</div>What distinct status values does app_v2 write since the 13th?</div></div>
+    <div class="msg"><input type="checkbox" class="check" checked><div class="av a-agent">AI</div><div class="body"><div class="meta"><b>Agent</b> · 08:33</div>Since 09-14 09:02 UTC, app_v2 writes <code>COMPLETE</code> (18,400 rows) and never <code>completed</code>.
+      <details class="tool"><summary>▸ Ran 1 query · 3 rows</summary>
+        <table><tr><th>status</th><th>rows</th></tr><tr><td>COMPLETE</td><td>18,400</td></tr><tr><td>cancelled</td><td>612</td></tr><tr><td>pending</td><td>2,104</td></tr></table></details></div></div>
+  </div>
+  <div class="composer">
+    <textarea placeholder="Ask the agent privately…"></textarea>
+    <div class="row" style="justify-content:space-between">
+      <button class="btn">Publish selected (1)</button>
+      <span><button class="btn" onclick="closeAll();openBrief()">Investigate from here</button> <button class="btn primary">Send</button></span>
+    </div>
+  </div>
+</div>
+
+<script>
+function setMode(i){
+  const b=document.querySelectorAll('#mode button');
+  b.forEach((x,j)=>x.classList.toggle('on',j===i));
+  document.getElementById('ta').placeholder=i?'Ask the agent. It runs read-only queries as you.':'Write a comment for the team (markdown).';
+  document.getElementById('hintText').textContent=i?'⚠ Agent replies are visible to everyone on this issue. Use a scratch chat to explore privately.':'Comments are visible to everyone on this issue.';
+}
+function toggleMenu(){document.getElementById('dd').classList.toggle('open')}
+function openBrief(){document.getElementById('scrim').classList.add('open');document.getElementById('brief').classList.add('open')}
+function openDrawer(){document.getElementById('scrim').classList.add('open');document.getElementById('drawer').classList.add('open')}
+function closeAll(){['scrim','brief','drawer'].forEach(id=>document.getElementById(id).classList.remove('open'))}
+document.addEventListener('click',e=>{if(!e.target.closest('.menu'))document.getElementById('dd').classList.remove('open')});
+document.addEventListener('keydown',e=>{if(e.key==='Escape')closeAll()});
+</script>
+</body>
+</html>

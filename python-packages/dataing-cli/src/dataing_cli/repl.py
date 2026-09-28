@@ -170,13 +170,15 @@ class DataingREPL:
             self.console.print("[dim]Type /help to see available commands.[/dim]")
 
     async def _handle_message(self, message: str) -> None:
-        """Send message and stream response.
+        """Give the running investigation this context and stream what it does next.
 
         Args:
-            message: The user message to send.
+            message: The context to add.
         """
-        # Send message to investigation
-        self.client.send_message(self.investigation_id, message)
+        steer = self.client.steer(self.investigation_id, message)
+        if steer.status == "rejected":
+            self.console.print(f"[yellow]Not applied:[/yellow] {steer.outcome}")
+            return
 
         # Stream response with Rich Live display
         panels: list[Any] = []

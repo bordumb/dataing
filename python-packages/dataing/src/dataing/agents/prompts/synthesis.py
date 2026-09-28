@@ -7,11 +7,14 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from dataing.agents.prompts.brief import team_brief_section
+
 if TYPE_CHECKING:
     from dataing.core.domain_types import (
         AnomalyAlert,
         Evidence,
         RelevantCodeChange,
+        RuledOutHypothesis,
         UntestedHypothesis,
     )
 
@@ -30,6 +33,9 @@ Hypotheses listed under "Untested Hypotheses" could not be tested because their
 evaluation failed (for example, their query or its interpretation failed). A failed
 evaluation is not evidence: never treat an untested hypothesis as refuted or ruled out.
 Untested hypotheses remain possible explanations, so lower confidence accordingly.
+Hypotheses listed under "Ruled Out by the Team" were ruled out by a person while the
+investigation ran; their evidence, if any, is left out. Do not name one as the root
+cause, and do not count it as refuted by evidence.
 If no hypothesis was tested, the investigation is inconclusive: set root_cause to null,
 keep confidence below 0.5, use causal_chain and supporting_evidence to state what could
 not be tested and why, set estimated_onset to "unknown", and recommend fixing what made
@@ -181,11 +187,21 @@ def _build_untested_section(untested: list[UntestedHypothesis]) -> str:
     return "\n".join(lines)
 
 
+def _build_ruled_out_section(ruled_out: list[RuledOutHypothesis]) -> str:
+    """Build a section listing hypotheses a person ruled out, with their reasons."""
+    lines = ["## Ruled Out by the Team", ""]
+    for hypothesis in ruled_out:
+        reason = " ".join(hypothesis.reason.split())[:300]
+        lines.append(f"- {hypothesis.hypothesis_id} ({hypothesis.title}): {reason}")
+    return "\n".join(lines)
+
+
 def build_user(
     alert: AnomalyAlert,
     evidence: list[Evidence],
     code_changes: list[RelevantCodeChange] | None = None,
     untested_hypotheses: list[UntestedHypothesis] | None = None,
+    ruled_out_hypotheses: list[RuledOutHypothesis] | None = None,
 ) -> str:
     """Build synthesis user prompt.
 
@@ -194,6 +210,7 @@ def build_user(
         evidence: All collected evidence.
         code_changes: Optional list of recent code changes related to the investigation.
         untested_hypotheses: Optional hypotheses whose evaluation failed.
+        ruled_out_hypotheses: Optional hypotheses a person ruled out.
 
     Returns:
         Formatted user prompt.
@@ -216,6 +233,8 @@ def build_user(
     untested_section = ""
     if untested_hypotheses:
         untested_section = f"\n{_build_untested_section(untested_hypotheses)}\n"
+    if ruled_out_hypotheses:
+        untested_section += f"\n{_build_ruled_out_section(ruled_out_hypotheses)}\n"
 
     code_changes_section = ""
     if code_changes:
@@ -231,7 +250,7 @@ def build_user(
 
 ## What Was Investigated
 {metric_context}
-
+{team_brief_section(alert)}
 ## Investigation Findings
 {evidence_text}
 {untested_section}{code_changes_section}

@@ -1,0 +1,25 @@
+{
+  "assignee": "bordumbb@gmail.com",
+  "claim_note": "",
+  "claimed_at": "2026-09-27T23:45:48.993040Z",
+  "created_at": "2026-09-27T23:20:29.273445Z",
+  "depends_on": [
+    "fn-70.3"
+  ],
+  "epic": "fn-70",
+  "evidence": {
+    "commits": [
+      "36234165"
+    ],
+    "prs": [],
+    "tests": [
+      "pytest tests/unit/agents/test_chat_agent.py"
+    ]
+  },
+  "id": "fn-70.4",
+  "priority": null,
+  "spec_path": ".flow/tasks/fn-70.4.md",
+  "status": "done",
+  "title": "M1: chat agent (pydantic-ai) with tools, prompt assembly and streaming",
+  "updated_at": "2026-09-27T23:49:52.624066Z"
+}

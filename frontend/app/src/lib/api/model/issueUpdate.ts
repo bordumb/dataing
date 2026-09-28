@@ -7,7 +7,10 @@
  */
 import type { IssueUpdateAcknowledgedBy } from "./issueUpdateAcknowledgedBy";
 import type { IssueUpdateAssigneeUserId } from "./issueUpdateAssigneeUserId";
+import type { IssueUpdateContext } from "./issueUpdateContext";
+import type { IssueUpdateDatasetId } from "./issueUpdateDatasetId";
 import type { IssueUpdateDescription } from "./issueUpdateDescription";
+import type { IssueUpdateDueAt } from "./issueUpdateDueAt";
 import type { IssueUpdateLabels } from "./issueUpdateLabels";
 import type { IssueUpdatePriority } from "./issueUpdatePriority";
 import type { IssueUpdateResolutionNote } from "./issueUpdateResolutionNote";
@@ -17,11 +20,18 @@ import type { IssueUpdateTitle } from "./issueUpdateTitle";
 
 /**
  * Request body for updating an issue.
+
+A field sent as null clears the column; a field left out is unchanged.
+Title and status cannot be null. A null context resets it to an empty object,
+and null labels remove every label.
  */
 export interface IssueUpdate {
   acknowledged_by?: IssueUpdateAcknowledgedBy;
   assignee_user_id?: IssueUpdateAssigneeUserId;
+  context?: IssueUpdateContext;
+  dataset_id?: IssueUpdateDatasetId;
   description?: IssueUpdateDescription;
+  due_at?: IssueUpdateDueAt;
   labels?: IssueUpdateLabels;
   priority?: IssueUpdatePriority;
   resolution_note?: IssueUpdateResolutionNote;

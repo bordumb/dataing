@@ -1,0 +1,29 @@
+{
+  "assignee": "bordumbb@gmail.com",
+  "claim_note": "",
+  "claimed_at": "2026-09-28T01:06:20.015278Z",
+  "created_at": "2026-09-27T23:20:33.928624Z",
+  "depends_on": [
+    "fn-70.5",
+    "fn-70.10"
+  ],
+  "epic": "fn-70",
+  "evidence": {
+    "commits": [
+      "c30108a9"
+    ],
+    "prs": [],
+    "tests": [
+      "unit temporal+agents 216 pass",
+      "replay 5 histories",
+      "integration 117 pass",
+      "EE 702 pass"
+    ]
+  },
+  "id": "fn-70.12",
+  "priority": null,
+  "spec_path": ".flow/tasks/fn-70.12.md",
+  "status": "done",
+  "title": "M3: record histories, steer signal and checkpoint application",
+  "updated_at": "2026-09-28T01:06:20.301903Z"
+}

@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import asyncio
 import base64
+import json
 import logging
 from collections.abc import AsyncIterator
 from datetime import UTC, datetime
@@ -15,12 +16,15 @@ from typing import Annotated, Any
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator, model_validator
 from sse_starlette.sse import EventSourceResponse
 
 from dataing.adapters.db.app_db import AppDatabase
+from dataing.adapters.db.issue_threads import IssueThreadRepository
+from dataing.agents.prompts.brief import BRIEF_METADATA_KEY
 from dataing.core.domain_types import AnomalyAlert, MetricSpec
-from dataing.core.json_utils import to_json_string
+from dataing.core.investigation.brief import InvestigationBrief, brief_to_prompt
+from dataing.core.json_utils import to_json_safe, to_json_string
 from dataing.entrypoints.api.deps import (
     get_app_db,
     get_investigation_starter,
@@ -67,6 +71,61 @@ STATE_TRANSITIONS: dict[str, set[str]] = {
     IssueStatus.CLOSED.value: {IssueStatus.OPEN.value},  # reopening
 }
 
+# Lifecycle order, used to list allowed transitions deterministically.
+_STATUS_ORDER = [status.value for status in IssueStatus]
+
+_OWNED_STATUSES = frozenset({IssueStatus.IN_PROGRESS.value, IssueStatus.BLOCKED.value})
+
+
+def missing_transition_fields(
+    new_status: str,
+    assignee_user_id: UUID | None,
+    acknowledged_by: UUID | None,
+    resolution_note: str | None,
+    has_linked_investigation: bool = False,
+) -> list[str]:
+    """Return the fields a move to new_status still needs, given the issue's values.
+
+    In progress and blocked need an owner (assignee_user_id or acknowledged_by);
+    resolved needs a resolution_note unless a linked investigation has a synthesis.
+    """
+    if new_status in _OWNED_STATUSES and not assignee_user_id and not acknowledged_by:
+        return ["assignee_user_id"]
+    if (
+        new_status == IssueStatus.RESOLVED.value
+        and not resolution_note
+        and not has_linked_investigation
+    ):
+        return ["resolution_note"]
+    return []
+
+
+def transition_options(
+    current_status: str,
+    assignee_user_id: UUID | None,
+    acknowledged_by: UUID | None,
+    resolution_note: str | None,
+    has_linked_investigation: bool,
+) -> tuple[list[str], dict[str, list[str]]]:
+    """Return the allowed moves from current_status and what each still needs.
+
+    Returns:
+        Tuple of (allowed_transitions, transition_requirements). The allowed
+        transitions are the state machine's moves in lifecycle order. The
+        requirements map only the moves whose guard the issue does not already
+        satisfy to the fields the client must send in the same PATCH.
+    """
+    targets = STATE_TRANSITIONS.get(current_status, set())
+    allowed = [status for status in _STATUS_ORDER if status in targets]
+    requirements: dict[str, list[str]] = {}
+    for target in allowed:
+        missing = missing_transition_fields(
+            target, assignee_user_id, acknowledged_by, resolution_note, has_linked_investigation
+        )
+        if missing:
+            requirements[target] = missing
+    return allowed, requirements
+
 
 def validate_state_transition(
     current_status: str,
@@ -89,26 +148,17 @@ def validate_state_transition(
     Returns:
         Tuple of (is_valid, error_message).
     """
-    # Check if transition is allowed
     valid_transitions = STATE_TRANSITIONS.get(current_status, set())
     if new_status not in valid_transitions:
         return False, f"Cannot transition from {current_status} to {new_status}"
 
-    # Transitions to IN_PROGRESS or BLOCKED require assignee OR acknowledged_by
-    if new_status in {IssueStatus.IN_PROGRESS.value, IssueStatus.BLOCKED.value}:
-        if not assignee_user_id and not acknowledged_by:
-            return (
-                False,
-                f"Transition to {new_status} requires an assignee or acknowledged_by user",
-            )
-
-    # Transition to RESOLVED requires resolution_note OR linked investigation
-    if new_status == IssueStatus.RESOLVED.value:
-        if not resolution_note and not has_linked_investigation:
-            return (
-                False,
-                "Transition to RESOLVED requires resolution_note or a linked investigation",
-            )
+    missing = missing_transition_fields(
+        new_status, assignee_user_id, acknowledged_by, resolution_note, has_linked_investigation
+    )
+    if missing == ["assignee_user_id"]:
+        return False, f"Transition to {new_status} requires an assignee or acknowledged_by user"
+    if missing == ["resolution_note"]:
+        return False, "Transition to RESOLVED requires resolution_note or a linked investigation"
 
     return True, ""
 
@@ -116,6 +166,16 @@ def validate_state_transition(
 # ============================================================================
 # Pydantic Schemas
 # ============================================================================
+
+# Issue context is a small hint (e.g. observed_at, column), not a payload store.
+MAX_CONTEXT_BYTES = 4096
+
+
+def _check_context_size(value: dict[str, Any] | None) -> dict[str, Any] | None:
+    """Reject a context whose JSON encoding exceeds MAX_CONTEXT_BYTES."""
+    if value is not None and len(to_json_string(value).encode()) > MAX_CONTEXT_BYTES:
+        raise ValueError(f"context must be at most {MAX_CONTEXT_BYTES} bytes as JSON")
+    return value
 
 
 class IssueCreate(BaseModel):
@@ -127,10 +187,25 @@ class IssueCreate(BaseModel):
     severity: str | None = Field(None, pattern="^(low|medium|high|critical)$")
     dataset_id: str | None = None
     labels: list[str] = Field(default_factory=list)
+    context: dict[str, Any] = Field(
+        default_factory=dict,
+        description="Where the problem was seen, e.g. observed_at and column",
+    )
+
+    check_context_size = field_validator("context")(_check_context_size)
+
+
+# Fields that may not be cleared with an explicit null.
+_NON_NULLABLE_UPDATE_FIELDS = ("title", "status")
 
 
 class IssueUpdate(BaseModel):
-    """Request body for updating an issue."""
+    """Request body for updating an issue.
+
+    A field sent as null clears the column; a field left out is unchanged.
+    Title and status cannot be null. A null context resets it to an empty object,
+    and null labels remove every label.
+    """
 
     title: str | None = Field(None, min_length=1, max_length=500)
     description: str | None = None
@@ -140,7 +215,20 @@ class IssueUpdate(BaseModel):
     assignee_user_id: UUID | None = None
     acknowledged_by: UUID | None = None
     resolution_note: str | None = None
+    dataset_id: str | None = None
+    due_at: datetime | None = None
+    context: dict[str, Any] | None = None
     labels: list[str] | None = None
+
+    check_context_size = field_validator("context")(_check_context_size)
+
+    @model_validator(mode="after")
+    def reject_required_nulls(self) -> IssueUpdate:
+        """Refuse explicit nulls for fields the issue must always have."""
+        for name in _NON_NULLABLE_UPDATE_FIELDS:
+            if name in self.model_fields_set and getattr(self, name) is None:
+                raise ValueError(f"{name} cannot be null")
+        return self
 
 
 class IssueResponse(BaseModel):
@@ -154,6 +242,7 @@ class IssueResponse(BaseModel):
     priority: str | None
     severity: str | None
     dataset_id: str | None
+    due_at: datetime | None
     assignee_user_id: UUID | None
     acknowledged_by: UUID | None
     created_by_user_id: UUID | None
@@ -162,7 +251,17 @@ class IssueResponse(BaseModel):
     source_external_id: str | None
     source_external_url: str | None
     resolution_note: str | None
+    context: dict[str, Any]
     labels: list[str]
+    allowed_transitions: list[str] = Field(
+        description="Statuses this issue may move to (the state machine's moves)"
+    )
+    transition_requirements: dict[str, list[str]] = Field(
+        description=(
+            "For allowed moves whose guard the issue does not yet satisfy, the fields "
+            "to send in the same PATCH (assignee_user_id or resolution_note)"
+        )
+    )
     created_at: datetime
     updated_at: datetime
     closed_at: datetime | None
@@ -190,6 +289,11 @@ class IssueListResponse(BaseModel):
 # Helper Functions
 # ============================================================================
 
+ISSUE_COLUMNS = """id, number, title, description, status, priority, severity,
+               dataset_id, due_at, assignee_user_id, acknowledged_by, created_by_user_id,
+               author_type, source_provider, source_external_id, source_external_url,
+               resolution_note, context, created_at, updated_at, closed_at"""
+
 
 def _encode_cursor(created_at: datetime, issue_id: UUID) -> str:
     """Encode pagination cursor."""
@@ -205,6 +309,16 @@ def _decode_cursor(cursor: str) -> tuple[datetime, UUID] | None:
         return datetime.fromisoformat(parts[0]), UUID(parts[1])
     except (ValueError, IndexError):
         return None
+
+
+def _decode_json_object(value: Any) -> dict[str, Any]:
+    """Decode a JSONB column value (text without a codec) into a dict."""
+    if isinstance(value, str):
+        try:
+            value = json.loads(value)
+        except ValueError:
+            return {}
+    return value if isinstance(value, dict) else {}
 
 
 async def _get_issue_labels(db: AppDatabase, issue_id: UUID) -> list[str]:
@@ -240,6 +354,81 @@ async def _has_linked_investigation(db: AppDatabase, issue_id: UUID) -> bool:
     return row is not None
 
 
+def _needs_synthesis_check(row: dict[str, Any]) -> bool:
+    """Whether the resolve guard for this issue depends on a linked synthesis."""
+    return (
+        IssueStatus.RESOLVED.value in STATE_TRANSITIONS.get(row["status"], set())
+        and not (row["resolution_note"])
+    )
+
+
+async def _issues_with_synthesis(db: AppDatabase, rows: list[dict[str, Any]]) -> set[UUID]:
+    """Return the ids among rows that have a linked investigation with a synthesis.
+
+    Only rows whose resolve guard depends on it are looked up, in one query.
+    """
+    ids = [row["id"] for row in rows if _needs_synthesis_check(row)]
+    if not ids:
+        return set()
+    found = await db.fetch_all(
+        """
+        SELECT DISTINCT issue_id FROM issue_investigation_runs
+        WHERE issue_id = ANY($1::uuid[]) AND synthesis_summary IS NOT NULL
+        """,
+        ids,
+    )
+    return {r["issue_id"] for r in found}
+
+
+def _build_issue_response(
+    row: dict[str, Any], labels: list[str], has_linked_investigation: bool
+) -> IssueResponse:
+    """Build an IssueResponse from an issues row selected with ISSUE_COLUMNS."""
+    allowed, requirements = transition_options(
+        row["status"],
+        row["assignee_user_id"],
+        row["acknowledged_by"],
+        row["resolution_note"],
+        has_linked_investigation,
+    )
+    return IssueResponse(
+        id=row["id"],
+        number=row["number"],
+        title=row["title"],
+        description=row["description"],
+        status=row["status"],
+        priority=row["priority"],
+        severity=row["severity"],
+        dataset_id=row["dataset_id"],
+        due_at=row["due_at"],
+        assignee_user_id=row["assignee_user_id"],
+        acknowledged_by=row["acknowledged_by"],
+        created_by_user_id=row["created_by_user_id"],
+        author_type=row["author_type"],
+        source_provider=row["source_provider"],
+        source_external_id=row["source_external_id"],
+        source_external_url=row["source_external_url"],
+        resolution_note=row["resolution_note"],
+        context=_decode_json_object(row["context"]),
+        labels=labels,
+        allowed_transitions=allowed,
+        transition_requirements=requirements,
+        created_at=row["created_at"],
+        updated_at=row["updated_at"],
+        closed_at=row["closed_at"],
+    )
+
+
+async def _issue_response(db: AppDatabase, row: dict[str, Any]) -> IssueResponse:
+    """Load labels and the synthesis flag for one issue row and build its response."""
+    labels = await _get_issue_labels(db, row["id"])
+    synthesized = await _issues_with_synthesis(db, [row])
+    return _build_issue_response(row, labels, row["id"] in synthesized)
+
+
+THREAD_SILENT_EVENTS = frozenset({"comment_added", "investigation_spawned"})
+
+
 async def _record_issue_event(
     db: AppDatabase,
     issue_id: UUID,
@@ -247,7 +436,11 @@ async def _record_issue_event(
     actor_user_id: UUID | None,
     payload: dict[str, Any] | None = None,
 ) -> None:
-    """Record an issue event."""
+    """Record an issue event and show it in the issue's shared thread.
+
+    A new comment and a new investigation are already messages in the thread (a
+    comment, an investigation card), so those events are only in the event log.
+    """
     await db.execute(
         """
         INSERT INTO issue_events (issue_id, event_type, actor_user_id, payload)
@@ -258,6 +451,84 @@ async def _record_issue_event(
         actor_user_id,
         to_json_string(payload or {}),
     )
+    if event_type not in THREAD_SILENT_EVENTS:
+        await IssueThreadRepository(db).append_event(issue_id, event_type, actor_user_id, payload)
+
+
+async def _record_confirmed_cause(
+    db: AppDatabase, issue_id: UUID, actor_user_id: UUID | None
+) -> None:
+    """Record the confirmed root cause an issue was resolved with, if it has one."""
+    confirmed = await db.fetch_one(
+        """
+        SELECT investigation_id, synthesis_summary FROM issue_investigation_runs
+        WHERE issue_id = $1 AND outcome_verdict = 'confirmed'
+        ORDER BY outcome_reviewed_at DESC LIMIT 1
+        """,
+        issue_id,
+    )
+    if confirmed is None:
+        return
+    await _record_issue_event(
+        db,
+        issue_id,
+        "resolved_with_cause",
+        actor_user_id,
+        {
+            "investigation_id": str(confirmed["investigation_id"]),
+            "root_cause": confirmed["synthesis_summary"],
+        },
+    )
+
+
+# PATCHable columns, in the order they are written.
+_UPDATABLE_COLUMNS = (
+    "title",
+    "description",
+    "status",
+    "priority",
+    "severity",
+    "assignee_user_id",
+    "acknowledged_by",
+    "resolution_note",
+    "dataset_id",
+    "due_at",
+    "context",
+)
+
+
+def _field_change_event(field: str, old: Any, new: Any) -> tuple[str, dict[str, Any]]:
+    """Return the (event_type, payload) recorded for a changed issue field."""
+    before, after = to_json_safe(old), to_json_safe(new)
+    if field == "status":
+        return "status_changed", {"from": before, "to": after}
+    if field == "assignee_user_id":
+        return "assigned", {"assignee_user_id": after, "from": before, "to": after}
+    if field == "acknowledged_by":
+        return "acknowledged", {"acknowledged_by": after, "from": before, "to": after}
+    if field in ("priority", "severity"):
+        return f"{field}_changed", {"from": before, "to": after}
+    return "field_changed", {"field": field, "from": before, "to": after}
+
+
+def _changed_fields(current: dict[str, Any], body: IssueUpdate) -> dict[str, Any]:
+    """Return the columns the PATCH body sets to a value different from current.
+
+    Only fields present in the request body count; an explicit null clears the
+    column, except context, which resets to an empty object.
+    """
+    changes: dict[str, Any] = {}
+    for field in _UPDATABLE_COLUMNS:
+        if field not in body.model_fields_set:
+            continue
+        new = getattr(body, field)
+        old = current[field]
+        if field == "context":
+            new = new or {}
+            old = _decode_json_object(old)
+        if new != old:
+            changes[field] = new
+    return changes
 
 
 # ============================================================================
@@ -339,10 +610,7 @@ async def list_issues(
 
     # Fetch issues
     query = f"""
-        SELECT id, number, title, description, status, priority, severity,
-               dataset_id, assignee_user_id, acknowledged_by, created_by_user_id,
-               author_type, source_provider, source_external_id, source_external_url,
-               resolution_note, created_at, updated_at, closed_at
+        SELECT {ISSUE_COLUMNS}
         FROM issues
         WHERE {where_clause}
         ORDER BY updated_at DESC, id DESC
@@ -357,34 +625,11 @@ async def list_issues(
     if has_more:
         rows = rows[:limit]
 
-    # Build response items with labels
+    synthesized = await _issues_with_synthesis(db, rows)
     items = []
     for row in rows:
         labels = await _get_issue_labels(db, row["id"])
-        items.append(
-            IssueResponse(
-                id=row["id"],
-                number=row["number"],
-                title=row["title"],
-                description=row["description"],
-                status=row["status"],
-                priority=row["priority"],
-                severity=row["severity"],
-                dataset_id=row["dataset_id"],
-                assignee_user_id=row["assignee_user_id"],
-                acknowledged_by=row["acknowledged_by"],
-                created_by_user_id=row["created_by_user_id"],
-                author_type=row["author_type"],
-                source_provider=row["source_provider"],
-                source_external_id=row["source_external_id"],
-                source_external_url=row["source_external_url"],
-                resolution_note=row["resolution_note"],
-                labels=labels,
-                created_at=row["created_at"],
-                updated_at=row["updated_at"],
-                closed_at=row["closed_at"],
-            )
-        )
+        items.append(_build_issue_response(row, labels, row["id"] in synthesized))
 
     # Build next cursor
     next_cursor = None
@@ -419,16 +664,13 @@ async def create_issue(
 
     # Insert issue
     row = await db.execute_returning(
-        """
+        f"""
         INSERT INTO issues (
             tenant_id, number, title, description, status, priority, severity,
-            dataset_id, created_by_user_id, author_type
+            dataset_id, created_by_user_id, author_type, context
         )
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
-        RETURNING id, number, title, description, status, priority, severity,
-                  dataset_id, assignee_user_id, acknowledged_by, created_by_user_id,
-                  author_type, source_provider, source_external_id, source_external_url,
-                  resolution_note, created_at, updated_at, closed_at
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+        RETURNING {ISSUE_COLUMNS}
         """,
         auth.tenant_id,
         number,
@@ -440,6 +682,7 @@ async def create_issue(
         body.dataset_id,
         auth.user_id,
         "human",
+        to_json_string(body.context),
     )
 
     if not row:
@@ -460,30 +703,7 @@ async def create_issue(
         {"title": body.title},
     )
 
-    labels = await _get_issue_labels(db, issue_id)
-
-    return IssueResponse(
-        id=row["id"],
-        number=row["number"],
-        title=row["title"],
-        description=row["description"],
-        status=row["status"],
-        priority=row["priority"],
-        severity=row["severity"],
-        dataset_id=row["dataset_id"],
-        assignee_user_id=row["assignee_user_id"],
-        acknowledged_by=row["acknowledged_by"],
-        created_by_user_id=row["created_by_user_id"],
-        author_type=row["author_type"],
-        source_provider=row["source_provider"],
-        source_external_id=row["source_external_id"],
-        source_external_url=row["source_external_url"],
-        resolution_note=row["resolution_note"],
-        labels=labels,
-        created_at=row["created_at"],
-        updated_at=row["updated_at"],
-        closed_at=row["closed_at"],
-    )
+    return await _issue_response(db, row)
 
 
 @router.get("/{issue_id}", response_model=IssueResponse)
@@ -497,14 +717,7 @@ async def get_issue(
     Returns the full issue if user has access, 404 if not found.
     """
     row = await db.fetch_one(
-        """
-        SELECT id, number, title, description, status, priority, severity,
-               dataset_id, assignee_user_id, acknowledged_by, created_by_user_id,
-               author_type, source_provider, source_external_id, source_external_url,
-               resolution_note, created_at, updated_at, closed_at
-        FROM issues
-        WHERE id = $1 AND tenant_id = $2
-        """,
+        f"SELECT {ISSUE_COLUMNS} FROM issues WHERE id = $1 AND tenant_id = $2",
         issue_id,
         auth.tenant_id,
     )
@@ -512,30 +725,7 @@ async def get_issue(
     if not row:
         raise HTTPException(status_code=404, detail="Issue not found")
 
-    labels = await _get_issue_labels(db, issue_id)
-
-    return IssueResponse(
-        id=row["id"],
-        number=row["number"],
-        title=row["title"],
-        description=row["description"],
-        status=row["status"],
-        priority=row["priority"],
-        severity=row["severity"],
-        dataset_id=row["dataset_id"],
-        assignee_user_id=row["assignee_user_id"],
-        acknowledged_by=row["acknowledged_by"],
-        created_by_user_id=row["created_by_user_id"],
-        author_type=row["author_type"],
-        source_provider=row["source_provider"],
-        source_external_id=row["source_external_id"],
-        source_external_url=row["source_external_url"],
-        resolution_note=row["resolution_note"],
-        labels=labels,
-        created_at=row["created_at"],
-        updated_at=row["updated_at"],
-        closed_at=row["closed_at"],
-    )
+    return await _issue_response(db, row)
 
 
 @router.patch("/{issue_id}", response_model=IssueResponse)
@@ -547,15 +737,13 @@ async def update_issue(
 ) -> IssueResponse:
     """Update issue fields.
 
-    Enforces state machine transitions when status is changed.
+    A field sent as null clears it; a field left out is unchanged. A status
+    change is validated against the issue as it will be after this PATCH, so
+    status and assignee (or resolution_note) can be sent together. Every
+    changed field is recorded as an issue event.
     """
-    # Get current issue
     current = await db.fetch_one(
-        """
-        SELECT id, status, assignee_user_id, acknowledged_by, resolution_note
-        FROM issues
-        WHERE id = $1 AND tenant_id = $2
-        """,
+        f"SELECT {ISSUE_COLUMNS} FROM issues WHERE id = $1 AND tenant_id = $2",
         issue_id,
         auth.tenant_id,
     )
@@ -563,196 +751,80 @@ async def update_issue(
     if not current:
         raise HTTPException(status_code=404, detail="Issue not found")
 
-    # Handle status transition
-    if body.status and body.status != current["status"]:
-        # Determine effective values for validation
-        assignee = (
-            body.assignee_user_id
-            if body.assignee_user_id is not None
-            else current["assignee_user_id"]
-        )
-        acknowledged = (
-            body.acknowledged_by if body.acknowledged_by is not None else current["acknowledged_by"]
-        )
-        resolution = (
-            body.resolution_note if body.resolution_note is not None else current["resolution_note"]
-        )
-        has_investigation = await _has_linked_investigation(db, issue_id)
+    changes = _changed_fields(current, body)
 
+    if "status" in changes:
+        effective = {**current, **changes}
+        has_investigation = await _has_linked_investigation(db, issue_id)
         is_valid, error = validate_state_transition(
             current["status"],
-            body.status,
-            assignee,
-            acknowledged,
-            resolution,
+            changes["status"],
+            effective["assignee_user_id"],
+            effective["acknowledged_by"],
+            effective["resolution_note"],
             has_investigation,
         )
-
         if not is_valid:
             raise HTTPException(status_code=400, detail=error)
 
-    # Build update query dynamically
-    updates = []
-    params: list[Any] = []
-    param_idx = 1
-
-    if body.title is not None:
-        updates.append(f"title = ${param_idx}")
-        params.append(body.title)
-        param_idx += 1
-
-    if body.description is not None:
-        updates.append(f"description = ${param_idx}")
-        params.append(body.description)
-        param_idx += 1
-
-    if body.status is not None:
-        updates.append(f"status = ${param_idx}")
-        params.append(body.status)
-        param_idx += 1
-
-        # Set closed_at when transitioning to CLOSED
-        if body.status == IssueStatus.CLOSED.value:
-            updates.append(f"closed_at = ${param_idx}")
-            params.append(datetime.now(UTC))
-            param_idx += 1
-        elif current["status"] == IssueStatus.CLOSED.value:
-            # Clear closed_at when reopening
-            updates.append("closed_at = NULL")
-
-    if body.priority is not None:
-        updates.append(f"priority = ${param_idx}")
-        params.append(body.priority)
-        param_idx += 1
-
-    if body.severity is not None:
-        updates.append(f"severity = ${param_idx}")
-        params.append(body.severity)
-        param_idx += 1
-
-    if body.assignee_user_id is not None:
-        updates.append(f"assignee_user_id = ${param_idx}")
-        params.append(body.assignee_user_id)
-        param_idx += 1
-
-    if body.acknowledged_by is not None:
-        updates.append(f"acknowledged_by = ${param_idx}")
-        params.append(body.acknowledged_by)
-        param_idx += 1
-
-    if body.resolution_note is not None:
-        updates.append(f"resolution_note = ${param_idx}")
-        params.append(body.resolution_note)
-        param_idx += 1
-
-    if not updates:
-        # Nothing to update, just return current issue
-        return await get_issue(issue_id, auth, db)
-
-    # Always update updated_at
-    updates.append(f"updated_at = ${param_idx}")
-    params.append(datetime.now(UTC))
-    param_idx += 1
-
-    # Add WHERE clause params
-    params.extend([issue_id, auth.tenant_id])
-
-    query = f"""
-        UPDATE issues
-        SET {", ".join(updates)}
-        WHERE id = ${param_idx} AND tenant_id = ${param_idx + 1}
-        RETURNING id, number, title, description, status, priority, severity,
-                  dataset_id, assignee_user_id, acknowledged_by, created_by_user_id,
-                  author_type, source_provider, source_external_id, source_external_url,
-                  resolution_note, created_at, updated_at, closed_at
-    """
-
-    row = await db.execute_returning(query, *params)
-
-    if not row:
-        raise HTTPException(status_code=404, detail="Issue not found")
-
-    # Handle labels separately
-    if body.labels is not None:
-        await _set_issue_labels(db, issue_id, body.labels)
-
-    # Record status change event
-    if body.status and body.status != current["status"]:
-        await _record_issue_event(
-            db,
-            issue_id,
-            "status_changed",
-            auth.user_id,
-            {"from": current["status"], "to": body.status},
-        )
-
-    # Record assignment event
-    if body.assignee_user_id and body.assignee_user_id != current["assignee_user_id"]:
-        await _record_issue_event(
-            db,
-            issue_id,
-            "assigned",
-            auth.user_id,
-            {"assignee_user_id": str(body.assignee_user_id)},
-        )
-
-    labels = await _get_issue_labels(db, issue_id)
-
-    return IssueResponse(
-        id=row["id"],
-        number=row["number"],
-        title=row["title"],
-        description=row["description"],
-        status=row["status"],
-        priority=row["priority"],
-        severity=row["severity"],
-        dataset_id=row["dataset_id"],
-        assignee_user_id=row["assignee_user_id"],
-        acknowledged_by=row["acknowledged_by"],
-        created_by_user_id=row["created_by_user_id"],
-        author_type=row["author_type"],
-        source_provider=row["source_provider"],
-        source_external_id=row["source_external_id"],
-        source_external_url=row["source_external_url"],
-        resolution_note=row["resolution_note"],
-        labels=labels,
-        created_at=row["created_at"],
-        updated_at=row["updated_at"],
-        closed_at=row["closed_at"],
+    old_labels = await _get_issue_labels(db, issue_id)
+    labels_changed = "labels" in body.model_fields_set and sorted(set(body.labels or [])) != sorted(
+        old_labels
     )
+
+    row = current
+    if changes or labels_changed:
+        updates: list[str] = []
+        params: list[Any] = []
+        for field, value in changes.items():
+            params.append(to_json_string(value) if field == "context" else value)
+            updates.append(f"{field} = ${len(params)}")
+
+        if "status" in changes:
+            if changes["status"] == IssueStatus.CLOSED.value:
+                params.append(datetime.now(UTC))
+                updates.append(f"closed_at = ${len(params)}")
+            elif current["status"] == IssueStatus.CLOSED.value:
+                updates.append("closed_at = NULL")
+
+        params.append(datetime.now(UTC))
+        updates.append(f"updated_at = ${len(params)}")
+        params.extend([issue_id, auth.tenant_id])
+
+        updated = await db.execute_returning(
+            f"""
+            UPDATE issues
+            SET {", ".join(updates)}
+            WHERE id = ${len(params) - 1} AND tenant_id = ${len(params)}
+            RETURNING {ISSUE_COLUMNS}
+            """,
+            *params,
+        )
+        if not updated:
+            raise HTTPException(status_code=404, detail="Issue not found")
+        row = updated
+
+        for field, value in changes.items():
+            old = _decode_json_object(current[field]) if field == "context" else current[field]
+            event_type, payload = _field_change_event(field, old, value)
+            await _record_issue_event(db, issue_id, event_type, auth.user_id, payload)
+
+        if changes.get("status") == IssueStatus.RESOLVED.value:
+            await _record_confirmed_cause(db, issue_id, auth.user_id)
+
+    if labels_changed:
+        new_labels = sorted(set(body.labels or []))
+        await _set_issue_labels(db, issue_id, new_labels)
+        for label in sorted(set(new_labels) - set(old_labels)):
+            await _record_issue_event(db, issue_id, "label_added", auth.user_id, {"label": label})
+        for label in sorted(set(old_labels) - set(new_labels)):
+            await _record_issue_event(db, issue_id, "label_removed", auth.user_id, {"label": label})
+
+    return await _issue_response(db, row)
 
 
 # ============================================================================
 # Comment Schemas
-# ============================================================================
-
-
-class IssueCommentCreate(BaseModel):
-    """Request body for creating an issue comment."""
-
-    body: str = Field(..., min_length=1)
-
-
-class IssueCommentResponse(BaseModel):
-    """Response for an issue comment."""
-
-    id: UUID
-    issue_id: UUID
-    author_user_id: UUID
-    body: str
-    created_at: datetime
-    updated_at: datetime
-
-
-class IssueCommentListResponse(BaseModel):
-    """Paginated comment list response."""
-
-    items: list[IssueCommentResponse]
-    total: int
-
-
-# ============================================================================
-# Event Schemas
 # ============================================================================
 
 
@@ -817,103 +889,6 @@ async def _verify_issue_access(
         raise HTTPException(status_code=404, detail="Issue not found")
     result: dict[str, Any] = row
     return result
-
-
-# ============================================================================
-# Comment API Routes
-# ============================================================================
-
-
-@router.get("/{issue_id}/comments", response_model=IssueCommentListResponse)
-async def list_issue_comments(
-    issue_id: UUID,
-    auth: AuthDep,
-    db: AppDbDep,
-) -> IssueCommentListResponse:
-    """List comments for an issue."""
-    await _verify_issue_access(db, issue_id, auth.tenant_id)
-
-    rows = await db.fetch_all(
-        """
-        SELECT id, issue_id, author_user_id, body, created_at, updated_at
-        FROM issue_comments
-        WHERE issue_id = $1
-        ORDER BY created_at ASC
-        """,
-        issue_id,
-    )
-
-    items = [
-        IssueCommentResponse(
-            id=row["id"],
-            issue_id=row["issue_id"],
-            author_user_id=row["author_user_id"],
-            body=row["body"],
-            created_at=row["created_at"],
-            updated_at=row["updated_at"],
-        )
-        for row in rows
-    ]
-
-    return IssueCommentListResponse(items=items, total=len(items))
-
-
-@router.post("/{issue_id}/comments", response_model=IssueCommentResponse, status_code=201)
-async def create_issue_comment(
-    issue_id: UUID,
-    auth: AuthDep,
-    db: AppDbDep,
-    body: IssueCommentCreate,
-) -> IssueCommentResponse:
-    """Add a comment to an issue.
-
-    Requires user identity (JWT auth or user-scoped API key).
-    """
-    await _verify_issue_access(db, issue_id, auth.tenant_id)
-
-    if auth.user_id is None:
-        raise HTTPException(
-            status_code=403,
-            detail="User identity required to create comments",
-        )
-
-    row = await db.execute_returning(
-        """
-        INSERT INTO issue_comments (issue_id, author_user_id, body)
-        VALUES ($1, $2, $3)
-        RETURNING id, issue_id, author_user_id, body, created_at, updated_at
-        """,
-        issue_id,
-        auth.user_id,
-        body.body,
-    )
-
-    if not row:
-        raise HTTPException(status_code=500, detail="Failed to create comment")
-
-    # Record comment_added event
-    await _record_issue_event(
-        db,
-        issue_id,
-        "comment_added",
-        auth.user_id,
-        {"comment_id": str(row["id"])},
-    )
-
-    # Update issue updated_at timestamp
-    await db.execute(
-        "UPDATE issues SET updated_at = NOW() WHERE id = $1",
-        issue_id,
-    )
-
-    return IssueCommentResponse(
-        id=row["id"],
-        issue_id=row["issue_id"],
-        author_user_id=row["author_user_id"],
-        body=row["body"],
-        created_at=row["created_at"],
-        updated_at=row["updated_at"],
-    )
 
 
 # ============================================================================
@@ -1008,15 +983,17 @@ async def remove_issue_watcher(
 
 
 class InvestigationRunCreate(BaseModel):
-    """Request body for spawning an investigation from an issue."""
+    """Request body for starting an investigation from an issue with a brief."""
 
-    focus_prompt: str = Field(..., min_length=1)
+    brief: InvestigationBrief
     dataset_id: str | None = None  # Inherits from issue if not provided
-    datasource_id: UUID | None = None  # Uses tenant default if not provided
+    datasource_id: UUID | None = None  # Brief scope, then tenant default, if not provided
     execution_profile: str = Field(
         default="standard",
         pattern="^(safe|standard|deep)$",
     )
+    source_thread_id: UUID | None = None  # The thread the brief was drafted in
+    parent_run_id: UUID | None = None  # Set for "Continue investigating"
 
 
 class InvestigationRunResponse(BaseModel):
@@ -1026,7 +1003,9 @@ class InvestigationRunResponse(BaseModel):
     issue_id: UUID
     investigation_id: UUID
     trigger_type: str
-    focus_prompt: str | None
+    brief: dict[str, Any]
+    source_thread_id: UUID | None
+    parent_run_id: UUID | None
     execution_profile: str
     approval_status: str | None
     confidence: float | None
@@ -1034,6 +1013,29 @@ class InvestigationRunResponse(BaseModel):
     synthesis_summary: str | None
     created_at: datetime
     completed_at: datetime | None
+    outcome_verdict: str | None = None  # confirmed | rejected, once someone reviewed it
+    outcome_note: str | None = None
+    outcome_reviewed_by: UUID | None = None
+    outcome_reviewed_at: datetime | None = None
+
+
+RUN_COLUMNS = """
+    id, issue_id, investigation_id, trigger_type, brief, source_thread_id, parent_run_id,
+    execution_profile, approval_status, confidence, root_cause_tag, synthesis_summary,
+    created_at, completed_at, outcome_verdict, outcome_note, outcome_reviewed_by,
+    outcome_reviewed_at
+"""
+
+
+def _run_response(row: dict[str, Any]) -> InvestigationRunResponse:
+    """Convert an issue_investigation_runs row (brief as JSON text) to its API shape."""
+    brief = row["brief"]
+    return InvestigationRunResponse(
+        **{
+            **{field: row.get(field) for field in InvestigationRunResponse.model_fields},
+            "brief": json.loads(brief) if isinstance(brief, str) else brief,
+        }
+    )
 
 
 class InvestigationRunListResponse(BaseModel):
@@ -1058,34 +1060,15 @@ async def list_investigation_runs(
     await _verify_issue_access(db, issue_id, auth.tenant_id)
 
     rows = await db.fetch_all(
-        """
-        SELECT id, issue_id, investigation_id, trigger_type, focus_prompt,
-               execution_profile, approval_status, confidence, root_cause_tag,
-               synthesis_summary, created_at, completed_at
+        f"""
+        SELECT {RUN_COLUMNS}
         FROM issue_investigation_runs
         WHERE issue_id = $1
         ORDER BY created_at DESC
         """,
         issue_id,
     )
-
-    items = [
-        InvestigationRunResponse(
-            id=row["id"],
-            issue_id=row["issue_id"],
-            investigation_id=row["investigation_id"],
-            trigger_type=row["trigger_type"],
-            focus_prompt=row["focus_prompt"],
-            execution_profile=row["execution_profile"],
-            approval_status=row["approval_status"],
-            confidence=row["confidence"],
-            root_cause_tag=row["root_cause_tag"],
-            synthesis_summary=row["synthesis_summary"],
-            created_at=row["created_at"],
-            completed_at=row["completed_at"],
-        )
-        for row in rows
-    ]
+    items = [_run_response(row) for row in rows]
 
     return InvestigationRunListResponse(items=items, total=len(items))
 
@@ -1103,15 +1086,15 @@ async def spawn_investigation(
     investigation_starter: InvestigationStarterDep,
     body: InvestigationRunCreate,
 ) -> InvestigationRunResponse:
-    """Spawn an investigation from an issue.
+    """Start an investigation from an issue with an editable brief.
 
-    Creates a new investigation linked to this issue. The focus_prompt
-    guides the investigation direction.
+    The manager and its subagents start from the brief: its symptom is what they
+    investigate, its findings are facts, its exclusions are not proposed again and
+    its leads are tested first. The brief's scope tables join the issue's dataset
+    as reference tables. The run appears in the issue's shared thread.
 
     Requires user identity (JWT auth or user-scoped API key).
-    Deep profile may require approval depending on tenant settings.
     """
-    # Verify issue exists and get its data
     issue = await db.fetch_one(
         """
         SELECT id, tenant_id, dataset_id, title, severity, created_at
@@ -1121,29 +1104,36 @@ async def spawn_investigation(
         issue_id,
         auth.tenant_id,
     )
-
     if not issue:
         raise HTTPException(status_code=404, detail="Issue not found")
-
     if auth.user_id is None:
         raise HTTPException(
             status_code=403,
             detail="User identity required to spawn investigations",
         )
 
-    # Use dataset_id from request or inherit from issue
-    dataset_id = body.dataset_id or issue["dataset_id"]
-
+    brief = body.brief
+    dataset_id = body.dataset_id or issue["dataset_id"] or next(iter(brief.scope.tables), None)
     if not dataset_id:
         raise HTTPException(
             status_code=400,
-            detail="dataset_id required - not set on issue and not provided in request",
+            detail="dataset_id required - not set on issue, request or brief scope",
         )
 
-    # Resolve datasource_id (use provided or get default)
+    if body.parent_run_id is not None:
+        parent = await db.fetch_one(
+            "SELECT id FROM issue_investigation_runs WHERE id = $1 AND issue_id = $2",
+            body.parent_run_id,
+            issue_id,
+        )
+        if parent is None:
+            raise HTTPException(status_code=400, detail="parent_run_id is not a run of this issue")
+
     try:
         datasource_id = await resolve_datasource_id(
-            http_request, auth.tenant_id, explicit_id=body.datasource_id
+            http_request,
+            auth.tenant_id,
+            explicit_id=body.datasource_id or brief.scope.datasource_id,
         )
     except ValueError as e:
         error_msg = str(e)
@@ -1158,19 +1148,19 @@ async def spawn_investigation(
             ) from e
         raise HTTPException(status_code=400, detail=error_msg) from e
 
-    # Determine approval_status based on execution_profile
-    # Deep profile may require approval - for now we approve immediately
-    approval_status = None
-    if body.execution_profile == "deep":
-        approval_status = "approved"  # Could be "queued" based on tenant settings
+    approval_status = "approved" if body.execution_profile == "deep" else None
+    brief = brief.model_copy(
+        update={"scope": brief.scope.model_copy(update={"datasource_id": datasource_id})}
+    )
+    brief_json = brief.model_dump(mode="json", by_alias=True)
 
-    # Build the alert from the issue. An issue has no measured metric, so the
-    # focus prompt is the free-text description the agents investigate.
+    # The issue's dataset comes first; the brief's other tables become reference tables
+    dataset_ids = [dataset_id] + [t for t in brief.scope.tables if t != dataset_id]
     alert = AnomalyAlert(
-        dataset_ids=[dataset_id],
+        dataset_ids=dataset_ids,
         metric_spec=MetricSpec(
             metric_type="description",
-            expression=body.focus_prompt,
+            expression=brief.symptom,
             display_name=issue["title"],
         ),
         anomaly_type="custom",
@@ -1179,19 +1169,19 @@ async def spawn_investigation(
         deviation_pct=0.0,
         anomaly_date=issue["created_at"].date().isoformat(),
         severity=issue["severity"] or "medium",
+        # Every prompt that renders the alert adds this as its "Team brief" section
+        metadata={BRIEF_METADATA_KEY: brief_to_prompt(brief)},
     )
     alert_data = {
         **alert.model_dump(mode="json"),
         "issue_id": str(issue_id),
-        "focus_prompt": body.focus_prompt,
+        "brief": brief_json,
     }
     alert_summary = (
         f"Investigation spawned from issue: {issue.get('title', 'Untitled')}. "
-        f"Dataset: {dataset_id}. "
-        f"Focus: {body.focus_prompt or 'General investigation'}."
+        f"Dataset: {dataset_id}. Symptom: {brief.symptom}"
     )
 
-    # Start the investigation using the centralized service
     try:
         result = await investigation_starter.start_investigation(
             tenant_id=auth.tenant_id,
@@ -1207,33 +1197,28 @@ async def spawn_investigation(
         logger.error(f"Failed to start investigation: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to start investigation: {e}") from e
 
-    # Create the issue_investigation_run record
     trigger_ref = {"user_id": str(auth.user_id), "dataset_id": dataset_id}
-
     row = await db.execute_returning(
-        """
+        f"""
         INSERT INTO issue_investigation_runs (
-            issue_id, investigation_id, trigger_type, trigger_ref,
-            focus_prompt, execution_profile, approval_status
+            issue_id, investigation_id, trigger_type, trigger_ref, brief,
+            source_thread_id, parent_run_id, execution_profile, approval_status
         )
-        VALUES ($1, $2, $3, $4, $5, $6, $7)
-        RETURNING id, issue_id, investigation_id, trigger_type, focus_prompt,
-                  execution_profile, approval_status, confidence, root_cause_tag,
-                  synthesis_summary, created_at, completed_at
+        VALUES ($1, $2, 'human', $3, $4, $5, $6, $7, $8)
+        RETURNING {RUN_COLUMNS}
         """,
         issue_id,
         investigation_id,
-        "human",
         to_json_string(trigger_ref),
-        body.focus_prompt,
+        to_json_string(brief_json),
+        body.source_thread_id,
+        body.parent_run_id,
         body.execution_profile,
         approval_status,
     )
-
     if not row:
         raise HTTPException(status_code=500, detail="Failed to create investigation run")
 
-    # Record investigation_spawned event
     await _record_issue_event(
         db,
         issue_id,
@@ -1242,31 +1227,37 @@ async def spawn_investigation(
         {
             "investigation_id": str(investigation_id),
             "run_id": str(row["id"]),
-            "focus_prompt": body.focus_prompt,
+            "symptom": brief.symptom,
             "execution_profile": body.execution_profile,
         },
     )
 
-    # Update issue updated_at timestamp
-    await db.execute(
-        "UPDATE issues SET updated_at = NOW() WHERE id = $1",
-        issue_id,
+    # The run's card in the shared thread (from a scratch chat too)
+    threads = IssueThreadRepository(db)
+    shared = await threads.ensure_shared_thread(issue_id)
+    started_from = (
+        " from a scratch chat"
+        if body.source_thread_id and body.source_thread_id != shared["id"]
+        else ""
+    )
+    await threads.append_message(
+        shared["id"],
+        author_kind="user",
+        kind="investigation",
+        author_user_id=auth.user_id,
+        body_md=f"Started an investigation{started_from}: {brief.symptom}",
+        payload={
+            "investigation_id": str(investigation_id),
+            "run_id": str(row["id"]),
+            "execution_profile": body.execution_profile,
+            "brief": brief_json,
+            "source_thread_id": str(body.source_thread_id) if body.source_thread_id else None,
+            "parent_run_id": str(body.parent_run_id) if body.parent_run_id else None,
+        },
     )
 
-    return InvestigationRunResponse(
-        id=row["id"],
-        issue_id=row["issue_id"],
-        investigation_id=row["investigation_id"],
-        trigger_type=row["trigger_type"],
-        focus_prompt=row["focus_prompt"],
-        execution_profile=row["execution_profile"],
-        approval_status=row["approval_status"],
-        confidence=row["confidence"],
-        root_cause_tag=row["root_cause_tag"],
-        synthesis_summary=row["synthesis_summary"],
-        created_at=row["created_at"],
-        completed_at=row["completed_at"],
-    )
+    await db.execute("UPDATE issues SET updated_at = NOW() WHERE id = $1", issue_id)
+    return _run_response(row)
 
 
 # ============================================================================
@@ -1330,7 +1321,7 @@ async def list_issue_events(
             issue_id=row["issue_id"],
             event_type=row["event_type"],
             actor_user_id=row["actor_user_id"],
-            payload=row["payload"] if isinstance(row["payload"], dict) else {},
+            payload=_decode_json_object(row["payload"]),
             created_at=row["created_at"],
         )
         for row in rows
@@ -1442,7 +1433,7 @@ async def stream_issue_events(
                             "actor_user_id": (
                                 str(row["actor_user_id"]) if row["actor_user_id"] else None
                             ),
-                            "payload": (row["payload"] if isinstance(row["payload"], dict) else {}),
+                            "payload": _decode_json_object(row["payload"]),
                             "created_at": row["created_at"].isoformat(),
                         }
                         yield {

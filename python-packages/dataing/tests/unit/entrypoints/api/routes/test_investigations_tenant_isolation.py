@@ -29,8 +29,6 @@ OTHER_TENANT = UUID("bbbbbbbb-0000-0000-0000-000000000002")
 # Minimal valid bodies, keyed by endpoint name, for routes that require one.
 REQUEST_BODIES: dict[str, dict[str, Any]] = {
     "codify_investigation": {"format": "sql"},
-    "send_message": {"message": "check the upstream job"},
-    "send_user_input": {"feedback": "looks right"},
 }
 
 INVESTIGATION_ROUTES = sorted(
@@ -118,7 +116,6 @@ def _completed_status(investigation_id: str) -> InvestigationStatus:
         progress=1.0,
         is_complete=True,
         is_cancelled=False,
-        is_awaiting_user=False,
     )
 
 
@@ -168,9 +165,7 @@ def test_sweep_covers_every_investigation_route() -> None:
         "get_investigation",
         "verify_investigation",
         "codify_investigation",
-        "send_message",
         "get_investigation_status",
-        "send_user_input",
         "stream_updates",
         "stream_events",
         "list_snapshots",

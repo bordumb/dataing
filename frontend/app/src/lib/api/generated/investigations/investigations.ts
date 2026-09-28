@@ -20,15 +20,16 @@ import type {
   ChainVerificationResponse,
   HTTPValidationError,
   InvestigationListItem,
+  InvestigationRunResponse,
   InvestigationStateResponse,
-  SendMessageRequest,
-  SendMessageResponse,
-  SendUserInputApiV1InvestigationsInvestigationIdInputPost200,
+  OutcomeReview,
   StartInvestigationRequest,
   StartInvestigationResponse,
+  SteerCreate,
+  SteerListResponse,
+  SteerResponse,
   StreamEventsApiV1InvestigationsInvestigationIdEventsGetParams,
   TemporalStatusResponse,
-  UserInputRequest,
 } from "../../model";
 import { customInstance } from "../../client";
 
@@ -602,122 +603,6 @@ export const useVerifyInvestigationApiV1InvestigationsInvestigationIdVerifyGet =
   };
 
 /**
- * Send a message to an investigation via Temporal signal.
-
-Args:
-    investigation_id: UUID of the investigation.
-    request: The message request.
-    auth: Authentication context from API key/JWT.
-    temporal_client: Temporal client for durable execution.
-
-Returns:
-    SendMessageResponse with status.
-
-Raises:
-    HTTPException: If failed to send message.
- * @summary Send Message
- */
-export const sendMessageApiV1InvestigationsInvestigationIdMessagesPost = (
-  investigationId: string,
-  sendMessageRequest: SendMessageRequest,
-) => {
-  return customInstance<SendMessageResponse>({
-    url: `/api/v1/investigations/${investigationId}/messages`,
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    data: sendMessageRequest,
-  });
-};
-
-export const getSendMessageApiV1InvestigationsInvestigationIdMessagesPostMutationOptions =
-  <TError = HTTPValidationError, TContext = unknown>(options?: {
-    mutation?: UseMutationOptions<
-      Awaited<
-        ReturnType<
-          typeof sendMessageApiV1InvestigationsInvestigationIdMessagesPost
-        >
-      >,
-      TError,
-      { investigationId: string; data: SendMessageRequest },
-      TContext
-    >;
-  }): UseMutationOptions<
-    Awaited<
-      ReturnType<
-        typeof sendMessageApiV1InvestigationsInvestigationIdMessagesPost
-      >
-    >,
-    TError,
-    { investigationId: string; data: SendMessageRequest },
-    TContext
-  > => {
-    const { mutation: mutationOptions } = options ?? {};
-
-    const mutationFn: MutationFunction<
-      Awaited<
-        ReturnType<
-          typeof sendMessageApiV1InvestigationsInvestigationIdMessagesPost
-        >
-      >,
-      { investigationId: string; data: SendMessageRequest }
-    > = (props) => {
-      const { investigationId, data } = props ?? {};
-
-      return sendMessageApiV1InvestigationsInvestigationIdMessagesPost(
-        investigationId,
-        data,
-      );
-    };
-
-    return { mutationFn, ...mutationOptions };
-  };
-
-export type SendMessageApiV1InvestigationsInvestigationIdMessagesPostMutationResult =
-  NonNullable<
-    Awaited<
-      ReturnType<
-        typeof sendMessageApiV1InvestigationsInvestigationIdMessagesPost
-      >
-    >
-  >;
-export type SendMessageApiV1InvestigationsInvestigationIdMessagesPostMutationBody =
-  SendMessageRequest;
-export type SendMessageApiV1InvestigationsInvestigationIdMessagesPostMutationError =
-  HTTPValidationError;
-
-/**
- * @summary Send Message
- */
-export const useSendMessageApiV1InvestigationsInvestigationIdMessagesPost = <
-  TError = HTTPValidationError,
-  TContext = unknown,
->(options?: {
-  mutation?: UseMutationOptions<
-    Awaited<
-      ReturnType<
-        typeof sendMessageApiV1InvestigationsInvestigationIdMessagesPost
-      >
-    >,
-    TError,
-    { investigationId: string; data: SendMessageRequest },
-    TContext
-  >;
-}): UseMutationResult<
-  Awaited<
-    ReturnType<typeof sendMessageApiV1InvestigationsInvestigationIdMessagesPost>
-  >,
-  TError,
-  { investigationId: string; data: SendMessageRequest },
-  TContext
-> => {
-  const mutationOptions =
-    getSendMessageApiV1InvestigationsInvestigationIdMessagesPostMutationOptions(
-      options,
-    );
-
-  return useMutation(mutationOptions);
-};
-/**
  * Get the status of an investigation.
 
 Queries the Temporal workflow for real-time progress.
@@ -858,124 +743,6 @@ export const useGetInvestigationStatusApiV1InvestigationsInvestigationIdStatusGe
     return query;
   };
 
-/**
- * Send user input to an investigation awaiting feedback.
-
-This endpoint sends a signal to the Temporal workflow when it's
-in AWAIT_USER state.
-
-Args:
-    investigation_id: UUID of the investigation.
-    request: User input payload.
-    auth: Authentication context from API key/JWT.
-    temporal_client: Temporal client for durable execution.
-
-Returns:
-    Confirmation message.
- * @summary Send User Input
- */
-export const sendUserInputApiV1InvestigationsInvestigationIdInputPost = (
-  investigationId: string,
-  userInputRequest: UserInputRequest,
-) => {
-  return customInstance<SendUserInputApiV1InvestigationsInvestigationIdInputPost200>(
-    {
-      url: `/api/v1/investigations/${investigationId}/input`,
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      data: userInputRequest,
-    },
-  );
-};
-
-export const getSendUserInputApiV1InvestigationsInvestigationIdInputPostMutationOptions =
-  <TError = HTTPValidationError, TContext = unknown>(options?: {
-    mutation?: UseMutationOptions<
-      Awaited<
-        ReturnType<
-          typeof sendUserInputApiV1InvestigationsInvestigationIdInputPost
-        >
-      >,
-      TError,
-      { investigationId: string; data: UserInputRequest },
-      TContext
-    >;
-  }): UseMutationOptions<
-    Awaited<
-      ReturnType<
-        typeof sendUserInputApiV1InvestigationsInvestigationIdInputPost
-      >
-    >,
-    TError,
-    { investigationId: string; data: UserInputRequest },
-    TContext
-  > => {
-    const { mutation: mutationOptions } = options ?? {};
-
-    const mutationFn: MutationFunction<
-      Awaited<
-        ReturnType<
-          typeof sendUserInputApiV1InvestigationsInvestigationIdInputPost
-        >
-      >,
-      { investigationId: string; data: UserInputRequest }
-    > = (props) => {
-      const { investigationId, data } = props ?? {};
-
-      return sendUserInputApiV1InvestigationsInvestigationIdInputPost(
-        investigationId,
-        data,
-      );
-    };
-
-    return { mutationFn, ...mutationOptions };
-  };
-
-export type SendUserInputApiV1InvestigationsInvestigationIdInputPostMutationResult =
-  NonNullable<
-    Awaited<
-      ReturnType<
-        typeof sendUserInputApiV1InvestigationsInvestigationIdInputPost
-      >
-    >
-  >;
-export type SendUserInputApiV1InvestigationsInvestigationIdInputPostMutationBody =
-  UserInputRequest;
-export type SendUserInputApiV1InvestigationsInvestigationIdInputPostMutationError =
-  HTTPValidationError;
-
-/**
- * @summary Send User Input
- */
-export const useSendUserInputApiV1InvestigationsInvestigationIdInputPost = <
-  TError = HTTPValidationError,
-  TContext = unknown,
->(options?: {
-  mutation?: UseMutationOptions<
-    Awaited<
-      ReturnType<
-        typeof sendUserInputApiV1InvestigationsInvestigationIdInputPost
-      >
-    >,
-    TError,
-    { investigationId: string; data: UserInputRequest },
-    TContext
-  >;
-}): UseMutationResult<
-  Awaited<
-    ReturnType<typeof sendUserInputApiV1InvestigationsInvestigationIdInputPost>
-  >,
-  TError,
-  { investigationId: string; data: UserInputRequest },
-  TContext
-> => {
-  const mutationOptions =
-    getSendUserInputApiV1InvestigationsInvestigationIdInputPostMutationOptions(
-      options,
-    );
-
-  return useMutation(mutationOptions);
-};
 /**
  * Stream real-time updates via SSE.
 
@@ -1260,6 +1027,328 @@ export const useStreamEventsApiV1InvestigationsInvestigationIdEventsGet = <
     getStreamEventsApiV1InvestigationsInvestigationIdEventsGetQueryOptions(
       investigationId,
       params,
+      options,
+    );
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  query.queryKey = queryOptions.queryKey;
+
+  return query;
+};
+
+/**
+ * Confirm or reject the root cause an issue's investigation reached.
+ * @summary Review Outcome
+ */
+export const reviewOutcomeApiV1InvestigationsInvestigationIdOutcomeReviewPost =
+  (investigationId: string, outcomeReview: OutcomeReview) => {
+    return customInstance<InvestigationRunResponse>({
+      url: `/api/v1/investigations/${investigationId}/outcome-review`,
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      data: outcomeReview,
+    });
+  };
+
+export const getReviewOutcomeApiV1InvestigationsInvestigationIdOutcomeReviewPostMutationOptions =
+  <TError = HTTPValidationError, TContext = unknown>(options?: {
+    mutation?: UseMutationOptions<
+      Awaited<
+        ReturnType<
+          typeof reviewOutcomeApiV1InvestigationsInvestigationIdOutcomeReviewPost
+        >
+      >,
+      TError,
+      { investigationId: string; data: OutcomeReview },
+      TContext
+    >;
+  }): UseMutationOptions<
+    Awaited<
+      ReturnType<
+        typeof reviewOutcomeApiV1InvestigationsInvestigationIdOutcomeReviewPost
+      >
+    >,
+    TError,
+    { investigationId: string; data: OutcomeReview },
+    TContext
+  > => {
+    const { mutation: mutationOptions } = options ?? {};
+
+    const mutationFn: MutationFunction<
+      Awaited<
+        ReturnType<
+          typeof reviewOutcomeApiV1InvestigationsInvestigationIdOutcomeReviewPost
+        >
+      >,
+      { investigationId: string; data: OutcomeReview }
+    > = (props) => {
+      const { investigationId, data } = props ?? {};
+
+      return reviewOutcomeApiV1InvestigationsInvestigationIdOutcomeReviewPost(
+        investigationId,
+        data,
+      );
+    };
+
+    return { mutationFn, ...mutationOptions };
+  };
+
+export type ReviewOutcomeApiV1InvestigationsInvestigationIdOutcomeReviewPostMutationResult =
+  NonNullable<
+    Awaited<
+      ReturnType<
+        typeof reviewOutcomeApiV1InvestigationsInvestigationIdOutcomeReviewPost
+      >
+    >
+  >;
+export type ReviewOutcomeApiV1InvestigationsInvestigationIdOutcomeReviewPostMutationBody =
+  OutcomeReview;
+export type ReviewOutcomeApiV1InvestigationsInvestigationIdOutcomeReviewPostMutationError =
+  HTTPValidationError;
+
+/**
+ * @summary Review Outcome
+ */
+export const useReviewOutcomeApiV1InvestigationsInvestigationIdOutcomeReviewPost =
+  <TError = HTTPValidationError, TContext = unknown>(options?: {
+    mutation?: UseMutationOptions<
+      Awaited<
+        ReturnType<
+          typeof reviewOutcomeApiV1InvestigationsInvestigationIdOutcomeReviewPost
+        >
+      >,
+      TError,
+      { investigationId: string; data: OutcomeReview },
+      TContext
+    >;
+  }): UseMutationResult<
+    Awaited<
+      ReturnType<
+        typeof reviewOutcomeApiV1InvestigationsInvestigationIdOutcomeReviewPost
+      >
+    >,
+    TError,
+    { investigationId: string; data: OutcomeReview },
+    TContext
+  > => {
+    const mutationOptions =
+      getReviewOutcomeApiV1InvestigationsInvestigationIdOutcomeReviewPostMutationOptions(
+        options,
+      );
+
+    return useMutation(mutationOptions);
+  };
+/**
+ * Send a steer to a running investigation.
+ * @summary Create Steer
+ */
+export const createSteerApiV1InvestigationsInvestigationIdSteersPost = (
+  investigationId: string,
+  steerCreate: SteerCreate,
+) => {
+  return customInstance<SteerResponse>({
+    url: `/api/v1/investigations/${investigationId}/steers`,
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    data: steerCreate,
+  });
+};
+
+export const getCreateSteerApiV1InvestigationsInvestigationIdSteersPostMutationOptions =
+  <TError = HTTPValidationError, TContext = unknown>(options?: {
+    mutation?: UseMutationOptions<
+      Awaited<
+        ReturnType<
+          typeof createSteerApiV1InvestigationsInvestigationIdSteersPost
+        >
+      >,
+      TError,
+      { investigationId: string; data: SteerCreate },
+      TContext
+    >;
+  }): UseMutationOptions<
+    Awaited<
+      ReturnType<typeof createSteerApiV1InvestigationsInvestigationIdSteersPost>
+    >,
+    TError,
+    { investigationId: string; data: SteerCreate },
+    TContext
+  > => {
+    const { mutation: mutationOptions } = options ?? {};
+
+    const mutationFn: MutationFunction<
+      Awaited<
+        ReturnType<
+          typeof createSteerApiV1InvestigationsInvestigationIdSteersPost
+        >
+      >,
+      { investigationId: string; data: SteerCreate }
+    > = (props) => {
+      const { investigationId, data } = props ?? {};
+
+      return createSteerApiV1InvestigationsInvestigationIdSteersPost(
+        investigationId,
+        data,
+      );
+    };
+
+    return { mutationFn, ...mutationOptions };
+  };
+
+export type CreateSteerApiV1InvestigationsInvestigationIdSteersPostMutationResult =
+  NonNullable<
+    Awaited<
+      ReturnType<typeof createSteerApiV1InvestigationsInvestigationIdSteersPost>
+    >
+  >;
+export type CreateSteerApiV1InvestigationsInvestigationIdSteersPostMutationBody =
+  SteerCreate;
+export type CreateSteerApiV1InvestigationsInvestigationIdSteersPostMutationError =
+  HTTPValidationError;
+
+/**
+ * @summary Create Steer
+ */
+export const useCreateSteerApiV1InvestigationsInvestigationIdSteersPost = <
+  TError = HTTPValidationError,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<
+      ReturnType<typeof createSteerApiV1InvestigationsInvestigationIdSteersPost>
+    >,
+    TError,
+    { investigationId: string; data: SteerCreate },
+    TContext
+  >;
+}): UseMutationResult<
+  Awaited<
+    ReturnType<typeof createSteerApiV1InvestigationsInvestigationIdSteersPost>
+  >,
+  TError,
+  { investigationId: string; data: SteerCreate },
+  TContext
+> => {
+  const mutationOptions =
+    getCreateSteerApiV1InvestigationsInvestigationIdSteersPostMutationOptions(
+      options,
+    );
+
+  return useMutation(mutationOptions);
+};
+/**
+ * List an investigation's steers with their status and outcome.
+ * @summary List Steers
+ */
+export const listSteersApiV1InvestigationsInvestigationIdSteersGet = (
+  investigationId: string,
+  signal?: AbortSignal,
+) => {
+  return customInstance<SteerListResponse>({
+    url: `/api/v1/investigations/${investigationId}/steers`,
+    method: "GET",
+    signal,
+  });
+};
+
+export const getListSteersApiV1InvestigationsInvestigationIdSteersGetQueryKey =
+  (investigationId: string) => {
+    return [`/api/v1/investigations/${investigationId}/steers`] as const;
+  };
+
+export const getListSteersApiV1InvestigationsInvestigationIdSteersGetQueryOptions =
+  <
+    TData = Awaited<
+      ReturnType<typeof listSteersApiV1InvestigationsInvestigationIdSteersGet>
+    >,
+    TError = HTTPValidationError,
+  >(
+    investigationId: string,
+    options?: {
+      query?: Partial<
+        UseQueryOptions<
+          Awaited<
+            ReturnType<
+              typeof listSteersApiV1InvestigationsInvestigationIdSteersGet
+            >
+          >,
+          TError,
+          TData
+        >
+      >;
+    },
+  ) => {
+    const { query: queryOptions } = options ?? {};
+
+    const queryKey =
+      queryOptions?.queryKey ??
+      getListSteersApiV1InvestigationsInvestigationIdSteersGetQueryKey(
+        investigationId,
+      );
+
+    const queryFn: QueryFunction<
+      Awaited<
+        ReturnType<typeof listSteersApiV1InvestigationsInvestigationIdSteersGet>
+      >
+    > = ({ signal }) =>
+      listSteersApiV1InvestigationsInvestigationIdSteersGet(
+        investigationId,
+        signal,
+      );
+
+    return {
+      queryKey,
+      queryFn,
+      enabled: !!investigationId,
+      ...queryOptions,
+    } as UseQueryOptions<
+      Awaited<
+        ReturnType<typeof listSteersApiV1InvestigationsInvestigationIdSteersGet>
+      >,
+      TError,
+      TData
+    > & { queryKey: QueryKey };
+  };
+
+export type ListSteersApiV1InvestigationsInvestigationIdSteersGetQueryResult =
+  NonNullable<
+    Awaited<
+      ReturnType<typeof listSteersApiV1InvestigationsInvestigationIdSteersGet>
+    >
+  >;
+export type ListSteersApiV1InvestigationsInvestigationIdSteersGetQueryError =
+  HTTPValidationError;
+
+/**
+ * @summary List Steers
+ */
+export const useListSteersApiV1InvestigationsInvestigationIdSteersGet = <
+  TData = Awaited<
+    ReturnType<typeof listSteersApiV1InvestigationsInvestigationIdSteersGet>
+  >,
+  TError = HTTPValidationError,
+>(
+  investigationId: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<
+          ReturnType<
+            typeof listSteersApiV1InvestigationsInvestigationIdSteersGet
+          >
+        >,
+        TError,
+        TData
+      >
+    >;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } => {
+  const queryOptions =
+    getListSteersApiV1InvestigationsInvestigationIdSteersGetQueryOptions(
+      investigationId,
       options,
     );
 

@@ -20,7 +20,14 @@ from dataing.entrypoints.api.routes.integrations import router as integrations_r
 from dataing.entrypoints.api.routes.investigation_feedback import (
     router as investigation_feedback_router,
 )
+from dataing.entrypoints.api.routes.investigation_outcomes import (
+    router as investigation_outcomes_router,
+)
+from dataing.entrypoints.api.routes.investigation_steers import (
+    router as investigation_steers_router,
+)
 from dataing.entrypoints.api.routes.investigations import router as investigations_router
+from dataing.entrypoints.api.routes.issue_threads import router as issue_threads_router
 from dataing.entrypoints.api.routes.issues import router as issues_router
 from dataing.entrypoints.api.routes.knowledge_comments import (
     router as knowledge_comments_router,
@@ -56,7 +63,10 @@ api_router = APIRouter()
 api_router.include_router(auth_router, prefix="/auth")  # Auth routes (no API key required)
 api_router.include_router(asset_instances_router)  # Cross-datasource asset search
 api_router.include_router(investigations_router)  # Unified investigation API
+api_router.include_router(investigation_outcomes_router)  # Confirm/reject a run's root cause
+api_router.include_router(investigation_steers_router)  # Steer a running investigation
 api_router.include_router(issues_router)  # Issues CRUD API
+api_router.include_router(issue_threads_router)  # Issue hub threads and messages
 api_router.include_router(datasources_router)
 api_router.include_router(datasources_v2_router, prefix="/v2")  # New unified adapter API
 api_router.include_router(credentials_router)  # User datasource credentials

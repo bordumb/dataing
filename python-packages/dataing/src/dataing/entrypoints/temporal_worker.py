@@ -21,6 +21,7 @@ import json
 import logging
 import os
 import sys
+from datetime import timedelta
 from typing import Any
 from uuid import UUID
 
@@ -32,9 +33,12 @@ from dataing.adapters.context import ContextEngine
 from dataing.adapters.datasource import get_registry
 from dataing.adapters.datasource.base import BaseAdapter
 from dataing.adapters.db.app_db import AppDatabase
+from dataing.adapters.db.issue_threads import IssueThreadRepository
 from dataing.adapters.investigation.pattern_adapter import InMemoryPatternRepository
 from dataing.agents import AgentClient
+from dataing.agents.chat import build_brief_agent, build_chat_agent, build_chat_model
 from dataing.config import settings
+from dataing.core.issue_chat import InvestigationStatusReader
 from dataing.core.snapshot_store import LocalSnapshotStore
 from dataing.telemetry import configure_logging
 from dataing.temporal.activities import (
@@ -49,8 +53,22 @@ from dataing.temporal.activities import (
     make_interpret_evidence_activity,
     make_synthesize_activity,
 )
+from dataing.temporal.activities.agent_turn import (
+    make_mark_turn_failed_activity,
+    make_run_agent_turn_activity,
+    make_run_brief_draft_activity,
+)
+from dataing.temporal.activities.publish_outcome import make_publish_investigation_outcome_activity
+from dataing.temporal.activities.steering import (
+    formulate_hypothesis,
+    make_record_steer_outcome_activity,
+)
 from dataing.temporal.adapters import TemporalAgentAdapter
-from dataing.temporal.workflows import EvaluateHypothesisWorkflow, InvestigationWorkflow
+from dataing.temporal.workflows import (
+    EvaluateHypothesisWorkflow,
+    InvestigationWorkflow,
+    IssueThreadWorkflow,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -185,6 +203,57 @@ class TenantAdapterCache:
         return adapter
 
 
+def _chat_agent_factory() -> Any:
+    """Return a factory for the issue chat agent (one model, a fresh agent per turn)."""
+    model = build_chat_model(
+        settings.chat_agent_model, settings.anthropic_api_key, settings.chat_agent_effort
+    )
+    logger.info(f"Chat agent model: {settings.chat_agent_model}")
+    return lambda: build_chat_agent(model)
+
+
+def _brief_agent_factory() -> Any:
+    """Return a factory for the brief-drafting agent (medium effort by default)."""
+    model = build_chat_model(
+        settings.chat_agent_model, settings.anthropic_api_key, settings.chat_brief_effort
+    )
+    return lambda: build_brief_agent(model)
+
+
+# A turn's attempts (2 x TURN_TIMEOUT plus backoff) end well within this
+STALE_TURN_AFTER = timedelta(minutes=15)
+
+
+async def _fail_stale_turns(app_db: AppDatabase) -> None:
+    """Mark replies a crashed worker left streaming as failed. Non-fatal."""
+    try:
+        failed = await IssueThreadRepository(app_db).fail_stale_turns(STALE_TURN_AFTER)
+    except Exception as e:
+        logger.warning(f"Could not sweep stale agent turns: {e}")
+        return
+    if failed:
+        logger.info(f"Marked {failed} stale agent replies as failed")
+
+
+def _investigation_status_reader(client: Client) -> InvestigationStatusReader:
+    """Return a reader of a running investigation's live hypotheses and steers."""
+
+    async def read(investigation_id: str) -> dict[str, Any] | None:
+        try:
+            handle = client.get_workflow_handle(investigation_id)
+            status = await handle.query(InvestigationWorkflow.get_status)
+        except Exception as e:  # Finished, not found, or Temporal unreachable
+            logger.debug(f"No live status for investigation {investigation_id}: {e}")
+            return None
+        return {
+            "current_step": status.current_step,
+            "hypotheses": status.hypotheses,
+            "pending_steers": status.pending_steers,
+        }
+
+    return read
+
+
 def create_activities(deps: dict[str, Any]) -> list[Any]:
     """Create all activity functions with injected dependencies.
 
@@ -225,6 +294,19 @@ def create_activities(deps: dict[str, Any]) -> list[Any]:
         make_counter_analyze_activity(adapter=agent_adapter),
         # Evidence chain finalization
         make_finalize_evidence_chain_activity(app_db=app_db),
+        # Outcome write-back to the investigation, its issue run and thread
+        make_publish_investigation_outcome_activity(app_db=app_db),
+        # Steering a running investigation
+        formulate_hypothesis,
+        make_record_steer_outcome_activity(app_db=app_db),
+        # Issue chat agent turns
+        make_run_agent_turn_activity(
+            app_db=app_db,
+            agent_factory=_chat_agent_factory(),
+            investigation_status=deps.get("investigation_status"),
+        ),
+        make_run_brief_draft_activity(app_db=app_db, agent_factory=_brief_agent_factory()),
+        make_mark_turn_failed_activity(app_db=app_db),
     ]
 
     logger.info(f"Created {len(activities)} activities with dependencies")
@@ -247,6 +329,8 @@ async def run_worker() -> None:
 
     # Initialize dependencies
     deps = await create_dependencies()
+    await _fail_stale_turns(deps["app_db"])
+    deps["investigation_status"] = _investigation_status_reader(client)
 
     # Create activities with dependencies
     activities = create_activities(deps)
@@ -261,7 +345,7 @@ async def run_worker() -> None:
     worker = Worker(
         client,
         task_queue=settings.TEMPORAL_TASK_QUEUE,
-        workflows=[InvestigationWorkflow, EvaluateHypothesisWorkflow],
+        workflows=[InvestigationWorkflow, EvaluateHypothesisWorkflow, IssueThreadWorkflow],
         activities=activities,
         max_concurrent_activities=MAX_CONCURRENT_ACTIVITIES,
         max_concurrent_workflow_tasks=MAX_CONCURRENT_WORKFLOW_TASKS,
@@ -274,7 +358,7 @@ async def run_worker() -> None:
         logger.info("Worker shutting down, cleaning up resources...")
         app_db = deps.get("app_db")
         if app_db:
-            await app_db.disconnect()
+            await app_db.close()
         logger.info("Cleanup complete")
 
 

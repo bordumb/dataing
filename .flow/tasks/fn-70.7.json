@@ -1,0 +1,30 @@
+{
+  "assignee": "bordumbb@gmail.com",
+  "claim_note": "",
+  "claimed_at": "2026-09-28T00:02:12.884703Z",
+  "created_at": "2026-09-27T23:20:30.954214Z",
+  "depends_on": [
+    "fn-70.2",
+    "fn-70.5",
+    "fn-70.6"
+  ],
+  "epic": "fn-70",
+  "evidence": {
+    "commits": [
+      "56a6d9b5"
+    ],
+    "prs": [],
+    "tests": [
+      "pnpm test -- --run",
+      "pnpm typecheck",
+      "pnpm lint",
+      "pytest tests/unit"
+    ]
+  },
+  "id": "fn-70.7",
+  "priority": null,
+  "spec_path": ".flow/tasks/fn-70.7.md",
+  "status": "done",
+  "title": "M1: frontend thread, composer, streaming, sidebar",
+  "updated_at": "2026-09-28T00:32:09.323523Z"
+}

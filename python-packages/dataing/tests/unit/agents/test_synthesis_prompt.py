@@ -12,6 +12,7 @@ from dataing.core.domain_types import (
     Evidence,
     MetricSpec,
     RelevantCodeChange,
+    RuledOutHypothesis,
     UntestedHypothesis,
 )
 
@@ -335,3 +336,32 @@ class TestBuildSystem:
         assert "Schema issues" in result
         assert "Data quality" in result
         assert "Transformation logic" in result
+
+
+def test_ruled_out_hypotheses_are_listed_apart_from_untested() -> None:
+    """What a person ruled out is its own section, with the reason."""
+    alert = AnomalyAlert(
+        dataset_ids=["public.orders"],
+        metric_spec=MetricSpec(
+            metric_type="description", expression="Orders dropped", display_name="Orders"
+        ),
+        anomaly_type="custom",
+        expected_value=0.0,
+        actual_value=0.0,
+        deviation_pct=0.0,
+        anomaly_date="2026-09-14",
+        severity="high",
+    )
+
+    result = synthesis.build_user(
+        alert,
+        [],
+        untested_hypotheses=[UntestedHypothesis(hypothesis_id="h2", title="t2", error="boom")],
+        ruled_out_hypotheses=[
+            RuledOutHypothesis(hypothesis_id="h3", title="late events", reason="Lands\nfast")
+        ],
+    )
+
+    assert "## Untested Hypotheses" in result
+    assert "## Ruled Out by the Team\n\n- h3 (late events): Lands fast" in result
+    assert "Ruled Out by the Team" in synthesis.build_system()

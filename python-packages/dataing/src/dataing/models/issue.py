@@ -99,9 +99,6 @@ class Issue(BaseModel):
     created_by_user: Mapped["User | None"] = relationship(
         "User", foreign_keys=[created_by_user_id], back_populates="created_issues"
     )
-    comments: Mapped[list["IssueComment"]] = relationship(
-        "IssueComment", back_populates="issue", cascade="all, delete-orphan"
-    )
     events: Mapped[list["IssueEvent"]] = relationship(
         "IssueEvent", back_populates="issue", cascade="all, delete-orphan"
     )
@@ -112,20 +109,6 @@ class Issue(BaseModel):
         "IssueInvestigationRun", back_populates="issue", cascade="all, delete-orphan"
     )
     sla_policy: Mapped["SLAPolicy | None"] = relationship("SLAPolicy", back_populates="issues")
-
-
-class IssueComment(BaseModel):
-    """Comment on an issue."""
-
-    __tablename__ = "issue_comments"
-
-    issue_id: Mapped[UUID] = mapped_column(ForeignKey("issues.id"), nullable=False)
-    author_user_id: Mapped[UUID] = mapped_column(ForeignKey("users.id"), nullable=False)
-    body: Mapped[str] = mapped_column(Text, nullable=False)
-
-    # Relationships
-    issue: Mapped["Issue"] = relationship("Issue", back_populates="comments")
-    author: Mapped["User"] = relationship("User")
 
 
 class IssueEventType(str, enum.Enum):
@@ -235,7 +218,7 @@ class IssueInvestigationRun(BaseModel):
     investigation_id: Mapped[UUID] = mapped_column(ForeignKey("investigations.id"), nullable=False)
     trigger_type: Mapped[str] = mapped_column(String(20), nullable=False)
     trigger_ref: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
-    focus_prompt: Mapped[str | None] = mapped_column(Text, nullable=True)
+    brief: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False, default=dict)
     execution_profile: Mapped[str] = mapped_column(
         String(20), default=IssueExecutionProfile.STANDARD.value
     )

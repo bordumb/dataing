@@ -1,0 +1,27 @@
+{
+  "assignee": "bordumbb@gmail.com",
+  "claim_note": "",
+  "claimed_at": "2026-09-28T01:43:17.690393Z",
+  "created_at": "2026-09-27T23:20:35.625258Z",
+  "depends_on": [
+    "fn-70.11",
+    "fn-70.14"
+  ],
+  "epic": "fn-70",
+  "evidence": {
+    "commits": [
+      "6fb05a08"
+    ],
+    "prs": [],
+    "tests": [
+      "frontend/app/src/features/issues/scratch/ScratchDrawer.test.tsx (create + private ask, publish selected, investigate from here, rename + delete, viewer)",
+      "vitest 126 passed, tsc/eslint/prettier green, vite build ok"
+    ]
+  },
+  "id": "fn-70.15",
+  "priority": null,
+  "spec_path": ".flow/tasks/fn-70.15.md",
+  "status": "done",
+  "title": "M4: frontend scratch drawer",
+  "updated_at": "2026-09-28T01:49:21.526010Z"
+}

@@ -18,12 +18,6 @@ vi.mock("@/lib/api/investigations", async (importOriginal) => ({
     error: null,
     refetch: vi.fn(),
   }),
-  useSendMessage: () => ({
-    mutate: vi.fn(),
-    mutateAsync: vi.fn(),
-    isPending: false,
-    error: null,
-  }),
   subscribeToInvestigation: () => () => undefined,
 }));
 
@@ -67,7 +61,7 @@ function renderDetail(role: OrgRole) {
 afterEach(() => localStorage.clear());
 
 describe("InvestigationDetail while running", () => {
-  it("does not let viewers steer, branch or cancel the investigation", async () => {
+  it("does not let viewers cancel the investigation", async () => {
     investigation.current = investigationWith("in_progress", null);
     renderDetail("viewer");
 
@@ -75,21 +69,24 @@ describe("InvestigationDetail while running", () => {
       await screen.findByText("Investigation Progress"),
     ).toBeInTheDocument();
     expect(screen.queryByText("Cancel Investigation")).not.toBeInTheDocument();
-    expect(screen.queryByText("Collaborate")).not.toBeInTheDocument();
-    expect(
-      screen.queryByPlaceholderText("Ask a question or provide direction..."),
-    ).not.toBeInTheDocument();
   });
 
-  it("lets members steer, branch and cancel the investigation", async () => {
+  it("lets members cancel the investigation", async () => {
     investigation.current = investigationWith("in_progress", null);
     renderDetail("member");
 
     expect(await screen.findByText("Cancel Investigation")).toBeInTheDocument();
-    expect(screen.getByText("Collaborate")).toBeInTheDocument();
+  });
+
+  it("no longer offers the old chat box or branch flow", async () => {
+    investigation.current = investigationWith("in_progress", null);
+    renderDetail("member");
+
+    expect(await screen.findByText("Cancel Investigation")).toBeInTheDocument();
+    expect(screen.queryByText("Collaborate")).not.toBeInTheDocument();
     expect(
-      screen.getByPlaceholderText("Ask a question or provide direction..."),
-    ).toBeInTheDocument();
+      screen.queryByPlaceholderText("Ask a question or provide direction..."),
+    ).not.toBeInTheDocument();
   });
 });
 

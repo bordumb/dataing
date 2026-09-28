@@ -23,6 +23,10 @@ class SynthesizeInput:
     code_changes: list[dict[str, Any]] | None = None
     # Hypotheses whose evaluation failed: {"hypothesis_id", "title", "error"}
     untested_hypotheses: list[dict[str, Any]] = field(default_factory=list)
+    # The alert, whose metadata carries the team brief and steering notes
+    alert: dict[str, Any] | None = None
+    # Hypotheses a person ruled out: {"hypothesis_id", "title", "reason"}
+    ruled_out_hypotheses: list[dict[str, Any]] = field(default_factory=list)
 
 
 @dataclass
@@ -61,6 +65,8 @@ def make_synthesize_activity(
                 alert_summary=input.alert_summary,
                 untested_hypotheses=input.untested_hypotheses,
                 code_changes=input.code_changes,
+                alert=input.alert,
+                ruled_out_hypotheses=input.ruled_out_hypotheses,
             )
         except Exception as e:
             return SynthesizeResult(

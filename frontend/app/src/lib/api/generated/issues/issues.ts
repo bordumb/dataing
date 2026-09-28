@@ -20,9 +20,6 @@ import type {
   InvestigationRunCreate,
   InvestigationRunListResponse,
   InvestigationRunResponse,
-  IssueCommentCreate,
-  IssueCommentListResponse,
-  IssueCommentResponse,
   IssueCreate,
   IssueEventListResponse,
   IssueListResponse,
@@ -296,7 +293,10 @@ export const useGetIssueApiV1IssuesIssueIdGet = <
 /**
  * Update issue fields.
 
-Enforces state machine transitions when status is changed.
+A field sent as null clears it; a field left out is unchanged. A status
+change is validated against the issue as it will be after this PATCH, so
+status and assignee (or resolution_note) can be sent together. Every
+changed field is recorded as an issue event.
  * @summary Update Issue
  */
 export const updateIssueApiV1IssuesIssueIdPatch = (
@@ -369,200 +369,6 @@ export const useUpdateIssueApiV1IssuesIssueIdPatch = <
 > => {
   const mutationOptions =
     getUpdateIssueApiV1IssuesIssueIdPatchMutationOptions(options);
-
-  return useMutation(mutationOptions);
-};
-/**
- * List comments for an issue.
- * @summary List Issue Comments
- */
-export const listIssueCommentsApiV1IssuesIssueIdCommentsGet = (
-  issueId: string,
-  signal?: AbortSignal,
-) => {
-  return customInstance<IssueCommentListResponse>({
-    url: `/api/v1/issues/${issueId}/comments`,
-    method: "GET",
-    signal,
-  });
-};
-
-export const getListIssueCommentsApiV1IssuesIssueIdCommentsGetQueryKey = (
-  issueId: string,
-) => {
-  return [`/api/v1/issues/${issueId}/comments`] as const;
-};
-
-export const getListIssueCommentsApiV1IssuesIssueIdCommentsGetQueryOptions = <
-  TData = Awaited<
-    ReturnType<typeof listIssueCommentsApiV1IssuesIssueIdCommentsGet>
-  >,
-  TError = HTTPValidationError,
->(
-  issueId: string,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<
-          ReturnType<typeof listIssueCommentsApiV1IssuesIssueIdCommentsGet>
-        >,
-        TError,
-        TData
-      >
-    >;
-  },
-) => {
-  const { query: queryOptions } = options ?? {};
-
-  const queryKey =
-    queryOptions?.queryKey ??
-    getListIssueCommentsApiV1IssuesIssueIdCommentsGetQueryKey(issueId);
-
-  const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof listIssueCommentsApiV1IssuesIssueIdCommentsGet>>
-  > = ({ signal }) =>
-    listIssueCommentsApiV1IssuesIssueIdCommentsGet(issueId, signal);
-
-  return {
-    queryKey,
-    queryFn,
-    enabled: !!issueId,
-    ...queryOptions,
-  } as UseQueryOptions<
-    Awaited<ReturnType<typeof listIssueCommentsApiV1IssuesIssueIdCommentsGet>>,
-    TError,
-    TData
-  > & { queryKey: QueryKey };
-};
-
-export type ListIssueCommentsApiV1IssuesIssueIdCommentsGetQueryResult =
-  NonNullable<
-    Awaited<ReturnType<typeof listIssueCommentsApiV1IssuesIssueIdCommentsGet>>
-  >;
-export type ListIssueCommentsApiV1IssuesIssueIdCommentsGetQueryError =
-  HTTPValidationError;
-
-/**
- * @summary List Issue Comments
- */
-export const useListIssueCommentsApiV1IssuesIssueIdCommentsGet = <
-  TData = Awaited<
-    ReturnType<typeof listIssueCommentsApiV1IssuesIssueIdCommentsGet>
-  >,
-  TError = HTTPValidationError,
->(
-  issueId: string,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<
-          ReturnType<typeof listIssueCommentsApiV1IssuesIssueIdCommentsGet>
-        >,
-        TError,
-        TData
-      >
-    >;
-  },
-): UseQueryResult<TData, TError> & { queryKey: QueryKey } => {
-  const queryOptions =
-    getListIssueCommentsApiV1IssuesIssueIdCommentsGetQueryOptions(
-      issueId,
-      options,
-    );
-
-  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
-    queryKey: QueryKey;
-  };
-
-  query.queryKey = queryOptions.queryKey;
-
-  return query;
-};
-
-/**
- * Add a comment to an issue.
-
-Requires user identity (JWT auth or user-scoped API key).
- * @summary Create Issue Comment
- */
-export const createIssueCommentApiV1IssuesIssueIdCommentsPost = (
-  issueId: string,
-  issueCommentCreate: IssueCommentCreate,
-) => {
-  return customInstance<IssueCommentResponse>({
-    url: `/api/v1/issues/${issueId}/comments`,
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    data: issueCommentCreate,
-  });
-};
-
-export const getCreateIssueCommentApiV1IssuesIssueIdCommentsPostMutationOptions =
-  <TError = HTTPValidationError, TContext = unknown>(options?: {
-    mutation?: UseMutationOptions<
-      Awaited<
-        ReturnType<typeof createIssueCommentApiV1IssuesIssueIdCommentsPost>
-      >,
-      TError,
-      { issueId: string; data: IssueCommentCreate },
-      TContext
-    >;
-  }): UseMutationOptions<
-    Awaited<
-      ReturnType<typeof createIssueCommentApiV1IssuesIssueIdCommentsPost>
-    >,
-    TError,
-    { issueId: string; data: IssueCommentCreate },
-    TContext
-  > => {
-    const { mutation: mutationOptions } = options ?? {};
-
-    const mutationFn: MutationFunction<
-      Awaited<
-        ReturnType<typeof createIssueCommentApiV1IssuesIssueIdCommentsPost>
-      >,
-      { issueId: string; data: IssueCommentCreate }
-    > = (props) => {
-      const { issueId, data } = props ?? {};
-
-      return createIssueCommentApiV1IssuesIssueIdCommentsPost(issueId, data);
-    };
-
-    return { mutationFn, ...mutationOptions };
-  };
-
-export type CreateIssueCommentApiV1IssuesIssueIdCommentsPostMutationResult =
-  NonNullable<
-    Awaited<ReturnType<typeof createIssueCommentApiV1IssuesIssueIdCommentsPost>>
-  >;
-export type CreateIssueCommentApiV1IssuesIssueIdCommentsPostMutationBody =
-  IssueCommentCreate;
-export type CreateIssueCommentApiV1IssuesIssueIdCommentsPostMutationError =
-  HTTPValidationError;
-
-/**
- * @summary Create Issue Comment
- */
-export const useCreateIssueCommentApiV1IssuesIssueIdCommentsPost = <
-  TError = HTTPValidationError,
-  TContext = unknown,
->(options?: {
-  mutation?: UseMutationOptions<
-    Awaited<
-      ReturnType<typeof createIssueCommentApiV1IssuesIssueIdCommentsPost>
-    >,
-    TError,
-    { issueId: string; data: IssueCommentCreate },
-    TContext
-  >;
-}): UseMutationResult<
-  Awaited<ReturnType<typeof createIssueCommentApiV1IssuesIssueIdCommentsPost>>,
-  TError,
-  { issueId: string; data: IssueCommentCreate },
-  TContext
-> => {
-  const mutationOptions =
-    getCreateIssueCommentApiV1IssuesIssueIdCommentsPostMutationOptions(options);
 
   return useMutation(mutationOptions);
 };
@@ -962,13 +768,14 @@ export const useListInvestigationRunsApiV1IssuesIssueIdInvestigationRunsGet = <
 };
 
 /**
- * Spawn an investigation from an issue.
+ * Start an investigation from an issue with an editable brief.
 
-Creates a new investigation linked to this issue. The focus_prompt
-guides the investigation direction.
+The manager and its subagents start from the brief: its symptom is what they
+investigate, its findings are facts, its exclusions are not proposed again and
+its leads are tested first. The brief's scope tables join the issue's dataset
+as reference tables. The run appears in the issue's shared thread.
 
 Requires user identity (JWT auth or user-scoped API key).
-Deep profile may require approval depending on tenant settings.
  * @summary Spawn Investigation
  */
 export const spawnInvestigationApiV1IssuesIssueIdInvestigationRunsPost = (

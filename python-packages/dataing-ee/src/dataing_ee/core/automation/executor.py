@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING, Any
 from uuid import UUID
 
 from dataing.adapters.db.app_db import AppDatabase
+from dataing.adapters.db.issue_threads import IssueThreadRepository
 from dataing.core.domain_types import AnomalyAlert, MetricSpec
 from dataing.core.json_utils import to_json_string
 from dataing_ee.models.automation import ActionType
@@ -358,13 +359,15 @@ class ActionExecutor:
                 error="Comment text not specified",
             )
 
-        await ctx.db.execute(
-            """
-            INSERT INTO issue_comments (issue_id, author_type, body)
-            VALUES ($1, 'automation', $2)
-            """,
-            ctx.issue_id,
-            text,
+        # Automation comments are system messages in the issue's shared thread
+        threads = IssueThreadRepository(ctx.db)
+        thread = await threads.ensure_shared_thread(ctx.issue_id)
+        await threads.append_message(
+            thread["id"],
+            author_kind="system",
+            kind="comment",
+            body_md=text,
+            payload={"source": "automation"},
         )
 
         return ActionResult(

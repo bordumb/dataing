@@ -73,10 +73,6 @@ export interface StartInvestigationResponse {
   main_branch_id: string;
 }
 
-export interface SendMessageResponse {
-  branch_id: string;
-}
-
 export interface CodifyTest {
   test_type: string;
   column: string | null;
@@ -119,17 +115,6 @@ async function startInvestigation(
     url: API_BASE,
     method: "POST",
     data: { alert },
-  });
-}
-
-async function sendMessage(
-  investigationId: string,
-  message: string,
-): Promise<SendMessageResponse> {
-  return customInstance<SendMessageResponse>({
-    url: `${API_BASE}/${investigationId}/messages`,
-    method: "POST",
-    data: { message },
   });
 }
 
@@ -179,25 +164,6 @@ export function useStartInvestigation() {
     mutationFn: startInvestigation,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.investigations.all });
-    },
-  });
-}
-
-export function useSendMessage() {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: ({
-      investigationId,
-      message,
-    }: {
-      investigationId: string;
-      message: string;
-    }) => sendMessage(investigationId, message),
-    onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({
-        queryKey: queryKeys.investigations.detail(variables.investigationId),
-      });
     },
   });
 }

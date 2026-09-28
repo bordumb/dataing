@@ -1,0 +1,30 @@
+{
+  "assignee": "bordumbb@gmail.com",
+  "claim_note": "",
+  "claimed_at": "2026-09-28T01:23:46.019038Z",
+  "created_at": "2026-09-27T23:20:33.341028Z",
+  "depends_on": [
+    "fn-70.7",
+    "fn-70.10"
+  ],
+  "epic": "fn-70",
+  "evidence": {
+    "commits": [
+      "547a688a"
+    ],
+    "prs": [],
+    "tests": [
+      "frontend/app/src/features/issues/brief/BriefEditor.test.tsx",
+      "frontend/app/src/features/issues/thread/InvestigationCards.test.tsx",
+      "frontend/app/src/features/issues/IssueSidebar.test.tsx",
+      "frontend/app/src/features/issues/IssueWorkspace.test.tsx",
+      "vitest 110 passed, tsc/eslint/prettier green"
+    ]
+  },
+  "id": "fn-70.11",
+  "priority": null,
+  "spec_path": ".flow/tasks/fn-70.11.md",
+  "status": "done",
+  "title": "M2: frontend brief editor, investigation card, outcome card",
+  "updated_at": "2026-09-28T01:37:06.387822Z"
+}

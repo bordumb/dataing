@@ -4,7 +4,6 @@ from dataing.models.issue import (
     Issue,
     IssueApprovalStatus,
     IssueAuthorType,
-    IssueComment,
     IssueEvent,
     IssueEventType,
     IssueExecutionProfile,
@@ -122,20 +121,6 @@ class TestIssueModel:
         assert required.issubset(columns), f"Missing columns: {required - columns}"
 
 
-class TestIssueCommentModel:
-    """Test IssueComment model attributes."""
-
-    def test_issue_comment_tablename(self) -> None:
-        """Test IssueComment has correct tablename."""
-        assert IssueComment.__tablename__ == "issue_comments"
-
-    def test_issue_comment_has_required_columns(self) -> None:
-        """Test IssueComment model has all required columns."""
-        columns = {c.key for c in IssueComment.__table__.columns}
-        required = {"id", "issue_id", "author_user_id", "body", "created_at", "updated_at"}
-        assert required.issubset(columns), f"Missing columns: {required - columns}"
-
-
 class TestIssueEventModel:
     """Test IssueEvent model attributes."""
 
@@ -194,7 +179,7 @@ class TestIssueInvestigationRunModel:
             "investigation_id",
             "trigger_type",
             "trigger_ref",
-            "focus_prompt",
+            "brief",
             "execution_profile",
             "approval_status",
             "confidence",

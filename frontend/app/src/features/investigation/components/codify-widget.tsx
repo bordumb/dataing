@@ -31,7 +31,12 @@ interface FormatOption {
 const FORMAT_OPTIONS: FormatOption[] = [
   { value: "sql", label: "SQL", extension: ".sql", language: "sql" },
   { value: "dbt", label: "dbt", extension: ".yml", language: "yaml" },
-  { value: "gx", label: "Great Expectations", extension: ".json", language: "json" },
+  {
+    value: "gx",
+    label: "Great Expectations",
+    extension: ".json",
+    language: "json",
+  },
   { value: "soda", label: "Soda", extension: ".yml", language: "yaml" },
 ];
 
@@ -47,7 +52,11 @@ interface CodifyModalProps {
   investigationId: string;
 }
 
-function CodifyModal({ isOpen, onClose, investigationId }: CodifyModalProps) {
+export function CodifyModal({
+  isOpen,
+  onClose,
+  investigationId,
+}: CodifyModalProps) {
   const [selectedFormat, setSelectedFormat] = useState<OutputFormat>("sql");
   const [copied, setCopied] = useState(false);
 
@@ -75,7 +84,9 @@ function CodifyModal({ isOpen, onClose, investigationId }: CodifyModalProps) {
     const formatOption = FORMAT_OPTIONS.find((f) => f.value === selectedFormat);
     const filename = `investigation_${investigationId.slice(0, 8)}_tests${formatOption?.extension || ".txt"}`;
 
-    const blob = new Blob([codifyMutation.data.content], { type: "text/plain" });
+    const blob = new Blob([codifyMutation.data.content], {
+      type: "text/plain",
+    });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
@@ -87,7 +98,11 @@ function CodifyModal({ isOpen, onClose, investigationId }: CodifyModalProps) {
   };
 
   // Fetch on mount with default format
-  if (!codifyMutation.data && !codifyMutation.isPending && !codifyMutation.isError) {
+  if (
+    !codifyMutation.data &&
+    !codifyMutation.isPending &&
+    !codifyMutation.isError
+  ) {
     codifyMutation.mutate({ investigationId, format: selectedFormat });
   }
 
@@ -102,7 +117,9 @@ function CodifyModal({ isOpen, onClose, investigationId }: CodifyModalProps) {
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <FlaskConical className="h-5 w-5 text-primary" />
-                <CardTitle className="text-lg">Codify as Regression Test</CardTitle>
+                <CardTitle className="text-lg">
+                  Codify as Regression Test
+                </CardTitle>
               </div>
               <Button variant="ghost" size="icon" onClick={onClose}>
                 <X className="h-4 w-4" />
@@ -117,7 +134,9 @@ function CodifyModal({ isOpen, onClose, investigationId }: CodifyModalProps) {
                 {FORMAT_OPTIONS.map((option) => (
                   <Button
                     key={option.value}
-                    variant={selectedFormat === option.value ? "default" : "outline"}
+                    variant={
+                      selectedFormat === option.value ? "default" : "outline"
+                    }
                     size="sm"
                     onClick={() => handleFormatChange(option.value)}
                     disabled={codifyMutation.isPending}
@@ -167,21 +186,22 @@ function CodifyModal({ isOpen, onClose, investigationId }: CodifyModalProps) {
             </div>
 
             {/* Test Summary */}
-            {codifyMutation.data?.tests && codifyMutation.data.tests.length > 0 && (
-              <div className="mt-4 p-3 bg-muted/50 rounded-md">
-                <p className="text-xs font-medium text-muted-foreground mb-2">
-                  Generated Tests ({codifyMutation.data.tests.length})
-                </p>
-                <div className="flex flex-wrap gap-2">
-                  {codifyMutation.data.tests.map((test, i) => (
-                    <Badge key={i} variant="outline" className="text-xs">
-                      {test.test_type}
-                      {test.column && `: ${test.column}`}
-                    </Badge>
-                  ))}
+            {codifyMutation.data?.tests &&
+              codifyMutation.data.tests.length > 0 && (
+                <div className="mt-4 p-3 bg-muted/50 rounded-md">
+                  <p className="text-xs font-medium text-muted-foreground mb-2">
+                    Generated Tests ({codifyMutation.data.tests.length})
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    {codifyMutation.data.tests.map((test, i) => (
+                      <Badge key={i} variant="outline" className="text-xs">
+                        {test.test_type}
+                        {test.column && `: ${test.column}`}
+                      </Badge>
+                    ))}
+                  </div>
                 </div>
-              </div>
-            )}
+              )}
 
             {/* Actions */}
             <div className="flex justify-end gap-2 mt-4 pt-4 border-t">
@@ -189,7 +209,9 @@ function CodifyModal({ isOpen, onClose, investigationId }: CodifyModalProps) {
                 variant="outline"
                 size="sm"
                 onClick={handleCopy}
-                disabled={!codifyMutation.data?.content || codifyMutation.isPending}
+                disabled={
+                  !codifyMutation.data?.content || codifyMutation.isPending
+                }
                 className="gap-2"
               >
                 {copied ? (
@@ -208,7 +230,9 @@ function CodifyModal({ isOpen, onClose, investigationId }: CodifyModalProps) {
                 variant="outline"
                 size="sm"
                 onClick={handleDownload}
-                disabled={!codifyMutation.data?.content || codifyMutation.isPending}
+                disabled={
+                  !codifyMutation.data?.content || codifyMutation.isPending
+                }
                 className="gap-2"
               >
                 <Download className="h-4 w-4" />

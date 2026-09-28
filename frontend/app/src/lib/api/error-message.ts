@@ -39,3 +39,16 @@ export function apiErrorMessage(
 
   return fallback || `HTTP error ${status}`;
 }
+
+/**
+ * Text for an error thrown by the API client. customInstance already turns
+ * the response body into a readable message with apiErrorMessage.
+ */
+export function errorText(
+  error: unknown,
+  fallback = "Something went wrong. Try again.",
+): string {
+  if (error instanceof Error && error.message) return error.message;
+  if (typeof error === "string" && error) return error;
+  return fallback;
+}

@@ -1127,25 +1127,25 @@ class ChainVerificationResult(BaseModel):
     chain_available: bool = Field(default=True, description="Whether hash chain data exists")
 
 
-class SendMessageResponse(BaseModel):
-    """Response from sending a user message to an investigation.
+class SteerResult(BaseModel):
+    """A steer sent to a running investigation, and how it ended so far.
 
-    Returned by `DataingClient.send_message()` when sending follow-up
-    messages to an ongoing investigation.
+    Returned by `DataingClient.steer()`.
 
     Attributes:
-        status: Status of the message send operation (e.g., "message_sent").
-        investigation_id: ID of the investigation the message was sent to.
-
-    Example:
-        ```python
-        response = client.send_message(
-            investigation_id="abc123",
-            message="Can you investigate the upstream table?"
-        )
-        print(f"Status: {response.status}")
-        ```
+        id: The steer's ID.
+        investigation_id: The investigation it steers.
+        kind: add_context, rule_out, add_hypothesis or stop_and_synthesize.
+        text: The fact, reason or hypothesis sent.
+        hypothesis_id: The hypothesis a rule-out targets.
+        status: pending until the run applies it, then applied or rejected.
+        outcome: What the run did with it, or why it was rejected.
     """
 
-    status: str = Field(..., description="Status of the message send operation")
-    investigation_id: str = Field(..., description="Investigation the message was sent to")
+    id: str = Field(..., description="Steer ID")
+    investigation_id: str = Field(..., description="Investigation the steer was sent to")
+    kind: str = Field(..., description="Steer kind")
+    text: str = Field(default="", description="The fact, reason or hypothesis sent")
+    hypothesis_id: str | None = Field(default=None, description="Hypothesis a rule-out targets")
+    status: str = Field(..., description="pending, applied or rejected")
+    outcome: str | None = Field(default=None, description="What the run did with the steer")

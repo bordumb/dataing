@@ -6,10 +6,16 @@
  * OpenAPI spec version: 2.0.0
  */
 import type { InvestigationRunResponseApprovalStatus } from "./investigationRunResponseApprovalStatus";
+import type { InvestigationRunResponseBrief } from "./investigationRunResponseBrief";
 import type { InvestigationRunResponseCompletedAt } from "./investigationRunResponseCompletedAt";
 import type { InvestigationRunResponseConfidence } from "./investigationRunResponseConfidence";
-import type { InvestigationRunResponseFocusPrompt } from "./investigationRunResponseFocusPrompt";
+import type { InvestigationRunResponseOutcomeNote } from "./investigationRunResponseOutcomeNote";
+import type { InvestigationRunResponseOutcomeReviewedAt } from "./investigationRunResponseOutcomeReviewedAt";
+import type { InvestigationRunResponseOutcomeReviewedBy } from "./investigationRunResponseOutcomeReviewedBy";
+import type { InvestigationRunResponseOutcomeVerdict } from "./investigationRunResponseOutcomeVerdict";
+import type { InvestigationRunResponseParentRunId } from "./investigationRunResponseParentRunId";
 import type { InvestigationRunResponseRootCauseTag } from "./investigationRunResponseRootCauseTag";
+import type { InvestigationRunResponseSourceThreadId } from "./investigationRunResponseSourceThreadId";
 import type { InvestigationRunResponseSynthesisSummary } from "./investigationRunResponseSynthesisSummary";
 
 /**
@@ -17,15 +23,21 @@ import type { InvestigationRunResponseSynthesisSummary } from "./investigationRu
  */
 export interface InvestigationRunResponse {
   approval_status: InvestigationRunResponseApprovalStatus;
+  brief: InvestigationRunResponseBrief;
   completed_at: InvestigationRunResponseCompletedAt;
   confidence: InvestigationRunResponseConfidence;
   created_at: string;
   execution_profile: string;
-  focus_prompt: InvestigationRunResponseFocusPrompt;
   id: string;
   investigation_id: string;
   issue_id: string;
+  outcome_note?: InvestigationRunResponseOutcomeNote;
+  outcome_reviewed_at?: InvestigationRunResponseOutcomeReviewedAt;
+  outcome_reviewed_by?: InvestigationRunResponseOutcomeReviewedBy;
+  outcome_verdict?: InvestigationRunResponseOutcomeVerdict;
+  parent_run_id: InvestigationRunResponseParentRunId;
   root_cause_tag: InvestigationRunResponseRootCauseTag;
+  source_thread_id: InvestigationRunResponseSourceThreadId;
   synthesis_summary: InvestigationRunResponseSynthesisSummary;
   trigger_type: string;
 }

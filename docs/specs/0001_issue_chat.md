@@ -95,7 +95,7 @@ At any point, Maya can explore in a private scratch chat, then publish the usefu
 | D8 | Agent turns in a thread run **one at a time, in order**, through one Temporal workflow per thread. | A shared thread stays coherent when two people ask at once. |
 | D9 | Comments, agent replies and system events share **one timeline table**. Issue events also append a system entry. | One cursor for streaming, and no merging of sources in the UI. |
 | D10 | Every result the agent saw is **snapshotted with its message**, and every query is in the gateway's audit log. | Data changes; the thread must show what the agent actually saw. |
-| D11 | Model: `claude-opus-5` with adaptive thinking. Effort is `low` for chat turns and `medium` for brief drafting, configurable per route. | Speed comes from effort, not from a smaller model. Cost is an open question for the owner (§12). |
+| D11 | Model: `claude-opus-5-5` (Claude Opus 5.5) with adaptive thinking, which it can't turn off. Effort is `low` for chat turns and `medium` for brief drafting, configurable per route. Brief drafting returns JSON text instead of calling an output tool, because Claude Opus 5.5 rejects a forced `tool_choice`. | Speed comes from effort, not from a smaller model. The owner chose Claude Opus 5.5 over Claude Opus 5 for cost: $4 / $20 per MTok against $5 / $25 (§12). |
 
 ---
 
@@ -478,7 +478,7 @@ The brief schema is `InvestigationBrief` (Pydantic, versioned):
 
 ## 12. Open questions
 
-1. **Model cost.** Chat defaults to `claude-opus-5` at low effort. Should chat turns use a cheaper model, such as `claude-sonnet-5`? That's the owner's call.
+1. **Model cost.** Resolved: the owner moved chat and brief drafting from `claude-opus-5` to `claude-opus-5-5`, which costs less per token. Effort stays `low` for chat turns and `medium` for briefs.
 2. **Raw tables in the shared thread.** Should result tables be hidden from viewers who have no credentials for that datasource, showing them only the agent's text?
 3. **PII redaction.** Should redacting tool results before they reach the model be on by default?
 4. **Steering automated runs.** Can people steer investigations that checks started, or only start follow-ups?

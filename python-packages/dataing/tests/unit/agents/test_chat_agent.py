@@ -297,26 +297,26 @@ def _no_model_requests(monkeypatch: pytest.MonkeyPatch) -> None:
 class TestBriefDrafting:
     """The drafting agent returns a structured BriefDraft from the thread."""
 
-    async def test_draft_is_structured_output(self) -> None:
-        """The model's final_result call becomes a BriefDraft."""
-        from pydantic_ai.messages import ModelResponse, ToolCallPart
+    async def test_draft_is_parsed_from_a_json_reply_without_forcing_a_tool(self) -> None:
+        """The draft comes back as JSON text, not through a forced output tool.
+
+        An output tool makes pydantic-ai send tool_choice "any", which Claude Opus 5.5
+        rejects with a 400; with text output allowed it sends "auto".
+        """
+        from pydantic_ai.messages import ModelResponse, TextPart
 
         from dataing.agents.chat import build_brief_agent, draft_brief
 
+        seen: list[AgentInfo] = []
+
         def respond(messages: list[ModelMessage], info: AgentInfo) -> ModelResponse:
-            (output_tool,) = info.output_tools
-            return ModelResponse(
-                parts=[
-                    ToolCallPart(
-                        output_tool.name,
-                        {
-                            "symptom": "Orders dropped",
-                            "findings": [{"statement": "Only app_v2", "source_seq": 4}],
-                            "leads": ["app_v2 deploy"],
-                        },
-                    )
-                ]
-            )
+            seen.append(info)
+            draft = {
+                "symptom": "Orders dropped",
+                "findings": [{"statement": "Only app_v2", "source_seq": 4}],
+                "leads": ["app_v2 deploy"],
+            }
+            return ModelResponse(parts=[TextPart(json.dumps(draft))])
 
         agent = build_brief_agent(FunctionModel(respond))
         history = build_history(
@@ -325,6 +325,7 @@ class TestBriefDrafting:
 
         draft, usage = await draft_brief(agent, history, instructions="issue block")
 
+        assert (seen[0].output_tools, seen[0].allow_text_output) == ([], True)
         assert draft.symptom == "Orders dropped"
         assert draft.findings[0].source_seq == 4
         assert usage.requests == 1

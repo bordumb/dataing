@@ -18,6 +18,10 @@ updates:
       # back to 1.22, which has no pydantic_ai.embeddings (see #199).
       - dependency-name: "sentence-transformers"
         versions: [">=6"]
+      # pydantic-ai 2 is a migration, not a bump: it fails 164 tests and moves
+      # anthropic to 1.x (see #212). Upgrade it deliberately.
+      - dependency-name: "pydantic-ai"
+        versions: [">=2"]
 
   # Frontend dependencies
   - package-ecosystem: "npm"

@@ -246,6 +246,10 @@ clean:
     rm -rf frontend/app/dist frontend/app/node_modules/.cache
     rm -rf frontend/landing/dist frontend/landing/node_modules/.cache
 
+# Show which worktrees still hold work not on main (--branches: other local branches too)
+worktrees *args:
+    @python3 scripts/worktree_status.py {{args}}
+
 # Start docker-compose stack
 docker-up:
     docker-compose -f infra/docker-compose.yml up -d

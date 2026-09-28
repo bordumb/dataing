@@ -445,7 +445,7 @@ The brief schema is `InvestigationBrief` (Pydantic, versioned):
 | EE rule action `spawn_investigation` | Starter, but no `alert.issue_id`, so the outcome is never written back | Starter, with the issue, `trigger_type = rule` |
 | `POST /investigations/import` | Inserts a finished replay record | Unchanged. It is a record, not a run, so it has no issue; its details page has no back link. |
 
-The dormant creation paths have no callers: the Redis queue worker (`adapters/queue/investigation_worker.py`) and `InvestigationService.start_investigation`. They are removed in a follow-up.
+Two dormant creation paths had no callers and are removed: the Redis queue worker (`adapters/queue/`) and `InvestigationService` with its branch/collaboration domain (`core/investigation/service.py` and friends, `adapters/db/investigation_repository.py`). The starter is the only code that creates an investigation.
 
 **`POST /investigations`** (SCOPE_WRITE):
 

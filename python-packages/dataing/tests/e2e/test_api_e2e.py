@@ -80,15 +80,6 @@ class TestAPIEndToEnd:
             duration_seconds=10.0,
         )
 
-        # Mock investigation service
-        mock_investigation_service = AsyncMock()
-        mock_investigation_service.start_investigation.return_value = (
-            uuid.uuid4(),  # investigation_id
-            uuid.uuid4(),  # main_branch_id
-            "queued",  # status
-        )
-        mock_investigation_service.get_state.side_effect = ValueError("Investigation not found")
-
         # Mock Temporal client (required for investigation routes)
         mock_temporal_client = AsyncMock()
         mock_temporal_client.start_investigation.return_value = AsyncMock()
@@ -101,7 +92,6 @@ class TestAPIEndToEnd:
         app.state.db = mock_db
         app.state.app_db = mock_db
         app.state.orchestrator = mock_orchestrator
-        app.state.investigation_service = mock_investigation_service
         app.state.temporal_client = mock_temporal_client
         app.state.investigations = {}
 

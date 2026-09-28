@@ -1,39 +1,6 @@
 """Investigation domain module.
 
-This module contains the core domain model for the investigation system,
-including entities and value objects.
-
-Workflow execution is now handled by Temporal.
+brief.py holds the investigation brief: what an issue's thread hands to the
+investigation manager (docs/specs/0001_issue_chat.md §7.7). Runs are started by
+dataing.services.investigation and executed by Temporal (dataing.temporal).
 """
-
-from .entities import Branch, Investigation, InvestigationContext, Snapshot
-from .pattern_extraction import (
-    PatternExtractionService,
-    PatternRepositoryProtocol,
-)
-from .repository import ExecutionLock, InvestigationRepository
-from .values import (
-    BranchStatus,
-    BranchType,
-    StepType,
-    VersionId,
-)
-
-__all__ = [
-    # Entities
-    "Investigation",
-    "Branch",
-    "Snapshot",
-    "InvestigationContext",
-    # Value Objects
-    "VersionId",
-    "BranchType",
-    "BranchStatus",
-    "StepType",
-    # Repository
-    "InvestigationRepository",
-    "ExecutionLock",
-    # Pattern Learning
-    "PatternExtractionService",
-    "PatternRepositoryProtocol",
-]

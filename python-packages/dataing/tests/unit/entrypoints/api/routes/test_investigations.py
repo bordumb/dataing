@@ -4,12 +4,10 @@ from __future__ import annotations
 
 import uuid
 from typing import Any
-from unittest.mock import AsyncMock
 
 import pytest
 
 from dataing.core.domain_types import AnomalyAlert, MetricSpec
-from dataing.core.investigation.service import BranchState, InvestigationState
 from dataing.entrypoints.api.middleware.auth import ApiKeyContext
 
 
@@ -44,28 +42,6 @@ def sample_alert() -> dict[str, Any]:
         "anomaly_date": "2026-01-10",
         "severity": "high",
     }
-
-
-@pytest.fixture
-def mock_service() -> AsyncMock:
-    """Create mock investigation service."""
-    service = AsyncMock()
-    investigation_id = uuid.uuid4()
-    branch_id = uuid.uuid4()
-
-    service.start_investigation.return_value = (investigation_id, branch_id)
-    service.get_state.return_value = InvestigationState(
-        investigation_id=investigation_id,
-        status="active",
-        main_branch=BranchState(
-            branch_id=branch_id,
-            status="active",
-            current_step="gather_context",
-        ),
-    )
-    service.send_message.return_value = branch_id
-
-    return service
 
 
 class TestStartInvestigationRoute:
@@ -356,8 +332,8 @@ class TestRouterConfiguration:
         assert "investigations" in router.tags
 
 
-class TestInvestigationServiceIntegration:
-    """Integration tests for route handlers with mocked service."""
+class TestStartInvestigationRequestParsing:
+    """POST /investigations parses an SDK alert into an AnomalyAlert."""
 
     @pytest.mark.asyncio
     async def test_start_investigation_parses_alert(
@@ -380,60 +356,6 @@ class TestInvestigationServiceIntegration:
             expression="user_id",
             display_name="NULL rate",
             columns_referenced=["user_id"],
-        )
-
-    @pytest.mark.asyncio
-    async def test_get_investigation_returns_state(
-        self,
-        mock_auth_context: ApiKeyContext,
-        mock_service: AsyncMock,
-    ) -> None:
-        """Test that get_investigation returns proper state."""
-        investigation_id = uuid.uuid4()
-        branch_id = uuid.uuid4()
-
-        mock_service.get_state.return_value = InvestigationState(
-            investigation_id=investigation_id,
-            status="active",
-            main_branch=BranchState(
-                branch_id=branch_id,
-                status="active",
-                current_step="generate_hypotheses",
-            ),
-        )
-
-        state = await mock_service.get_state(
-            investigation_id=investigation_id,
-            user_id=mock_auth_context.user_id,
-        )
-
-        assert state.investigation_id == investigation_id
-        assert state.main_branch.current_step == "generate_hypotheses"
-
-    @pytest.mark.asyncio
-    async def test_send_message_triggers_resume(
-        self,
-        mock_auth_context: ApiKeyContext,
-        mock_service: AsyncMock,
-    ) -> None:
-        """Test that send_message triggers branch resume."""
-        investigation_id = uuid.uuid4()
-        branch_id = uuid.uuid4()
-        message = "Please investigate the upstream ETL job"
-
-        mock_service.send_message.return_value = branch_id
-
-        result_branch_id = await mock_service.send_message(
-            investigation_id=investigation_id,
-            user_id=mock_auth_context.user_id,
-            message=message,
-        )
-
-        assert result_branch_id == branch_id
-        mock_service.send_message.assert_called_once_with(
-            investigation_id=investigation_id,
-            user_id=mock_auth_context.user_id,
-            message=message,
         )
 
 

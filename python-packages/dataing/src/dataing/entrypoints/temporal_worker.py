@@ -64,6 +64,7 @@ from dataing.temporal.activities.steering import (
     make_record_steer_outcome_activity,
 )
 from dataing.temporal.adapters import TemporalAgentAdapter
+from dataing.temporal.sandbox import workflow_runner
 from dataing.temporal.workflows import (
     EvaluateHypothesisWorkflow,
     InvestigationWorkflow,
@@ -347,6 +348,7 @@ async def run_worker() -> None:
         task_queue=settings.TEMPORAL_TASK_QUEUE,
         workflows=[InvestigationWorkflow, EvaluateHypothesisWorkflow, IssueThreadWorkflow],
         activities=activities,
+        workflow_runner=workflow_runner(),
         max_concurrent_activities=MAX_CONCURRENT_ACTIVITIES,
         max_concurrent_workflow_tasks=MAX_CONCURRENT_WORKFLOW_TASKS,
     )

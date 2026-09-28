@@ -22,6 +22,7 @@ from fixtures.investigation_env import INVESTIGATION_TASK_QUEUE, FakeInvestigati
 from temporalio.testing import WorkflowEnvironment
 from temporalio.worker import Worker
 
+from dataing.temporal.sandbox import workflow_runner
 from dataing.temporal.workflows import (
     EvaluateHypothesisWorkflow,
     InvestigationInput,
@@ -70,6 +71,7 @@ async def record(label: str, *, steer: bool = True) -> None:
     async with await WorkflowEnvironment.start_time_skipping() as env:
         async with Worker(
             env.client,
+            workflow_runner=workflow_runner(),
             task_queue=INVESTIGATION_TASK_QUEUE,
             workflows=[InvestigationWorkflow, EvaluateHypothesisWorkflow],
             activities=fake.activities(),
@@ -110,6 +112,7 @@ async def record_steered(env: WorkflowEnvironment) -> Any:
     fake = FakeInvestigation(hold={"h3"})
     async with Worker(
         env.client,
+        workflow_runner=workflow_runner(),
         task_queue=INVESTIGATION_TASK_QUEUE,
         workflows=[InvestigationWorkflow, EvaluateHypothesisWorkflow],
         activities=fake.activities(),

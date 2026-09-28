@@ -6,6 +6,7 @@ removed or path changes break the SDK/CLI.
 """
 
 import pytest
+from fastapi.routing import iter_route_contexts
 
 
 class TestInvestigationEndpointsRegistered:
@@ -17,8 +18,8 @@ class TestInvestigationEndpointsRegistered:
         from dataing.entrypoints.api.factory import create_app
 
         app = create_app()
-        # Extract path patterns from all routes
-        return [r.path for r in app.routes if hasattr(r, "path")]
+        # Extract path patterns from all routes, including those of included routers
+        return [r.path for r in iter_route_contexts(app.routes) if r.path]
 
     def test_investigations_list_endpoint(self, app_routes):
         """POST/GET /api/v1/investigations should be registered."""

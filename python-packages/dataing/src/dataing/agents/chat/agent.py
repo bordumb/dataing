@@ -112,7 +112,7 @@ async def run_turn(
         instructions=instructions,
         event_stream_handler=handle_events,
     )
-    run_usage = result.usage()
+    run_usage = result.usage
     usage = TurnUsage(
         requests=run_usage.requests,
         input_tokens=run_usage.input_tokens,
@@ -152,7 +152,7 @@ async def draft_brief(
         The draft and the token usage of the call.
     """
     result = await agent.run(BRIEF_PROMPT, message_history=list(history), instructions=instructions)
-    run_usage = result.usage()
+    run_usage = result.usage
     usage = TurnUsage(
         requests=run_usage.requests,
         input_tokens=run_usage.input_tokens,

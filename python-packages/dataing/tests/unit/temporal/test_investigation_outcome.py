@@ -10,6 +10,7 @@ from fixtures.record_investigation_histories import investigation_input
 from temporalio.testing import WorkflowEnvironment
 from temporalio.worker import Worker
 
+from dataing.temporal.sandbox import workflow_runner
 from dataing.temporal.workflows import EvaluateHypothesisWorkflow, InvestigationWorkflow
 
 
@@ -25,6 +26,7 @@ async def test_completed_run_publishes_its_outcome_once(env: WorkflowEnvironment
     fake = FakeInvestigation()
     async with Worker(
         env.client,
+        workflow_runner=workflow_runner(),
         task_queue=INVESTIGATION_TASK_QUEUE,
         workflows=[InvestigationWorkflow, EvaluateHypothesisWorkflow],
         activities=fake.activities(),
@@ -50,6 +52,7 @@ async def test_cancelled_run_publishes_nothing(env: WorkflowEnvironment) -> None
     fake = FakeInvestigation(hold={"h1"})
     async with Worker(
         env.client,
+        workflow_runner=workflow_runner(),
         task_queue=INVESTIGATION_TASK_QUEUE,
         workflows=[InvestigationWorkflow, EvaluateHypothesisWorkflow],
         activities=fake.activities(),

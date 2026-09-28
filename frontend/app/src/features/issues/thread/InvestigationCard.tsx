@@ -11,13 +11,15 @@ import {
   asBrief,
   isRunning,
   useLiveStatus,
+  useSteers,
   type HypothesisState,
   type InvestigationBrief,
   type InvestigationOutcome,
 } from "@/lib/api/investigation-runs";
 import type { ThreadMessage } from "@/lib/api/issue-threads";
 
-import { Pill, hypothesisStatus, type PillTone } from "./Pill";
+import { Pill, type PillTone } from "./Pill";
+import { Steering } from "./Steering";
 
 export interface InvestigationPayload {
   investigation_id?: string;
@@ -92,51 +94,19 @@ export function BriefSummary({ brief }: { brief: InvestigationBrief }) {
   );
 }
 
-export interface HypothesisRowProps {
-  hypothesis: HypothesisState;
-  index: number;
-  /** Extra words after the status, e.g. who ruled it out. */
-  note?: string;
-  action?: React.ReactNode;
-}
-
-export function HypothesisRow({
-  hypothesis,
-  index,
-  note,
-  action,
-}: HypothesisRowProps) {
-  const status = hypothesisStatus(hypothesis.status);
-  return (
-    <li
-      className="flex items-center gap-2 border-t border-border py-1.5 text-sm"
-      aria-label={`Hypothesis ${hypothesis.title}`}
-    >
-      <Pill tone={status.tone}>{status.label}</Pill>
-      <span
-        className={
-          hypothesis.status === "ruled_out"
-            ? "flex-1 text-muted-foreground line-through"
-            : "flex-1"
-        }
-      >
-        H{index + 1} · {hypothesis.title || hypothesis.id}
-      </span>
-      {note && <span className="text-xs text-muted-foreground">{note}</span>}
-      {action}
-    </li>
-  );
-}
-
 export interface InvestigationCardProps {
   message: ThreadMessage;
   /** The outcome the run posted, once it finished. */
   outcome?: InvestigationOutcome | null;
+  canWrite: boolean;
+  nameOf: (userId: string | null | undefined) => string;
 }
 
 export function InvestigationCard({
   message,
   outcome,
+  canWrite,
+  nameOf,
 }: InvestigationCardProps) {
   const payload = message.payload as InvestigationPayload;
   const investigationId = payload.investigation_id ?? null;
@@ -145,6 +115,7 @@ export function InvestigationCard({
   const live = useLiveStatus(investigationId);
   const status = live.data;
   const running = isRunning(status);
+  const steers = useSteers(investigationId, running);
 
   // A finished run's status has no hypotheses; its outcome does.
   const hypotheses: HypothesisState[] =
@@ -241,18 +212,20 @@ export function InvestigationCard({
         </div>
       )}
 
-      {hypotheses.length > 0 ? (
-        <ul className="mt-2">
-          {hypotheses.map((h, i) => (
-            <HypothesisRow key={h.id} hypothesis={h} index={i} />
-          ))}
-        </ul>
-      ) : (
-        running && (
-          <p className="mt-2 text-xs text-muted-foreground">
-            Hypotheses appear here once the manager has generated them.
-          </p>
-        )
+      {investigationId && (
+        <Steering
+          investigationId={investigationId}
+          running={running}
+          hypotheses={hypotheses}
+          steers={steers.data?.items ?? []}
+          canWrite={canWrite}
+          nameOf={nameOf}
+        />
+      )}
+      {running && hypotheses.length === 0 && (
+        <p className="mt-2 text-xs text-muted-foreground">
+          Hypotheses appear here once the manager has generated them.
+        </p>
       )}
     </div>
   );

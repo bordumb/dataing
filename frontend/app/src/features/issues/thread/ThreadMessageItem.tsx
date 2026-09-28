@@ -16,6 +16,7 @@ import {
   useDeleteMessage,
   useEditMessage,
   type AgentReplyPayload,
+  type SteerProposal,
   type ThreadMessage,
 } from "@/lib/api/issue-threads";
 import { errorText } from "@/lib/api/error-message";
@@ -31,6 +32,8 @@ import {
   type InvestigationPayload,
 } from "./InvestigationCard";
 import { OutcomeCard } from "./OutcomeCard";
+import { Pill } from "./Pill";
+import { ProposalCard, type SentProposal } from "./ProposalCard";
 import { ToolCalls } from "./ToolCalls";
 
 export interface ThreadViewer {
@@ -45,21 +48,52 @@ export interface ThreadViewer {
 export interface ThreadFacts {
   /** Each finished run's outcome, by investigation id. */
   outcomes: Map<string, InvestigationOutcome>;
+  /** Steers people sent from agent proposals, by the proposing reply's id. */
+  sentProposals: Map<string, SentProposal[]>;
 }
 
-export const EMPTY_FACTS: ThreadFacts = { outcomes: new Map() };
+export const EMPTY_FACTS: ThreadFacts = {
+  outcomes: new Map(),
+  sentProposals: new Map(),
+};
 
 /** Collect the facts messages need from the thread's messages. */
 export function threadFacts(messages: ThreadMessage[]): ThreadFacts {
   const outcomes = new Map<string, InvestigationOutcome>();
+  const sentProposals = new Map<string, SentProposal[]>();
   for (const m of messages) {
-    if (m.kind !== "investigation" || m.payload.phase !== "outcome") continue;
-    const id = m.payload.investigation_id;
-    if (typeof id === "string" && m.payload.outcome) {
-      outcomes.set(id, m.payload.outcome as InvestigationOutcome);
+    if (m.kind === "investigation" && m.payload.phase === "outcome") {
+      const id = m.payload.investigation_id;
+      if (typeof id === "string" && m.payload.outcome) {
+        outcomes.set(id, m.payload.outcome as InvestigationOutcome);
+      }
+    }
+    const replyId = m.payload.proposal_message_id;
+    if (m.kind === "steer" && m.author_kind === "user" && replyId) {
+      const sent = sentProposals.get(String(replyId)) ?? [];
+      sent.push({
+        kind: String(m.payload.kind ?? ""),
+        hypothesis_id: (m.payload.hypothesis_id as string | null) ?? null,
+        author_user_id: m.author_user_id,
+      });
+      sentProposals.set(String(replyId), sent);
     }
   }
-  return { outcomes };
+  return { outcomes, sentProposals };
+}
+
+/** The steer already sent for a proposal, matched by kind and hypothesis. */
+function sentFor(
+  sent: SentProposal[] | undefined,
+  proposal: SteerProposal,
+): SentProposal | null {
+  return (
+    sent?.find(
+      (s) =>
+        s.kind === proposal.kind &&
+        (s.hypothesis_id ?? null) === (proposal.hypothesis_id ?? null),
+    ) ?? null
+  );
 }
 
 interface MessageProps {
@@ -251,6 +285,7 @@ function AgentReplyMessage({
   issueId,
   threadId,
   viewer,
+  facts = EMPTY_FACTS,
 }: MessageProps) {
   const cancel = useCancelAnswer(issueId, threadId);
   const payload = message.payload as AgentReplyPayload;
@@ -310,16 +345,17 @@ function AgentReplyMessage({
 
         <ToolCalls calls={toolCalls} issueId={issueId} threadId={threadId} />
 
-        {proposals.map((proposal, i) => (
-          <div
-            key={i}
-            className="mt-2 rounded-md border border-dashed border-violet-400 px-3 py-2 text-sm"
-          >
-            <span className="font-semibold">Proposed steer</span> ·{" "}
-            {proposal.kind.replace(/_/g, " ")}
-            <p className="mt-1">{proposal.text}</p>
-          </div>
-        ))}
+        {message.status === "complete" &&
+          proposals.map((proposal, i) => (
+            <ProposalCard
+              key={i}
+              proposal={proposal}
+              replyId={message.id}
+              canWrite={viewer.canWrite}
+              sent={sentFor(facts.sentProposals.get(message.id), proposal)}
+              nameOf={viewer.nameOf}
+            />
+          ))}
 
         {canCancel && (
           <Button
@@ -352,7 +388,6 @@ function EventMessage({ message }: { message: ThreadMessage }) {
 }
 
 const KIND_LABEL: Record<string, string> = {
-  steer: "steer",
   published: "shared from a scratch chat",
 };
 
@@ -448,6 +483,8 @@ function InvestigationMessage({
         ) : (
           <InvestigationCard
             message={message}
+            canWrite={viewer.canWrite}
+            nameOf={viewer.nameOf}
             outcome={
               payload.investigation_id
                 ? facts.outcomes.get(payload.investigation_id)
@@ -518,6 +555,41 @@ function BriefMessage({ message, threadId, viewer }: MessageProps) {
   );
 }
 
+const STEER_OUTCOME_TONE: Record<string, "ok" | "bad" | "warn"> = {
+  applied: "ok",
+  rejected: "bad",
+  pending: "warn",
+};
+
+/** A person's steer, or the run's note on how a steer ended. */
+function SteerMessage({ message, viewer }: MessageProps) {
+  const author = authorName(message, viewer);
+  const status =
+    typeof message.payload.status === "string" ? message.payload.status : null;
+  return (
+    <div className="flex gap-2.5 py-2.5">
+      <AuthorAvatar message={message} author={author} />
+      <div className="min-w-0 flex-1">
+        <Meta>
+          <span className="font-semibold text-foreground">{author}</span> ·{" "}
+          {message.author_kind === "user"
+            ? "steered the investigation"
+            : "steer outcome"}{" "}
+          · {formatTime(message.created_at)}
+        </Meta>
+        <div className="flex flex-wrap items-baseline gap-1.5 rounded border-l-[3px] border-violet-500 bg-violet-50 px-2 py-1 text-sm dark:bg-violet-950/40">
+          {status && (
+            <Pill tone={STEER_OUTCOME_TONE[status] ?? "warn"}>
+              {status === "rejected" ? "not applied" : status}
+            </Pill>
+          )}
+          <Markdown className="[&_p]:my-0">{message.body_md}</Markdown>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function renderMessage(props: MessageProps) {
   switch (props.message.kind) {
     case "comment":
@@ -530,6 +602,8 @@ function renderMessage(props: MessageProps) {
       return <InvestigationMessage {...props} />;
     case "brief":
       return <BriefMessage {...props} />;
+    case "steer":
+      return <SteerMessage {...props} />;
     default:
       return <CardMessage {...props} />;
   }

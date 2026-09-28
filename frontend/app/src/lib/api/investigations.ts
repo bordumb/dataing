@@ -6,7 +6,9 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { customInstance } from "./client";
 import type {
   ExecutionProfile,
+  HypothesisStatus,
   InvestigationBrief,
+  RunError,
 } from "./investigation-runs";
 import { queryKeys } from "./query-keys";
 
@@ -37,11 +39,32 @@ export interface BranchState {
   parent_branch_id: string | null;
 }
 
+/** A hypothesis the manager proposed, and how testing it ended. */
+export interface RunHypothesis {
+  id: string;
+  title: string;
+  status: HypothesisStatus | string;
+  reasoning: string | null;
+}
+
 export interface InvestigationState {
   investigation_id: string;
   status: string;
   main_branch: BranchState;
   user_branch: BranchState | null;
+  /**
+   * The issue the run belongs to, and the run's number among its runs.
+   * Null for imported snapshots, which have no issue (spec 0001 §7.11).
+   */
+  issue_id?: string | null;
+  issue_number?: number | null;
+  issue_title?: string | null;
+  run_number?: number | null;
+  brief?: InvestigationBrief | null;
+  execution_profile?: string | null;
+  /** Why the run failed, when it did. */
+  error?: RunError | null;
+  hypotheses?: RunHypothesis[] | null;
 }
 
 export interface InvestigationListItem {
@@ -116,6 +139,15 @@ export async function startInvestigation(
   });
 }
 
+/** The run as a snapshot archive (tar.gz), for replay or sharing. */
+export async function fetchSnapshot(investigationId: string): Promise<Blob> {
+  return customInstance<Blob>({
+    url: `${API_BASE}/${investigationId}/snapshot`,
+    method: "GET",
+    responseType: "blob",
+  });
+}
+
 async function codifyInvestigation(
   investigationId: string,
   format: "gx" | "dbt" | "soda" | "sql",
@@ -136,6 +168,21 @@ export function useInvestigations() {
   });
 }
 
+/** Workflow statuses a run doesn't leave. */
+export const TERMINAL_STATUSES = new Set([
+  "completed",
+  "failed",
+  "cancelled",
+  "inconclusive",
+  "terminated",
+  "timed_out",
+]);
+
+/** Whether the run has ended, by its status or a recorded failure. */
+export function hasEnded(state: Pick<InvestigationState, "status" | "error">) {
+  return TERMINAL_STATUSES.has(state.status) || !!state.error;
+}
+
 export function useInvestigation(investigationId: string | undefined) {
   return useQuery({
     queryKey: queryKeys.investigations.detail(investigationId ?? ""),
@@ -143,13 +190,7 @@ export function useInvestigation(investigationId: string | undefined) {
     enabled: !!investigationId,
     refetchInterval: (query) => {
       const data = query.state.data;
-      if (
-        ["completed", "failed", "cancelled", "inconclusive"].includes(
-          data?.status ?? "",
-        )
-      ) {
-        return false;
-      }
+      if (query.state.error || (data && hasEnded(data))) return false;
       return 2000;
     },
   });

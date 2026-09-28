@@ -9,6 +9,7 @@ import {
 import { AppSidebar } from "@/components/layout/app-sidebar";
 import { Separator } from "@/components/ui/separator";
 import { ModeToggle } from "@/components/mode-toggle";
+import { LlmStatusBanner } from "@/components/llm-status-banner";
 import {
   ErrorBoundary,
   FeatureErrorBoundary,
@@ -84,6 +85,8 @@ function AppLayout({ children }: { children: React.ReactNode }) {
             <ModeToggle />
           </div>
         </header>
+        {/* A broken LLM key or model is visible on every page. */}
+        <LlmStatusBanner />
         <main className="flex-1 p-6">{children}</main>
       </SidebarInset>
     </SidebarProvider>

@@ -14,6 +14,8 @@ export interface RequestConfig {
   data?: unknown;
   headers?: Record<string, string>;
   signal?: AbortSignal;
+  /** "blob" returns the body as a Blob, for downloads. Defaults to JSON. */
+  responseType?: "json" | "blob";
 }
 
 /**
@@ -37,7 +39,7 @@ export class ApiError extends Error {
 }
 
 export const customInstance = async <T>(config: RequestConfig): Promise<T> => {
-  const { url, method, params, data, headers, signal } = config;
+  const { url, method, params, data, headers, signal, responseType } = config;
 
   // Convert params to string, filtering out null/undefined
   const queryString = params
@@ -99,6 +101,10 @@ export const customInstance = async <T>(config: RequestConfig): Promise<T> => {
   // No Content (e.g. DELETE): there is no body to parse.
   if (response.status === 204) {
     return undefined as T;
+  }
+
+  if (responseType === "blob") {
+    return (await response.blob()) as T;
   }
 
   return response.json();

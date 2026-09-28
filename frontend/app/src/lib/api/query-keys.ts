@@ -56,6 +56,11 @@ export const queryKeys = {
     providers: ["/api/v1/lineage/providers"] as const,
   },
 
+  // System health
+  system: {
+    llm: ["/api/v1/system/llm"] as const,
+  },
+
   // Dashboard
   dashboard: {
     stats: ["/api/v1/dashboard/"] as const,

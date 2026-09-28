@@ -179,7 +179,7 @@ class TestIssueInvestigationRunModel:
             "investigation_id",
             "trigger_type",
             "trigger_ref",
-            "focus_prompt",
+            "brief",
             "execution_profile",
             "approval_status",
             "confidence",

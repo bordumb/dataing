@@ -7,6 +7,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from dataing.agents.prompts.brief import team_brief_section
+
 if TYPE_CHECKING:
     from dataing.core.domain_types import (
         AnomalyAlert,
@@ -231,7 +233,7 @@ def build_user(
 
 ## What Was Investigated
 {metric_context}
-
+{team_brief_section(alert)}
 ## Investigation Findings
 {evidence_text}
 {untested_section}{code_changes_section}

@@ -21,7 +21,9 @@ from sse_starlette.sse import EventSourceResponse
 
 from dataing.adapters.db.app_db import AppDatabase
 from dataing.adapters.db.issue_threads import IssueThreadRepository
+from dataing.agents.prompts.brief import BRIEF_METADATA_KEY
 from dataing.core.domain_types import AnomalyAlert, MetricSpec
+from dataing.core.investigation.brief import InvestigationBrief, brief_to_prompt
 from dataing.core.json_utils import to_json_safe, to_json_string
 from dataing.entrypoints.api.deps import (
     get_app_db,
@@ -424,7 +426,7 @@ async def _issue_response(db: AppDatabase, row: dict[str, Any]) -> IssueResponse
     return _build_issue_response(row, labels, row["id"] in synthesized)
 
 
-THREAD_SILENT_EVENTS = frozenset({"comment_added"})
+THREAD_SILENT_EVENTS = frozenset({"comment_added", "investigation_spawned"})
 
 
 async def _record_issue_event(
@@ -436,8 +438,8 @@ async def _record_issue_event(
 ) -> None:
     """Record an issue event and show it in the issue's shared thread.
 
-    A new comment is already a message in the thread, so comment_added is only
-    recorded in the event log.
+    A new comment and a new investigation are already messages in the thread (a
+    comment, an investigation card), so those events are only in the event log.
     """
     await db.execute(
         """
@@ -952,15 +954,17 @@ async def remove_issue_watcher(
 
 
 class InvestigationRunCreate(BaseModel):
-    """Request body for spawning an investigation from an issue."""
+    """Request body for starting an investigation from an issue with a brief."""
 
-    focus_prompt: str = Field(..., min_length=1)
+    brief: InvestigationBrief
     dataset_id: str | None = None  # Inherits from issue if not provided
-    datasource_id: UUID | None = None  # Uses tenant default if not provided
+    datasource_id: UUID | None = None  # Brief scope, then tenant default, if not provided
     execution_profile: str = Field(
         default="standard",
         pattern="^(safe|standard|deep)$",
     )
+    source_thread_id: UUID | None = None  # The thread the brief was drafted in
+    parent_run_id: UUID | None = None  # Set for "Continue investigating"
 
 
 class InvestigationRunResponse(BaseModel):
@@ -970,7 +974,9 @@ class InvestigationRunResponse(BaseModel):
     issue_id: UUID
     investigation_id: UUID
     trigger_type: str
-    focus_prompt: str | None
+    brief: dict[str, Any]
+    source_thread_id: UUID | None
+    parent_run_id: UUID | None
     execution_profile: str
     approval_status: str | None
     confidence: float | None
@@ -978,6 +984,24 @@ class InvestigationRunResponse(BaseModel):
     synthesis_summary: str | None
     created_at: datetime
     completed_at: datetime | None
+
+
+RUN_COLUMNS = """
+    id, issue_id, investigation_id, trigger_type, brief, source_thread_id, parent_run_id,
+    execution_profile, approval_status, confidence, root_cause_tag, synthesis_summary,
+    created_at, completed_at
+"""
+
+
+def _run_response(row: dict[str, Any]) -> InvestigationRunResponse:
+    """Convert an issue_investigation_runs row (brief as JSON text) to its API shape."""
+    brief = row["brief"]
+    return InvestigationRunResponse(
+        **{
+            **{field: row.get(field) for field in InvestigationRunResponse.model_fields},
+            "brief": json.loads(brief) if isinstance(brief, str) else brief,
+        }
+    )
 
 
 class InvestigationRunListResponse(BaseModel):
@@ -1002,34 +1026,15 @@ async def list_investigation_runs(
     await _verify_issue_access(db, issue_id, auth.tenant_id)
 
     rows = await db.fetch_all(
-        """
-        SELECT id, issue_id, investigation_id, trigger_type, focus_prompt,
-               execution_profile, approval_status, confidence, root_cause_tag,
-               synthesis_summary, created_at, completed_at
+        f"""
+        SELECT {RUN_COLUMNS}
         FROM issue_investigation_runs
         WHERE issue_id = $1
         ORDER BY created_at DESC
         """,
         issue_id,
     )
-
-    items = [
-        InvestigationRunResponse(
-            id=row["id"],
-            issue_id=row["issue_id"],
-            investigation_id=row["investigation_id"],
-            trigger_type=row["trigger_type"],
-            focus_prompt=row["focus_prompt"],
-            execution_profile=row["execution_profile"],
-            approval_status=row["approval_status"],
-            confidence=row["confidence"],
-            root_cause_tag=row["root_cause_tag"],
-            synthesis_summary=row["synthesis_summary"],
-            created_at=row["created_at"],
-            completed_at=row["completed_at"],
-        )
-        for row in rows
-    ]
+    items = [_run_response(row) for row in rows]
 
     return InvestigationRunListResponse(items=items, total=len(items))
 
@@ -1047,15 +1052,15 @@ async def spawn_investigation(
     investigation_starter: InvestigationStarterDep,
     body: InvestigationRunCreate,
 ) -> InvestigationRunResponse:
-    """Spawn an investigation from an issue.
+    """Start an investigation from an issue with an editable brief.
 
-    Creates a new investigation linked to this issue. The focus_prompt
-    guides the investigation direction.
+    The manager and its subagents start from the brief: its symptom is what they
+    investigate, its findings are facts, its exclusions are not proposed again and
+    its leads are tested first. The brief's scope tables join the issue's dataset
+    as reference tables. The run appears in the issue's shared thread.
 
     Requires user identity (JWT auth or user-scoped API key).
-    Deep profile may require approval depending on tenant settings.
     """
-    # Verify issue exists and get its data
     issue = await db.fetch_one(
         """
         SELECT id, tenant_id, dataset_id, title, severity, created_at
@@ -1065,29 +1070,36 @@ async def spawn_investigation(
         issue_id,
         auth.tenant_id,
     )
-
     if not issue:
         raise HTTPException(status_code=404, detail="Issue not found")
-
     if auth.user_id is None:
         raise HTTPException(
             status_code=403,
             detail="User identity required to spawn investigations",
         )
 
-    # Use dataset_id from request or inherit from issue
-    dataset_id = body.dataset_id or issue["dataset_id"]
-
+    brief = body.brief
+    dataset_id = body.dataset_id or issue["dataset_id"] or next(iter(brief.scope.tables), None)
     if not dataset_id:
         raise HTTPException(
             status_code=400,
-            detail="dataset_id required - not set on issue and not provided in request",
+            detail="dataset_id required - not set on issue, request or brief scope",
         )
 
-    # Resolve datasource_id (use provided or get default)
+    if body.parent_run_id is not None:
+        parent = await db.fetch_one(
+            "SELECT id FROM issue_investigation_runs WHERE id = $1 AND issue_id = $2",
+            body.parent_run_id,
+            issue_id,
+        )
+        if parent is None:
+            raise HTTPException(status_code=400, detail="parent_run_id is not a run of this issue")
+
     try:
         datasource_id = await resolve_datasource_id(
-            http_request, auth.tenant_id, explicit_id=body.datasource_id
+            http_request,
+            auth.tenant_id,
+            explicit_id=body.datasource_id or brief.scope.datasource_id,
         )
     except ValueError as e:
         error_msg = str(e)
@@ -1102,19 +1114,19 @@ async def spawn_investigation(
             ) from e
         raise HTTPException(status_code=400, detail=error_msg) from e
 
-    # Determine approval_status based on execution_profile
-    # Deep profile may require approval - for now we approve immediately
-    approval_status = None
-    if body.execution_profile == "deep":
-        approval_status = "approved"  # Could be "queued" based on tenant settings
+    approval_status = "approved" if body.execution_profile == "deep" else None
+    brief = brief.model_copy(
+        update={"scope": brief.scope.model_copy(update={"datasource_id": datasource_id})}
+    )
+    brief_json = brief.model_dump(mode="json", by_alias=True)
 
-    # Build the alert from the issue. An issue has no measured metric, so the
-    # focus prompt is the free-text description the agents investigate.
+    # The issue's dataset comes first; the brief's other tables become reference tables
+    dataset_ids = [dataset_id] + [t for t in brief.scope.tables if t != dataset_id]
     alert = AnomalyAlert(
-        dataset_ids=[dataset_id],
+        dataset_ids=dataset_ids,
         metric_spec=MetricSpec(
             metric_type="description",
-            expression=body.focus_prompt,
+            expression=brief.symptom,
             display_name=issue["title"],
         ),
         anomaly_type="custom",
@@ -1123,19 +1135,19 @@ async def spawn_investigation(
         deviation_pct=0.0,
         anomaly_date=issue["created_at"].date().isoformat(),
         severity=issue["severity"] or "medium",
+        # Every prompt that renders the alert adds this as its "Team brief" section
+        metadata={BRIEF_METADATA_KEY: brief_to_prompt(brief)},
     )
     alert_data = {
         **alert.model_dump(mode="json"),
         "issue_id": str(issue_id),
-        "focus_prompt": body.focus_prompt,
+        "brief": brief_json,
     }
     alert_summary = (
         f"Investigation spawned from issue: {issue.get('title', 'Untitled')}. "
-        f"Dataset: {dataset_id}. "
-        f"Focus: {body.focus_prompt or 'General investigation'}."
+        f"Dataset: {dataset_id}. Symptom: {brief.symptom}"
     )
 
-    # Start the investigation using the centralized service
     try:
         result = await investigation_starter.start_investigation(
             tenant_id=auth.tenant_id,
@@ -1151,33 +1163,28 @@ async def spawn_investigation(
         logger.error(f"Failed to start investigation: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to start investigation: {e}") from e
 
-    # Create the issue_investigation_run record
     trigger_ref = {"user_id": str(auth.user_id), "dataset_id": dataset_id}
-
     row = await db.execute_returning(
-        """
+        f"""
         INSERT INTO issue_investigation_runs (
-            issue_id, investigation_id, trigger_type, trigger_ref,
-            focus_prompt, execution_profile, approval_status
+            issue_id, investigation_id, trigger_type, trigger_ref, brief,
+            source_thread_id, parent_run_id, execution_profile, approval_status
         )
-        VALUES ($1, $2, $3, $4, $5, $6, $7)
-        RETURNING id, issue_id, investigation_id, trigger_type, focus_prompt,
-                  execution_profile, approval_status, confidence, root_cause_tag,
-                  synthesis_summary, created_at, completed_at
+        VALUES ($1, $2, 'human', $3, $4, $5, $6, $7, $8)
+        RETURNING {RUN_COLUMNS}
         """,
         issue_id,
         investigation_id,
-        "human",
         to_json_string(trigger_ref),
-        body.focus_prompt,
+        to_json_string(brief_json),
+        body.source_thread_id,
+        body.parent_run_id,
         body.execution_profile,
         approval_status,
     )
-
     if not row:
         raise HTTPException(status_code=500, detail="Failed to create investigation run")
 
-    # Record investigation_spawned event
     await _record_issue_event(
         db,
         issue_id,
@@ -1186,31 +1193,37 @@ async def spawn_investigation(
         {
             "investigation_id": str(investigation_id),
             "run_id": str(row["id"]),
-            "focus_prompt": body.focus_prompt,
+            "symptom": brief.symptom,
             "execution_profile": body.execution_profile,
         },
     )
 
-    # Update issue updated_at timestamp
-    await db.execute(
-        "UPDATE issues SET updated_at = NOW() WHERE id = $1",
-        issue_id,
+    # The run's card in the shared thread (from a scratch chat too)
+    threads = IssueThreadRepository(db)
+    shared = await threads.ensure_shared_thread(issue_id)
+    started_from = (
+        " from a scratch chat"
+        if body.source_thread_id and body.source_thread_id != shared["id"]
+        else ""
+    )
+    await threads.append_message(
+        shared["id"],
+        author_kind="user",
+        kind="investigation",
+        author_user_id=auth.user_id,
+        body_md=f"Started an investigation{started_from}: {brief.symptom}",
+        payload={
+            "investigation_id": str(investigation_id),
+            "run_id": str(row["id"]),
+            "execution_profile": body.execution_profile,
+            "brief": brief_json,
+            "source_thread_id": str(body.source_thread_id) if body.source_thread_id else None,
+            "parent_run_id": str(body.parent_run_id) if body.parent_run_id else None,
+        },
     )
 
-    return InvestigationRunResponse(
-        id=row["id"],
-        issue_id=row["issue_id"],
-        investigation_id=row["investigation_id"],
-        trigger_type=row["trigger_type"],
-        focus_prompt=row["focus_prompt"],
-        execution_profile=row["execution_profile"],
-        approval_status=row["approval_status"],
-        confidence=row["confidence"],
-        root_cause_tag=row["root_cause_tag"],
-        synthesis_summary=row["synthesis_summary"],
-        created_at=row["created_at"],
-        completed_at=row["completed_at"],
-    )
+    await db.execute("UPDATE issues SET updated_at = NOW() WHERE id = $1", issue_id)
+    return _run_response(row)
 
 
 # ============================================================================

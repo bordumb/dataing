@@ -335,11 +335,10 @@ class TestInvestigationRunSchemas:
         """Test InvestigationRunCreate with valid data."""
         from dataing.entrypoints.api.routes.issues import InvestigationRunCreate
 
-        data = InvestigationRunCreate(
-            focus_prompt="Investigate the data quality issue",
-            execution_profile="standard",
+        data = InvestigationRunCreate.model_validate(
+            {"brief": {"symptom": "Investigate the data quality issue"}}
         )
-        assert data.focus_prompt == "Investigate the data quality issue"
+        assert data.brief.symptom == "Investigate the data quality issue"
         assert data.execution_profile == "standard"
         assert data.dataset_id is None
 
@@ -347,10 +346,12 @@ class TestInvestigationRunSchemas:
         """Test InvestigationRunCreate with dataset_id."""
         from dataing.entrypoints.api.routes.issues import InvestigationRunCreate
 
-        data = InvestigationRunCreate(
-            focus_prompt="Check the orders table",
-            dataset_id="public.orders",
-            execution_profile="deep",
+        data = InvestigationRunCreate.model_validate(
+            {
+                "brief": {"symptom": "Check the orders table"},
+                "dataset_id": "public.orders",
+                "execution_profile": "deep",
+            }
         )
         assert data.dataset_id == "public.orders"
         assert data.execution_profile == "deep"
@@ -360,17 +361,16 @@ class TestInvestigationRunSchemas:
         from dataing.entrypoints.api.routes.issues import InvestigationRunCreate
 
         with pytest.raises(ValueError):
-            InvestigationRunCreate(
-                focus_prompt="Test",
-                execution_profile="invalid",
+            InvestigationRunCreate.model_validate(
+                {"brief": {"symptom": "Test"}, "execution_profile": "invalid"}
             )
 
-    def test_investigation_run_create_empty_prompt_fails(self) -> None:
-        """Test InvestigationRunCreate rejects empty focus_prompt."""
+    def test_investigation_run_create_empty_symptom_fails(self) -> None:
+        """Test InvestigationRunCreate rejects a brief without a symptom."""
         from dataing.entrypoints.api.routes.issues import InvestigationRunCreate
 
         with pytest.raises(ValueError):
-            InvestigationRunCreate(focus_prompt="")
+            InvestigationRunCreate.model_validate({"brief": {"symptom": ""}})
 
     def test_investigation_run_response_fields(self) -> None:
         """Test InvestigationRunResponse has expected fields."""
@@ -383,7 +383,9 @@ class TestInvestigationRunSchemas:
             issue_id=uuid4(),
             investigation_id=uuid4(),
             trigger_type="human",
-            focus_prompt="Test prompt",
+            brief={"version": 1, "symptom": "Test prompt"},
+            source_thread_id=None,
+            parent_run_id=None,
             execution_profile="standard",
             approval_status=None,
             confidence=None,

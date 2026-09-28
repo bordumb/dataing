@@ -7,6 +7,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from dataing.agents.prompts.brief import team_brief_section
+
 if TYPE_CHECKING:
     from dataing.adapters.datasource.types import SchemaResponse
     from dataing.core.domain_types import AnomalyAlert, Hypothesis
@@ -79,6 +81,7 @@ def build_user(hypothesis: Hypothesis, alert: AnomalyAlert | None = None) -> str
     date_hint = ""
     if alert:
         date_hint = f"\n\nIMPORTANT: Focus your query on the anomaly date: {alert.anomaly_date}"
+        date_hint += team_brief_section(alert)
 
     # Use the suggested query if available - it was crafted during hypothesis generation
     suggested_query_section = ""

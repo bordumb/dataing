@@ -20,7 +20,8 @@ from dataing.entrypoints.api.routes.issues import router
 pytestmark = pytest.mark.integration
 
 ISSUE_CREATED_AT = datetime(2026, 9, 1, 12, 0, tzinfo=UTC)
-FOCUS_PROMPT = "Did the checkout service stop sending customer ids?"
+SYMPTOM = "Did the checkout service stop sending customer ids?"
+BRIEF: dict[str, Any] = {"symptom": SYMPTOM}
 
 
 async def _create_tenant(db: AppDatabase) -> UUID:
@@ -130,7 +131,7 @@ async def test_spawned_investigation_runs_on_a_valid_anomaly_alert(
     user_id = await _create_user(migrated_db)
     datasource_id = await _create_datasource(migrated_db, tenant_id)
     issue_id = await _create_issue(migrated_db, tenant_id, dataset_id="public.orders")
-    body: dict[str, Any] = {"focus_prompt": FOCUS_PROMPT, "datasource_id": str(datasource_id)}
+    body: dict[str, Any] = {"brief": BRIEF, "datasource_id": str(datasource_id)}
     if request_dataset_id is not None:
         body["dataset_id"] = request_dataset_id
 
@@ -151,10 +152,10 @@ async def test_spawned_investigation_runs_on_a_valid_anomaly_alert(
         pytest.param(None, "medium", id="no-issue-severity"),
     ],
 )
-async def test_spawned_alert_describes_the_issue_and_focus(
+async def test_spawned_alert_describes_the_issue_and_brief(
     migrated_db: AppDatabase, issue_severity: str | None, alert_severity: str
 ) -> None:
-    """The focus prompt is the metric description the agents investigate; the issue is linked."""
+    """The symptom is the metric description the agents investigate; the brief is stored."""
     tenant_id = await _create_tenant(migrated_db)
     user_id = await _create_user(migrated_db)
     datasource_id = await _create_datasource(migrated_db, tenant_id)
@@ -167,14 +168,14 @@ async def test_spawned_alert_describes_the_issue_and_focus(
         tenant_id,
         user_id,
         issue_id,
-        {"focus_prompt": FOCUS_PROMPT, "datasource_id": str(datasource_id)},
+        {"brief": BRIEF, "datasource_id": str(datasource_id)},
     )
 
     assert await _stored_alert(migrated_db, run["investigation_id"]) == {
         "dataset_ids": ["public.orders"],
         "metric_spec": {
             "metric_type": "description",
-            "expression": FOCUS_PROMPT,
+            "expression": SYMPTOM,
             "display_name": "Orders missing customer ids",
             "columns_referenced": [],
             "source_url": None,
@@ -188,8 +189,93 @@ async def test_spawned_alert_describes_the_issue_and_focus(
         "source_system": None,
         "source_alert_id": None,
         "source_url": None,
-        "metadata": None,
+        "metadata": {"brief": f"Symptom: {SYMPTOM}"},
         "datasource_id": str(datasource_id),
         "issue_id": str(issue_id),
-        "focus_prompt": FOCUS_PROMPT,
+        "brief": {
+            "version": 1,
+            "symptom": SYMPTOM,
+            # The brief records the datasource the run resolved to
+            "scope": {"datasource_id": str(datasource_id), "tables": [], "time_window": None},
+            "findings": [],
+            "ruled_out": [],
+            "leads": [],
+            "notes": "",
+        },
     }
+
+
+async def test_brief_scope_findings_and_thread_card(migrated_db: AppDatabase) -> None:
+    """A brief's scope, text and card reach the alert, the prompts and the thread.
+
+    Scope tables become reference tables, the alert metadata carries the brief's
+    prompt text, and the run appears in the shared thread as an investigation card.
+    """
+    tenant_id = await _create_tenant(migrated_db)
+    user_id = await _create_user(migrated_db)
+    datasource_id = await _create_datasource(migrated_db, tenant_id)
+    issue_id = await _create_issue(migrated_db, tenant_id, dataset_id="public.orders")
+    brief = {
+        "symptom": "Completed orders dropped about 30%",
+        "scope": {"tables": ["public.orders", "raw.app_events"]},
+        "findings": [{"statement": "Only app_v2 orders dropped"}],
+        "ruled_out": [{"statement": "Not region-specific"}],
+        "leads": ["app_v2 deploy on the 14th"],
+        "notes": "Dashboard counts completed only",
+    }
+
+    run, temporal = await _spawn_investigation(
+        migrated_db,
+        tenant_id,
+        user_id,
+        issue_id,
+        {"brief": brief, "datasource_id": str(datasource_id), "execution_profile": "standard"},
+    )
+
+    stored = await _stored_alert(migrated_db, run["investigation_id"])
+    assert stored["dataset_ids"] == ["public.orders", "raw.app_events"]
+    # Every prompt renders the alert's metadata brief (agents/prompts/brief.py)
+    brief_text = stored["metadata"]["brief"]
+    assert "Observed (treat as facts):\n- Only app_v2 orders dropped" in brief_text
+    assert "Ruled out (do not propose these):\n- Not region-specific" in brief_text
+    assert run["brief"]["symptom"] == "Completed orders dropped about 30%"
+    assert "focus_prompt" not in run
+
+    card = await migrated_db.fetch_one(
+        """
+        SELECT m.kind, m.author_user_id, m.payload FROM issue_thread_messages m
+        JOIN issue_threads t ON t.id = m.thread_id
+        WHERE t.issue_id = $1 AND t.kind = 'shared' AND m.kind = 'investigation'
+        """,
+        issue_id,
+    )
+    assert card is not None
+    assert card["author_user_id"] == user_id
+    payload = json.loads(card["payload"])
+    assert payload["investigation_id"] == run["investigation_id"]
+    assert payload["execution_profile"] == "standard"
+
+
+async def test_follow_up_run_must_belong_to_the_same_issue(migrated_db: AppDatabase) -> None:
+    """parent_run_id links a follow-up only to a run of the same issue."""
+    tenant_id = await _create_tenant(migrated_db)
+    user_id = await _create_user(migrated_db)
+    datasource_id = await _create_datasource(migrated_db, tenant_id)
+    issue_id = await _create_issue(migrated_db, tenant_id)
+    first, _ = await _spawn_investigation(
+        migrated_db,
+        tenant_id,
+        user_id,
+        issue_id,
+        {"brief": BRIEF, "datasource_id": str(datasource_id)},
+    )
+
+    follow_up, _ = await _spawn_investigation(
+        migrated_db,
+        tenant_id,
+        user_id,
+        issue_id,
+        {"brief": BRIEF, "datasource_id": str(datasource_id), "parent_run_id": first["id"]},
+    )
+
+    assert follow_up["parent_run_id"] == first["id"]

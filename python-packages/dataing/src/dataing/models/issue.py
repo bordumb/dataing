@@ -218,7 +218,7 @@ class IssueInvestigationRun(BaseModel):
     investigation_id: Mapped[UUID] = mapped_column(ForeignKey("investigations.id"), nullable=False)
     trigger_type: Mapped[str] = mapped_column(String(20), nullable=False)
     trigger_ref: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
-    focus_prompt: Mapped[str | None] = mapped_column(Text, nullable=True)
+    brief: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False, default=dict)
     execution_profile: Mapped[str] = mapped_column(
         String(20), default=IssueExecutionProfile.STANDARD.value
     )

@@ -7,6 +7,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from dataing.agents.prompts.brief import team_brief_section
+
 if TYPE_CHECKING:
     from dataing.core.domain_types import (
         AnomalyAlert,
@@ -187,7 +189,7 @@ def build_user(
 
 ## What To Investigate
 {metric_context}
-
+{team_brief_section(alert)}
 ## Available Schema
 {context.schema.to_prompt_string()}
 {lineage_section}{code_changes_section}

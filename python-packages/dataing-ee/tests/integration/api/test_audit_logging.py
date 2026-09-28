@@ -6,9 +6,8 @@ attribute name was incorrect.
 """
 
 import asyncio
-import os
-from collections.abc import AsyncGenerator
-from uuid import UUID
+import json
+from uuid import UUID, uuid4
 
 import pytest
 
@@ -20,41 +19,25 @@ class TestAuditLoggingIntegration:
     """Integration tests for audit log recording.
 
     These tests verify that the audit logging middleware is properly registered
-    and writes audit log entries to the database when API actions occur.
+    and writes audit log entries to the database when API actions occur. They
+    run on a freshly migrated database (migrated_db), so schema errors fail.
     """
 
     @pytest.fixture
-    async def db(self) -> AsyncGenerator[AppDatabase, None]:
-        """Create database connection."""
-        # Use DATABASE_URL from env (set by CI) or default for local dev
-        dsn = os.environ.get(
-            "DATABASE_URL",
-            "postgresql://localhost/dataing",  # pragma: allowlist secret
-        )
-        db = AppDatabase(dsn=dsn)
-        try:
-            # Add timeout to prevent hanging in CI
-            await asyncio.wait_for(db.connect(), timeout=5.0)
-        except (TimeoutError, Exception) as e:
-            pytest.skip(f"Database not available: {e}")
-        yield db
-        await db.close()
+    def tenant_id(self) -> UUID:
+        """A tenant id that no other test writes audit entries for.
 
-    @pytest.fixture
-    async def tenant_id(self, db: AppDatabase) -> UUID:
-        """Get a valid tenant ID from the database."""
-        tenant = await db.fetch_one("SELECT id FROM tenants LIMIT 1")
-        if not tenant:
-            pytest.skip("No tenant in database")
-        tenant_uuid: UUID = tenant["id"]
-        return tenant_uuid
+        audit_logs.tenant_id has no foreign key (001_initial.sql creates the
+        table), so no tenants row is needed.
+        """
+        return uuid4()
 
-    async def test_audit_log_table_exists(self, db: AppDatabase) -> None:
+    async def test_audit_log_table_exists(self, migrated_db: AppDatabase) -> None:
         """Verify audit_logs table exists and is queryable.
 
         This is a basic sanity check that the migration has run.
         """
-        result = await db.fetch_one(
+        result = await migrated_db.fetch_one(
             """
             SELECT EXISTS (
                 SELECT FROM information_schema.tables
@@ -65,50 +48,75 @@ class TestAuditLoggingIntegration:
         assert result is not None
         assert result["exists"] is True
 
-    async def test_audit_log_has_recent_entries(
+    async def test_audit_log_created_for_api_call(
         self,
-        db: AppDatabase,
+        migrated_db: AppDatabase,
         tenant_id: UUID,
     ) -> None:
-        """Verify audit logs are being written for the tenant.
+        """Verify a mutating API call through AuditMiddleware writes an entry.
 
-        This test checks that the audit logging middleware is active by verifying
-        that recent audit log entries exist. If this fails, it indicates that
-        either:
-        1. AuditMiddleware is not registered in the app
-        2. The middleware is looking for the wrong database attribute
-        3. The create_audit_log method is not being called
-
-        To make this test pass:
-        1. Ensure AuditMiddleware is added via app.add_middleware()
-        2. Ensure middleware uses app.state.app_db (not app.state.db)
+        The middleware writes the entry in a background task after responding,
+        using the request's auth context and app.state.app_db. If no entry
+        appears, either the middleware stopped writing them or its insert no
+        longer matches the audit_logs schema (it then logs "audit_log_failed").
         """
-        # Query for any audit logs for this tenant in the last hour
-        result = await db.fetch_one(
-            """
-            SELECT COUNT(*) as count
-            FROM audit_logs
-            WHERE tenant_id = $1
-              AND created_at > NOW() - INTERVAL '1 hour'
-            """,
-            tenant_id,
-        )
+        import httpx
+        from dataing_ee.entrypoints.api.middleware.audit import AuditMiddleware
+        from fastapi import FastAPI, Request
 
-        assert result is not None, "Query should return a result"
+        from dataing.entrypoints.api.middleware.auth import ApiKeyContext
 
-        # If running after some API activity, there should be logs
-        # This is a weak assertion - mainly useful when running after demo setup
-        # The key test is test_audit_log_created_for_api_call below
-        if result["count"] == 0:
-            pytest.skip(
-                "No recent audit logs found. "
-                "This may be expected if no API calls were made recently. "
-                "Run the full test suite or make an API call first."
+        actor_id = uuid4()
+        resource_id = uuid4()
+        app = FastAPI()
+        app.state.app_db = migrated_db
+        app.add_middleware(AuditMiddleware)
+
+        @app.post("/api/v1/widgets/{widget_id}")
+        async def update_widget(widget_id: UUID, request: Request) -> dict[str, str]:
+            # Real routes get this from the verify_api_key dependency
+            request.state.auth_context = ApiKeyContext(
+                key_id=uuid4(),
+                tenant_id=tenant_id,
+                tenant_slug="test",
+                tenant_name="Test Tenant",
+                user_id=actor_id,
+                scopes=["write"],
             )
+            return {"id": str(widget_id)}
+
+        transport = httpx.ASGITransport(app=app)
+        async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+            response = await client.post(
+                f"/api/v1/widgets/{resource_id}",
+                json={"name": "Widget", "password": "hunter2"},
+            )
+        assert response.status_code == 200
+
+        row = None
+        for _ in range(50):
+            row = await migrated_db.fetch_one(
+                "SELECT * FROM audit_logs WHERE tenant_id = $1 AND resource_id = $2",
+                tenant_id,
+                resource_id,
+            )
+            if row is not None:
+                break
+            await asyncio.sleep(0.1)
+
+        assert row is not None, "AuditMiddleware wrote no audit_logs entry within 5 seconds"
+        assert row["action"] == "widgets.created"
+        assert row["resource_type"] == "widgets"
+        assert row["actor_id"] == actor_id
+        assert row["request_method"] == "POST"
+        assert row["request_path"] == f"/api/v1/widgets/{resource_id}"
+        assert row["status_code"] == 200
+        assert json.loads(row["changes"]) == {"name": "Widget", "password": "[REDACTED]"}
+        assert json.loads(row["metadata"]) == {"request_id": response.headers["X-Request-ID"]}
 
     async def test_create_audit_log_directly(
         self,
-        db: AppDatabase,
+        migrated_db: AppDatabase,
         tenant_id: UUID,
     ) -> None:
         """Verify create_audit_log method works correctly.
@@ -116,13 +124,11 @@ class TestAuditLoggingIntegration:
         This tests the database method directly to ensure the SQL is correct
         and the table schema matches the insert statement.
         """
-        from uuid import uuid4
-
         resource_id = uuid4()
         actor_id = uuid4()
 
         # Create an audit log entry directly with all fields
-        await db.create_audit_log(
+        await migrated_db.create_audit_log(
             tenant_id=tenant_id,
             action="test.direct_insert",
             actor_id=actor_id,
@@ -140,7 +146,7 @@ class TestAuditLoggingIntegration:
         )
 
         # Verify it was created with all fields populated
-        result = await db.fetch_one(
+        result = await migrated_db.fetch_one(
             """
             SELECT * FROM audit_logs
             WHERE tenant_id = $1 AND resource_id = $2
@@ -172,7 +178,7 @@ class TestAuditLoggingIntegration:
             assert result["metadata"] is not None
         finally:
             # Cleanup - delete test entry
-            await db.execute(
+            await migrated_db.execute(
                 "DELETE FROM audit_logs WHERE tenant_id = $1 AND resource_id = $2",
                 tenant_id,
                 resource_id,
@@ -180,7 +186,7 @@ class TestAuditLoggingIntegration:
 
     async def test_repository_records_json_columns(
         self,
-        db: AppDatabase,
+        migrated_db: AppDatabase,
         tenant_id: UUID,
     ) -> None:
         """Verify the EE AuditRepository can store changes and metadata.
@@ -188,16 +194,13 @@ class TestAuditLoggingIntegration:
         The pool has no JSONB codec, so asyncpg rejects dicts for those
         columns. Entries that carry them (e.g. auth.login_failed) would be lost.
         """
-        import json
-        from uuid import uuid4
-
         from dataing_ee.adapters.audit import AuditRepository
 
         from dataing.adapters.audit import AuditLogCreate
 
-        assert db.pool is not None
+        assert migrated_db.pool is not None
         resource_id = uuid4()
-        repo = AuditRepository(pool=db.pool)
+        repo = AuditRepository(pool=migrated_db.pool)
 
         try:
             await repo.record(
@@ -210,7 +213,7 @@ class TestAuditLoggingIntegration:
                 )
             )
 
-            row = await db.fetch_one(
+            row = await migrated_db.fetch_one(
                 "SELECT changes, metadata FROM audit_logs"
                 " WHERE tenant_id = $1 AND resource_id = $2",
                 tenant_id,
@@ -220,7 +223,7 @@ class TestAuditLoggingIntegration:
             assert json.loads(row["changes"]) == {"name": "Engineering"}
             assert json.loads(row["metadata"]) == {"reason": "Invalid email or password"}
         finally:
-            await db.execute(
+            await migrated_db.execute(
                 "DELETE FROM audit_logs WHERE tenant_id = $1 AND resource_id = $2",
                 tenant_id,
                 resource_id,
@@ -228,7 +231,8 @@ class TestAuditLoggingIntegration:
 
     async def test_repository_records_json_columns_with_a_strict_json_codec(
         self,
-        db: AppDatabase,
+        migrated_db: AppDatabase,
+        migrated_dsn: str,
         tenant_id: UUID,
     ) -> None:
         """Verify the repository also works on pools with a json/jsonb codec.
@@ -236,9 +240,7 @@ class TestAuditLoggingIntegration:
         A codec that takes Python objects and refuses JSON text (as a pool may
         register) must not break recording.
         """
-        import json
         from typing import Any
-        from uuid import uuid4
 
         import asyncpg
         from dataing_ee.adapters.audit import AuditRepository
@@ -256,8 +258,7 @@ class TestAuditLoggingIntegration:
                     type_name, encoder=encode, decoder=json.loads, schema="pg_catalog"
                 )
 
-        dsn = os.environ.get("DATABASE_URL", "postgresql://localhost/dataing")
-        pool = await asyncpg.create_pool(dsn, min_size=1, max_size=1, init=register_codecs)
+        pool = await asyncpg.create_pool(migrated_dsn, min_size=1, max_size=1, init=register_codecs)
         resource_id = uuid4()
 
         try:
@@ -270,7 +271,7 @@ class TestAuditLoggingIntegration:
                 )
             )
 
-            row = await db.fetch_one(
+            row = await migrated_db.fetch_one(
                 "SELECT jsonb_typeof(metadata) AS kind, metadata FROM audit_logs"
                 " WHERE tenant_id = $1 AND resource_id = $2",
                 tenant_id,
@@ -281,7 +282,7 @@ class TestAuditLoggingIntegration:
             assert json.loads(row["metadata"]) == {"reason": "Invalid email or password"}
         finally:
             await pool.close()
-            await db.execute(
+            await migrated_db.execute(
                 "DELETE FROM audit_logs WHERE tenant_id = $1 AND resource_id = $2",
                 tenant_id,
                 resource_id,
@@ -294,11 +295,8 @@ class TestAuditLoggingIntegration:
         the middleware stack. This catches the bug where the middleware class
         exists but was never added via app.add_middleware().
         """
-        try:
-            from dataing_ee.entrypoints.api.app import app
-            from dataing_ee.entrypoints.api.middleware.audit import AuditMiddleware
-        except ImportError:
-            pytest.skip("EE package not available")
+        from dataing_ee.entrypoints.api.app import app
+        from dataing_ee.entrypoints.api.middleware.audit import AuditMiddleware
 
         # Check middleware stack
         # In Starlette/FastAPI, middleware is stored in app.middleware_stack
@@ -321,12 +319,9 @@ class TestAuditLoggingIntegration:
         the middleware was looking for request.app.state.db but the app
         stores it as request.app.state.app_db.
         """
-        try:
-            from dataing_ee.entrypoints.api.middleware.audit import AuditMiddleware
-        except ImportError:
-            pytest.skip("EE package not available")
-
         import inspect
+
+        from dataing_ee.entrypoints.api.middleware.audit import AuditMiddleware
 
         source = inspect.getsource(AuditMiddleware._log_request)
 
@@ -351,12 +346,9 @@ class TestAuditLoggingIntegration:
         This test inspects the middleware source to ensure it captures and passes
         the key audit fields. Catches regressions where fields are removed or renamed.
         """
-        try:
-            from dataing_ee.entrypoints.api.middleware.audit import AuditMiddleware
-        except ImportError:
-            pytest.skip("EE package not available")
-
         import inspect
+
+        from dataing_ee.entrypoints.api.middleware.audit import AuditMiddleware
 
         source = inspect.getsource(AuditMiddleware._log_request)
 

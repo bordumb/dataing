@@ -59,6 +59,8 @@ jobs:
 
   integration:
     runs-on: ubuntu-latest
+    env:
+      DATABASE_URL: postgresql://test:test@localhost:5432/test
 
     services:
       postgres:
@@ -97,5 +99,9 @@ jobs:
       # needs psql and pg_isready (postgresql-client, preinstalled on ubuntu-latest).
       - name: Run integration tests
         run: uv run pytest python-packages/dataing/tests/integration -m integration --no-cov
-        env:
-          DATABASE_URL: postgresql://test:test@localhost:5432/test
+
+      # dataing-ee's tests/integration/conftest.py loads that same CE conftest by
+      # path, so EE tests get the same throwaway migrated database.
+      - name: Run EE integration tests
+        if: ${{ !cancelled() }}
+        run: uv run pytest python-packages/dataing-ee/tests/integration -m integration --no-cov

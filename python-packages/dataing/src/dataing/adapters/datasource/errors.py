@@ -22,6 +22,7 @@ class ErrorCode(str, Enum):
     # Credentials errors
     CREDENTIALS_NOT_CONFIGURED = "CREDENTIALS_NOT_CONFIGURED"
     CREDENTIALS_INVALID = "CREDENTIALS_INVALID"
+    CREDENTIALS_NOT_SUPPORTED = "CREDENTIALS_NOT_SUPPORTED"
 
     # Permission errors
     ACCESS_DENIED = "ACCESS_DENIED"
@@ -476,5 +477,21 @@ class CredentialsInvalidError(AdapterError):
             code=ErrorCode.CREDENTIALS_INVALID,
             message=message,
             details=details,
+            retryable=False,
+        )
+
+
+class CredentialsNotSupportedError(AdapterError):
+    """Source type has no database login for a user's own credentials to replace."""
+
+    def __init__(self, source_type: str) -> None:
+        """Initialize credentials not supported error."""
+        super().__init__(
+            code=ErrorCode.CREDENTIALS_NOT_SUPPORTED,
+            message=(
+                f"Per-user credentials are not supported for {source_type} datasources: "
+                "they have no database login"
+            ),
+            details={"source_type": source_type},
             retryable=False,
         )

@@ -11,6 +11,8 @@ from cryptography.fernet import Fernet
 from dataing.adapters.datasource.encryption import encrypt_config
 from dataing.adapters.datasource.errors import (
     CredentialsNotConfiguredError,
+    CredentialsNotSupportedError,
+    ErrorCode,
 )
 from dataing.adapters.datasource.gateway import (
     QueryContext,
@@ -292,3 +294,62 @@ class TestQueryGatewayUserAdapter:
             5432,
             "analytics",
         )
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize(
+        ("source_type", "stored_config"),
+        [
+            ("bigquery", {"project_id": "acme-analytics"}),
+            ("sqlite", {"path": "warehouse.db"}),
+            ("duckdb", {"path": "warehouse.duckdb"}),
+        ],
+    )
+    async def test_refuses_source_without_a_login(
+        self,
+        mock_app_db: AsyncMock,
+        query_principal: QueryPrincipal,
+        encryption_key: bytes,
+        source_type: str,
+        stored_config: dict[str, str],
+    ) -> None:
+        """A source with no database login can't connect as the user, so it is refused."""
+        mock_app_db.get_data_source.return_value = {
+            "id": query_principal.datasource_id,
+            "name": "Warehouse",
+            "type": source_type,
+            "connection_config_encrypted": encrypt_config(stored_config, encryption_key),
+        }
+        credentials = DecryptedCredentials(username="alice", password="alice-secret")
+
+        gateway = QueryGateway(mock_app_db)
+        with pytest.raises(CredentialsNotSupportedError) as raised:
+            await gateway._create_user_adapter(query_principal, credentials)
+
+        assert raised.value.code == ErrorCode.CREDENTIALS_NOT_SUPPORTED
+        assert raised.value.details == {"source_type": source_type}
+
+    @pytest.mark.asyncio
+    async def test_execute_refuses_source_without_a_login(
+        self,
+        mock_app_db: AsyncMock,
+        query_principal: QueryPrincipal,
+        encryption_key: bytes,
+    ) -> None:
+        """execute() raises, rather than querying the source with its stored config."""
+        mock_app_db.get_data_source.return_value = {
+            "id": query_principal.datasource_id,
+            "name": "Local SQLite",
+            "type": "sqlite",
+            "connection_config_encrypted": encrypt_config({"path": "app.db"}, encryption_key),
+        }
+        gateway = QueryGateway(mock_app_db)
+        gateway._credentials_service.get_credentials = AsyncMock(  # type: ignore[method-assign]
+            return_value=DecryptedCredentials(username="alice", password="alice-secret")
+        )
+
+        # Not CredentialsInvalidError: the user's login was never tried
+        with pytest.raises(CredentialsNotSupportedError):
+            await gateway.execute(principal=query_principal, sql="SELECT 1")
+
+        audit = mock_app_db.insert_query_audit_log.call_args.kwargs
+        assert audit["status"] == "error"

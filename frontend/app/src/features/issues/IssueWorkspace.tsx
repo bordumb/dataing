@@ -4,28 +4,16 @@ import type { UseQueryResult } from "@tanstack/react-query";
 import {
   ArrowLeft,
   RefreshCw,
-  Send,
   Loader2,
   Play,
   X,
-  Eye,
-  EyeOff,
-  Clock,
-  User,
-  Tag,
-  MessageSquare,
   Search,
   Lightbulb,
   ArrowRight,
 } from "lucide-react";
+import { toast } from "sonner";
 import {
   useIssue,
-  useUpdateIssue,
-  useIssueComments,
-  useCreateIssueComment,
-  useIssueWatchers,
-  useWatchIssue,
-  useUnwatchIssue,
   useIssueInvestigationRuns,
   useSpawnInvestigation,
   useInvalidateIssues,
@@ -37,16 +25,13 @@ import {
 import { useRole } from "@/lib/auth";
 import type {
   IssueResponse,
-  IssueCommentResponse,
-  IssueCommentListResponse,
   InvestigationRunResponse,
   InvestigationRunListResponse,
-  WatcherListResponse,
 } from "@/lib/api/issues";
+import { errorText } from "@/lib/api/error-message";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
-import { Input } from "@/components/ui/Input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import {
@@ -57,98 +42,11 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { AsyncBoundary } from "@/components/async-boundary";
+import { Markdown } from "@/components/markdown";
 import { formatDate } from "@/lib/utils";
 
-interface CommentsSectionProps {
-  issueId: string;
-}
-
-function CommentsSection({ issueId }: CommentsSectionProps) {
-  const [newComment, setNewComment] = useState("");
-  const query = useIssueComments(issueId);
-  const createComment = useCreateIssueComment();
-  const invalidate = useInvalidateIssues();
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newComment.trim()) return;
-
-    try {
-      await createComment.mutateAsync({
-        issueId,
-        data: { body: newComment.trim() },
-      });
-      setNewComment("");
-      invalidate.invalidateComments(issueId);
-    } catch (error) {
-      console.error("Failed to add comment:", error);
-    }
-  };
-
-  return (
-    <Card>
-      <CardHeader className="pb-3">
-        <CardTitle className="text-base flex items-center gap-2">
-          <MessageSquare className="h-4 w-4" />
-          Comments
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        <AsyncBoundary
-          query={
-            query as unknown as UseQueryResult<IssueCommentListResponse, Error>
-          }
-        >
-          {(data) => (
-            <div className="space-y-3">
-              {data.items.length === 0 ? (
-                <p className="text-sm text-muted-foreground">
-                  No comments yet.
-                </p>
-              ) : (
-                data.items.map((comment: IssueCommentResponse) => (
-                  <div
-                    key={comment.id}
-                    className="p-3 bg-muted/50 rounded-lg text-sm"
-                  >
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="font-medium">User</span>
-                      <span className="text-xs text-muted-foreground">
-                        {formatDate(comment.created_at)}
-                      </span>
-                    </div>
-                    <p className="whitespace-pre-wrap">{comment.body}</p>
-                  </div>
-                ))
-              )}
-            </div>
-          )}
-        </AsyncBoundary>
-
-        <form onSubmit={handleSubmit} className="flex gap-2">
-          <Input
-            value={newComment}
-            onChange={(e) => setNewComment(e.target.value)}
-            placeholder="Add a comment..."
-            disabled={createComment.isPending}
-            className="flex-1"
-          />
-          <Button
-            type="submit"
-            size="icon"
-            disabled={createComment.isPending || !newComment.trim()}
-          >
-            {createComment.isPending ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <Send className="h-4 w-4" />
-            )}
-          </Button>
-        </form>
-      </CardContent>
-    </Card>
-  );
-}
+import { IssueSidebar } from "./IssueSidebar";
+import { IssueThread } from "./thread/IssueThread";
 
 interface InvestigationSummaryCardProps {
   issueId: string;
@@ -238,7 +136,9 @@ function InvestigationRunsSection({
       setFocusPrompt("");
       invalidate.invalidateInvestigationRuns(issueId);
     } catch (error) {
-      console.error("Failed to spawn investigation:", error);
+      toast.error("Couldn't start the investigation", {
+        description: errorText(error),
+      });
     }
   };
 
@@ -404,261 +304,75 @@ function InvestigationRunsSection({
   );
 }
 
-interface WatchersSectionProps {
-  issueId: string;
-}
-
-function WatchersSection({ issueId }: WatchersSectionProps) {
-  const query = useIssueWatchers(issueId);
-  const watchIssue = useWatchIssue();
-  const unwatchIssue = useUnwatchIssue();
-  const invalidate = useInvalidateIssues();
-  const [isWatching, setIsWatching] = useState(false);
-
-  const handleToggleWatch = async () => {
-    try {
-      if (isWatching) {
-        await unwatchIssue.mutateAsync({ issueId });
-      } else {
-        await watchIssue.mutateAsync({ issueId });
-      }
-      setIsWatching(!isWatching);
-      invalidate.invalidateWatchers(issueId);
-    } catch (error) {
-      console.error("Failed to toggle watch:", error);
-    }
-  };
-
-  const isPending = watchIssue.isPending || unwatchIssue.isPending;
-
-  return (
-    <div className="space-y-2">
-      <div className="flex items-center justify-between">
-        <span className="text-sm font-medium flex items-center gap-2">
-          <Eye className="h-4 w-4" />
-          Watchers
-        </span>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={handleToggleWatch}
-          disabled={isPending}
-        >
-          {isPending ? (
-            <Loader2 className="h-4 w-4 animate-spin" />
-          ) : isWatching ? (
-            <>
-              <EyeOff className="h-4 w-4 mr-1" />
-              Unwatch
-            </>
-          ) : (
-            <>
-              <Eye className="h-4 w-4 mr-1" />
-              Watch
-            </>
-          )}
-        </Button>
-      </div>
-      <AsyncBoundary
-        query={query as unknown as UseQueryResult<WatcherListResponse, Error>}
-      >
-        {(data) => (
-          <p className="text-sm text-muted-foreground">
-            {data.total} {data.total === 1 ? "watcher" : "watchers"}
-          </p>
-        )}
-      </AsyncBoundary>
-    </div>
-  );
-}
-
 interface IssueWorkspaceContentProps {
   issue: IssueResponse;
 }
 
 function IssueWorkspaceContent({ issue }: IssueWorkspaceContentProps) {
-  const updateIssue = useUpdateIssue();
-  const invalidate = useInvalidateIssues();
-  const { isMember } = useRole();
-  const [isEditingStatus, setIsEditingStatus] = useState(false);
-
-  const handleStatusChange = async (newStatus: string) => {
-    try {
-      await updateIssue.mutateAsync({
-        issueId: issue.id,
-        data: { status: newStatus },
-      });
-      invalidate.invalidateDetail(issue.id);
-      invalidate.invalidateList();
-      setIsEditingStatus(false);
-    } catch (error) {
-      console.error("Failed to update status:", error);
-    }
-  };
-
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-start justify-between">
-        <div className="flex items-start gap-4">
-          <Link to="/issues">
-            <Button variant="ghost" size="icon">
-              <ArrowLeft className="h-4 w-4" />
-            </Button>
-          </Link>
-          <div>
-            <div className="flex items-center gap-2 mb-1">
-              <span className="text-muted-foreground font-mono">
-                #{issue.number}
-              </span>
-              <h1 className="text-2xl font-bold">{issue.title}</h1>
-            </div>
-            <div className="flex items-center gap-2">
-              {isEditingStatus ? (
-                <Select
-                  value={issue.status}
-                  onValueChange={handleStatusChange}
-                  disabled={updateIssue.isPending}
-                >
-                  <SelectTrigger className="w-[140px] h-7">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="open">Open</SelectItem>
-                    <SelectItem value="triaged">Triaged</SelectItem>
-                    <SelectItem value="in_progress">In Progress</SelectItem>
-                    <SelectItem value="blocked">Blocked</SelectItem>
-                    <SelectItem value="resolved">Resolved</SelectItem>
-                    <SelectItem value="closed">Closed</SelectItem>
-                  </SelectContent>
-                </Select>
-              ) : (
-                <Badge
-                  variant={getStatusVariant(issue.status)}
-                  className={isMember ? "cursor-pointer" : undefined}
-                  onClick={
-                    isMember ? () => setIsEditingStatus(true) : undefined
-                  }
-                >
-                  {getStatusLabel(issue.status)}
-                </Badge>
-              )}
-              {issue.priority && (
-                <Badge variant={getPriorityVariant(issue.priority)}>
-                  {issue.priority}
-                </Badge>
-              )}
-              {issue.severity && (
-                <Badge variant={getSeverityVariant(issue.severity)}>
-                  {issue.severity}
-                </Badge>
-              )}
-            </div>
+      <div className="flex items-start gap-4">
+        <Link to="/issues">
+          <Button variant="ghost" size="icon" aria-label="Back to issues">
+            <ArrowLeft className="h-4 w-4" />
+          </Button>
+        </Link>
+        <div className="min-w-0">
+          <div className="mb-1 flex items-center gap-2">
+            <span className="font-mono text-muted-foreground">
+              #{issue.number}
+            </span>
+            <h1 className="text-2xl font-bold">{issue.title}</h1>
+          </div>
+          <div className="flex items-center gap-2">
+            <Badge variant={getStatusVariant(issue.status)}>
+              {getStatusLabel(issue.status)}
+            </Badge>
+            {issue.priority && (
+              <Badge variant={getPriorityVariant(issue.priority)}>
+                {issue.priority}
+              </Badge>
+            )}
+            {issue.severity && (
+              <Badge variant={getSeverityVariant(issue.severity)}>
+                {issue.severity}
+              </Badge>
+            )}
           </div>
         </div>
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-3">
-        {/* Main content */}
-        <div className="lg:col-span-2 space-y-6">
-          {/* Investigation Summary - prominent placement */}
+      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
+        {/* Thread column */}
+        <div className="min-w-0 space-y-6">
           <InvestigationSummaryCard issueId={issue.id} />
 
-          {/* Description */}
           <Card>
             <CardHeader className="pb-3">
               <CardTitle className="text-base">Description</CardTitle>
             </CardHeader>
             <CardContent>
               {issue.description ? (
-                <p className="text-sm whitespace-pre-wrap">
-                  {issue.description}
-                </p>
+                <Markdown>{issue.description}</Markdown>
               ) : (
-                <p className="text-sm text-muted-foreground italic">
+                <p className="text-sm italic text-muted-foreground">
                   No description provided.
                 </p>
               )}
             </CardContent>
           </Card>
 
-          {/* Investigation Runs */}
+          <IssueThread issueId={issue.id} />
+        </div>
+
+        {/* Sidebar */}
+        <div className="space-y-4">
+          <IssueSidebar issue={issue} />
           <InvestigationRunsSection
             issueId={issue.id}
             datasetId={issue.dataset_id}
           />
-
-          {/* Comments */}
-          <CommentsSection issueId={issue.id} />
-        </div>
-
-        {/* Right rail */}
-        <div className="space-y-4">
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-base">Details</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {/* Dataset */}
-              {issue.dataset_id && (
-                <div>
-                  <span className="text-sm font-medium flex items-center gap-2 mb-1">
-                    <Tag className="h-4 w-4" />
-                    Dataset
-                  </span>
-                  <code className="text-sm bg-muted px-2 py-1 rounded">
-                    {issue.dataset_id}
-                  </code>
-                </div>
-              )}
-
-              {/* Assignee */}
-              <div>
-                <span className="text-sm font-medium flex items-center gap-2 mb-1">
-                  <User className="h-4 w-4" />
-                  Assignee
-                </span>
-                <p className="text-sm text-muted-foreground">
-                  {issue.assignee_user_id || "Unassigned"}
-                </p>
-              </div>
-
-              {/* Labels */}
-              {issue.labels.length > 0 && (
-                <div>
-                  <span className="text-sm font-medium flex items-center gap-2 mb-2">
-                    <Tag className="h-4 w-4" />
-                    Labels
-                  </span>
-                  <div className="flex flex-wrap gap-1">
-                    {issue.labels.map((label) => (
-                      <Badge key={label} variant="outline" className="text-xs">
-                        {label}
-                      </Badge>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Watchers */}
-              <WatchersSection issueId={issue.id} />
-
-              {/* Timestamps */}
-              <div>
-                <span className="text-sm font-medium flex items-center gap-2 mb-1">
-                  <Clock className="h-4 w-4" />
-                  Timeline
-                </span>
-                <div className="text-sm text-muted-foreground space-y-1">
-                  <p>Created: {formatDate(issue.created_at)}</p>
-                  <p>Updated: {formatDate(issue.updated_at)}</p>
-                  {issue.closed_at && (
-                    <p>Closed: {formatDate(issue.closed_at)}</p>
-                  )}
-                </div>
-              </div>
-            </CardContent>
-          </Card>
         </div>
       </div>
     </div>

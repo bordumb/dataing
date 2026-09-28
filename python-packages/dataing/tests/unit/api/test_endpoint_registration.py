@@ -47,13 +47,10 @@ class TestInvestigationEndpointsRegistered:
         """GET /api/v1/investigations/{id}/status should be registered."""
         assert "/api/v1/investigations/{investigation_id}/status" in app_routes
 
-    def test_investigations_messages_endpoint(self, app_routes):
-        """POST /api/v1/investigations/{id}/messages should be registered."""
-        assert "/api/v1/investigations/{investigation_id}/messages" in app_routes
-
-    def test_investigations_input_endpoint(self, app_routes):
-        """POST /api/v1/investigations/{id}/input should be registered."""
-        assert "/api/v1/investigations/{investigation_id}/input" in app_routes
+    def test_investigation_chat_endpoints_removed(self, app_routes):
+        """Issue threads replaced the investigation message and input routes."""
+        assert "/api/v1/investigations/{investigation_id}/messages" not in app_routes
+        assert "/api/v1/investigations/{investigation_id}/input" not in app_routes
 
 
 class TestSDKEndpointPaths:

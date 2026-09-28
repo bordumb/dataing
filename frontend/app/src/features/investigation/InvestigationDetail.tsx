@@ -2,29 +2,28 @@ import { useState, useEffect, useRef } from "react";
 import { useParams, Link } from "react-router-dom";
 import {
   useInvestigation,
-  useSendMessage,
   subscribeToInvestigation,
 } from "@/lib/api/investigations";
 import { useCancelInvestigationApiV1InvestigationsInvestigationIdCancelPost } from "@/lib/api/generated/investigations/investigations";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
-import { Input } from "@/components/ui/Input";
 import {
   ArrowLeft,
   RefreshCw,
-  Send,
   Bot,
   Loader2,
-  Users,
   Share2,
   ChevronDown,
-  GitBranch,
-  X,
   XCircle,
 } from "lucide-react";
 
-import { StepTimeline, PatternList, EvidenceList, CodifyWidget } from "./components";
+import {
+  StepTimeline,
+  PatternList,
+  EvidenceList,
+  CodifyWidget,
+} from "./components";
 import { InvestigationFeedbackProvider } from "./context/InvestigationFeedbackContext";
 import { InvestigationFeedbackButtons } from "./components/InvestigationFeedbackButtons";
 import { useRole } from "@/lib/auth";
@@ -97,95 +96,6 @@ function ShareMenu({ isOpen, onClose }: ShareMenuProps) {
             Copy shareable link
           </button>
         </div>
-      </div>
-    </>
-  );
-}
-
-interface CollaborateModalProps {
-  isOpen: boolean;
-  onClose: () => void;
-  onSubmit: (context: string) => void;
-  isPending: boolean;
-}
-
-function CollaborateModal({
-  isOpen,
-  onClose,
-  onSubmit,
-  isPending,
-}: CollaborateModalProps) {
-  const [context, setContext] = useState("");
-
-  if (!isOpen) return null;
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!context.trim() || isPending) return;
-    onSubmit(context.trim());
-    setContext("");
-  };
-
-  return (
-    <>
-      <div className="fixed inset-0 z-40 bg-black/50" onClick={onClose} />
-      <div className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-50 w-full max-w-lg">
-        <Card>
-          <CardHeader className="pb-3">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <GitBranch className="h-5 w-5 text-primary" />
-                <CardTitle className="text-lg">Add Your Perspective</CardTitle>
-              </div>
-              <Button variant="ghost" size="icon" onClick={onClose}>
-                <X className="h-4 w-4" />
-              </Button>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <p className="text-sm text-muted-foreground mb-4">
-              Branch off this investigation with your own direction. Your input
-              will create a parallel analysis that explores a different angle
-              while keeping the same initial configuration.
-            </p>
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div>
-                <label className="text-sm font-medium mb-2 block">
-                  What direction should this branch explore?
-                </label>
-                <textarea
-                  value={context}
-                  onChange={(e) => setContext(e.target.value)}
-                  placeholder="e.g., Focus on the data pipeline timing issues, or investigate whether this could be related to the recent deployment..."
-                  disabled={isPending}
-                  className="w-full min-h-[120px] p-3 text-sm border rounded-md bg-background resize-none focus:outline-none focus:ring-2 focus:ring-primary"
-                />
-              </div>
-              <div className="flex justify-end gap-2">
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={onClose}
-                  disabled={isPending}
-                >
-                  Cancel
-                </Button>
-                <Button
-                  type="submit"
-                  disabled={isPending || !context.trim()}
-                  className="gap-2"
-                >
-                  {isPending ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <GitBranch className="h-4 w-4" />
-                  )}
-                  Create Branch
-                </Button>
-              </div>
-            </form>
-          </CardContent>
-        </Card>
       </div>
     </>
   );
@@ -379,52 +289,10 @@ function SynthesisCard({
   );
 }
 
-interface ChatInputProps {
-  onSend: (message: string) => void;
-  isPending: boolean;
-  error?: Error | null;
-}
-
-function ChatInput({ onSend, isPending, error }: ChatInputProps) {
-  const [message, setMessage] = useState("");
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!message.trim() || isPending) return;
-    onSend(message.trim());
-    setMessage("");
-  };
-
-  return (
-    <div className="p-3">
-      <form onSubmit={handleSubmit} className="flex gap-2">
-        <Input
-          value={message}
-          onChange={(e) => setMessage(e.target.value)}
-          placeholder="Ask a question or provide direction..."
-          disabled={isPending}
-          className="text-sm"
-        />
-        <Button type="submit" size="sm" disabled={isPending || !message.trim()}>
-          {isPending ? (
-            <Loader2 className="h-4 w-4 animate-spin" />
-          ) : (
-            <Send className="h-4 w-4" />
-          )}
-        </Button>
-      </form>
-      {error && (
-        <p className="text-xs text-destructive mt-1">{String(error)}</p>
-      )}
-    </div>
-  );
-}
-
 export function InvestigationDetail() {
   const { id } = useParams<{ id: string }>();
   const { data, isLoading, error, refetch } = useInvestigation(id);
   const { isMember } = useRole();
-  const sendMessage = useSendMessage();
   const cancelMutation =
     useCancelInvestigationApiV1InvestigationsInvestigationIdCancelPost();
   const [sseStatus, setSseStatus] = useState<
@@ -432,7 +300,6 @@ export function InvestigationDetail() {
   >("connecting");
   const sseCleanupRef = useRef<(() => void) | null>(null);
   const [showShareMenu, setShowShareMenu] = useState(false);
-  const [showCollaborateModal, setShowCollaborateModal] = useState(false);
 
   // Subscribe to SSE updates
   useEffect(() => {
@@ -467,18 +334,6 @@ export function InvestigationDetail() {
       sseCleanupRef.current = null;
     };
   }, [id, data, refetch]);
-
-  const handleSendMessage = async (message: string) => {
-    if (!id) return;
-    await sendMessage.mutateAsync({ investigationId: id, message });
-  };
-
-  const handleCollaborate = async (context: string) => {
-    if (!id) return;
-    // For now, use the same sendMessage API - this creates a branch with the user's direction
-    await sendMessage.mutateAsync({ investigationId: id, message: context });
-    setShowCollaborateModal(false);
-  };
 
   const handleCancel = async () => {
     if (!id) return;
@@ -579,24 +434,14 @@ export function InvestigationDetail() {
               <CodifyWidget
                 investigationId={id}
                 confidence={
-                  typeof (data.main_branch.synthesis as Record<string, unknown>)?.confidence === "number"
-                    ? (data.main_branch.synthesis as Record<string, unknown>).confidence as number
+                  typeof (data.main_branch.synthesis as Record<string, unknown>)
+                    ?.confidence === "number"
+                    ? ((data.main_branch.synthesis as Record<string, unknown>)
+                        .confidence as number)
                     : 0
                 }
                 isComplete={isComplete}
               />
-            )}
-
-            {/* Collaborate Button */}
-            {isMember && (
-              <Button
-                variant="default"
-                className="gap-2"
-                onClick={() => setShowCollaborateModal(true)}
-              >
-                <Users className="h-4 w-4" />
-                Collaborate
-              </Button>
             )}
 
             {/* Share Button */}
@@ -617,14 +462,6 @@ export function InvestigationDetail() {
             </div>
           </div>
         </div>
-
-        {/* Collaborate Modal */}
-        <CollaborateModal
-          isOpen={showCollaborateModal}
-          onClose={() => setShowCollaborateModal(false)}
-          onSubmit={handleCollaborate}
-          isPending={sendMessage.isPending}
-        />
 
         {/* Main Investigation Panel */}
         <div className="flex-1 overflow-auto">
@@ -691,20 +528,6 @@ export function InvestigationDetail() {
                     </div>
                   </div>
                 )}
-
-              {/* Chat input for asking questions */}
-              {isMember && !isComplete && (
-                <div className="border-t pt-4">
-                  <p className="text-sm text-muted-foreground mb-2">
-                    Ask a question or provide direction
-                  </p>
-                  <ChatInput
-                    onSend={handleSendMessage}
-                    isPending={sendMessage.isPending}
-                    error={sendMessage.error}
-                  />
-                </div>
-              )}
             </CardContent>
           </Card>
         </div>

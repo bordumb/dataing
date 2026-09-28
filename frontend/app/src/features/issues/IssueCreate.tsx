@@ -2,7 +2,10 @@ import { useState, useEffect, useCallback } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { ArrowLeft, Loader2, X, Plus, AlertCircle } from "lucide-react";
 import { useCreateIssue, useInvalidateIssues } from "@/lib/api/issues";
-import type { IssueCreate as IssueCreateType } from "@/lib/api/issues";
+import type {
+  IssueContext,
+  IssueCreate as IssueCreateType,
+} from "@/lib/api/issues";
 import { useDataSources, SchemaTable } from "@/lib/api/datasources";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
@@ -19,6 +22,7 @@ import { Badge } from "@/components/ui/Badge";
 import {
   DatePicker,
   DatePickerValue,
+  datePickerValueToString,
   stringToDatePickerValue,
 } from "@/components/ui/DatePicker";
 import {
@@ -102,6 +106,13 @@ export function IssueCreate() {
     const primaryDataset = datasets[0];
     if (!formData.title.trim() || !primaryDataset.identifier.trim()) return;
 
+    const context: IssueContext = {};
+    const observedAt = datePickerValueToString(issueDate);
+    if (observedAt) context.observed_at = observedAt;
+    if (formData.column_name.trim()) {
+      context.column = formData.column_name.trim();
+    }
+
     try {
       const payload: IssueCreateType = {
         title: formData.title.trim(),
@@ -110,13 +121,14 @@ export function IssueCreate() {
         severity: formData.severity || undefined,
         dataset_id: primaryDataset.identifier,
         labels: formData.labels.length > 0 ? formData.labels : undefined,
+        context,
       };
 
       const result = await createIssue.mutateAsync({ data: payload });
       invalidate.invalidateList();
       navigate(`/issues/${result.id}`);
-    } catch (error) {
-      console.error("Failed to create issue:", error);
+    } catch {
+      // Shown below the form from createIssue.error.
     }
   };
 
@@ -315,7 +327,6 @@ export function IssueCreate() {
                         <SelectItem value="P1">P1 - High</SelectItem>
                         <SelectItem value="P2">P2 - Medium</SelectItem>
                         <SelectItem value="P3">P3 - Low</SelectItem>
-                        <SelectItem value="P4">P4 - Minimal</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
@@ -391,7 +402,7 @@ export function IssueCreate() {
                 {createIssue.error && (
                   <div className="rounded-md bg-destructive/10 p-3 text-sm text-destructive">
                     <p className="font-medium">Error creating issue:</p>
-                    <p>{String(createIssue.error)}</p>
+                    <p>{createIssue.error.message}</p>
                   </div>
                 )}
 

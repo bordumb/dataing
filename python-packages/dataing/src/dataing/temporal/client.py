@@ -66,9 +66,6 @@ class TemporalInvestigationClient:
 
         # Cancel if needed
         await client.cancel_investigation("inv-123")
-
-        # Send user input
-        await client.send_user_input("inv-123", {"feedback": "..."})
     """
 
     def __init__(
@@ -204,20 +201,6 @@ class TemporalInvestigationClient:
         except RPCError as e:
             if e.status != RPCStatusCode.NOT_FOUND:
                 raise
-
-    async def send_user_input(
-        self,
-        investigation_id: str,
-        payload: dict[str, Any],
-    ) -> None:
-        """Send user input to an investigation awaiting feedback.
-
-        Args:
-            investigation_id: ID of the investigation.
-            payload: User feedback data (e.g., {"feedback": "...", "action": "..."}).
-        """
-        handle = await self.get_handle(investigation_id)
-        await handle.signal(InvestigationWorkflow.user_input, payload)
 
     async def get_result(self, investigation_id: str) -> InvestigationResult:
         """Get the result of a completed investigation.

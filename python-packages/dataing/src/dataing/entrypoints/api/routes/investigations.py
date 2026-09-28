@@ -122,19 +122,6 @@ class InvestigationListItem(BaseModel):
     dataset_id: str
 
 
-class SendMessageRequest(BaseModel):
-    """Request body for sending a message."""
-
-    message: str
-
-
-class SendMessageResponse(BaseModel):
-    """Response for sending a message."""
-
-    status: str
-    investigation_id: UUID
-
-
 class TemporalStatusResponse(BaseModel):
     """Status response for Temporal-based investigations."""
 
@@ -148,14 +135,6 @@ class TemporalStatusResponse(BaseModel):
     hypotheses_count: int | None = None
     hypotheses_evaluated: int | None = None
     evidence_count: int | None = None
-
-
-class UserInputRequest(BaseModel):
-    """Request body for sending user input to an investigation."""
-
-    feedback: str
-    action: str | None = None
-    data: dict[str, Any] | None = None
 
 
 class CodifyFormat(str, Enum):
@@ -942,51 +921,6 @@ async def record_test_run(
     return {"status": status, "test_id": str(request.test_id)}
 
 
-@router.post("/{investigation_id}/messages", response_model=SendMessageResponse)
-async def send_message(
-    auth: WriteScopeDep,
-    investigation_id: TenantInvestigationId,
-    request: SendMessageRequest,
-    temporal_client: TemporalClientDep,
-) -> SendMessageResponse:
-    """Send a message to an investigation via Temporal signal.
-
-    Args:
-        investigation_id: UUID of the investigation.
-        request: The message request.
-        auth: Authentication context from API key/JWT.
-        temporal_client: Temporal client for durable execution.
-
-    Returns:
-        SendMessageResponse with status.
-
-    Raises:
-        HTTPException: If failed to send message.
-    """
-    try:
-        payload: dict[str, Any] = {
-            "feedback": request.message,
-            "action": "user_message",
-            "data": {},
-            "user_id": str(auth.user_id) if auth.user_id else None,
-        }
-        await temporal_client.send_user_input(str(investigation_id), payload)
-        logger.info(
-            f"Sent message to Temporal investigation: "
-            f"investigation_id={investigation_id}, tenant_id={auth.tenant_id}"
-        )
-        return SendMessageResponse(
-            status="message_sent",
-            investigation_id=investigation_id,
-        )
-    except Exception as e:
-        logger.error(f"Failed to send message to Temporal investigation: {e}")
-        raise HTTPException(
-            status_code=500,
-            detail=f"Failed to send message: {e}",
-        ) from e
-
-
 @router.get("/{investigation_id}/status", response_model=TemporalStatusResponse)
 async def get_investigation_status(
     investigation_id: TenantInvestigationId,
@@ -1024,48 +958,6 @@ async def get_investigation_status(
         raise HTTPException(
             status_code=500,
             detail=f"Failed to get investigation status: {e}",
-        ) from e
-
-
-@router.post("/{investigation_id}/input")
-async def send_user_input(
-    auth: WriteScopeDep,
-    investigation_id: TenantInvestigationId,
-    request: UserInputRequest,
-    temporal_client: TemporalClientDep,
-) -> dict[str, str]:
-    """Send user input to an investigation awaiting feedback.
-
-    This endpoint sends a signal to the Temporal workflow when it's
-    in AWAIT_USER state.
-
-    Args:
-        investigation_id: UUID of the investigation.
-        request: User input payload.
-        auth: Authentication context from API key/JWT.
-        temporal_client: Temporal client for durable execution.
-
-    Returns:
-        Confirmation message.
-    """
-    try:
-        payload = {
-            "feedback": request.feedback,
-            "action": request.action,
-            "data": request.data or {},
-            "user_id": str(auth.user_id) if auth.user_id else None,
-        }
-        await temporal_client.send_user_input(str(investigation_id), payload)
-        logger.info(
-            f"Sent user input to Temporal investigation: "
-            f"investigation_id={investigation_id}, tenant_id={auth.tenant_id}"
-        )
-        return {"status": "input_received", "investigation_id": str(investigation_id)}
-    except Exception as e:
-        logger.error(f"Failed to send user input to Temporal investigation: {e}")
-        raise HTTPException(
-            status_code=500,
-            detail=f"Failed to send user input: {e}",
         ) from e
 
 

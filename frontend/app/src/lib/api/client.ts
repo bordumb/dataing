@@ -72,6 +72,11 @@ export const customInstance = async <T>(config: RequestConfig): Promise<T> => {
     throw new Error(apiErrorMessage(errorData, response.status));
   }
 
+  // No Content (e.g. DELETE): there is no body to parse.
+  if (response.status === 204) {
+    return undefined as T;
+  }
+
   return response.json();
 };
 

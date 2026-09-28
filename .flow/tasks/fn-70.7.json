@@ -9,10 +9,22 @@
     "fn-70.6"
   ],
   "epic": "fn-70",
+  "evidence": {
+    "commits": [
+      "56a6d9b5"
+    ],
+    "prs": [],
+    "tests": [
+      "pnpm test -- --run",
+      "pnpm typecheck",
+      "pnpm lint",
+      "pytest tests/unit"
+    ]
+  },
   "id": "fn-70.7",
   "priority": null,
   "spec_path": ".flow/tasks/fn-70.7.md",
-  "status": "in_progress",
+  "status": "done",
   "title": "M1: frontend thread, composer, streaming, sidebar",
-  "updated_at": "2026-09-28T00:02:12.886783Z"
+  "updated_at": "2026-09-28T00:32:09.323523Z"
 }

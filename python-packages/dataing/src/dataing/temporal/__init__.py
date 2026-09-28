@@ -20,5 +20,4 @@ Usage:
     client = await TemporalInvestigationClient.connect()
     handle = await client.start_investigation(...)
     await client.cancel_investigation(investigation_id)
-    await client.send_user_input(investigation_id, {"feedback": "..."})
 """

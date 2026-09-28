@@ -1,33 +1,31 @@
 /**
  * API client wrapper for Issues.
- * Re-exports generated hooks with cleaner names.
+ *
+ * List/watch/run hooks come from the orval output. Issue get/create/update are
+ * hand-written because the committed openapi.json predates the fields the
+ * issue hub needs (context, due_at, allowed_transitions, transition_requirements).
  */
 
-import { useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   useListIssuesApiV1IssuesGet,
-  useGetIssueApiV1IssuesIssueIdGet,
-  useCreateIssueApiV1IssuesPost,
-  useUpdateIssueApiV1IssuesIssueIdPatch,
-  useListIssueCommentsApiV1IssuesIssueIdCommentsGet,
-  useCreateIssueCommentApiV1IssuesIssueIdCommentsPost,
   useListIssueWatchersApiV1IssuesIssueIdWatchersGet,
   useAddIssueWatcherApiV1IssuesIssueIdWatchPost,
   useRemoveIssueWatcherApiV1IssuesIssueIdWatchDelete,
   useListInvestigationRunsApiV1IssuesIssueIdInvestigationRunsGet,
   useSpawnInvestigationApiV1IssuesIssueIdInvestigationRunsPost,
 } from "./generated/issues/issues";
+import type {
+  IssueResponse as GeneratedIssueResponse,
+  IssueListResponse as GeneratedIssueListResponse,
+  IssueCreate as GeneratedIssueCreate,
+  IssueUpdate as GeneratedIssueUpdate,
+} from "./model";
+import { customInstance } from "./client";
 import { queryKeys } from "./query-keys";
 
 // Re-export types from model
 export type {
-  IssueResponse,
-  IssueListResponse,
-  IssueCreate,
-  IssueUpdate,
-  IssueCommentResponse,
-  IssueCommentListResponse,
-  IssueCommentCreate,
   WatcherResponse,
   WatcherListResponse,
   InvestigationRunResponse,
@@ -36,15 +34,64 @@ export type {
   ListIssuesApiV1IssuesGetParams as IssueListParams,
 } from "./model";
 
-// Re-export hooks with cleaner names
+/** Where the problem was seen, collected by the create form. */
+export interface IssueContext {
+  observed_at?: string;
+  column?: string;
+  [key: string]: unknown;
+}
+
+export type IssueResponse = GeneratedIssueResponse & {
+  due_at: string | null;
+  context: IssueContext;
+  /** Statuses this issue may move to. The UI offers only these. */
+  allowed_transitions: string[];
+  /** For allowed moves, the fields to send in the same PATCH. */
+  transition_requirements: Record<string, string[]>;
+};
+
+export type IssueListResponse = Omit<GeneratedIssueListResponse, "items"> & {
+  items: IssueResponse[];
+};
+
+export type IssueCreate = GeneratedIssueCreate & {
+  context?: IssueContext;
+};
+
+/** A field sent as null clears it; a missing field is left unchanged. */
+export type IssueUpdate = GeneratedIssueUpdate & {
+  dataset_id?: string | null;
+  due_at?: string | null;
+  context?: IssueContext | null;
+};
+
+const ISSUES_URL = "/api/v1/issues";
+
+export function getIssue(issueId: string, signal?: AbortSignal) {
+  return customInstance<IssueResponse>({
+    url: `${ISSUES_URL}/${issueId}`,
+    method: "GET",
+    signal,
+  });
+}
+
+export function createIssue(data: IssueCreate) {
+  return customInstance<IssueResponse>({
+    url: ISSUES_URL,
+    method: "POST",
+    data,
+  });
+}
+
+export function updateIssue(issueId: string, data: IssueUpdate) {
+  return customInstance<IssueResponse>({
+    url: `${ISSUES_URL}/${issueId}`,
+    method: "PATCH",
+    data,
+  });
+}
+
 export const useIssues = useListIssuesApiV1IssuesGet;
-export const useIssue = useGetIssueApiV1IssuesIssueIdGet;
-export const useCreateIssue = useCreateIssueApiV1IssuesPost;
-export const useUpdateIssue = useUpdateIssueApiV1IssuesIssueIdPatch;
-export const useIssueComments =
-  useListIssueCommentsApiV1IssuesIssueIdCommentsGet;
-export const useCreateIssueComment =
-  useCreateIssueCommentApiV1IssuesIssueIdCommentsPost;
 export const useIssueWatchers =
   useListIssueWatchersApiV1IssuesIssueIdWatchersGet;
 export const useWatchIssue = useAddIssueWatcherApiV1IssuesIssueIdWatchPost;
@@ -55,6 +102,33 @@ export const useIssueInvestigationRuns =
 export const useSpawnInvestigation =
   useSpawnInvestigationApiV1IssuesIssueIdInvestigationRunsPost;
 
+export function useIssue(issueId: string) {
+  return useQuery({
+    queryKey: queryKeys.issues.detail(issueId),
+    queryFn: ({ signal }) => getIssue(issueId, signal),
+    enabled: !!issueId,
+  });
+}
+
+export function useCreateIssue() {
+  return useMutation({
+    mutationFn: ({ data }: { data: IssueCreate }) => createIssue(data),
+  });
+}
+
+/** PATCH an issue; the response replaces the cached detail. */
+export function useUpdateIssue() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ issueId, data }: { issueId: string; data: IssueUpdate }) =>
+      updateIssue(issueId, data),
+    onSuccess: (issue) => {
+      queryClient.setQueryData(queryKeys.issues.detail(issue.id), issue);
+      queryClient.invalidateQueries({ queryKey: queryKeys.issues.all });
+    },
+  });
+}
+
 // Helper hook to invalidate issue queries
 export function useInvalidateIssues() {
   const queryClient = useQueryClient();
@@ -64,10 +138,6 @@ export function useInvalidateIssues() {
       queryClient.invalidateQueries({ queryKey: queryKeys.issues.all }),
     invalidateDetail: (id: string) =>
       queryClient.invalidateQueries({ queryKey: queryKeys.issues.detail(id) }),
-    invalidateComments: (id: string) =>
-      queryClient.invalidateQueries({
-        queryKey: queryKeys.issues.comments(id),
-      }),
     invalidateWatchers: (id: string) =>
       queryClient.invalidateQueries({
         queryKey: queryKeys.issues.watchers(id),
@@ -154,4 +224,12 @@ export function getSeverityVariant(
     default:
       return "secondary";
   }
+}
+
+/** Values the API accepts (IssueCreate/IssueUpdate patterns). */
+export const ISSUE_PRIORITIES = ["P0", "P1", "P2", "P3"] as const;
+export const ISSUE_SEVERITIES = ["critical", "high", "medium", "low"] as const;
+
+export function getSeverityLabel(severity: string): string {
+  return severity.charAt(0).toUpperCase() + severity.slice(1);
 }

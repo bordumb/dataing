@@ -165,30 +165,6 @@ class TestGetInvestigationRoute:
         assert response.user_branch.status == "suspended"
 
 
-class TestSendMessageRoute:
-    """Tests for POST /investigations/{investigation_id}/messages."""
-
-    def test_request_model(self) -> None:
-        """Test message request model."""
-        from dataing.entrypoints.api.routes.investigations import (
-            SendMessageRequest,
-        )
-
-        request = SendMessageRequest(message="Can you investigate upstream?")
-        assert request.message == "Can you investigate upstream?"
-
-    def test_response_model(self) -> None:
-        """Test message response model."""
-        from dataing.entrypoints.api.routes.investigations import (
-            SendMessageResponse,
-        )
-
-        investigation_id = uuid.uuid4()
-        response = SendMessageResponse(status="sent", investigation_id=investigation_id)
-        assert response.status == "sent"
-        assert response.investigation_id == investigation_id
-
-
 class TestStreamUpdatesRoute:
     """Tests for GET /investigations/{investigation_id}/stream."""
 

@@ -129,10 +129,20 @@ export const queryKeys = {
       cursor?: string;
     }) => ["/api/v1/issues", filters] as const,
     detail: (id: string) => [`/api/v1/issues/${id}`] as const,
-    comments: (id: string) => [`/api/v1/issues/${id}/comments`] as const,
     watchers: (id: string) => [`/api/v1/issues/${id}/watchers`] as const,
     investigationRuns: (id: string) =>
       [`/api/v1/issues/${id}/investigation-runs`] as const,
+  },
+
+  // Issue threads (shared + scratch chats on an issue)
+  issueThreads: {
+    list: (issueId: string) => [`/api/v1/issues/${issueId}/threads`] as const,
+    messages: (issueId: string, threadId: string) =>
+      [`/api/v1/issues/${issueId}/threads/${threadId}/messages`] as const,
+    queryResult: (issueId: string, threadId: string, resultId: string) =>
+      [
+        `/api/v1/issues/${issueId}/threads/${threadId}/query-results/${resultId}`,
+      ] as const,
   },
 } as const;
 

@@ -11,6 +11,7 @@ from collections.abc import Collection
 
 import pytest
 from fixtures.temporal import FakeAgent, FakeDatasource, InProcessTemporal, sql_for
+from temporalio.exceptions import ApplicationError
 
 from dataing.adapters.datasource.errors import ConnectionFailedError, QuerySyntaxError
 from dataing.adapters.datasource.types import QueryResult
@@ -147,26 +148,26 @@ async def test_failed_interpretation_reaches_synthesis_as_untested_not_refuted(
     ]
 
 
-async def test_datasource_down_reaches_synthesis_as_all_untested(
+async def test_datasource_down_fails_the_run_with_the_query_error(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """When every query fails, synthesis gets no evidence and every hypothesis as untested."""
+    """When every query fails there is nothing to conclude from: the run fails and says why.
+
+    Synthesizing from no evidence would "complete" at confidence 0 and hide the cause
+    (docs/specs/0001_issue_chat.md §7.12).
+    """
     down = ConnectionFailedError("connection refused")
     datasource = FakeDatasource({sql_for("h-1"): down, sql_for("h-2"): down})
     agent = FakeAgent()
 
-    await _investigate(monkeypatch, datasource, agent)
+    with pytest.raises(ApplicationError) as caught:
+        await _investigate(monkeypatch, datasource, agent)
 
-    [synthesis] = agent.synthesized
-    assert synthesis["evidence"] == []
-    assert synthesis["untested_hypotheses"] == [
-        {
-            "hypothesis_id": hypothesis["id"],
-            "title": hypothesis["title"],
-            "error": "Query execution failed: connection refused",
-        }
-        for hypothesis in HYPOTHESES
-    ]
+    assert caught.value.type == "InvestigationFailed"
+    assert caught.value.message == (
+        "No hypothesis could be tested. The first error: Query execution failed: connection refused"
+    )
+    assert agent.synthesized == []
 
 
 async def test_terminated_evaluation_reaches_synthesis_as_untested(

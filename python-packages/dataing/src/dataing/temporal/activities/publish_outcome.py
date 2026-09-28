@@ -1,9 +1,10 @@
-"""Activity that publishes a finished investigation's outcome (spec 0001 §7.7).
+"""Activity that publishes a finished investigation's outcome (spec 0001 §7.7, §7.12).
 
 It writes the outcome to the investigation (the 036 trigger stamps completed_at),
 fills the linked issue run's summary fields, and posts the result card to the
-issue's shared thread. Every step is idempotent, so a retried attempt changes
-nothing twice.
+issue's shared thread. A failed run publishes its failure the same way, as
+{"status": "failed", "error": {code, message, step}}. Every step is idempotent, so a
+retried attempt changes nothing twice.
 """
 
 from __future__ import annotations
@@ -37,6 +38,11 @@ def outcome_markdown(synthesis: dict[str, Any], hypotheses: list[dict[str, Any]]
     return "\n".join(lines)
 
 
+def failure_markdown(failure: dict[str, Any]) -> str:
+    """Render a failed run's card text for the thread."""
+    return f"**Investigation failed**\n\n{failure.get('message') or 'The run failed.'}"
+
+
 def make_publish_investigation_outcome_activity(app_db: AppDatabase) -> Any:
     """Return the publish_investigation_outcome activity with its database bound."""
 
@@ -47,15 +53,20 @@ def make_publish_investigation_outcome_activity(app_db: AppDatabase) -> Any:
         tenant_id = UUID(str(payload["tenant_id"]))
         synthesis: dict[str, Any] = payload.get("synthesis") or {}
         hypotheses: list[dict[str, Any]] = payload.get("hypotheses") or []
-        outcome = {
-            "status": "completed",
-            "root_cause": synthesis.get("root_cause"),
-            "confidence": synthesis.get("confidence"),
-            "recommendations": synthesis.get("recommendations") or [],
-            "supporting_evidence": synthesis.get("supporting_evidence") or [],
-            "hypotheses": hypotheses,
-            "counter_analysis": payload.get("counter_analysis"),
-        }
+        failure: dict[str, Any] | None = payload.get("failure")
+        outcome: dict[str, Any]
+        if failure:
+            outcome = {"status": "failed", "error": failure, "hypotheses": hypotheses}
+        else:
+            outcome = {
+                "status": "completed",
+                "root_cause": synthesis.get("root_cause"),
+                "confidence": synthesis.get("confidence"),
+                "recommendations": synthesis.get("recommendations") or [],
+                "supporting_evidence": synthesis.get("supporting_evidence") or [],
+                "hypotheses": hypotheses,
+                "counter_analysis": payload.get("counter_analysis"),
+            }
         await app_db.execute(
             "UPDATE investigations SET outcome = $3 WHERE id = $1 AND tenant_id = $2",
             investigation_id,
@@ -98,7 +109,11 @@ def make_publish_investigation_outcome_activity(app_db: AppDatabase) -> Any:
                 thread["id"],
                 author_kind="agent",
                 kind="investigation",
-                body_md=outcome_markdown(synthesis, hypotheses),
+                body_md=(
+                    failure_markdown(failure)
+                    if failure
+                    else outcome_markdown(synthesis, hypotheses)
+                ),
                 payload={
                     "phase": "outcome",
                     "outcome_for": str(investigation_id),
@@ -107,18 +122,19 @@ def make_publish_investigation_outcome_activity(app_db: AppDatabase) -> Any:
                     "outcome": outcome,
                 },
             )
+            event_type, event = (
+                ("investigation_failed", {"code": failure.get("code")})
+                if failure
+                else ("investigation_completed", {"confidence": synthesis.get("confidence")})
+            )
             await app_db.execute(
                 """
                 INSERT INTO issue_events (issue_id, event_type, payload)
-                VALUES ($1, 'investigation_completed', $2)
+                VALUES ($1, $2, $3)
                 """,
                 issue_id,
-                to_json_string(
-                    {
-                        "investigation_id": str(investigation_id),
-                        "confidence": synthesis.get("confidence"),
-                    }
-                ),
+                event_type,
+                to_json_string({"investigation_id": str(investigation_id), **event}),
             )
         return {"published": True, "thread_message": existing is None}
 

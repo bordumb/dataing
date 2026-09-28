@@ -1,14 +1,21 @@
 {
-  "assignee": null,
+  "assignee": "bordumbb@gmail.com",
   "claim_note": "",
-  "claimed_at": null,
+  "claimed_at": "2026-09-28T17:54:28.759022Z",
   "created_at": "2026-09-28T17:51:58.959592Z",
   "depends_on": [],
   "epic": "fn-70",
+  "evidence": {
+    "commits": [
+      "f292971a"
+    ],
+    "prs": [],
+    "tests": []
+  },
   "id": "fn-70.18",
   "priority": null,
   "spec_path": ".flow/tasks/fn-70.18.md",
-  "status": "todo",
+  "status": "done",
   "title": "M5: spec revision: every run in the hub, one-step start, details page, LLM failures",
-  "updated_at": "2026-09-28T17:51:58.959798Z"
+  "updated_at": "2026-09-28T17:54:29.035901Z"
 }

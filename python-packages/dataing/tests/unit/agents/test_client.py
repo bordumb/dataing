@@ -15,6 +15,7 @@ from typing import Any
 import pytest
 from bond import BondAgent
 from pydantic_ai import models
+from pydantic_ai.exceptions import ModelHTTPError
 from pydantic_ai.messages import (
     ModelMessage,
     ModelMessagesTypeAdapter,
@@ -36,6 +37,7 @@ from dataing.adapters.datasource.types import (
 )
 from dataing.agents import client as client_module
 from dataing.agents.client import AgentClient
+from dataing.agents.errors import classify_llm_error
 from dataing.core.domain_types import (
     AnomalyAlert,
     Evidence,
@@ -44,6 +46,7 @@ from dataing.core.domain_types import (
     InvestigationContext,
     MetricSpec,
 )
+from dataing.core.exceptions import LLMError
 
 LlmCall = Callable[[AgentClient, str], Awaitable[object]]
 RecordedRequests = list[list[ModelMessage]]
@@ -229,3 +232,37 @@ class TestAgentClientHistoryIsolation:
         held = [name for name, value in vars(client).items() if isinstance(value, BondAgent)]
 
         assert held == []
+
+
+class TestAgentClientErrors:
+    """A failed model call surfaces as LLMError that keeps the API error as its cause."""
+
+    @pytest.mark.parametrize(
+        "call",
+        [
+            pytest.param(_generate_hypotheses, id="generate_hypotheses"),
+            pytest.param(_generate_query, id="generate_query"),
+            pytest.param(_interpret_evidence, id="interpret_evidence"),
+            pytest.param(_synthesize_findings, id="synthesize_findings"),
+            pytest.param(_counter_analyze, id="counter_analyze"),
+        ],
+    )
+    async def test_a_rejected_key_is_raised_never_turned_into_a_result(
+        self, monkeypatch: pytest.MonkeyPatch, call: LlmCall
+    ) -> None:
+        """No call turns an API error into a result, e.g. evidence that reads as refuted."""
+
+        def reject(messages: list[ModelMessage], info: AgentInfo) -> ModelResponse:
+            raise ModelHTTPError(status_code=401, model_name="claude-x", body=None)
+
+        model = FunctionModel(reject)
+        monkeypatch.setattr(client_module, "AnthropicModel", lambda *args, **kwargs: model)
+        monkeypatch.setattr(models, "ALLOW_MODEL_REQUESTS", False)
+        client = AgentClient(api_key="test-key")
+
+        with pytest.raises(LLMError) as caught:
+            await call(client, "tenant_a")
+
+        failure = classify_llm_error(caught.value)
+        assert failure is not None
+        assert failure.code == "invalid_key"

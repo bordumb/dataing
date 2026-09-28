@@ -227,6 +227,10 @@ class AgentClient:
 
         Returns:
             Evidence with validated interpretation.
+
+        Raises:
+            LLMError: If interpretation fails. A failed interpretation is not evidence:
+                returned as such, its hypothesis would read as refuted.
         """
         prompt = interpretation.build_user(hypothesis=hypothesis, query=sql, results=results)
         system = interpretation.build_system()
@@ -239,28 +243,18 @@ class AgentClient:
                 instructions=system,
                 handlers=handlers,
             )
-
-            return Evidence(
-                hypothesis_id=hypothesis.id,
-                query=sql,
-                result_summary=results.to_summary(),
-                row_count=results.row_count,
-                supports_hypothesis=result.supports_hypothesis,
-                confidence=result.confidence,
-                interpretation=result.interpretation,
-            )
-
         except Exception as e:
-            # Return low-confidence evidence on failure rather than crashing
-            return Evidence(
-                hypothesis_id=hypothesis.id,
-                query=sql,
-                result_summary=results.to_summary(),
-                row_count=results.row_count,
-                supports_hypothesis=None,
-                confidence=0.3,
-                interpretation=f"Interpretation failed: {e}",
-            )
+            raise LLMError(f"Interpretation failed: {e}", retryable=True) from e
+
+        return Evidence(
+            hypothesis_id=hypothesis.id,
+            query=sql,
+            result_summary=results.to_summary(),
+            row_count=results.row_count,
+            supports_hypothesis=result.supports_hypothesis,
+            confidence=result.confidence,
+            interpretation=result.interpretation,
+        )
 
     async def synthesize_findings(
         self,

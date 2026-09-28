@@ -1,8 +1,9 @@
 """Fake activities for running InvestigationWorkflow on Temporal's test server.
 
 Each fake returns the dict shape the workflow reads. Hypothesis evaluations can be
-held open (to steer a run while its subagents are working) and every call is
-recorded, so tests can assert what the manager and its subagents did.
+held open (to steer a run while its subagents are working), calls can be scripted to
+fail, and every call is recorded, so tests can assert what the manager and its
+subagents did.
 """
 
 from __future__ import annotations
@@ -42,6 +43,11 @@ class FakeInvestigation:
     # Hypothesis ids whose query generation, or activity names, wait for `released`
     hold: set[str] = field(default_factory=set)
     released: asyncio.Event = field(default_factory=asyncio.Event)
+    # Activity names, or "<activity>:<hypothesis id>" for a subagent's activity, mapped
+    # to the errors their calls raise in turn; once a list runs out, calls succeed
+    failures: dict[str, list[BaseException]] = field(default_factory=dict)
+    # Hypothesis ids whose query fails, with the error execute_query reports
+    query_errors: dict[str, str] = field(default_factory=dict)
     calls: list[tuple[str, dict[str, Any]]] = field(default_factory=list)
 
     def names(self) -> list[str]:
@@ -51,6 +57,13 @@ class FakeInvestigation:
     def inputs(self, name: str) -> list[dict[str, Any]]:
         """Return the inputs of every call to one activity."""
         return [payload for called, payload in self.calls if called == name]
+
+    def fail_if_scripted(self, *keys: str) -> None:
+        """Raise the next scripted error for the first key that still has one."""
+        for key in keys:
+            errors = self.failures.get(key)
+            if errors:
+                raise errors.pop(0)
 
     async def wait_if_held(self, name: str) -> None:
         """Keep an activity running until released, heartbeating so it can be cancelled."""
@@ -80,6 +93,7 @@ class FakeInvestigation:
         @activity.defn(name="generate_hypotheses")
         async def generate_hypotheses(payload: dict[str, Any]) -> dict[str, Any]:
             record("generate_hypotheses", payload)
+            fake.fail_if_scripted("generate_hypotheses")
             return {"hypotheses": fake.hypotheses}
 
         @activity.defn(name="capture_snapshot")
@@ -91,16 +105,22 @@ class FakeInvestigation:
             record("generate_query", payload)
             hypothesis_id = payload["hypothesis"]["id"]
             await fake.wait_if_held(hypothesis_id)
+            fake.fail_if_scripted("generate_query", f"generate_query:{hypothesis_id}")
             return {"query": f"SELECT 1 -- {hypothesis_id}"}
 
         @activity.defn(name="execute_query")
         async def execute_query(payload: dict[str, Any]) -> dict[str, Any]:
             record("execute_query", payload)
+            error = fake.query_errors.get(payload["hypothesis_id"])
+            if error:
+                return {"error": error}
             return {"columns": ["n"], "rows": [{"n": 1}], "row_count": 1}
 
         @activity.defn(name="interpret_evidence")
         async def interpret_evidence(payload: dict[str, Any]) -> dict[str, Any]:
             record("interpret_evidence", payload)
+            hypothesis_id = payload["hypothesis"]["id"]
+            fake.fail_if_scripted("interpret_evidence", f"interpret_evidence:{hypothesis_id}")
             return {
                 "supports_hypothesis": payload["hypothesis"]["id"] == "h1",
                 "confidence": 0.8,
@@ -112,6 +132,7 @@ class FakeInvestigation:
         async def synthesize(payload: dict[str, Any]) -> dict[str, Any]:
             record("synthesize", payload)
             await fake.wait_if_held("synthesize")
+            fake.fail_if_scripted("synthesize")
             return {
                 "root_cause": "app_v2 writes COMPLETE instead of completed",
                 "confidence": fake.confidence,
@@ -128,6 +149,7 @@ class FakeInvestigation:
         async def counter_analyze(payload: dict[str, Any]) -> dict[str, Any]:
             record("counter_analyze", payload)
             await fake.wait_if_held("counter_analyze")
+            fake.fail_if_scripted("counter_analyze")
             return {"alternative_explanations": [], "weaknesses": [], "recommendation": "accept"}
 
         @activity.defn(name="publish_investigation_outcome")

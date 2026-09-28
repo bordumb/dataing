@@ -7,7 +7,12 @@ from typing import Any
 
 from temporalio import workflow
 from temporalio.common import RetryPolicy
-from temporalio.exceptions import ActivityError, CancelledError, ChildWorkflowError
+from temporalio.exceptions import (
+    ActivityError,
+    ApplicationError,
+    CancelledError,
+    ChildWorkflowError,
+)
 from temporalio.workflow import ChildWorkflowCancellationType, ChildWorkflowHandle
 
 with workflow.unsafe.imports_passed_through():
@@ -19,6 +24,12 @@ with workflow.unsafe.imports_passed_through():
         GatherContextInput,
         GenerateHypothesesInput,
         SynthesizeInput,
+    )
+    from dataing.temporal.errors import (
+        INVESTIGATION_FAILED,
+        LLM_MAX_ATTEMPTS,
+        LLM_RETRY_POLICY,
+        llm_failure_details,
     )
     from dataing.temporal.workflows.evaluate_hypothesis import (
         EvaluateHypothesisInput,
@@ -86,6 +97,25 @@ class InvestigationQueryStatus:
     pending_steers: list[dict[str, Any]] = field(default_factory=list)
 
 
+class _RunFailed(Exception):
+    """Ends a run as failed, with the reason (runs with the llm-failures-v1 patch).
+
+    Raised inside the workflow and turned into an InvestigationFailed error by run(),
+    after the failure is published. See docs/specs/0001_issue_chat.md §7.12.
+    """
+
+    def __init__(self, code: str, message: str, step: str) -> None:
+        """Initialize with the failure's code, what to fix, and the step that failed."""
+        super().__init__(message)
+        self.code = code
+        self.message = message
+        self.step = step
+
+    def details(self) -> dict[str, str]:
+        """Return the failure as outcome payloads and error details carry it."""
+        return {"code": self.code, "message": self.message, "step": self.step}
+
+
 @workflow.defn
 class InvestigationWorkflow:
     """Main investigation workflow that orchestrates the full investigation process.
@@ -102,6 +132,9 @@ class InvestigationWorkflow:
     - cancel_investigation: Gracefully cancel the investigation
     - steer: A person's steer, applied at the next checkpoint (runs with the
       steering-v1 patch; see steering.py)
+
+    With the llm-failures-v1 patch, a run the model can't serve fails with the reason
+    instead of concluding from nothing (docs/specs/0001_issue_chat.md §7.12).
     """
 
     def __init__(self) -> None:
@@ -138,6 +171,9 @@ class InvestigationWorkflow:
         self._input: InvestigationInput | None = None
         self._schema_info: dict[str, Any] = {}
         self._alert_summary = ""
+        # LLM failures fail the run (llm-failures-v1)
+        self._fail_runs = False
+        self._stopped: set[str] = set()  # Hypotheses a person's stop left untested
 
     @workflow.signal
     def cancel_investigation(self) -> None:
@@ -273,7 +309,16 @@ class InvestigationWorkflow:
         Returns:
             InvestigationResult with status and findings.
         """
-        result = await self._investigate(input)
+        try:
+            result = await self._investigate(input)
+        except _RunFailed as failure:
+            await self._fail(input, failure)
+            raise ApplicationError(
+                failure.message,
+                failure.details(),
+                type=INVESTIGATION_FAILED,
+                non_retryable=True,
+            ) from None
         if self._steering:
             # Steers the run never reached end here, so none stays pending
             rejection = "The investigation was cancelled" if result.status == "cancelled" else None
@@ -292,6 +337,7 @@ class InvestigationWorkflow:
         self._snapshot_paths = []
         self._max_hypotheses = input.max_hypotheses
         self._steering = workflow.patched("steering-v1")
+        self._fail_runs = workflow.patched("llm-failures-v1")
 
         alert_summary = input.alert_summary or str(input.alert_data)
 
@@ -390,15 +436,21 @@ class InvestigationWorkflow:
                 matched_patterns=matched_patterns,
                 max_hypotheses=input.max_hypotheses,
             )
-            hypotheses_result = await workflow.execute_activity(
-                "generate_hypotheses",
-                hypotheses_input,
-                start_to_close_timeout=timedelta(minutes=5),
+            hypotheses_result = await self._llm_activity(
+                "generate_hypotheses", hypotheses_input, timedelta(minutes=5)
             )
             hypotheses = hypotheses_result.get("hypotheses", [])
             if hypotheses_result.get("error"):
                 err = hypotheses_result["error"]
                 workflow.logger.warning(f"Hypothesis generation warning: {err}")
+                if self._fail_runs:
+                    raise _RunFailed("hypotheses_failed", err, "generate_hypotheses")
+            if self._fail_runs and not hypotheses and not self._additions_queued():
+                raise _RunFailed(
+                    "no_hypotheses",
+                    "The model proposed no hypotheses to test.",
+                    "generate_hypotheses",
+                )
         except CancelledError:
             return InvestigationResult(
                 investigation_id=input.investigation_id,
@@ -463,6 +515,8 @@ class InvestigationWorkflow:
                 evidence=evidence,
                 snapshot_paths=self._snapshot_paths,
             )
+        if self._fail_runs:
+            self._require_evidence(evidence, untested_hypotheses)
 
         # Step 5: Synthesize findings
         self._current_step = "synthesize"
@@ -490,6 +544,8 @@ class InvestigationWorkflow:
             }
             if synthesize_result.get("error"):
                 workflow.logger.warning(f"Synthesis warning: {synthesize_result['error']}")
+                if self._fail_runs:
+                    raise _RunFailed("synthesis_failed", synthesize_result["error"], "synthesize")
         except CancelledError:
             return InvestigationResult(
                 investigation_id=input.investigation_id,
@@ -558,11 +614,14 @@ class InvestigationWorkflow:
                     evidence=evidence,
                     hypotheses=hypotheses,
                 )
-                counter_result = await workflow.execute_activity(
-                    "counter_analyze",
-                    counter_input,
-                    start_to_close_timeout=timedelta(minutes=5),
-                )
+                try:
+                    counter_result = await self._llm_activity(
+                        "counter_analyze", counter_input, timedelta(minutes=5)
+                    )
+                except _RunFailed as failure:
+                    # Counter-analysis only checks the conclusion: keep the conclusion
+                    workflow.logger.warning(f"Counter-analysis failed: {failure.message}")
+                    counter_result = {"error": failure.message, "error_code": failure.code}
                 # Build counter_analysis dict from result fields
                 counter_analysis = {
                     "alternative_explanations": counter_result.get("alternative_explanations", []),
@@ -572,6 +631,13 @@ class InvestigationWorkflow:
                 }
                 if counter_result.get("error"):
                     workflow.logger.warning(f"Counter-analysis warning: {counter_result['error']}")
+                    if self._fail_runs:
+                        counter_analysis = {
+                            "error": {
+                                "code": counter_result.get("error_code", "counter_analysis_failed"),
+                                "message": counter_result["error"],
+                            }
+                        }
             except CancelledError:
                 return InvestigationResult(
                     investigation_id=input.investigation_id,
@@ -689,12 +755,92 @@ class InvestigationWorkflow:
             alert=self._alert(input.alert_data),
             ruled_out_hypotheses=ruled_out,
         )
-        result: dict[str, Any] = await workflow.execute_activity(
-            "synthesize",
-            synthesize_input,
-            start_to_close_timeout=timedelta(minutes=5),
-        )
+        return await self._llm_activity("synthesize", synthesize_input, timedelta(minutes=5))
+
+    async def _llm_activity(self, name: str, arg: Any, timeout: timedelta) -> dict[str, Any]:
+        """Run an LLM activity.
+
+        With llm-failures-v1 it retries per LLM_RETRY_POLICY, and a failure the model
+        caused fails the run with the reason.
+        """
+        if not self._fail_runs:
+            result: dict[str, Any] = await workflow.execute_activity(
+                name, arg, start_to_close_timeout=timeout
+            )
+            return result
+        try:
+            result = await workflow.execute_activity(
+                name, arg, start_to_close_timeout=timeout, retry_policy=LLM_RETRY_POLICY
+            )
+        except ActivityError as e:
+            failure = _llm_run_failure(e, step=name)
+            if failure is None:
+                raise
+            raise failure from None
         return result
+
+    def _additions_queued(self) -> bool:
+        """Return whether a person has asked for a hypothesis the run hasn't added yet."""
+        return any(steer.kind == "add_hypothesis" for steer in self._steers)
+
+    def _require_evidence(
+        self, evidence: list[dict[str, Any]], untested: list[dict[str, Any]]
+    ) -> None:
+        """Fail the run when errors left every hypothesis untested.
+
+        Hypotheses a person ruled out or stopped don't count: concluding without them
+        was that person's choice.
+        """
+        if evidence:
+            return
+        failed = [
+            u
+            for u in untested
+            if u["hypothesis_id"] not in self._stopped and u["hypothesis_id"] not in self._ruled_out
+        ]
+        if failed:
+            raise _RunFailed(
+                "no_evidence",
+                f"No hypothesis could be tested. The first error: {failed[0]['error']}",
+                "evaluate_hypotheses",
+            )
+
+    async def _fail(self, input: InvestigationInput, failure: _RunFailed) -> None:
+        """End a failed run: stop its subagents, publish the failure, answer steers."""
+        for handle in self._running.values():
+            handle.cancel()
+        self._running.clear()
+        for hypothesis_id, status in list(self._statuses.items()):
+            if status in ("pending", "running"):
+                self._statuses[hypothesis_id] = "untested"
+        self._current_step = "failed"
+        self._is_complete = True
+        payload = {
+            "investigation_id": input.investigation_id,
+            "tenant_id": input.tenant_id,
+            "issue_id": (input.alert_data or {}).get("issue_id"),
+            "failure": failure.details(),
+            "hypotheses": [
+                {
+                    "id": _hypothesis_id(hypothesis, index),
+                    "title": hypothesis.get("title", ""),
+                    "status": self._statuses.get(_hypothesis_id(hypothesis, index), "untested"),
+                }
+                for index, hypothesis in enumerate(self._hypotheses)
+            ],
+        }
+        try:
+            await workflow.execute_activity(
+                "publish_investigation_outcome",
+                payload,
+                start_to_close_timeout=timedelta(minutes=1),
+                retry_policy=RetryPolicy(maximum_attempts=5),
+            )
+        except Exception as e:
+            workflow.logger.warning(f"Publishing the failure failed (non-fatal): {e}")
+        if self._steering:
+            while self._steers:
+                await self._apply_steers(Phase.FINISHED, rejection="The investigation failed")
 
     def _run_state(self) -> RunState:
         """Return what steer decisions need to know about the run."""
@@ -751,6 +897,7 @@ class InvestigationWorkflow:
             for running_id, handle in list(self._running.items()):
                 handle.cancel()
                 self._statuses[running_id] = "untested"
+                self._stopped.add(running_id)
                 index = self._index(running_id)
                 self._untested.append(
                     _untested(
@@ -852,6 +999,9 @@ class InvestigationWorkflow:
             workflow.logger.warning(f"Child workflow failed: {reason}")
             self._untested.append(_untested(hypothesis, index, f"Evaluation failed: {reason}"))
             self._statuses[hypothesis_id] = "untested"
+            # The model fails every subagent the same way, so the run stops here
+            if self._fail_runs and (failure := _llm_run_failure(e)) is not None:
+                raise failure from None
             return
         self._hypotheses_evaluated += 1
         if result.error:
@@ -1043,6 +1193,17 @@ def _untested(hypothesis: dict[str, Any], index: int, error: str) -> dict[str, A
         "title": hypothesis.get("title", ""),
         "error": error,
     }
+
+
+def _llm_run_failure(error: BaseException, step: str | None = None) -> _RunFailed | None:
+    """Return the run failure for an activity or child failure the model caused."""
+    details = llm_failure_details(error)
+    if details is None:
+        return None
+    message = details["message"]
+    if details["retried"]:
+        message = f"{message} It kept failing after {LLM_MAX_ATTEMPTS} attempts; try again later."
+    return _RunFailed(details["code"], message, step or details["activity"] or "evaluate")
 
 
 def _describe_failure(error: BaseException) -> str:

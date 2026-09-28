@@ -2,6 +2,9 @@
 
 These tests verify the complete SSO flow from discovery to authenticated session,
 using mocked external IdP responses but exercising the full internal logic.
+The repositories and database are mocked too, so these tests have no
+`integration` marker (that marker means a database is required) and run with
+the unit tests.
 """
 
 from datetime import UTC, datetime, timedelta
@@ -168,7 +171,6 @@ def create_signed_token(
     )
 
 
-@pytest.mark.integration
 class TestSSODiscoveryFlow:
     """Tests for SSO discovery endpoint."""
 
@@ -278,7 +280,6 @@ class TestSSODiscoveryFlow:
         assert data["method"] == "password"
 
 
-@pytest.mark.integration
 class TestSSOCallbackFlow:
     """Tests for SSO callback endpoint."""
 

@@ -169,17 +169,6 @@ class RedshiftAdapter(SQLAdapter):
         """Get the capabilities of this adapter."""
         return REDSHIFT_CAPABILITIES
 
-    def _build_dsn(self) -> str:
-        """Build PostgreSQL-compatible DSN from config."""
-        host = self._config.get("host", "localhost")
-        port = self._config.get("port", 5439)
-        database = self._config.get("database", "dev")
-        username = self._config.get("username", "")
-        password = self._config.get("password", "")
-        ssl_mode = self._config.get("ssl_mode", "require")
-
-        return f"postgresql://{username}:{password}@{host}:{port}/{database}?sslmode={ssl_mode}"
-
     async def connect(self) -> None:
         """Establish connection to Redshift."""
         try:
@@ -192,8 +181,16 @@ class RedshiftAdapter(SQLAdapter):
 
         try:
             timeout = self._config.get("connection_timeout", 30)
+            # Discrete arguments, not a DSN, so credentials reach the server verbatim.
+            # Never pass None: asyncpg would fill the gap from the server's own PG*
+            # environment and ~/.pgpass.
             self._pool = await asyncpg.create_pool(
-                self._build_dsn(),
+                host=self._config.get("host") or "localhost",
+                port=int(self._config.get("port") or 5439),
+                database=self._config.get("database") or "dev",
+                user=self._config.get("username") or "",
+                password=self._config.get("password") or "",
+                ssl=self._config.get("ssl_mode") or "require",
                 min_size=1,
                 max_size=10,
                 command_timeout=timeout,

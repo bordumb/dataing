@@ -1,3 +1,10 @@
+## [1.24.10](https://github.com/bordumb/dataing/compare/v1.24.9...v1.24.10) (2026-09-28)
+
+
+### Bug Fixes
+
+* **core:** stop Redshift password injection from redirecting connections ([#207](https://github.com/bordumb/dataing/issues/207)) ([193b24f](https://github.com/bordumb/dataing/commit/193b24f9aff5600f4b4fa53f5d1cacc188f3f0b8))
+
 ## [1.24.9](https://github.com/bordumb/dataing/compare/v1.24.8...v1.24.9) (2026-09-28)
 
 

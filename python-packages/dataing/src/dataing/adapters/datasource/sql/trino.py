@@ -201,7 +201,7 @@ class TrinoAdapter(SQLAdapter):
             if password:
                 auth = BasicAuthentication(username, password)
 
-            self._conn = connect(
+            self._conn = connect(  # type: ignore[no-untyped-call]
                 host=host,
                 port=port,
                 user=username,

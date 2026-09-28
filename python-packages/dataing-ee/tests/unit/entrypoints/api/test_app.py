@@ -4,6 +4,7 @@ import os
 import subprocess
 import sys
 
+import pytest
 from dataing_ee.entrypoints.api.app import app
 from fastapi.routing import APIRoute
 from fastapi.testclient import TestClient
@@ -60,3 +61,15 @@ def test_app_has_one_health_route() -> None:
     health_routes = [r for r in app.routes if isinstance(r, APIRoute) and r.path == "/health"]
 
     assert len(health_routes) == 1
+
+
+def test_ee_app_refuses_to_start_without_a_jwt_secret(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The EE app, which SSO logins sign tokens for, needs the JWT key as well."""
+    from dataing_ee.entrypoints.api.app import create_ee_app
+
+    from dataing.core.auth.jwt import JWTSecretKeyError
+
+    monkeypatch.delenv("JWT_SECRET_KEY", raising=False)
+
+    with pytest.raises(JWTSecretKeyError):
+        create_ee_app()

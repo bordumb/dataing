@@ -24,6 +24,15 @@ if [ -z "$ANTHROPIC_API_KEY" ]; then
     errors=$((errors + 1))
 fi
 
+jwt_key="${JWT_SECRET_KEY:-}"
+if [ "${#jwt_key}" -lt 32 ]; then
+    echo -e "${RED}ERROR: JWT_SECRET_KEY is not set or shorter than 32 bytes${NC}"
+    echo "  The API refuses to start without it: it signs every login token."
+    echo "  Generate with: openssl rand -hex 32"
+    echo ""
+    errors=$((errors + 1))
+fi
+
 if [ -z "$DATADR_ENCRYPTION_KEY" ]; then
     echo -e "${RED}ERROR: DATADR_ENCRYPTION_KEY is not set${NC}"
     echo "  Datasource credentials cannot be stored without an encryption key."

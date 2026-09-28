@@ -50,6 +50,18 @@
     DATADR_ENCRYPTION_KEY=<paste-key-here>
     ```
 
+    Generate the key that signs login tokens (required; the API refuses to start without it):
+
+    ```bash
+    openssl rand -hex 32
+    ```
+
+    Add it to `.env`:
+
+    ```bash
+    JWT_SECRET_KEY=<paste-key-here>
+    ```
+
     Start the stack:
 
     ```bash

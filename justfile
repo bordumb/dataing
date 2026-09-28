@@ -94,6 +94,10 @@ dev:
     if [ -f .env ]; then
         export $(grep -v '^#' .env | xargs)
     fi
+    # The API refuses to start without a JWT signing key of 32+ bytes. Keep the one from
+    # .env or the shell; otherwise use a fresh one for this run (sign in again after a restart).
+    jwt_key="${JWT_SECRET_KEY:-}"
+    if [ "${#jwt_key}" -lt 32 ]; then export JWT_SECRET_KEY="$(openssl rand -hex 32)"; fi
 
     trap 'kill 0' EXIT
 
@@ -120,6 +124,10 @@ dev-backend:
     export REDIS_PORT=6379
     export ENCRYPTION_KEY=ZnxhCyx4-ZjziPWtUguwGOFMMiLNioSwso5-qNPAGZI=
     if [ -f .env ]; then export $(grep -v '^#' .env | xargs); fi
+    # The API refuses to start without a JWT signing key of 32+ bytes. Keep the one from
+    # .env or the shell; otherwise use a fresh one for this run (sign in again after a restart).
+    jwt_key="${JWT_SECRET_KEY:-}"
+    if [ "${#jwt_key}" -lt 32 ]; then export JWT_SECRET_KEY="$(openssl rand -hex 32)"; fi
     uv run fastapi dev python-packages/dataing-ee/src/dataing_ee/entrypoints/api/app.py --host 0.0.0.0 --port 8000
 
 # Run CE backend only (no enterprise features). Requires infrastructure.
@@ -136,6 +144,10 @@ dev-backend-ce:
     export REDIS_PORT=6379
     export ENCRYPTION_KEY=ZnxhCyx4-ZjziPWtUguwGOFMMiLNioSwso5-qNPAGZI=
     if [ -f .env ]; then export $(grep -v '^#' .env | xargs); fi
+    # The API refuses to start without a JWT signing key of 32+ bytes. Keep the one from
+    # .env or the shell; otherwise use a fresh one for this run (sign in again after a restart).
+    jwt_key="${JWT_SECRET_KEY:-}"
+    if [ "${#jwt_key}" -lt 32 ]; then export JWT_SECRET_KEY="$(openssl rand -hex 32)"; fi
     uv run fastapi dev python-packages/dataing/src/dataing/entrypoints/api/app.py --host 0.0.0.0 --port 8000
 
 # Stop dev servers
@@ -334,6 +346,11 @@ demo: demo-fixtures
     #!/usr/bin/env bash
     set -euo pipefail
     echo "Starting demo stack..."
+    # The API refuses to start without a JWT signing key of 32+ bytes. docker compose
+    # takes it from the shell or .env; if neither has one, use a fresh key for this run.
+    if [ -z "${JWT_SECRET_KEY:-}" ] && ! grep -qsE '^JWT_SECRET_KEY=.{32,}' .env; then
+        export JWT_SECRET_KEY="$(openssl rand -hex 32)"
+    fi
     # Force recreate db-migrate to ensure seeds run
     docker compose -f docker-compose.yml -f demo/docker-compose.demo.yml up -d --build --force-recreate db-migrate
     docker compose -f docker-compose.yml -f demo/docker-compose.demo.yml up -d --build

@@ -54,6 +54,12 @@ if ! grep -q "ANTHROPIC_API_KEY=" .env 2>/dev/null; then
   echo "ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}" >> .env
 fi
 
+# Generate a JWT signing key unless .env already has one of 32+ bytes
+if ! grep -qE '^JWT_SECRET_KEY=.{32,}' .env 2>/dev/null; then
+  grep -v '^JWT_SECRET_KEY=' .env > .env.tmp && mv .env.tmp .env
+  echo "JWT_SECRET_KEY=$(openssl rand -hex 32)" >> .env
+fi
+
 # Generate encryption key if not present
 if ! grep -q "DATADR_ENCRYPTION_KEY=" .env 2>/dev/null; then
   KEY=$(python3 -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())")

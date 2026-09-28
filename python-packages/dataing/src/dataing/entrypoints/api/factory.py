@@ -13,6 +13,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
 
+from dataing.core.auth.jwt import jwt_secret_key
 from dataing.telemetry import CorrelationMiddleware, configure_logging, init_telemetry
 
 from .deps import lifespan
@@ -24,7 +25,14 @@ def create_app() -> FastAPI:
 
     Returns:
         Configured FastAPI application instance.
+
+    Raises:
+        JWTSecretKeyError: If JWT_SECRET_KEY is missing or too short. The API
+            signs and verifies every login token with it, so it does not start
+            without one.
     """
+    jwt_secret_key()
+
     # Initialize OpenTelemetry SDK (idempotent, safe to call multiple times)
     init_telemetry()
 

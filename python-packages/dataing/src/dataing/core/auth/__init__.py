@@ -1,6 +1,7 @@
 """Auth domain types and utilities."""
 
 from dataing.core.auth.jwt import (
+    JWTSecretKeyError,
     TokenError,
     create_access_token,
     create_refresh_token,
@@ -29,6 +30,7 @@ __all__ = [
     "TokenPayload",
     "hash_password",
     "verify_password",
+    "JWTSecretKeyError",
     "create_access_token",
     "create_refresh_token",
     "decode_token",

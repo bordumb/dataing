@@ -3,11 +3,16 @@
 from __future__ import annotations
 
 import logging
+import os
 import sys
 from collections.abc import Iterator
 from pathlib import Path
 
 import pytest
+
+# The API refuses to sign or verify JWTs without a 32+ byte key (core/auth/jwt.py).
+# Set one before any test imports the app.
+os.environ.setdefault("JWT_SECRET_KEY", "test-jwt-secret-key-that-is-at-least-32-bytes")
 
 # Add CE package to path for imports
 ce_src = Path(__file__).parent.parent / "src"

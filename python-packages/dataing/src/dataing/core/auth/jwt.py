@@ -14,11 +14,40 @@ class TokenError(Exception):
     pass
 
 
+class JWTSecretKeyError(RuntimeError):
+    """Raised when JWT_SECRET_KEY is missing or too short to sign tokens safely."""
+
+
 # Configuration
-SECRET_KEY = os.environ.get("JWT_SECRET_KEY", "dev-secret-change-in-production")
+JWT_SECRET_KEY_ENV = "JWT_SECRET_KEY"  # pragma: allowlist secret
+# HS256 wants a key at least as long as its 32-byte hash output (RFC 7518, section 3.2)
+MIN_SECRET_KEY_BYTES = 32
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24  # 24 hours
 REFRESH_TOKEN_EXPIRE_DAYS = 7
+
+
+def jwt_secret_key() -> str:
+    """Return the key that signs and verifies JWTs.
+
+    There is deliberately no built-in fallback: a key that ships in the source lets
+    anyone who reads it forge tokens for any user, org and role.
+
+    Returns:
+        The JWT_SECRET_KEY environment variable.
+
+    Raises:
+        JWTSecretKeyError: If JWT_SECRET_KEY is unset or shorter than 32 bytes.
+    """
+    key = os.environ.get(JWT_SECRET_KEY_ENV, "")
+    size = len(key.encode())
+    if size < MIN_SECRET_KEY_BYTES:
+        problem = "is not set" if not key else f"is only {size} bytes"
+        raise JWTSecretKeyError(
+            f"{JWT_SECRET_KEY_ENV} {problem}; it must be at least {MIN_SECRET_KEY_BYTES} "
+            "random bytes. Generate one with: openssl rand -hex 32"
+        )
+    return key
 
 
 def create_access_token(
@@ -50,7 +79,7 @@ def create_access_token(
         "iat": int(now.timestamp()),
     }
 
-    return jwt.encode(payload, SECRET_KEY, algorithm=ALGORITHM)
+    return jwt.encode(payload, jwt_secret_key(), algorithm=ALGORITHM)
 
 
 def create_refresh_token(user_id: str) -> str:
@@ -75,7 +104,7 @@ def create_refresh_token(user_id: str) -> str:
         "type": "refresh",
     }
 
-    return jwt.encode(payload, SECRET_KEY, algorithm=ALGORITHM)
+    return jwt.encode(payload, jwt_secret_key(), algorithm=ALGORITHM)
 
 
 def decode_token(token: str) -> TokenPayload:
@@ -89,9 +118,10 @@ def decode_token(token: str) -> TokenPayload:
 
     Raises:
         TokenError: If token is invalid or expired
+        JWTSecretKeyError: If JWT_SECRET_KEY is missing or too short
     """
     try:
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        payload = jwt.decode(token, jwt_secret_key(), algorithms=[ALGORITHM])
         return TokenPayload(
             sub=payload["sub"],
             org_id=payload["org_id"],

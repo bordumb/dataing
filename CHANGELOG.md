@@ -1,3 +1,10 @@
+## [1.25.2](https://github.com/bordumb/dataing/compare/v1.25.1...v1.25.2) (2026-09-28)
+
+
+### Bug Fixes
+
+* **deps:** declare redis, keep greenlet, and move to SQLAlchemy 2.1 ([#220](https://github.com/bordumb/dataing/issues/220)) ([d607d42](https://github.com/bordumb/dataing/commit/d607d42842b2b6cea27510e7044f97941dc47882)), closes [#212](https://github.com/bordumb/dataing/issues/212) [#219](https://github.com/bordumb/dataing/issues/219) [#219](https://github.com/bordumb/dataing/issues/219) [#212](https://github.com/bordumb/dataing/issues/212)
+
 ## [1.25.1](https://github.com/bordumb/dataing/compare/v1.25.0...v1.25.1) (2026-09-28)
 
 

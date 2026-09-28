@@ -41,8 +41,7 @@ from dataing_sdk import DataingClient
 
 client = DataingClient(api_key="your-api-key")
 investigation = client.start_investigation(
-    name="Revenue drop",
-    question="Why did revenue drop 40%?"
+    name="Revenue drop", question="Why did revenue drop 40%?"
 )
 ```
 

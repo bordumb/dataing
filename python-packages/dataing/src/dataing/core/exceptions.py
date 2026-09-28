@@ -116,7 +116,7 @@ class SnapshotSizeExceededError(DataingError):
             max_size: The maximum allowed size in bytes.
         """
         super().__init__(
-            f"Snapshot size ({actual_size:,} bytes) exceeds maximum " f"({max_size:,} bytes)"
+            f"Snapshot size ({actual_size:,} bytes) exceeds maximum ({max_size:,} bytes)"
         )
         self.actual_size = actual_size
         self.max_size = max_size

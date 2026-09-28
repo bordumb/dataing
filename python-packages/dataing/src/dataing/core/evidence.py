@@ -112,7 +112,7 @@ def verify_chain(
             return (
                 False,
                 seq,
-                f"Genesis item (seq={seq}) must have prev_hash=None, " f"got '{prev_hash}'",
+                f"Genesis item (seq={seq}) must have prev_hash=None, got '{prev_hash}'",
             )
 
         # Verify prev_hash linkage

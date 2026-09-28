@@ -463,7 +463,7 @@ def snapshot_run(
     size_mb = len(data) / (1024 * 1024)
     if size_mb > max_size:
         console.print(
-            f"[red]-[/red] Snapshot size ({size_mb:.1f} MB) exceeds " f"--max-size ({max_size} MB)"
+            f"[red]-[/red] Snapshot size ({size_mb:.1f} MB) exceeds --max-size ({max_size} MB)"
         )
         raise typer.Exit(1)
 

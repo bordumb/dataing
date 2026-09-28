@@ -245,11 +245,12 @@ class Context:
         import html as html_module
 
         assets_html = "".join(
-            f'<li><code>{html_module.escape(a.dataset_id)}</code></li>'
+            f"<li><code>{html_module.escape(a.dataset_id)}</code></li>"
             for a in self._bundle.resolved_assets
         )
+        style = "font-family: monospace; padding: 10px; border: 1px solid #ccc; border-radius: 4px;"
         return f"""
-        <div style="font-family: monospace; padding: 10px; border: 1px solid #ccc; border-radius: 4px;">
+        <div style="{style}">
             <strong>Context</strong><br>
             Bundle: {html_module.escape(self.bundle_id[:16])}...<br>
             Hash: {html_module.escape(self.bundle_hash)}<br>
@@ -577,7 +578,7 @@ class Context:
         *,
         focus: str | None = None,
     ) -> ExplainResult:
-        """Get an AI-powered explanation of the context.
+        r"""Get an AI-powered explanation of the context.
 
         Uses an LLM to analyze the assets, lineage, and anomalies in the
         context and provide a natural language explanation with actionable
@@ -613,11 +614,11 @@ class Context:
             print("Summary:")
             print(result.summary)
 
-            print("\\nInsights:")
+            print("\nInsights:")
             for insight in result.insights:
                 print(f"  - {insight}")
 
-            print("\\nRecommendations:")
+            print("\nRecommendations:")
             for rec in result.recommendations:
                 print(f"  - {rec}")
             ```
@@ -819,8 +820,7 @@ def from_sql(
         import sqlglot
     except ImportError as e:
         raise ImportError(
-            "sqlglot is required for from_sql(). "
-            "Install with: pip install 'dataing-sdk[sql]'"
+            "sqlglot is required for from_sql(). Install with: pip install 'dataing-sdk[sql]'"
         ) from e
 
     # Parse SQL

@@ -330,9 +330,9 @@ class TestConfigSchemaContracts:
         # All field groups referenced by fields must exist
         for field in schema.fields:
             if field.group:
-                assert (
-                    field.group in group_ids
-                ), f"Field {field.name} references unknown group {field.group}"
+                assert field.group in group_ids, (
+                    f"Field {field.name} references unknown group {field.group}"
+                )
 
     @pytest.mark.parametrize("source_type", list(SourceType))
     def test_login_field_is_username(self, source_type: SourceType):

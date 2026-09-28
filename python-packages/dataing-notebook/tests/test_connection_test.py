@@ -31,9 +31,11 @@ class TestConnectionTestHandler(tornado.testing.AsyncHTTPTestCase):
 
     def get_app(self) -> tornado.web.Application:
         """Create test application."""
-        return make_test_app([
-            (r"/dataing/connection/test", ConnectionTestHandler),
-        ])
+        return make_test_app(
+            [
+                (r"/dataing/connection/test", ConnectionTestHandler),
+            ]
+        )
 
     def test_missing_base_url(self) -> None:
         """Test error when base_url is missing."""

@@ -67,8 +67,7 @@ async def test_outcome_is_stored_and_posted_once(migrated_db: AppDatabase) -> No
     await ActivityEnvironment().run(record, steer["payload"])
 
     row = await migrated_db.fetch_one(
-        "SELECT status, applied_phase, outcome, applied_at FROM investigation_steers "
-        "WHERE id = $1",
+        "SELECT status, applied_phase, outcome, applied_at FROM investigation_steers WHERE id = $1",
         uuid.UUID(steer["payload"]["steer_id"]),
     )
     assert row is not None

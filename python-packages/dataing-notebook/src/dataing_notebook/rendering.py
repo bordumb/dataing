@@ -395,8 +395,9 @@ def render_timeline_event(event: RunEvent) -> None:
         ">
             <span style="margin-right: 8px;">{icon}</span>
             <strong style="color: {color};">[{event.seq}] {html.escape(label)}</strong>
-            {f'<span style="color: #6b7280; margin-left: 12px;">{details}</span>'
-             if details else ''}
+            {
+            f'<span style="color: #6b7280; margin-left: 12px;">{details}</span>' if details else ""
+        }
         </div>
         """
         display(HTML(html_content))
@@ -517,8 +518,7 @@ def render_history_table(
     total_pages = (actual_total + page_size - 1) // page_size
 
     html_parts.append(
-        f'<div class="pagination">'
-        f"Showing {start_idx}-{end_idx} of {actual_total} investigations"
+        f'<div class="pagination">Showing {start_idx}-{end_idx} of {actual_total} investigations'
     )
     if total_pages > 1:
         html_parts.append(f" | Page {page} of {total_pages}")
@@ -623,11 +623,11 @@ def render_replay_detail(investigation: dict[str, Any]) -> str:
         if isinstance(synthesis, dict):
             if "root_cause" in synthesis:
                 html_parts.append(
-                    f'<p><strong>Root Cause:</strong> '
-                    f'{html.escape(str(synthesis["root_cause"]))}</p>'
+                    f"<p><strong>Root Cause:</strong> "
+                    f"{html.escape(str(synthesis['root_cause']))}</p>"
                 )
             if "summary" in synthesis:
-                html_parts.append(f'<p>{html.escape(str(synthesis["summary"]))}</p>')
+                html_parts.append(f"<p>{html.escape(str(synthesis['summary']))}</p>")
             if "recommendations" in synthesis:
                 html_parts.append("<p><strong>Recommendations:</strong></p><ul>")
                 recs = synthesis["recommendations"]
@@ -673,7 +673,7 @@ def render_replay_detail(investigation: dict[str, Any]) -> str:
                 conclusion = ev.get("conclusion", "")
                 if conclusion:
                     html_parts.append(
-                        f"<p><strong>Conclusion:</strong> " f"{html.escape(conclusion)}</p>"
+                        f"<p><strong>Conclusion:</strong> {html.escape(conclusion)}</p>"
                     )
             elif kind == "metric":
                 metric = ev.get("metric", "")
@@ -691,8 +691,7 @@ def render_replay_detail(investigation: dict[str, Any]) -> str:
                     if key not in ("kind", "seq", "prev_hash", "hash"):
                         val_str = str(value)[:200]
                         html_parts.append(
-                            f"<p><strong>{html.escape(key)}:</strong> "
-                            f"{html.escape(val_str)}</p>"
+                            f"<p><strong>{html.escape(key)}:</strong> {html.escape(val_str)}</p>"
                         )
 
             html_parts.append("</div></details>")
@@ -779,9 +778,7 @@ def render_code_changes(code_changes: list[dict[str, Any]]) -> str:
             else:
                 display_text = short_hash
             html_parts.append(
-                f'<span class="commit-hash">'
-                f'<a href="{html.escape(url)}">{display_text}</a>'
-                f"</span>"
+                f'<span class="commit-hash"><a href="{html.escape(url)}">{display_text}</a></span>'
             )
 
         if author:

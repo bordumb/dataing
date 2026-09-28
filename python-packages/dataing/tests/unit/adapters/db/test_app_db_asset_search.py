@@ -123,9 +123,7 @@ class TestSearchAssetInstances:
         assert "|" in decoded
         assert total_hint == 50
 
-    async def test_search_with_cursor_uses_cursor_filter(
-        self, app_db: AppDatabase
-    ) -> None:
+    async def test_search_with_cursor_uses_cursor_filter(self, app_db: AppDatabase) -> None:
         """Test search with cursor includes cursor filter in query."""
         tenant_id = uuid4()
         datasource_id = uuid4()

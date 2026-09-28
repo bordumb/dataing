@@ -335,7 +335,7 @@ class FixFeedbackService:
                 COUNT(*) FILTER (WHERE rating = 'no') as failed,
                 COUNT(*) FILTER (WHERE rating = 'partially') as partial
             FROM fix_feedback
-            WHERE {' AND '.join(conditions)}
+            WHERE {" AND ".join(conditions)}
         """
 
         row = await self.db.fetch_one(query, *params)

@@ -32,11 +32,12 @@ repos:
         exclude: ^frontend/node_modules/
 
   # Python: Ruff for linting and formatting
+  # Keep rev equal to the ruff version in uv.lock, so commits and CI lint alike
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.3.0
+    rev: v0.16.9
     hooks:
       # Linting
-      - id: ruff
+      - id: ruff-check
         args: [--fix]
         files: ^python-packages/
       # Formatting

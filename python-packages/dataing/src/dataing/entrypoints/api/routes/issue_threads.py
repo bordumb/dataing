@@ -250,6 +250,22 @@ async def create_scratch_thread(
     return _thread_response(row)
 
 
+@router.patch("/{issue_id}/threads/{thread_id}", response_model=ThreadResponse)
+async def rename_scratch_thread(
+    issue_id: UUID,
+    thread_id: UUID,
+    body: ScratchThreadCreate,
+    auth: AuthDep,
+    threads: ThreadsDep,
+) -> ThreadResponse:
+    """Rename the caller's own scratch thread."""
+    thread = await _thread_for_caller(threads, issue_id, thread_id, auth)
+    if thread["kind"] == "shared":
+        raise HTTPException(status_code=400, detail="The shared thread can't be renamed")
+    title = (body.title or "").strip() or None
+    return _thread_response(await threads.rename_thread(thread_id, title))
+
+
 @router.delete("/{issue_id}/threads/{thread_id}", status_code=204, response_class=Response)
 async def delete_scratch_thread(
     issue_id: UUID, thread_id: UUID, auth: AuthDep, threads: ThreadsDep

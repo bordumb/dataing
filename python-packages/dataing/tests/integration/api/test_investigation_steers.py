@@ -162,6 +162,30 @@ async def test_sending_a_proposal_twice_sends_one_steer(migrated_db: AppDatabase
     assert [s["id"] for s in listed.json()["items"]] == [first.json()["id"]]
 
 
+async def test_two_proposals_from_one_reply_are_two_steers(migrated_db: AppDatabase) -> None:
+    """A reply can propose several steers; each can be sent."""
+    run = await _running_investigation(migrated_db)
+    temporal = FakeTemporal()
+    reply_id = str(uuid4())
+    proposals = [
+        {"kind": "add_context", "text": "app_v2 shipped at 09:00"},
+        {"kind": "rule_out", "text": "lands fast", "hypothesis_id": "h3"},
+    ]
+
+    async with _client(migrated_db, run, temporal) as client:
+        responses = [
+            await client.post(
+                f"/investigations/{run['investigation_id']}/steers",
+                json={**body, "proposal_message_id": reply_id},
+            )
+            for body in proposals
+        ]
+
+    assert [r.status_code for r in responses] == [201, 201]
+    assert responses[0].json()["id"] != responses[1].json()["id"]
+    assert len(temporal.signals) == 2
+
+
 @pytest.mark.parametrize(
     "body",
     [

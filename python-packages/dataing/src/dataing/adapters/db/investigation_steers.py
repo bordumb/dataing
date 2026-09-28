@@ -55,18 +55,32 @@ class InvestigationSteerRepository:
         self._db = db
 
     async def find_by_proposal(
-        self, investigation_id: UUID, proposal_message_id: UUID
+        self,
+        investigation_id: UUID,
+        proposal_message_id: UUID,
+        *,
+        kind: str,
+        text: str,
+        hypothesis_id: str | None,
     ) -> dict[str, Any] | None:
-        """Return the steer already sent from an agent's proposal, if any."""
+        """Return the steer already sent from an agent's proposal, if any.
+
+        One reply can propose several steers, so a proposal is the reply plus the
+        steer's kind, target and text.
+        """
         row: dict[str, Any] | None = await self._db.fetch_one(
             f"""
             SELECT {", ".join(f"s.{c.strip()}" for c in STEER_COLUMNS.split(","))}
             FROM investigation_steers s
             JOIN issue_thread_messages m ON m.id = s.message_id
             WHERE s.investigation_id = $1 AND m.payload->>'proposal_message_id' = $2
+              AND s.kind = $3 AND s.text = $4 AND s.hypothesis_id IS NOT DISTINCT FROM $5
             """,
             investigation_id,
             str(proposal_message_id),
+            kind,
+            text,
+            hypothesis_id,
         )
         return row
 

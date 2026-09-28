@@ -241,12 +241,7 @@ export function createScratchThread(issueId: string, title: string | null) {
   });
 }
 
-/**
- * Rename one of the caller's scratch chats.
- *
- * Needs PATCH /issues/{issue_id}/threads/{thread_id} on the server, which
- * routes/issue_threads.py doesn't have yet; until it does this fails with 405.
- */
+/** Rename one of the caller's scratch chats. */
 export function renameThread(issueId: string, threadId: string, title: string) {
   return customInstance<IssueThread>({
     url: `${threadsUrl(issueId)}/${threadId}`,

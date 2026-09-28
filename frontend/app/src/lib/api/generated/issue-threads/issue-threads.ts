@@ -213,6 +213,112 @@ export const useCreateScratchThreadApiV1IssuesIssueIdThreadsPost = <
   return useMutation(mutationOptions);
 };
 /**
+ * Rename the caller's own scratch thread.
+ * @summary Rename Scratch Thread
+ */
+export const renameScratchThreadApiV1IssuesIssueIdThreadsThreadIdPatch = (
+  issueId: string,
+  threadId: string,
+  scratchThreadCreate: ScratchThreadCreate,
+) => {
+  return customInstance<ThreadResponse>({
+    url: `/api/v1/issues/${issueId}/threads/${threadId}`,
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    data: scratchThreadCreate,
+  });
+};
+
+export const getRenameScratchThreadApiV1IssuesIssueIdThreadsThreadIdPatchMutationOptions =
+  <TError = HTTPValidationError, TContext = unknown>(options?: {
+    mutation?: UseMutationOptions<
+      Awaited<
+        ReturnType<
+          typeof renameScratchThreadApiV1IssuesIssueIdThreadsThreadIdPatch
+        >
+      >,
+      TError,
+      { issueId: string; threadId: string; data: ScratchThreadCreate },
+      TContext
+    >;
+  }): UseMutationOptions<
+    Awaited<
+      ReturnType<
+        typeof renameScratchThreadApiV1IssuesIssueIdThreadsThreadIdPatch
+      >
+    >,
+    TError,
+    { issueId: string; threadId: string; data: ScratchThreadCreate },
+    TContext
+  > => {
+    const { mutation: mutationOptions } = options ?? {};
+
+    const mutationFn: MutationFunction<
+      Awaited<
+        ReturnType<
+          typeof renameScratchThreadApiV1IssuesIssueIdThreadsThreadIdPatch
+        >
+      >,
+      { issueId: string; threadId: string; data: ScratchThreadCreate }
+    > = (props) => {
+      const { issueId, threadId, data } = props ?? {};
+
+      return renameScratchThreadApiV1IssuesIssueIdThreadsThreadIdPatch(
+        issueId,
+        threadId,
+        data,
+      );
+    };
+
+    return { mutationFn, ...mutationOptions };
+  };
+
+export type RenameScratchThreadApiV1IssuesIssueIdThreadsThreadIdPatchMutationResult =
+  NonNullable<
+    Awaited<
+      ReturnType<
+        typeof renameScratchThreadApiV1IssuesIssueIdThreadsThreadIdPatch
+      >
+    >
+  >;
+export type RenameScratchThreadApiV1IssuesIssueIdThreadsThreadIdPatchMutationBody =
+  ScratchThreadCreate;
+export type RenameScratchThreadApiV1IssuesIssueIdThreadsThreadIdPatchMutationError =
+  HTTPValidationError;
+
+/**
+ * @summary Rename Scratch Thread
+ */
+export const useRenameScratchThreadApiV1IssuesIssueIdThreadsThreadIdPatch = <
+  TError = HTTPValidationError,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<
+      ReturnType<
+        typeof renameScratchThreadApiV1IssuesIssueIdThreadsThreadIdPatch
+      >
+    >,
+    TError,
+    { issueId: string; threadId: string; data: ScratchThreadCreate },
+    TContext
+  >;
+}): UseMutationResult<
+  Awaited<
+    ReturnType<typeof renameScratchThreadApiV1IssuesIssueIdThreadsThreadIdPatch>
+  >,
+  TError,
+  { issueId: string; threadId: string; data: ScratchThreadCreate },
+  TContext
+> => {
+  const mutationOptions =
+    getRenameScratchThreadApiV1IssuesIssueIdThreadsThreadIdPatchMutationOptions(
+      options,
+    );
+
+  return useMutation(mutationOptions);
+};
+/**
  * Delete the caller's own scratch thread.
  * @summary Delete Scratch Thread
  */

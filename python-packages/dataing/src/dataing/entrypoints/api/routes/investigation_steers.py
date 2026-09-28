@@ -44,7 +44,8 @@ class SteerCreate(BaseModel):
     kind: SteerKind
     text: str = Field(default="", max_length=2000)
     hypothesis_id: str | None = Field(default=None, max_length=64)
-    # The agent reply whose proposal this steer sends; sending it again is a no-op
+    # The agent reply whose proposal this steer sends; sending the same proposal
+    # (same reply, kind, target and text) again is a no-op
     proposal_message_id: UUID | None = None
 
     @model_validator(mode="after")
@@ -92,7 +93,13 @@ async def create_steer(
     """Send a steer to a running investigation."""
     steers = InvestigationSteerRepository(db)
     if body.proposal_message_id is not None:
-        sent = await steers.find_by_proposal(investigation_id, body.proposal_message_id)
+        sent = await steers.find_by_proposal(
+            investigation_id,
+            body.proposal_message_id,
+            kind=body.kind,
+            text=body.text.strip(),
+            hypothesis_id=body.hypothesis_id,
+        )
         if sent is not None:
             response.status_code = 200
             return SteerResponse(**sent)

@@ -194,6 +194,20 @@ class IssueThreadRepository:
             user_id,
         )
 
+    async def rename_thread(self, thread_id: UUID, title: str | None) -> dict[str, Any]:
+        """Set a thread's title and return the thread."""
+        row: dict[str, Any] | None = await self._db.execute_returning(
+            f"""
+            UPDATE issue_threads SET title = $2, updated_at = NOW()
+            WHERE id = $1 RETURNING {THREAD_COLUMNS}
+            """,
+            thread_id,
+            title,
+        )
+        if row is None:
+            raise LookupError(f"Thread not found: {thread_id}")
+        return row
+
     async def delete_thread(self, thread_id: UUID) -> None:
         """Delete a thread and its messages."""
         await self._db.execute("DELETE FROM issue_threads WHERE id = $1", thread_id)

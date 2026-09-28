@@ -85,6 +85,10 @@ class FakeThreads:
     async def delete_thread(self, thread_id: uuid.UUID) -> None:
         self.threads.pop(thread_id)
 
+    async def rename_thread(self, thread_id: uuid.UUID, title: str | None) -> dict[str, Any]:
+        self.threads[thread_id]["title"] = title
+        return self.threads[thread_id]
+
     async def append_message(self, thread_id: uuid.UUID, **fields: Any) -> dict[str, Any]:
         now = datetime.now(UTC)
         seq = 1 + sum(1 for m in self.messages.values() if m["thread_id"] == thread_id)
@@ -322,7 +326,7 @@ class TestScratchThreads:
 
     @pytest.mark.parametrize(
         ("method", "suffix"),
-        [("get", "/messages"), ("post", "/messages"), ("delete", "")],
+        [("get", "/messages"), ("post", "/messages"), ("delete", ""), ("patch", "")],
     )
     def test_other_peoples_scratch_threads_are_not_found(
         self, client: TestClient, threads: FakeThreads, method: str, suffix: str
@@ -330,7 +334,9 @@ class TestScratchThreads:
         """Every route answers 404 for someone else's scratch thread, admins included."""
         theirs = threads._thread("scratch", RAJ)
         url = f"/issues/{ISSUE_ID}/threads/{theirs['id']}{suffix}"
-        kwargs: dict[str, Any] = {"json": {"body_md": "hi"}} if method == "post" else {}
+        kwargs: dict[str, Any] = (
+            {"json": {"body_md": "hi", "title": "x"}} if method in ("post", "patch") else {}
+        )
 
         response = getattr(client, method)(url, **kwargs, **_auth(OrgRole.ADMIN, MAYA))
 
@@ -348,6 +354,33 @@ class TestScratchThreads:
 
         assert response.status_code == 204
         assert mine["id"] not in threads.threads
+
+    def test_owner_renames_own_scratch_thread(
+        self, client: TestClient, threads: FakeThreads
+    ) -> None:
+        """The owner can retitle their scratch chat."""
+        mine = threads._thread("scratch", MAYA)
+
+        response = client.patch(
+            f"/issues/{ISSUE_ID}/threads/{mine['id']}",
+            json={"title": "  enum check  "},
+            **_auth(OrgRole.MEMBER, MAYA),
+        )
+
+        assert response.status_code == 200
+        assert response.json()["title"] == "enum check"
+
+    def test_shared_thread_cannot_be_renamed(
+        self, client: TestClient, threads: FakeThreads
+    ) -> None:
+        """The shared thread has no title of its own."""
+        response = client.patch(
+            f"/issues/{ISSUE_ID}/threads/{threads.shared['id']}",
+            json={"title": "x"},
+            **_auth(OrgRole.ADMIN, MAYA),
+        )
+
+        assert response.status_code == 400
 
     def test_thread_from_another_issue_is_not_found(
         self, client: TestClient, threads: FakeThreads

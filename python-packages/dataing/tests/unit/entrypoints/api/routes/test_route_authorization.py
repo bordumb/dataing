@@ -87,6 +87,7 @@ POLICY: dict[tuple[str, str], str] = {
     # (test_issue_threads.py); asking the agent needs write, checked there too
     ("POST", "/issues/{issue_id}/threads"): SCOPE_WRITE,
     ("DELETE", "/issues/{issue_id}/threads/{thread_id}"): ANY_USER,
+    ("PATCH", "/issues/{issue_id}/threads/{thread_id}"): ANY_USER,
     ("POST", "/issues/{issue_id}/threads/{thread_id}/messages"): ANY_USER,
     ("PATCH", "/issues/{issue_id}/threads/{thread_id}/messages/{message_id}"): ANY_USER,
     ("DELETE", "/issues/{issue_id}/threads/{thread_id}/messages/{message_id}"): ANY_USER,

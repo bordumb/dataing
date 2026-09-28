@@ -18,7 +18,7 @@ class TestDataingREPL:
     def mock_client(self) -> MagicMock:
         """Create a mock DataingClient."""
         client = MagicMock()
-        client.send_message.return_value = MagicMock(status="ok")
+        client.steer.return_value = MagicMock(status="pending")
         client.stream_run.return_value = iter([])
         client.get_investigation.return_value = None
         return client
@@ -79,7 +79,7 @@ class TestReplCommandRouting:
     def mock_client(self) -> MagicMock:
         """Create a mock DataingClient."""
         client = MagicMock()
-        client.send_message.return_value = MagicMock(status="ok")
+        client.steer.return_value = MagicMock(status="pending")
         client.stream_run.return_value = iter([])
         client.get_investigation.return_value = None
         return client
@@ -273,7 +273,7 @@ class TestReplMessageHandling:
     def mock_client(self) -> MagicMock:
         """Create a mock DataingClient."""
         client = MagicMock()
-        client.send_message.return_value = MagicMock(status="ok")
+        client.steer.return_value = MagicMock(status="pending")
 
         # Set up completed event
         completed_event = MagicMock()
@@ -300,7 +300,7 @@ class TestReplMessageHandling:
         with patch("dataing_cli.repl.Live"):
             await repl._handle_message("test question")
 
-        mock_client.send_message.assert_called_once_with("test-id", "test question")
+        mock_client.steer.assert_called_once_with("test-id", "test question")
 
     @pytest.mark.asyncio
     async def test_handle_message_streams_response(

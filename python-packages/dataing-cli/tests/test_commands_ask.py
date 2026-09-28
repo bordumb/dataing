@@ -64,8 +64,32 @@ class TestAskCommand:
 
         result = runner.invoke(app, ["ask", "What caused this?"])
 
-        mock_client_patch.send_message.assert_called_once_with("test-inv-id", "What caused this?")
+        mock_client_patch.steer.assert_called_once_with("test-inv-id", "What caused this?")
         assert result.exit_code == 0
+
+    def test_ask_on_a_finished_run_says_why_nothing_happened(
+        self,
+        runner: CliRunner,
+        configured_env: Path,
+        mock_client_patch: MagicMock,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """A finished run rejects the context; the CLI shows the reason and stops."""
+        monkeypatch.setattr(
+            "dataing_cli.commands.ask.get_current_investigation_id",
+            lambda: "test-inv-id",
+        )
+        mock_client_patch.steer.return_value = MagicMock(
+            status="rejected",
+            outcome="The investigation isn't running: use Continue investigating",
+        )
+
+        result = runner.invoke(app, ["ask", "What caused this?"])
+
+        assert result.exit_code == 0
+        assert "Not applied" in result.output
+        assert "Continue investigating" in result.output
+        mock_client_patch.stream_run.assert_not_called()
 
     def test_ask_with_investigation_flag(
         self,
@@ -90,7 +114,7 @@ class TestAskCommand:
 
         result = runner.invoke(app, ["ask", "--investigation", "explicit-id", "question"])
 
-        mock_client_patch.send_message.assert_called_with("explicit-id", "question")
+        mock_client_patch.steer.assert_called_with("explicit-id", "question")
         assert result.exit_code == 0
 
     def test_ask_saves_investigation_to_config(

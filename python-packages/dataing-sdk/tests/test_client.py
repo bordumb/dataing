@@ -233,3 +233,62 @@ class TestDataingClientEndpointPaths:
         # which builds: f"{self.base_url}/api/v1/investigations/{run_id}/events"
         assert client.base_url == "http://test.example.com"
         # The actual URL would be: http://test.example.com/api/v1/investigations/test-run-123/events
+
+
+class TestDataingClientSteer:
+    """Steering a running investigation (the messages route is gone)."""
+
+    STEER = {
+        "id": "steer-1",
+        "investigation_id": "inv-1",
+        "kind": "add_context",
+        "text": "app_v2 shipped at 09:00",
+        "hypothesis_id": None,
+        "status": "pending",
+        "outcome": None,
+    }
+
+    def test_steer_posts_to_the_steers_endpoint(self) -> None:
+        """Context goes to POST /api/v1/investigations/{id}/steers as add_context."""
+        from unittest.mock import MagicMock
+
+        client = DataingClient(api_key="key", base_url="http://test.example.com")
+        response = MagicMock()
+        response.json.return_value = self.STEER
+
+        with patch.object(client, "_request", return_value=response) as request:
+            result = client.steer("inv-1", "app_v2 shipped at 09:00")
+
+        request.assert_called_once_with(
+            "POST",
+            "/api/v1/investigations/inv-1/steers",
+            json={"kind": "add_context", "text": "app_v2 shipped at 09:00", "hypothesis_id": None},
+        )
+        assert (result.id, result.status) == ("steer-1", "pending")
+
+    async def test_async_steer_can_rule_out_a_hypothesis(self) -> None:
+        """A rule-out names the hypothesis; a finished run's rejection is returned."""
+        from unittest.mock import AsyncMock, MagicMock
+
+        client = DataingClient(api_key="key", base_url="http://test.example.com")
+        response = MagicMock()
+        response.json.return_value = {
+            **self.STEER,
+            "kind": "rule_out",
+            "hypothesis_id": "h3",
+            "status": "rejected",
+            "outcome": "The investigation isn't running: use Continue investigating",
+        }
+
+        with patch.object(client, "_async_request", AsyncMock(return_value=response)) as request:
+            result = await client.async_steer(
+                "inv-1", "lands fast", kind="rule_out", hypothesis_id="h3"
+            )
+
+        assert request.await_args.kwargs["json"] == {
+            "kind": "rule_out",
+            "text": "lands fast",
+            "hypothesis_id": "h3",
+        }
+        assert result.status == "rejected"
+        assert result.outcome.startswith("The investigation isn't running")

@@ -56,7 +56,7 @@ See Also:
 from __future__ import annotations
 
 import os
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Literal
 
 import httpx
 
@@ -68,6 +68,8 @@ from .exceptions import (
     ServerError,
     ValidationError,
 )
+
+SteerKind = Literal["add_context", "rule_out", "add_hypothesis", "stop_and_synthesize"]
 
 if TYPE_CHECKING:
     from .context import Context
@@ -1050,78 +1052,69 @@ class DataingClient:
             root_hash=data.get("root_hash"),
         )
 
-    def send_message(self, investigation_id: str, message: str) -> Any:
-        """Send a user message to an investigation.
+    def steer(
+        self,
+        investigation_id: str,
+        text: str,
+        *,
+        kind: SteerKind = "add_context",
+        hypothesis_id: str | None = None,
+    ) -> Any:
+        """Steer a running investigation.
 
-        Sends a follow-up message to an ongoing investigation, allowing users
-        to provide additional context, ask questions, or redirect the
-        investigation focus.
+        The run applies the steer at its next checkpoint: new context reaches the
+        subagents started afterwards and the synthesis; a rule-out cancels that
+        hypothesis's subagent; an added hypothesis gets its own subagent; stop
+        concludes with what the run has. A finished run rejects the steer.
 
         Args:
             investigation_id: The unique identifier of the investigation.
-            message: The user message text to send.
+            text: The fact, reason or hypothesis, in a sentence or two.
+            kind: add_context (default), rule_out, add_hypothesis or
+                stop_and_synthesize.
+            hypothesis_id: The hypothesis to rule out, for rule_out.
 
         Returns:
-            A `SendMessageResponse` object with status and investigation_id.
+            A `SteerResult`: pending until the run applies it, or rejected with
+            the reason (for example, the run already finished).
 
         Raises:
             NotFoundError: If the investigation ID does not exist.
-            AuthError: If not authorized to access this investigation.
-            DataingError: If the message could not be sent.
+            AuthError: If not authorized to steer this investigation.
+            ValidationError: If the steer is missing what it acts on.
 
         Example:
             ```python
-            inv = client.start_investigation(
-                dataset="main.orders",
-                anomaly_type="null_rate",
-                goal="Investigate nulls",
-            )
-
-            # Later, send a follow-up message
-            response = client.send_message(
-                inv.investigation_id,
-                "Can you also check the upstream data source?"
-            )
-            print(f"Message status: {response.status}")
+            result = client.steer(inv.investigation_id, "app_v2 shipped at 09:00 UTC")
+            if result.status == "rejected":
+                print(result.outcome)
             ```
-
-        See Also:
-            - `start_investigation`: Start a new investigation
-            - `get_investigation`: Get current investigation state
-            - `stream_run`: Stream real-time events
         """
-        from .types import SendMessageResponse
-
         response = self._request(
             "POST",
-            f"/api/v1/investigations/{investigation_id}/messages",
-            json={"message": message},
+            f"/api/v1/investigations/{investigation_id}/steers",
+            json=_steer_body(kind, text, hypothesis_id),
         )
-        data = response.json()
+        return _steer_result(response.json())
 
-        return SendMessageResponse(
-            status=data.get("status", "unknown"),
-            investigation_id=str(data.get("investigation_id", investigation_id)),
-        )
+    async def async_steer(
+        self,
+        investigation_id: str,
+        text: str,
+        *,
+        kind: SteerKind = "add_context",
+        hypothesis_id: str | None = None,
+    ) -> Any:
+        """Async version of `steer`.
 
-    async def async_send_message(self, investigation_id: str, message: str) -> Any:
-        """Async version of `send_message`.
-
-        See `send_message` for full documentation.
+        See `steer` for full documentation.
         """
-        from .types import SendMessageResponse
-
         response = await self._async_request(
             "POST",
-            f"/api/v1/investigations/{investigation_id}/messages",
-            json={"message": message},
+            f"/api/v1/investigations/{investigation_id}/steers",
+            json=_steer_body(kind, text, hypothesis_id),
         )
-        data = response.json()
-
-        return SendMessageResponse(
-            status=data.get("status", "unknown"),
-            investigation_id=str(data.get("investigation_id", investigation_id)),
-        )
+        return _steer_result(response.json())
 
     def verify_investigation(self, investigation_id: str) -> Any:
         """Verify the evidence hash chain of an investigation.
@@ -1882,3 +1875,23 @@ class DataingClient:
         )
         result: dict[str, Any] = response.json()
         return result
+
+
+def _steer_body(kind: str, text: str, hypothesis_id: str | None) -> dict[str, Any]:
+    """Return the steers API request body."""
+    return {"kind": kind, "text": text, "hypothesis_id": hypothesis_id}
+
+
+def _steer_result(data: dict[str, Any]) -> Any:
+    """Build a SteerResult from the steers API response."""
+    from .types import SteerResult
+
+    return SteerResult(
+        id=str(data["id"]),
+        investigation_id=str(data["investigation_id"]),
+        kind=data["kind"],
+        text=data.get("text", ""),
+        hypothesis_id=data.get("hypothesis_id"),
+        status=data["status"],
+        outcome=data.get("outcome"),
+    )

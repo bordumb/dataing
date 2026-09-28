@@ -121,6 +121,10 @@ class FakeThreads:
             message["body_md"] = fields["body_md"]
         if fields.get("edited"):
             message["edited_at"] = datetime.now(UTC)
+        if fields.get("status") is not None:
+            message["status"] = fields["status"]
+        if fields.get("payload") is not None:
+            message["payload"] = fields["payload"]
         return message
 
     async def soft_delete_message(self, message_id: uuid.UUID) -> dict[str, Any]:
@@ -161,6 +165,9 @@ def client(threads: FakeThreads) -> TestClient:
     app.include_router(router)
     app.dependency_overrides[get_app_db] = lambda: db
     app.dependency_overrides[get_issue_thread_repository] = lambda: threads
+    from dataing.entrypoints.api.routes.issue_threads import get_thread_agent
+
+    app.dependency_overrides[get_thread_agent] = lambda: None
     return TestClient(app)
 
 
@@ -522,3 +529,141 @@ class TestEventDescriptions:
         from dataing.adapters.db.issue_threads import describe_event
 
         assert describe_event(event_type, payload) == text
+
+
+class FakeAgent:
+    """Records the requests sent to the thread workflow."""
+
+    def __init__(self, fail: bool = False) -> None:
+        """Initialize; with fail=True every enqueue raises."""
+        self.fail = fail
+        self.requests: list[dict[str, Any]] = []
+        self.cancelled: list[tuple[str, str]] = []
+
+    async def enqueue_thread_request(self, request: dict[str, Any]) -> None:
+        if self.fail:
+            raise RuntimeError("temporal down")
+        self.requests.append(request)
+
+    async def cancel_thread_request(self, thread_id: str, message_id: str) -> None:
+        self.cancelled.append((thread_id, message_id))
+
+
+def _client_with_agent(threads: FakeThreads, agent: FakeAgent | None) -> TestClient:
+    from dataing.entrypoints.api.routes.issue_threads import get_thread_agent
+
+    db = AsyncMock()
+    db.fetch_one.return_value = {"id": ISSUE_ID, "tenant_id": TENANT_ID}
+    app = FastAPI()
+    app.include_router(router)
+    app.dependency_overrides[get_app_db] = lambda: db
+    app.dependency_overrides[get_issue_thread_repository] = lambda: threads
+    app.dependency_overrides[get_thread_agent] = lambda: agent
+    return TestClient(app)
+
+
+class TestAskingTheAgent:
+    """Asking creates a queued reply and hands the request to the thread workflow."""
+
+    def test_question_queues_a_reply_and_enqueues_it(self, threads: FakeThreads) -> None:
+        """The reply exists at once, queued, so the UI and the turn limit see it."""
+        agent = FakeAgent()
+        client = _client_with_agent(threads, agent)
+
+        response = client.post(
+            _messages_url(threads.shared["id"]),
+            json={"body_md": "is it every region?", "ask_agent": True},
+            **_auth(OrgRole.MEMBER, MAYA),
+        )
+
+        assert response.status_code == 201
+        question_id = response.json()["id"]
+        (reply,) = (m for m in threads.messages.values() if m["kind"] == "agent_reply")
+        assert reply["status"] == "queued"
+        assert str(reply["request_message_id"]) == question_id
+        assert reply["requested_by_user_id"] == MAYA
+        (request,) = agent.requests
+        assert request["message_id"] == question_id
+        assert request["thread_id"] == str(threads.shared["id"])
+        assert request["requested_by"] == str(MAYA)
+        assert request["kind"] == "answer"
+
+    def test_unavailable_agent_marks_the_reply_failed(self, threads: FakeThreads) -> None:
+        """If the workflow can't be reached, the reply says so instead of waiting forever."""
+        client = _client_with_agent(threads, FakeAgent(fail=True))
+
+        response = client.post(
+            _messages_url(threads.shared["id"]),
+            json={"body_md": "q", "ask_agent": True},
+            **_auth(OrgRole.MEMBER, MAYA),
+        )
+
+        assert response.status_code == 201
+        (reply,) = (m for m in threads.messages.values() if m["kind"] == "agent_reply")
+        assert reply["status"] == "error"
+
+    def test_plain_comment_does_not_reach_the_agent(self, threads: FakeThreads) -> None:
+        """Only messages that ask the agent are enqueued."""
+        agent = FakeAgent()
+        client = _client_with_agent(threads, agent)
+
+        client.post(
+            _messages_url(threads.shared["id"]),
+            json={"body_md": "fyi"},
+            **_auth(OrgRole.MEMBER, MAYA),
+        )
+
+        assert agent.requests == []
+
+
+class TestCancellingATurn:
+    """The requester or an admin can cancel a queued or streaming answer."""
+
+    def _ask(self, client: TestClient, threads: FakeThreads) -> dict[str, Any]:
+        client.post(
+            _messages_url(threads.shared["id"]),
+            json={"body_md": "q", "ask_agent": True},
+            **_auth(OrgRole.MEMBER, MAYA),
+        )
+        (reply,) = (m for m in threads.messages.values() if m["kind"] == "agent_reply")
+        return reply
+
+    def test_requester_cancels_a_queued_answer(self, threads: FakeThreads) -> None:
+        """The reply is marked cancelled and the workflow is told."""
+        agent = FakeAgent()
+        client = _client_with_agent(threads, agent)
+        reply = self._ask(client, threads)
+
+        response = client.post(
+            f"{_messages_url(threads.shared['id'])}/{reply['id']}/cancel",
+            **_auth(OrgRole.MEMBER, MAYA),
+        )
+
+        assert response.status_code == 200
+        assert reply["status"] == "cancelled"
+        assert agent.cancelled == [(str(threads.shared["id"]), str(reply["request_message_id"]))]
+
+    def test_someone_else_cannot_cancel(self, threads: FakeThreads) -> None:
+        """Another member can't cancel Maya's question."""
+        client = _client_with_agent(threads, FakeAgent())
+        reply = self._ask(client, threads)
+
+        response = client.post(
+            f"{_messages_url(threads.shared['id'])}/{reply['id']}/cancel",
+            **_auth(OrgRole.MEMBER, RAJ),
+        )
+
+        assert response.status_code == 403
+
+    def test_finished_answers_cannot_be_cancelled(self, threads: FakeThreads) -> None:
+        """A complete reply answers 409."""
+        client = _client_with_agent(threads, FakeAgent())
+        reply = self._ask(client, threads)
+        reply["status"] = "complete"
+
+        response = client.post(
+            f"{_messages_url(threads.shared['id'])}/{reply['id']}/cancel",
+            **_auth(OrgRole.ADMIN, RAJ),
+        )
+
+        assert response.status_code == 409

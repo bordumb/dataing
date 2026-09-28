@@ -75,7 +75,7 @@ CREATE TABLE agent_query_results (
     tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
     message_id UUID NOT NULL REFERENCES issue_thread_messages(id) ON DELETE CASCADE,
     tool_call_id TEXT NOT NULL,
-    datasource_id UUID NOT NULL,
+    datasource_id UUID,  -- NULL when the issue has no datasource to query
     sql TEXT NOT NULL,
     dialect TEXT NOT NULL,
     columns JSONB NOT NULL DEFAULT '[]',

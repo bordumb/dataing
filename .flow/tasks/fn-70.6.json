@@ -7,10 +7,19 @@
     "fn-70.1"
   ],
   "epic": "fn-70",
+  "evidence": {
+    "commits": [
+      "009e8834"
+    ],
+    "prs": [],
+    "tests": [
+      "pytest tests/unit/entrypoints/api/routes/test_issue_sidebar.py"
+    ]
+  },
   "id": "fn-70.6",
   "priority": null,
   "spec_path": ".flow/tasks/fn-70.6.md",
-  "status": "in_progress",
+  "status": "done",
   "title": "M1: issue sidebar backend: allowed transitions, clearable PATCH, context",
-  "updated_at": "2026-09-27T23:54:41.931815Z"
+  "updated_at": "2026-09-27T23:54:55.319267Z"
 }

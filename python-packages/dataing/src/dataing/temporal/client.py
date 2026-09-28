@@ -6,12 +6,18 @@ from dataclasses import dataclass
 from typing import Any
 
 from temporalio.client import Client
+from temporalio.service import RPCError, RPCStatusCode
 
 from dataing.temporal.workflows.investigation import (
     InvestigationInput,
     InvestigationQueryStatus,
     InvestigationResult,
     InvestigationWorkflow,
+)
+from dataing.temporal.workflows.issue_thread import (
+    IssueThreadInput,
+    IssueThreadWorkflow,
+    thread_workflow_id,
 )
 
 
@@ -167,6 +173,37 @@ class TemporalInvestigationClient:
         """
         handle = await self.get_handle(investigation_id)
         await handle.signal(InvestigationWorkflow.cancel_investigation)
+
+    async def enqueue_thread_request(self, request: dict[str, Any]) -> None:
+        """Queue an agent request on its thread's workflow, starting it if needed.
+
+        Uses signal-with-start, so concurrent requests for the same thread reach
+        one workflow and run in order.
+
+        Args:
+            request: message_id, kind, thread_id, tenant_id, issue_id, requested_by.
+        """
+        thread_id = str(request["thread_id"])
+        await self._client.start_workflow(
+            IssueThreadWorkflow.run,
+            IssueThreadInput(thread_id=thread_id),
+            id=thread_workflow_id(thread_id),
+            task_queue=self._task_queue,
+            start_signal="enqueue",
+            start_signal_args=[request],
+        )
+
+    async def cancel_thread_request(self, thread_id: str, message_id: str) -> None:
+        """Drop a queued agent request or cancel the running turn.
+
+        A thread whose workflow already finished has nothing to cancel.
+        """
+        handle = self._client.get_workflow_handle(thread_workflow_id(thread_id))
+        try:
+            await handle.signal(IssueThreadWorkflow.cancel_request, message_id)
+        except RPCError as e:
+            if e.status != RPCStatusCode.NOT_FOUND:
+                raise
 
     async def send_user_input(
         self,

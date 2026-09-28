@@ -90,6 +90,7 @@ POLICY: dict[tuple[str, str], str] = {
     ("POST", "/issues/{issue_id}/threads/{thread_id}/messages"): ANY_USER,
     ("PATCH", "/issues/{issue_id}/threads/{thread_id}/messages/{message_id}"): ANY_USER,
     ("DELETE", "/issues/{issue_id}/threads/{thread_id}/messages/{message_id}"): ANY_USER,
+    ("POST", "/issues/{issue_id}/threads/{thread_id}/messages/{message_id}/cancel"): ANY_USER,
     ("POST", "/issues/{issue_id}/investigation-runs"): SCOPE_WRITE,
     ("DELETE", "/issues/{issue_id}/watch"): ANY_USER,
     ("POST", "/issues/{issue_id}/watch"): ANY_USER,

@@ -37,6 +37,24 @@ router = APIRouter(prefix="/issues", tags=["issue-threads"])
 MAX_RUNNING_TURNS_PER_PERSON = 3
 
 
+class ThreadAgent(Protocol):
+    """Hands agent requests to the thread's workflow."""
+
+    async def enqueue_thread_request(self, request: dict[str, Any]) -> None:
+        """Queue a request, starting the thread's workflow if needed."""
+        ...
+
+    async def cancel_thread_request(self, thread_id: str, message_id: str) -> None:
+        """Drop a queued request or cancel the running turn."""
+        ...
+
+
+def get_thread_agent(request: Request) -> ThreadAgent | None:
+    """Return the Temporal client that runs agent turns, if one is connected."""
+    agent: ThreadAgent | None = getattr(request.app.state, "temporal_client", None)
+    return agent
+
+
 def get_issue_thread_repository(
     db: Annotated[AppDatabase, Depends(get_app_db)],
 ) -> IssueThreadRepository:
@@ -48,6 +66,7 @@ AuthDep = Annotated[ApiKeyContext, Depends(verify_api_key)]
 WriteScopeDep = Annotated[ApiKeyContext, Depends(require_scope("write"))]
 AppDbDep = Annotated[AppDatabase, Depends(get_app_db)]
 ThreadsDep = Annotated[IssueThreadRepository, Depends(get_issue_thread_repository)]
+ThreadAgentDep = Annotated["ThreadAgent | None", Depends(get_thread_agent)]
 
 
 # ============================================================================
@@ -250,6 +269,7 @@ async def post_message(
     auth: AuthDep,
     db: AppDbDep,
     threads: ThreadsDep,
+    agent: ThreadAgentDep,
 ) -> MessageResponse:
     """Post a comment, optionally asking the agent to answer it.
 
@@ -283,7 +303,52 @@ async def post_message(
             db, issue_id, "comment_added", user_id, {"message_id": str(row["id"])}
         )
         await db.execute("UPDATE issues SET updated_at = NOW() WHERE id = $1", issue_id)
+    if body.ask_agent:
+        await _queue_answer(threads, agent, thread, row, user_id)
     return message_response(row)
+
+
+async def _queue_answer(
+    threads: IssueThreadRepository,
+    agent: ThreadAgent | None,
+    thread: dict[str, Any],
+    question: dict[str, Any],
+    user_id: UUID,
+) -> None:
+    """Create the queued reply and hand the question to the thread's workflow.
+
+    The reply exists before the workflow runs, so the thread shows "queued" at
+    once and the per-person turn limit counts it. If the workflow can't be
+    reached, the reply is marked failed rather than left queued forever.
+    """
+    reply = await threads.append_message(
+        thread["id"],
+        author_kind="agent",
+        kind="agent_reply",
+        requested_by_user_id=user_id,
+        request_message_id=question["id"],
+        reply_to_id=question["id"],
+        status="queued",
+    )
+    request = {
+        "message_id": str(question["id"]),
+        "kind": "answer",
+        "thread_id": str(thread["id"]),
+        "tenant_id": str(thread["tenant_id"]),
+        "issue_id": str(thread["issue_id"]),
+        "requested_by": str(user_id),
+    }
+    try:
+        if agent is None:
+            raise RuntimeError("no workflow client connected")
+        await agent.enqueue_thread_request(request)
+    except Exception as e:
+        logger.error(f"Could not queue agent request {question['id']}: {e}")
+        await threads.update_message(
+            reply["id"],
+            status="error",
+            payload={"error": "The agent is unavailable right now. Try again shortly."},
+        )
 
 
 @router.patch(
@@ -331,6 +396,35 @@ async def delete_message(
         raise HTTPException(status_code=403, detail="Only the author or an admin can delete this")
     await threads.soft_delete_message(message_id)
     return Response(status_code=204)
+
+
+@router.post(
+    "/{issue_id}/threads/{thread_id}/messages/{message_id}/cancel",
+    response_model=MessageResponse,
+)
+async def cancel_answer(
+    issue_id: UUID,
+    thread_id: UUID,
+    message_id: UUID,
+    auth: AuthDep,
+    threads: ThreadsDep,
+    agent: ThreadAgentDep,
+) -> MessageResponse:
+    """Cancel a queued or streaming agent answer: the person who asked, or an admin."""
+    await _thread_for_caller(threads, issue_id, thread_id, auth)
+    reply = await _message_in_thread(threads, thread_id, message_id)
+    if reply["kind"] != "agent_reply" or reply["request_message_id"] is None:
+        raise HTTPException(status_code=400, detail="Only agent answers can be cancelled")
+    if not (auth.is_user(reply["requested_by_user_id"]) or auth.has_scope("admin")):
+        raise HTTPException(status_code=403, detail="Only the person who asked can cancel this")
+    if reply["status"] not in ("queued", "streaming"):
+        raise HTTPException(status_code=409, detail="This answer has already finished")
+    if reply["status"] == "queued":
+        updated = await threads.update_message(message_id, status="cancelled")
+        reply = updated or reply
+    if agent is not None:
+        await agent.cancel_thread_request(str(thread_id), str(reply["request_message_id"]))
+    return message_response(reply)
 
 
 # ============================================================================

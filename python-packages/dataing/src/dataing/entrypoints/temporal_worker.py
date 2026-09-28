@@ -34,6 +34,7 @@ from dataing.adapters.datasource.base import BaseAdapter
 from dataing.adapters.db.app_db import AppDatabase
 from dataing.adapters.investigation.pattern_adapter import InMemoryPatternRepository
 from dataing.agents import AgentClient
+from dataing.agents.chat import build_chat_agent, build_chat_model
 from dataing.config import settings
 from dataing.core.snapshot_store import LocalSnapshotStore
 from dataing.telemetry import configure_logging
@@ -49,8 +50,16 @@ from dataing.temporal.activities import (
     make_interpret_evidence_activity,
     make_synthesize_activity,
 )
+from dataing.temporal.activities.agent_turn import (
+    make_mark_turn_failed_activity,
+    make_run_agent_turn_activity,
+)
 from dataing.temporal.adapters import TemporalAgentAdapter
-from dataing.temporal.workflows import EvaluateHypothesisWorkflow, InvestigationWorkflow
+from dataing.temporal.workflows import (
+    EvaluateHypothesisWorkflow,
+    InvestigationWorkflow,
+    IssueThreadWorkflow,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -185,6 +194,15 @@ class TenantAdapterCache:
         return adapter
 
 
+def _chat_agent_factory() -> Any:
+    """Return a factory for the issue chat agent (one model, a fresh agent per turn)."""
+    model = build_chat_model(
+        settings.chat_agent_model, settings.anthropic_api_key, settings.chat_agent_effort
+    )
+    logger.info(f"Chat agent model: {settings.chat_agent_model}")
+    return lambda: build_chat_agent(model)
+
+
 def create_activities(deps: dict[str, Any]) -> list[Any]:
     """Create all activity functions with injected dependencies.
 
@@ -225,6 +243,9 @@ def create_activities(deps: dict[str, Any]) -> list[Any]:
         make_counter_analyze_activity(adapter=agent_adapter),
         # Evidence chain finalization
         make_finalize_evidence_chain_activity(app_db=app_db),
+        # Issue chat agent turns
+        make_run_agent_turn_activity(app_db=app_db, agent_factory=_chat_agent_factory()),
+        make_mark_turn_failed_activity(app_db=app_db),
     ]
 
     logger.info(f"Created {len(activities)} activities with dependencies")
@@ -261,7 +282,7 @@ async def run_worker() -> None:
     worker = Worker(
         client,
         task_queue=settings.TEMPORAL_TASK_QUEUE,
-        workflows=[InvestigationWorkflow, EvaluateHypothesisWorkflow],
+        workflows=[InvestigationWorkflow, EvaluateHypothesisWorkflow, IssueThreadWorkflow],
         activities=activities,
         max_concurrent_activities=MAX_CONCURRENT_ACTIVITIES,
         max_concurrent_workflow_tasks=MAX_CONCURRENT_WORKFLOW_TASKS,
@@ -274,7 +295,7 @@ async def run_worker() -> None:
         logger.info("Worker shutting down, cleaning up resources...")
         app_db = deps.get("app_db")
         if app_db:
-            await app_db.disconnect()
+            await app_db.close()
         logger.info("Cleanup complete")
 
 

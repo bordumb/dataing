@@ -9,7 +9,13 @@ import os
 # one: change a default here, or override it per deployment with LLM_MODEL and
 # CHAT_AGENT_MODEL.
 INVESTIGATION_MODEL = "claude-sonnet-5-5"  # The manager and its subagents
-CHAT_MODEL = "claude-opus-5-5"  # Issue chat turns and brief drafting
+CHAT_MODEL = "claude-sonnet-5-5"  # Issue chat turns and brief drafting
+
+# Approximate price per 1K tokens, for usage estimates
+MODEL_PRICING = {
+    "claude-sonnet-5-5": {"input": 0.003, "output": 0.015},  # Sonnet tier
+    "claude-opus-5-5": {"input": 0.004, "output": 0.02},  # $4 / $20 per MTok
+}
 
 
 class Settings:

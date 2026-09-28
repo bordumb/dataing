@@ -16,11 +16,11 @@ SOURCES = [
 MODEL_ID = re.compile(r"""["']claude-[a-z0-9.-]+["']""")
 
 
-def test_chat_agent_defaults_to_claude_opus_5_5(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Chat turns and brief drafting run on Claude Opus 5.5 unless CHAT_AGENT_MODEL is set."""
+def test_chat_agent_defaults_to_claude_sonnet_5_5(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Chat turns and brief drafting run on Claude Sonnet 5.5 unless CHAT_AGENT_MODEL is set."""
     monkeypatch.delenv("CHAT_AGENT_MODEL", raising=False)
 
-    assert Settings().chat_agent_model == CHAT_MODEL == "claude-opus-5-5"
+    assert Settings().chat_agent_model == CHAT_MODEL == "claude-sonnet-5-5"
 
 
 def test_investigations_default_to_claude_sonnet_5_5(monkeypatch: pytest.MonkeyPatch) -> None:

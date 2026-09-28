@@ -130,7 +130,8 @@ def build_brief_agent(model: Model | str) -> Agent[None, BriefDraft]:
     """Return the agent that drafts an investigation brief from a thread.
 
     The draft comes back as JSON text rather than through an output tool: an output
-    tool makes pydantic-ai force tool_choice, which Claude Opus 5.5 rejects.
+    tool makes pydantic-ai force tool_choice, which recent Claude models (Opus 5.5)
+    reject; JSON text works on every model.
     """
     return Agent(
         model,

@@ -1,3 +1,10 @@
+## [1.25.5](https://github.com/bordumb/dataing/compare/v1.25.4...v1.25.5) (2026-09-29)
+
+
+### Bug Fixes
+
+* **frontend:** keep the API client's shapes under orval 8 and regenerate it ([#232](https://github.com/bordumb/dataing/issues/232)) ([5831074](https://github.com/bordumb/dataing/commit/5831074496934a7ebc13262facdd4ab244123779)), closes [#221](https://github.com/bordumb/dataing/issues/221) [#230](https://github.com/bordumb/dataing/issues/230)
+
 ## [1.25.4](https://github.com/bordumb/dataing/compare/v1.25.3...v1.25.4) (2026-09-28)
 
 

@@ -219,9 +219,15 @@ format:
 
 # Generate OpenAPI client for frontend
 generate-client:
-    @echo "Exporting OpenAPI schema from backend..."
+    #!/usr/bin/env bash
+    set -euo pipefail
+    # Exporting the schema builds the app, which refuses to start without a JWT signing
+    # key of 32+ bytes. The schema doesn't depend on the key, so a throwaway one will do.
+    jwt_key="${JWT_SECRET_KEY:-}"
+    if [ "${#jwt_key}" -lt 32 ]; then export JWT_SECRET_KEY="$(openssl rand -hex 32)"; fi
+    echo "Exporting OpenAPI schema from backend..."
     uv run python python-packages/dataing/scripts/export_openapi.py
-    @echo "Generating OpenAPI client..."
+    echo "Generating OpenAPI client..."
     cd frontend/app && pnpm orval
 
 # Build for production
@@ -245,6 +251,10 @@ clean:
     rm -rf python-packages/dataing-ee/.pytest_cache python-packages/dataing-ee/.ruff_cache
     rm -rf frontend/app/dist frontend/app/node_modules/.cache
     rm -rf frontend/landing/dist frontend/landing/node_modules/.cache
+
+# Show which worktrees still hold work not on main (--branches: other local branches too)
+worktrees *args:
+    @python3 scripts/worktree_status.py {{args}}
 
 # Start docker-compose stack
 docker-up:

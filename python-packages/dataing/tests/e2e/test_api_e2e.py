@@ -141,8 +141,26 @@ class TestAPIEndToEnd:
         self,
         client: TestClient,
     ) -> None:
-        """Test creating an investigation."""
+        """An SDK alert starts a run in an issue.
+
+        Opening the issue and starting the workflow are InvestigationStarterService's
+        job, tested on its own; here it stands in, so the test covers the API.
+        """
         from unittest.mock import patch
+
+        from dataing.entrypoints.api.deps import get_investigation_starter
+        from dataing.services.investigation import StartedInvestigation
+
+        started = StartedInvestigation(
+            investigation_id=uuid.uuid4(),
+            run_id=uuid.uuid4(),
+            issue_id=uuid.uuid4(),
+            issue_number=1,
+            run={},
+        )
+        starter = AsyncMock()
+        starter.start.return_value = started
+        app.dependency_overrides[get_investigation_starter] = lambda: starter
 
         payload = {
             "alert": {
@@ -163,26 +181,28 @@ class TestAPIEndToEnd:
         }
 
         # Patch the deps functions that the route calls
-        with (
-            patch(
+        try:
+            with patch(
                 "dataing.entrypoints.api.deps.resolve_datasource_id",
                 return_value=uuid.uuid4(),
-            ),
-            patch(
-                "dataing.entrypoints.api.deps.get_tenant_adapter",
-                return_value=AsyncMock(),
-            ),
-        ):
-            response = client.post(
-                "/api/v1/investigations",
-                json=payload,
-                headers={"X-API-Key": "ddr_valid_test_key"},
-            )
+            ):
+                response = client.post(
+                    "/api/v1/investigations",
+                    json=payload,
+                    headers={"X-API-Key": "ddr_valid_test_key"},
+                )
+        finally:
+            app.dependency_overrides.pop(get_investigation_starter, None)
 
         assert response.status_code == 200
         data = response.json()
-        assert "investigation_id" in data
+        assert (data["investigation_id"], data["issue_id"], data["issue_number"]) == (
+            str(started.investigation_id),
+            str(started.issue_id),
+            1,
+        )
         assert data["status"] == "queued"
+        assert starter.start.await_args.kwargs["alert"].dataset_ids == ["public.orders"]
 
     def test_create_investigation_validates_payload(
         self,

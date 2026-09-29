@@ -7,24 +7,48 @@
  * lists, strikethrough and autolinks.
  */
 
-import ReactMarkdown, { type Components } from "react-markdown";
+import type { ComponentProps } from "react";
+import ReactMarkdown, {
+  type Components,
+  type ExtraProps,
+} from "react-markdown";
+import { Link, useInRouterContext } from "react-router-dom";
 import remarkGfm from "remark-gfm";
 import rehypeSanitize from "rehype-sanitize";
 
 import { cn } from "@/lib/utils";
 
-const components: Components = {
-  p: ({ node: _node, ...props }) => (
-    <p className="my-1.5 first:mt-0 last:mb-0" {...props} />
-  ),
-  a: ({ node: _node, ...props }) => (
+const LINK_CLASS = "text-primary underline underline-offset-2";
+
+/**
+ * A link to a page of the app, like the credentials page the agent points to,
+ * opens in place. Anything else opens in a new tab.
+ */
+function MarkdownLink({
+  node: _node,
+  href,
+  ...props
+}: ComponentProps<"a"> & ExtraProps) {
+  const inRouter = useInRouterContext();
+  if (inRouter && href?.startsWith("/") && !href.startsWith("//")) {
+    return <Link to={href} className={LINK_CLASS} {...props} />;
+  }
+  return (
     <a
-      className="text-primary underline underline-offset-2"
+      href={href}
+      className={LINK_CLASS}
       target="_blank"
       rel="noopener noreferrer nofollow"
       {...props}
     />
+  );
+}
+
+const components: Components = {
+  p: ({ node: _node, ...props }) => (
+    <p className="my-1.5 first:mt-0 last:mb-0" {...props} />
   ),
+  a: MarkdownLink,
   ul: ({ node: _node, ...props }) => (
     <ul className="my-1.5 list-disc pl-5" {...props} />
   ),

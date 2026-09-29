@@ -298,7 +298,7 @@ How `run_query` works:
 
 Tools from the other specs join when they land: `get_lineage`, `get_recent_changes`, `get_code_links` and `get_dataset_knowledge` (0002), and `search_knowledge` (0003).
 
-No tool writes anything. If the asker has no credentials for the datasource, `run_query` returns a typed `credentials_missing` error. The agent explains, and the UI links the asker to their credentials page (checks as code §5.2 adds that page).
+No tool writes anything. If the asker has no credentials for the datasource, `run_query` returns a typed `credentials_missing` error (`credentials_invalid` for a login the database refuses). The agent explains and links the error's `action_url` as Markdown. Links to app pages open in place in the thread, and the page is §8.5's.
 
 ### 7.6 Prompt assembly and caching
 
@@ -611,6 +611,17 @@ The card shows a red "failed" pill, the message and **Retry**.
 - The app polls `GET /system/llm` (§7.12) once a minute.
 - While it reports a problem, a banner under the header on every page names it and says what to fix, for example "Anthropic rejected the API key. Investigations and the agent can't run until ANTHROPIC_API_KEY is fixed and the API and worker are restarted."
 - It can't be dismissed while the problem lasts.
+
+### 8.5 Your login for a datasource (D3)
+
+`/settings/datasources/{id}/credentials` is where a person saves their own login for a datasource, and where the agent's `credentials_missing` link goes. It was planned in checks as code (fn-69.12). This is its first cut, built because chat can't query anything without it.
+
+- **Layout:** the sign-in page's: a centered card with an icon, "Connect to prod", and inputs with icons.
+- **Fields:** username and password. A source type whose config takes `role` or `warehouse` (Snowflake) also gets those, both optional.
+- **Connect** tests the login against the database (`POST …/credentials/test`) and saves it only if it connects. If it doesn't, the database's reason shows in the form and nothing is saved. On success, the page goes back to where the person came from, usually the issue thread, so they can ask again. A page opened directly goes to `/datasources`.
+- **A saved login** shows as "You're connected as demo", with the username filled in and the password empty; the API never returns it. **Remove my login** deletes it.
+- **A source type with no `username` in its config** has no login to add, so the page says so instead of showing the form (#205).
+- **Later (fn-69.12, fn-69.31):** key pairs and service-account JSON, and the 403 toast for checks' "Run now".
 
 ---
 

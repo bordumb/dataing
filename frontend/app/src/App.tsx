@@ -30,6 +30,7 @@ import { InvestigationDetail } from "@/features/investigation/InvestigationDetai
 import { DataSourcePage } from "@/features/datasources/datasource-page";
 import { DatasetListPage, DatasetDetailPage } from "@/features/datasets";
 import { SettingsPage } from "@/features/settings/settings-page";
+import { DatasourceCredentialsPage } from "@/features/settings/datasource-credentials-page";
 import { UsagePage } from "@/features/usage/usage-page";
 import { NotificationsPage } from "@/features/notifications";
 import { AdminRoute } from "@/features/admin";
@@ -226,6 +227,15 @@ function AppWithEntitlements() {
                     element={
                       <FeatureErrorBoundary feature="settings">
                         <SettingsPage />
+                      </FeatureErrorBoundary>
+                    }
+                  />
+                  {/* The issue agent links here when a question needs your login */}
+                  <Route
+                    path="settings/datasources/:datasourceId/credentials"
+                    element={
+                      <FeatureErrorBoundary feature="settings">
+                        <DatasourceCredentialsPage />
                       </FeatureErrorBoundary>
                     }
                   />

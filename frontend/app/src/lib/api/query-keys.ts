@@ -27,6 +27,12 @@ export const queryKeys = {
     types: ["/api/v1/datasources/types"] as const,
   },
 
+  // A person's own login for a datasource
+  credentials: {
+    status: (datasourceId: string) =>
+      [`/api/v1/datasources/${datasourceId}/credentials`] as const,
+  },
+
   // Lineage
   lineage: {
     upstream: (datasetId: string, depth?: number) =>

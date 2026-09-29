@@ -573,7 +573,7 @@ class DataQualityTest(BaseModel):
         )
 
 
-# Minimum confidence threshold for test generation
+# A root cause below this confidence becomes a check only once a person confirms it
 MIN_CONFIDENCE_FOR_TEST = 0.6
 
 # Default freshness threshold in hours
@@ -581,6 +581,30 @@ DEFAULT_FRESHNESS_HOURS = 24.0
 
 # Default row count change threshold percentage
 DEFAULT_ROW_COUNT_CHANGE_PERCENT = 10.0
+
+
+def codify_refusal(confidence: float, verdict: str | None) -> str | None:
+    """Why a run's root cause can't become a check yet, or None when it can.
+
+    A person's review outranks the model's confidence: a confirmed cause can become
+    a check at any confidence, and a rejected one never can
+    (docs/specs/0001_issue_chat.md §7.10).
+
+    Args:
+        confidence: The synthesis's confidence, 0 to 1.
+        verdict: The run's review, "confirmed" or "rejected", or None before one.
+
+    Returns:
+        The reason to show the person, or None.
+    """
+    if verdict == "rejected":
+        return "This root cause was rejected, so it can't become a check."
+    if verdict == "confirmed" or confidence >= MIN_CONFIDENCE_FOR_TEST:
+        return None
+    return (
+        f"The root cause's confidence ({confidence:.0%}) is below "
+        f"{MIN_CONFIDENCE_FOR_TEST:.0%}. Confirm it to add it as a check."
+    )
 
 
 def extract_tests_from_synthesis(
@@ -591,8 +615,8 @@ def extract_tests_from_synthesis(
 ) -> list[DataQualityTest]:
     """Extract testable assertions from investigation synthesis.
 
-    Uses rule-based extraction to map root cause patterns to test types.
-    Generates tests when confidence is above threshold (0.6).
+    Uses rule-based extraction to map root cause patterns to test types. Whether
+    the root cause may become a check at all is codify_refusal's call.
 
     Args:
         synthesis: The synthesis response from an investigation.
@@ -606,10 +630,6 @@ def extract_tests_from_synthesis(
     # Import here to avoid circular imports
 
     tests: list[DataQualityTest] = []
-
-    # Check confidence threshold
-    if synthesis.confidence < MIN_CONFIDENCE_FOR_TEST:
-        return tests
 
     if synthesis.root_cause is None:
         return tests

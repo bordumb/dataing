@@ -65,6 +65,8 @@ export interface InvestigationState {
   /** Why the run failed, when it did. */
   error?: RunError | null;
   hypotheses?: RunHypothesis[] | null;
+  /** How a person reviewed the root cause, once someone has. */
+  outcome_verdict?: "confirmed" | "rejected" | null;
 }
 
 export interface InvestigationListItem {
@@ -208,6 +210,31 @@ export function useStartInvestigation() {
       void queryClient.invalidateQueries({ queryKey: queryKeys.issues.all });
     },
   });
+}
+
+/** Below this confidence, a root cause becomes a check only once a person confirms it. */
+const CODIFY_MIN_CONFIDENCE = 0.6;
+
+/**
+ * Why a run's root cause can't become a check yet, or null when it can. A
+ * person's review outranks the model's confidence: a confirmed cause can become
+ * a check at any confidence, and a rejected one never can (spec 0001 §7.10).
+ * The server applies the same rule.
+ */
+export function codifyBlocker(
+  confidence: number | null,
+  verdict: string | null | undefined,
+): string | null {
+  if (verdict === "rejected")
+    return "This root cause was rejected, so it can't become a check.";
+  if (verdict === "confirmed") return null;
+  if (confidence !== null && confidence >= CODIFY_MIN_CONFIDENCE) return null;
+  if (confidence === null)
+    return "Confirm the root cause to add it as a check.";
+  return (
+    `The root cause's confidence (${Math.round(confidence * 100)}%) is ` +
+    "below 60%. Confirm it to add it as a check."
+  );
 }
 
 export function useCodifyInvestigation() {

@@ -409,7 +409,11 @@ The brief schema is `InvestigationBrief` (Pydantic, versioned):
 - **Confirm or Reject** (`outcome-review`, SCOPE_WRITE) records investigation feedback and posts to the thread.
   - Confirm pre-fills the resolution note.
   - Reject asks why and offers Continue investigating.
-- **Add as check** works as described in checks as code §7.6.
+- **Add as check** works as described in checks as code §7.6. A person's review outranks the model's confidence:
+  - a confirmed root cause can become a check at any confidence
+  - a rejected one never can, so the card hides the button
+  - an unreviewed one needs a confidence of at least 60%. Below that, the button is disabled and the card says why: "The root cause's confidence (35%) is below 60%. Confirm it to add it as a check."
+  - `core/codify.codify_refusal` holds the rule for the codify endpoint, and `codifyBlocker` mirrors it in the UI. `GET /investigations/{id}` returns `outcome_verdict`, so the run's details page applies it too.
 - **Downstream:** resolving an issue with a confirmed outcome emits `issue.resolved_with_cause`. 0002 lists these on the dataset, and 0003 can export them.
 
 ### 7.11 Starting investigations (D12, D13)

@@ -19,6 +19,7 @@ import {
   type InvestigationBrief,
   type InvestigationOutcome,
 } from "@/lib/api/investigation-runs";
+import { codifyBlocker } from "@/lib/api/investigations";
 import type { InvestigationRunResponse } from "@/lib/api/issues";
 import type { ThreadMessage } from "@/lib/api/issue-threads";
 
@@ -26,9 +27,6 @@ import { continuationBrief } from "../brief/brief-form";
 import { useIssueHub } from "../hub/hub-context";
 import { phaseLabel } from "./InvestigationCard";
 import { Pill, hypothesisStatus, type PillTone } from "./Pill";
-
-/** Codify refuses a synthesis below this confidence. */
-const CODIFY_MIN_CONFIDENCE = 0.6;
 
 interface OutcomePayload {
   investigation_id?: string;
@@ -220,7 +218,8 @@ function RootCauseOutcome({
     });
   };
 
-  const canCodify = confidence !== null && confidence >= CODIFY_MIN_CONFIDENCE;
+  const codifyBlocked = codifyBlocker(confidence, verdict);
+  const codifyHintId = `codify-hint-${message.id}`;
 
   return (
     <div
@@ -344,57 +343,66 @@ function RootCauseOutcome({
               </div>
             </div>
           ) : (
-            <div className="mt-2 flex flex-wrap gap-1.5">
-              <Button
-                size="sm"
-                className="h-7 gap-1 text-xs"
-                disabled={review.isPending || verdict === "confirmed"}
-                onClick={() => void send("confirmed")}
-              >
-                {review.isPending ? (
-                  <Loader2 className="h-3 w-3 animate-spin" />
-                ) : (
-                  <Check className="h-3 w-3" />
-                )}
-                Confirm
-              </Button>
-              <Button
-                size="sm"
-                variant="outline"
-                className="h-7 gap-1 text-xs"
-                disabled={review.isPending || verdict === "rejected"}
-                onClick={() => setRejecting(true)}
-              >
-                <X className="h-3 w-3" />
-                Reject
-              </Button>
-              {hub && (
+            <>
+              <div className="mt-2 flex flex-wrap gap-1.5">
                 <Button
                   size="sm"
-                  variant={verdict === "rejected" ? "default" : "outline"}
                   className="h-7 gap-1 text-xs"
-                  onClick={continueInvestigating}
+                  disabled={review.isPending || verdict === "confirmed"}
+                  onClick={() => void send("confirmed")}
                 >
-                  <RotateCcw className="h-3 w-3" />
-                  Continue investigating
+                  {review.isPending ? (
+                    <Loader2 className="h-3 w-3 animate-spin" />
+                  ) : (
+                    <Check className="h-3 w-3" />
+                  )}
+                  Confirm
                 </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="h-7 gap-1 text-xs"
+                  disabled={review.isPending || verdict === "rejected"}
+                  onClick={() => setRejecting(true)}
+                >
+                  <X className="h-3 w-3" />
+                  Reject
+                </Button>
+                {hub && (
+                  <Button
+                    size="sm"
+                    variant={verdict === "rejected" ? "default" : "outline"}
+                    className="h-7 gap-1 text-xs"
+                    onClick={continueInvestigating}
+                  >
+                    <RotateCcw className="h-3 w-3" />
+                    Continue investigating
+                  </Button>
+                )}
+                {/* A rejected cause never becomes a check */}
+                {verdict !== "rejected" && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-7 gap-1 text-xs"
+                    disabled={!!codifyBlocked}
+                    aria-describedby={codifyBlocked ? codifyHintId : undefined}
+                    onClick={() => setCodifyOpen(true)}
+                  >
+                    <FlaskConical className="h-3 w-3" />
+                    Add as check
+                  </Button>
+                )}
+              </div>
+              {codifyBlocked && verdict !== "rejected" && (
+                <p
+                  id={codifyHintId}
+                  className="mt-1.5 text-xs text-muted-foreground"
+                >
+                  {codifyBlocked}
+                </p>
               )}
-              <Button
-                size="sm"
-                variant="outline"
-                className="h-7 gap-1 text-xs"
-                disabled={!canCodify}
-                title={
-                  canCodify
-                    ? undefined
-                    : "Checks need a root cause with confidence of at least 0.6"
-                }
-                onClick={() => setCodifyOpen(true)}
-              >
-                <FlaskConical className="h-3 w-3" />
-                Add as check
-              </Button>
-            </div>
+            </>
           )}
           {codifyOpen && (
             <CodifyModal

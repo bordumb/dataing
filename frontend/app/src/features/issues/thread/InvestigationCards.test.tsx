@@ -371,6 +371,97 @@ describe("Outcome card", () => {
     });
   });
 
+  describe("a root cause below 60% confidence", () => {
+    const weakOutcome = {
+      ...outcomeMessage,
+      payload: {
+        ...outcomeMessage.payload,
+        outcome: {
+          ...(outcomeMessage.payload.outcome as object),
+          confidence: 0.35,
+        },
+      },
+    };
+    const reviewed = (review: Record<string, unknown>) =>
+      run({
+        outcome_reviewed_by: "user-2",
+        outcome_reviewed_at: "2026-09-14T08:50:00Z",
+        ...review,
+      });
+
+    function stubWeak(runRecord = run(), extra = {}) {
+      return stubHub([started, weakOutcome], {
+        [`GET ${INVESTIGATION}/status`]: { body: completedStatus },
+        [`GET ${INVESTIGATION}/steers`]: { body: { items: [] } },
+        [`GET ${RUNS}`]: { body: { items: [runRecord], total: 1 } },
+        ...extra,
+      });
+    }
+
+    it("says it needs confirming before it can become a check", async () => {
+      stubWeak();
+      renderHub("member");
+
+      const card = await screen.findByLabelText("Investigation outcome");
+      const button = within(card).getByRole("button", { name: "Add as check" });
+      expect(button).toBeDisabled();
+      expect(button).toHaveAccessibleDescription(
+        "The root cause's confidence (35%) is below 60%. Confirm it to add it as a check.",
+      );
+    });
+
+    it("can become a check once someone confirms it", async () => {
+      const api = stubWeak(reviewed({ outcome_verdict: "confirmed" }), {
+        [`POST ${INVESTIGATION}/codify`]: {
+          body: {
+            investigation_id: INV,
+            format: "sql",
+            content: "SELECT count(*) FROM orders WHERE status = 'COMPLETE'",
+            tests: [],
+            confidence: 0.35,
+          },
+        },
+      });
+      const user = userEvent.setup();
+      renderHub("member");
+
+      const card = await screen.findByLabelText("Investigation outcome");
+      await within(card).findByText("Confirmed by Raj Patel");
+      await user.click(
+        within(card).getByRole("button", { name: "Add as check" }),
+      );
+
+      await waitFor(() =>
+        expect(api.find("POST", `${INVESTIGATION}/codify`)).toHaveLength(1),
+      );
+    });
+  });
+
+  it("doesn't offer a rejected root cause as a check", async () => {
+    stubOutcome({
+      [`GET ${RUNS}`]: {
+        body: {
+          items: [
+            run({
+              outcome_verdict: "rejected",
+              outcome_note: "It's the dedup job",
+              outcome_reviewed_by: "user-2",
+              outcome_reviewed_at: "2026-09-14T08:50:00Z",
+            }),
+          ],
+          total: 1,
+        },
+      },
+    });
+    renderHub("member");
+
+    const card = await screen.findByLabelText("Investigation outcome");
+    await within(card).findByText(/Rejected by Raj Patel/);
+    expect(
+      within(card).queryByRole("button", { name: "Add as check" }),
+    ).not.toBeInTheDocument();
+  });
+
   it("warns when the check of the conclusion didn't run", async () => {
     stubHub(
       [

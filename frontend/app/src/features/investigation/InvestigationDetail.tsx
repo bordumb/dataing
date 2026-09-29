@@ -223,6 +223,7 @@ function RunHeader({
               investigationId={state.investigation_id}
               confidence={confidence}
               isComplete={ended}
+              verdict={state.outcome_verdict}
             />
           )}
           {isMember && !ended && (

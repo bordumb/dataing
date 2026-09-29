@@ -12170,6 +12170,17 @@
             },
             "type": "array",
             "title": "Hypotheses"
+          },
+          "outcome_verdict": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Outcome Verdict"
           }
         },
         "type": "object",

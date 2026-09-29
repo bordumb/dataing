@@ -138,6 +138,8 @@ class InvestigationStateResponse(BaseModel):
     error: dict[str, Any] | None = None  # {code, message, step} for a failed run
     # Each hypothesis's id, title, status and reasoning, as far as the run got
     hypotheses: list[dict[str, Any]] = Field(default_factory=list)
+    # "confirmed" or "rejected" once a person reviewed the root cause
+    outcome_verdict: str | None = None
 
 
 class ChainVerificationResponse(BaseModel):
@@ -536,16 +538,17 @@ async def get_investigation(
         execution_profile=run.get("execution_profile"),
         error=outcome.get("error") if outcome.get("status") == "failed" else None,
         hypotheses=_hypotheses(outcome, status),
+        outcome_verdict=run.get("outcome_verdict"),
     )
 
 
 async def _run_context(
     db: AppDatabase, tenant_id: UUID, investigation_id: UUID
 ) -> dict[str, Any] | None:
-    """Return a run's outcome, issue, number among the issue's runs and brief."""
+    """Return a run's outcome, review, issue, number among the issue's runs and brief."""
     return await db.fetch_one(
         """
-        SELECT i.outcome, r.issue_id, r.brief, r.execution_profile,
+        SELECT i.outcome, r.issue_id, r.brief, r.execution_profile, r.outcome_verdict,
                s.number AS issue_number, s.title AS issue_title,
                (SELECT COUNT(*)::int FROM issue_investigation_runs earlier
                 WHERE earlier.issue_id = r.issue_id
@@ -690,13 +693,15 @@ async def codify_investigation(
     """Generate regression tests from an investigation's synthesis.
 
     Extracts testable assertions from the investigation synthesis and renders
-    them to the specified format (Great Expectations, dbt, Soda, or SQL).
+    them to the specified format (Great Expectations, dbt, Soda, or SQL). A root
+    cause qualifies once a person confirms it, or on its own at 60% confidence;
+    a rejected one never does.
 
     Args:
         investigation_id: UUID of the investigation.
         request: Codify request with output format.
         auth: Authentication context from API key/JWT.
-        db: Application database for test tracking.
+        db: Application database, for the run's review and test tracking.
         temporal_client: Temporal client for durable execution.
 
     Returns:
@@ -706,7 +711,7 @@ async def codify_investigation(
         HTTPException: If investigation not found or no synthesis available.
     """
     from dataing.agents.models import SynthesisResponse
-    from dataing.core.codify import extract_tests_from_synthesis
+    from dataing.core.codify import codify_refusal, extract_tests_from_synthesis
     from dataing.renderers import get_renderer
 
     try:
@@ -727,12 +732,10 @@ async def codify_investigation(
     synthesis_dict = status.result.synthesis
     confidence = synthesis_dict.get("confidence", 0.0)
 
-    if confidence < 0.6:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Synthesis confidence too low ({confidence:.0%}). "
-            "Codify requires at least 60% confidence.",
-        )
+    run = await _run_context(db, auth.tenant_id, investigation_id) or {}
+    refusal = codify_refusal(confidence, run.get("outcome_verdict"))
+    if refusal:
+        raise HTTPException(status_code=400, detail=refusal)
 
     # Build SynthesisResponse from dict
     try:

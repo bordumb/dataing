@@ -272,6 +272,34 @@ describe("InvestigationDetail header", () => {
     expect(screen.queryByText("Codify Test")).not.toBeInTheDocument();
   });
 
+  it.each([
+    { confidence: 0.35, verdict: null, offered: false },
+    { confidence: 0.35, verdict: "confirmed", offered: true },
+    { confidence: 0.91, verdict: "rejected", offered: false },
+  ])(
+    "offers Add as check at $confidence confidence when the review is $verdict: $offered",
+    async ({ confidence, verdict, offered }) => {
+      const base = state();
+      renderDetail(
+        "member",
+        state({
+          outcome_verdict: verdict,
+          main_branch: {
+            ...base.main_branch,
+            synthesis: { ...base.main_branch.synthesis, confidence },
+          },
+        }),
+      );
+
+      expect(
+        await screen.findByRole("heading", { name: "Investigation #7" }),
+      ).toBeInTheDocument();
+      expect(
+        screen.queryAllByRole("button", { name: "Add as check" }),
+      ).toHaveLength(offered ? 1 : 0);
+    },
+  );
+
   it("keeps viewers from adding checks", async () => {
     renderDetail("viewer");
 

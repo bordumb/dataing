@@ -18,7 +18,10 @@ import {
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
-import { useCodifyInvestigation } from "@/lib/api/investigations";
+import {
+  codifyBlocker,
+  useCodifyInvestigation,
+} from "@/lib/api/investigations";
 
 type OutputFormat = "gx" | "dbt" | "soda" | "sql";
 
@@ -45,6 +48,8 @@ interface CodifyWidgetProps {
   investigationId: string;
   confidence: number;
   isComplete: boolean;
+  /** The run's review: a confirmed cause can become a check at any confidence. */
+  verdict?: string | null;
 }
 
 interface CodifyModalProps {
@@ -249,11 +254,11 @@ export function CodifyWidget({
   investigationId,
   confidence,
   isComplete,
+  verdict,
 }: CodifyWidgetProps) {
   const [isModalOpen, setIsModalOpen] = useState(false);
 
-  // Only show for completed investigations with high confidence
-  if (!isComplete || confidence < 0.6) {
+  if (!isComplete || codifyBlocker(confidence, verdict)) {
     return null;
   }
 

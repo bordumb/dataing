@@ -3,9 +3,12 @@
 from __future__ import annotations
 
 import uuid
+from types import SimpleNamespace
 from typing import Any
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
+from fastapi import HTTPException
 
 from dataing.core.domain_types import AnomalyAlert, MetricSpec
 from dataing.entrypoints.api.middleware.auth import ApiKeyContext
@@ -436,3 +439,104 @@ class TestSnapshotModels:
             snapshots=[],
         )
         assert len(response.snapshots) == 0
+
+
+def _finished_run(confidence: float) -> MagicMock:
+    """A Temporal client whose run found NULL user_ids with the given confidence."""
+    synthesis = {
+        "root_cause": "NULL values in orders.user_id since app_v2 shipped",
+        "confidence": confidence,
+        "causal_chain": ["app_v2 shipped", "orders.user_id has NULL values"],
+        "supporting_evidence": ["12% of orders since 09:00 have no user_id"],
+        "recommendations": ["Roll back app_v2"],
+        "metadata": {"dataset": "public.orders"},
+    }
+    client = MagicMock()
+    client.get_status = AsyncMock(
+        return_value=SimpleNamespace(
+            workflow_status="completed",
+            current_step="complete",
+            hypotheses=[],
+            result=SimpleNamespace(synthesis=synthesis, evidence=[], hypotheses=[]),
+        )
+    )
+    return client
+
+
+def _reviewed(verdict: str | None) -> MagicMock:
+    """An app database whose run has the given review."""
+    db = MagicMock()
+    db.fetch_one = AsyncMock(return_value={"outcome": None, "outcome_verdict": verdict})
+    db.execute = AsyncMock()
+    return db
+
+
+class TestCodifyRoute:
+    """POST /investigations/{id}/codify follows the run's review (spec 0001 §7.10)."""
+
+    async def test_a_confirmed_cause_becomes_a_check_at_any_confidence(
+        self, mock_auth_context: ApiKeyContext
+    ) -> None:
+        """Confirming the cause lifts the 60% confidence bar."""
+        from dataing.entrypoints.api.routes.investigations import (
+            CodifyRequest,
+            codify_investigation,
+        )
+
+        response = await codify_investigation(
+            auth=mock_auth_context,
+            investigation_id=uuid.uuid4(),
+            request=CodifyRequest(),
+            db=_reviewed("confirmed"),
+            temporal_client=_finished_run(0.35),
+        )
+
+        assert [(t.test_type, t.column) for t in response.tests] == [("not_null", "user_id")]
+
+    @pytest.mark.parametrize(
+        ("confidence", "verdict", "reason"),
+        [
+            (
+                0.35,
+                None,
+                "The root cause's confidence (35%) is below 60%. Confirm it to add it as a check.",
+            ),
+            (0.95, "rejected", "This root cause was rejected, so it can't become a check."),
+        ],
+    )
+    async def test_refuses_an_unconfirmed_weak_or_rejected_cause(
+        self,
+        mock_auth_context: ApiKeyContext,
+        confidence: float,
+        verdict: str | None,
+        reason: str,
+    ) -> None:
+        """The refusal says why, and what the person can do about it."""
+        from dataing.entrypoints.api.routes.investigations import (
+            CodifyRequest,
+            codify_investigation,
+        )
+
+        with pytest.raises(HTTPException) as refused:
+            await codify_investigation(
+                auth=mock_auth_context,
+                investigation_id=uuid.uuid4(),
+                request=CodifyRequest(),
+                db=_reviewed(verdict),
+                temporal_client=_finished_run(confidence),
+            )
+
+        assert (refused.value.status_code, refused.value.detail) == (400, reason)
+
+    async def test_the_details_page_gets_the_review(self, mock_auth_context: ApiKeyContext) -> None:
+        """GET /investigations/{id} carries the verdict, so the page can offer the check."""
+        from dataing.entrypoints.api.routes.investigations import get_investigation
+
+        state = await get_investigation(
+            investigation_id=uuid.uuid4(),
+            auth=mock_auth_context,
+            db=_reviewed("confirmed"),
+            temporal_client=_finished_run(0.35),
+        )
+
+        assert state.outcome_verdict == "confirmed"

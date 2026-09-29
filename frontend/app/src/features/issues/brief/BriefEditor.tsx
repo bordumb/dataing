@@ -7,13 +7,14 @@
  * the same editor in new mode.
  */
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import { Loader2, Play, Plus, X } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/Button";
+import { DatePicker } from "@/components/ui/DatePicker";
 import {
   Dialog,
   DialogContent,
@@ -24,6 +25,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/Input";
 import { Textarea } from "@/components/ui/textarea";
+import { DatasetEntry } from "@/features/investigation/components";
 import { useDataSources } from "@/lib/api/datasources";
 import { errorText } from "@/lib/api/error-message";
 import {
@@ -40,12 +42,13 @@ import type { BriefEditorRequest } from "../hub/hub-context";
 import { useThreadStream } from "../thread/use-thread-stream";
 import { useThreadViewer } from "../thread/use-thread-viewer";
 import {
+  type BriefForm,
   briefFromForm,
+  type ClaimDraft,
   formFromBrief,
   formProblem,
   newClaim,
-  type BriefForm,
-  type ClaimDraft,
+  newTable,
 } from "./brief-form";
 
 const PROFILES: { value: ExecutionProfile; label: string }[] = [
@@ -276,24 +279,21 @@ export function BriefFormView({
     requireTables: isNew,
     requireDatasource: isNew && datasourceList.length > 1,
   });
-  const datasourceRef = useRef<HTMLSelectElement>(null);
   const set = (patch: Partial<BriefForm>) =>
     setForm((f) => ({ ...f, ...patch }));
 
-  // A new run on a tenant with one datasource needs no choice.
-  const onlyDatasource =
-    isNew && datasourceList.length === 1 ? datasourceList[0].id : null;
+  // Start on the default datasource (or the only one); the table rows change it
+  const fallbackDatasource =
+    datasourceList.find((d) => d.is_default)?.id ?? datasourceList[0]?.id;
+  const datasourceIds = datasourceList.map((d) => d.id).join(",");
   useEffect(() => {
-    if (onlyDatasource) {
-      setForm((f) =>
-        f.datasourceId ? f : { ...f, datasourceId: onlyDatasource },
-      );
-    }
-  }, [onlyDatasource]);
-
-  useEffect(() => {
-    if (datasourcePrompt) datasourceRef.current?.focus();
-  }, [datasourcePrompt]);
+    if (!fallbackDatasource) return;
+    setForm((f) =>
+      f.datasourceId && datasourceIds.split(",").includes(f.datasourceId)
+        ? f
+        : { ...f, datasourceId: fallbackDatasource },
+    );
+  }, [fallbackDatasource, datasourceIds]);
 
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -302,9 +302,9 @@ export function BriefFormView({
     onSubmit(form);
   };
 
-  const knownDatasource =
-    !form.datasourceId ||
-    datasourceList.some((d) => d.id === form.datasourceId);
+  const datasourceType =
+    datasourceList.find((d) => d.id === form.datasourceId)?.type ??
+    "postgresql";
 
   return (
     <form onSubmit={submit} aria-label="Investigation brief">
@@ -334,73 +334,117 @@ export function BriefFormView({
         scratchThreadId={scratchThreadId}
       />
 
-      <FieldLabel>Leads (tested first)</FieldLabel>
-      <ul className="space-y-1.5">
-        {form.leads.map((lead, i) => (
-          <li key={i} className="flex items-center gap-2">
-            <Input
-              aria-label={`Lead ${i + 1}`}
-              value={lead}
-              maxLength={300}
-              autoFocus={i === form.leads.length - 1 && !lead && focusNewLead}
-              placeholder="A suspected cause, or what to look at next"
-              onChange={(e) =>
-                set({
-                  leads: form.leads.map((l, j) =>
-                    j === i ? e.target.value : l,
-                  ),
-                })
-              }
-            />
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon"
-              className="h-9 w-9 flex-none"
-              aria-label={`Remove lead ${i + 1}`}
-              onClick={() =>
-                set({ leads: form.leads.filter((_, j) => j !== i) })
-              }
-            >
-              <X className="h-4 w-4" />
-            </Button>
-          </li>
+      {/* A new run has no thread to draft leads from */}
+      {!isNew && (
+        <>
+          <FieldLabel>Leads (tested first)</FieldLabel>
+          <ul className="space-y-1.5">
+            {form.leads.map((lead, i) => (
+              <li key={i} className="flex items-center gap-2">
+                <Input
+                  aria-label={`Lead ${i + 1}`}
+                  value={lead}
+                  maxLength={300}
+                  autoFocus={
+                    i === form.leads.length - 1 && !lead && focusNewLead
+                  }
+                  placeholder="A suspected cause, or what to look at next"
+                  onChange={(e) =>
+                    set({
+                      leads: form.leads.map((l, j) =>
+                        j === i ? e.target.value : l,
+                      ),
+                    })
+                  }
+                />
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="h-9 w-9 flex-none"
+                  aria-label={`Remove lead ${i + 1}`}
+                  onClick={() =>
+                    set({ leads: form.leads.filter((_, j) => j !== i) })
+                  }
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              </li>
+            ))}
+          </ul>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="mt-1 h-7 gap-1 px-2 text-xs"
+            onClick={() => set({ leads: [...form.leads, ""] })}
+          >
+            <Plus className="h-3 w-3" />
+            Add lead
+          </Button>
+        </>
+      )}
+
+      <FieldLabel>Table(s)</FieldLabel>
+      <div className="space-y-2">
+        {form.tables.map((table) => (
+          <DatasetEntry
+            key={table.key}
+            datasourceId={form.datasourceId}
+            datasourceType={datasourceType}
+            identifier={table.identifier}
+            onDatasourceChange={(datasourceId) => set({ datasourceId })}
+            onIdentifierChange={(identifier) =>
+              set({
+                tables: form.tables.map((t) =>
+                  t.key === table.key ? { ...t, identifier } : t,
+                ),
+              })
+            }
+            onRemove={() =>
+              set({ tables: form.tables.filter((t) => t.key !== table.key) })
+            }
+            canRemove={form.tables.length > 1}
+            disabled={pending}
+            dataSources={datasourceList}
+            onTableSelect={() => undefined}
+          />
         ))}
-      </ul>
+      </div>
       <Button
         type="button"
-        variant="ghost"
+        variant="outline"
         size="sm"
-        className="mt-1 h-7 gap-1 px-2 text-xs"
-        onClick={() => set({ leads: [...form.leads, ""] })}
+        className="mt-2 w-full border-dashed"
+        disabled={pending || datasourceList.length === 0}
+        onClick={() => set({ tables: [...form.tables, newTable()] })}
       >
-        <Plus className="h-3 w-3" />
-        Add lead
+        <Plus className="mr-2 h-4 w-4" />
+        Add another table
       </Button>
+      {datasourcePrompt && (
+        <p role="alert" className="mt-1 text-xs text-destructive">
+          {datasourcePrompt}
+        </p>
+      )}
+      {datasources.isSuccess && datasourceList.length === 0 && (
+        <p className="mt-1 text-xs text-muted-foreground">
+          No datasources yet.{" "}
+          <Link to="/datasources" className="text-primary underline">
+            Connect one
+          </Link>{" "}
+          to investigate its tables.
+        </p>
+      )}
 
-      <FieldLabel htmlFor="brief-tables">Scope: tables</FieldLabel>
-      <Input
-        id="brief-tables"
-        value={form.tables}
-        onChange={(e) => set({ tables: e.target.value })}
-        placeholder="analytics.public.orders, raw.app_events"
+      <DatePicker
+        className="mt-4"
+        label="Time window (optional)"
+        value={form.window}
+        onChange={(window) => set({ window })}
+        placeholder="Any time"
+        hint="The days the investigation should look at"
       />
-
-      <FieldLabel>Time window (UTC, optional)</FieldLabel>
-      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-        <Input
-          type="datetime-local"
-          aria-label="Time window from"
-          value={form.from}
-          onChange={(e) => set({ from: e.target.value })}
-        />
-        <Input
-          type="datetime-local"
-          aria-label="Time window to"
-          value={form.to}
-          onChange={(e) => set({ to: e.target.value })}
-        />
-      </div>
 
       <FieldLabel htmlFor="brief-notes">Notes</FieldLabel>
       <Textarea
@@ -412,82 +456,19 @@ export function BriefFormView({
         placeholder="Anything else the investigation should know"
       />
 
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-        <div>
-          <FieldLabel htmlFor="brief-profile">Depth</FieldLabel>
-          <select
-            id="brief-profile"
-            className={selectClass}
-            value={form.profile}
-            onChange={(e) =>
-              set({ profile: e.target.value as ExecutionProfile })
-            }
-          >
-            {PROFILES.map((p) => (
-              <option key={p.value} value={p.value}>
-                {p.label}
-              </option>
-            ))}
-          </select>
-        </div>
-        <div>
-          <FieldLabel htmlFor="brief-datasource">Datasource</FieldLabel>
-          <select
-            id="brief-datasource"
-            ref={datasourceRef}
-            className={cn(
-              selectClass,
-              datasourcePrompt && "border-destructive ring-1 ring-destructive",
-            )}
-            value={form.datasourceId}
-            aria-invalid={!!datasourcePrompt || undefined}
-            aria-describedby={
-              datasourcePrompt ? "brief-datasource-prompt" : undefined
-            }
-            onChange={(e) => set({ datasourceId: e.target.value })}
-          >
-            {isNew ? (
-              !onlyDatasource && (
-                <option value="" disabled>
-                  {datasources.isLoading
-                    ? "Loading datasources…"
-                    : "Choose a datasource"}
-                </option>
-              )
-            ) : (
-              <option value="">The issue's datasource</option>
-            )}
-            {datasourceList.map((d) => (
-              <option key={d.id} value={d.id}>
-                {d.name} ({d.type}){d.is_default ? " · default" : ""}
-              </option>
-            ))}
-            {!knownDatasource && (
-              <option value={form.datasourceId}>
-                Datasource {form.datasourceId.slice(0, 8)}
-              </option>
-            )}
-          </select>
-          {datasourcePrompt && (
-            <p
-              id="brief-datasource-prompt"
-              role="alert"
-              className="mt-1 text-xs text-destructive"
-            >
-              {datasourcePrompt}
-            </p>
-          )}
-          {isNew && datasources.isSuccess && datasourceList.length === 0 && (
-            <p className="mt-1 text-xs text-muted-foreground">
-              No datasources yet.{" "}
-              <Link to="/datasources" className="text-primary underline">
-                Connect one
-              </Link>{" "}
-              to investigate its tables.
-            </p>
-          )}
-        </div>
-      </div>
+      <FieldLabel htmlFor="brief-profile">Depth</FieldLabel>
+      <select
+        id="brief-profile"
+        className={selectClass}
+        value={form.profile}
+        onChange={(e) => set({ profile: e.target.value as ExecutionProfile })}
+      >
+        {PROFILES.map((p) => (
+          <option key={p.value} value={p.value}>
+            {p.label}
+          </option>
+        ))}
+      </select>
 
       {touched && problem && (
         <p role="alert" className="mt-3 text-sm text-destructive">

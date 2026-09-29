@@ -55,6 +55,6 @@ describe("DashboardPage", () => {
     });
     // The dashboard knows nothing about the problem yet.
     expect(within(dialog).getByLabelText("Symptom")).toHaveValue("");
-    expect(within(dialog).getByLabelText("Scope: tables")).toHaveValue("");
+    expect(within(dialog).getByLabelText("Table")).toHaveValue("");
   });
 });

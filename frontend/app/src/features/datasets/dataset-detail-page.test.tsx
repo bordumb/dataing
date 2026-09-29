@@ -105,7 +105,7 @@ describe("DatasetDetailPage", () => {
     const dialog = await screen.findByRole("dialog", {
       name: "Start an investigation",
     });
-    expect(within(dialog).getByLabelText("Scope: tables")).toHaveValue(
+    expect(within(dialog).getByLabelText("Table")).toHaveValue(
       "analytics.orders",
     );
     await within(dialog).findByRole("option", { name: /lake/ });

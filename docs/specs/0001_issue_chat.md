@@ -576,10 +576,14 @@ The card shows a red "failed" pill, the message and **Retry**.
   - the dataset page, as **Investigate this dataset** in the header, shown whether or not the dataset has runs
 - **New mode** is the same editor, titled "Start an investigation":
   - It is pre-filled from the page. The dataset page supplies the table's `native_path` as the scope table and its `datasource_id`; the other pages supply nothing.
-  - Symptom and at least one scope table are required. The datasource is required only when the tenant has more than one.
-  - Findings, ruled out and leads start empty; there is no thread to draft from.
+  - Symptom and at least one scope table are required.
+  - Findings and ruled out start empty, and there are no leads; there is no thread to draft from.
   - **Start investigation** calls `POST /investigations` (§7.11) and navigates to `/issues/{issue_id}`, where the card is already live.
-- **Hand off** mode (from a thread) is unchanged. Its datasource option stays "The issue's datasource": the server resolves it (explicit, then the brief's scope, then the tenant's only one), so the page can't name it in advance.
+- **Both modes** pick scope with the removed page's components:
+  - **Table(s)** is a list of `DatasetEntry` rows: a datasource select and a table field that looks tables up in that datasource's schema as the person types. **Add another table** adds a row.
+  - A run investigates one datasource, so every row shows the same one and changing it in any row changes it for all. It starts as the brief's datasource, else the tenant's default, else its first; a datasource the tenant no longer has is replaced the same way. There is no "The issue's datasource" option: the server never used the issue for this (it falls back to the tenant's only datasource and answers 409 when there are several), so the page shows its pick instead.
+  - **Time window (optional)** is the `DatePicker`: one day or a range, with quick picks. Days map to whole UTC days, `[first day 00:00Z, day after the last 00:00Z)`. A window that ends mid-day opens as the day it ends on.
+- **Hand off** mode (from a thread) keeps its leads, tested first.
 
 ### 8.3 The run's details page (D14)
 

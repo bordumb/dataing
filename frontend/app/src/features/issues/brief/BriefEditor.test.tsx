@@ -273,15 +273,15 @@ describe("Brief editor", () => {
 });
 
 describe("brief form", () => {
-  it("round-trips a brief with a UTC time window", () => {
+  it("round-trips a brief whose time window is whole UTC days", () => {
     const brief = {
       symptom: "x",
       scope: {
         datasource_id: null,
         tables: ["a", "b"],
         time_window: {
-          from: "2026-09-10T00:00:00Z",
-          to: "2026-09-16T12:30:00Z",
+          from: "2026-09-13T00:00:00Z",
+          to: "2026-09-15T00:00:00Z",
         },
       },
       findings: [],
@@ -293,6 +293,25 @@ describe("brief form", () => {
       version: 1,
       ...brief,
       leads: ["lead"],
+    });
+  });
+
+  it("widens a window that ends mid-day to the end of that day", () => {
+    // The date picker works in whole days
+    const form = formFromBrief({
+      symptom: "x",
+      scope: {
+        tables: [],
+        time_window: {
+          from: "2026-09-10T00:00:00Z",
+          to: "2026-09-16T12:30:00Z",
+        },
+      },
+    });
+
+    expect(briefFromForm(form).scope?.time_window).toEqual({
+      from: "2026-09-10T00:00:00Z",
+      to: "2026-09-17T00:00:00Z",
     });
   });
 

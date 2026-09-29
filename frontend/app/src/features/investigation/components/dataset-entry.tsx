@@ -107,6 +107,7 @@ export function DatasetEntry({
       <div className="flex items-center gap-2">
         <Icon className="h-4 w-4 text-muted-foreground" />
         <select
+          aria-label="Datasource"
           value={datasourceId}
           onChange={(e) => onDatasourceChange(e.target.value)}
           disabled={disabled || dataSources.length === 0}
@@ -127,6 +128,7 @@ export function DatasetEntry({
       <div className="relative flex-1">
         <Input
           ref={inputRef}
+          aria-label="Table"
           value={identifier}
           onChange={(e) => {
             onIdentifierChange(e.target.value);
@@ -191,6 +193,7 @@ export function DatasetEntry({
         variant="ghost"
         size="icon"
         onClick={onRemove}
+        aria-label="Remove table"
         disabled={disabled || !canRemove}
         className="h-8 w-8 text-muted-foreground hover:text-destructive"
       >

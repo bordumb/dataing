@@ -66,15 +66,18 @@ function renderStart(
     datasources = ONE_DATASOURCE,
     start = STARTED,
     prefill,
+    routes = {},
   }: {
     datasources?: StubResponse;
     start?: StubResponse;
     prefill?: InvestigationPrefill;
+    routes?: Record<string, StubResponse>;
   } = {},
 ) {
   const api = stubApi({
     "GET /api/v1/datasources": datasources,
     [`POST ${START}`]: start,
+    ...routes,
   });
   renderAsRole(
     <Routes>
@@ -126,10 +129,11 @@ describe("Investigate…", () => {
     const { dialog } = await openDialog();
 
     expect(within(dialog).getByLabelText("Symptom")).toHaveValue("");
-    expect(within(dialog).getByLabelText("Scope: tables")).toHaveValue("");
-    // Findings and exclusions start empty; there is no thread to draft from.
+    expect(within(dialog).getByLabelText("Table")).toHaveValue("");
+    // Findings and exclusions start empty; there is no thread to draft from,
+    // so there are no leads to test first either.
     expect(within(dialog).getAllByText("None yet.")).toHaveLength(2);
-    expect(within(dialog).queryByLabelText("Lead 1")).not.toBeInTheDocument();
+    expect(within(dialog).queryByText(/Leads/)).not.toBeInTheDocument();
     // The only datasource is preselected, and nothing defers to an issue.
     const select = within(dialog).getByLabelText("Datasource");
     await waitFor(() => expect(select).toHaveValue("ds-1"));
@@ -154,39 +158,110 @@ describe("Investigate…", () => {
     await user.paste("Null spike in orders.email");
     await user.click(start);
     expect(within(dialog).getByRole("alert")).toHaveTextContent(
-      "Name at least one table",
+      "Pick at least one table",
     );
     expect(api.find("POST", START)).toHaveLength(0);
   });
 
-  it("requires a datasource when there is more than one", async () => {
+  it("starts on the default datasource and lets the person pick another", async () => {
     const api = renderStart("member", { datasources: TWO_DATASOURCES });
     const { user, dialog } = await openDialog();
 
     const select = within(dialog).getByLabelText("Datasource");
     await within(dialog).findByRole("option", { name: /lake/ });
-    expect(select).toHaveValue("");
+    await waitFor(() => expect(select).toHaveValue("ds-1"));
+    await user.selectOptions(select, "ds-2");
     await user.click(within(dialog).getByLabelText("Symptom"));
     await user.paste("Null spike in orders.email");
-    await user.click(within(dialog).getByLabelText("Scope: tables"));
+    await user.click(within(dialog).getByLabelText("Table"));
     await user.paste("public.orders");
     await user.click(
       within(dialog).getByRole("button", { name: "Start investigation" }),
     );
-    expect(within(dialog).getByRole("alert")).toHaveTextContent(
-      "Pick the datasource",
-    );
-    expect(api.find("POST", START)).toHaveLength(0);
 
-    await user.selectOptions(select, "ds-2");
+    await waitFor(() => expect(api.find("POST", START)).toHaveLength(1));
+    const body = api.find("POST", START)[0].body as {
+      datasource_id: string;
+      brief: { scope: { datasource_id: string } };
+    };
+    expect([body.datasource_id, body.brief.scope.datasource_id]).toEqual([
+      "ds-2",
+      "ds-2",
+    ]);
+  });
+
+  it("looks tables up as the person types, like the old investigation page", async () => {
+    renderStart("member", {
+      routes: {
+        "GET /api/v1/datasources/ds-1/schema": {
+          body: {
+            catalogs: [
+              {
+                name: "demo",
+                schemas: [
+                  {
+                    name: "public",
+                    tables: [
+                      {
+                        name: "orders",
+                        native_path: "public.orders",
+                        columns: [{ name: "id" }, { name: "email" }],
+                      },
+                    ],
+                  },
+                ],
+              },
+            ],
+          },
+        },
+      },
+    });
+    const { user, dialog } = await openDialog();
+    await waitFor(() =>
+      expect(within(dialog).getByLabelText("Datasource")).toHaveValue("ds-1"),
+    );
+
+    await user.click(within(dialog).getByLabelText("Table"));
+    await user.paste("ord");
+    await user.click(
+      await within(dialog).findByRole("button", { name: /public\.orders/ }),
+    );
+
+    expect(within(dialog).getByLabelText("Table")).toHaveValue("public.orders");
+  });
+
+  it("sends the days picked in the date picker as the time window", async () => {
+    const api = renderStart("member");
+    const { user, dialog } = await openDialog();
+
+    await user.click(within(dialog).getByLabelText("Symptom"));
+    await user.paste("Null spike in orders.email");
+    await user.click(within(dialog).getByLabelText("Table"));
+    await user.paste("public.orders");
+    await user.click(within(dialog).getByRole("button", { name: /Any time/ }));
+    await user.click(
+      await within(dialog).findByRole("button", { name: "Today" }),
+    );
     await user.click(
       within(dialog).getByRole("button", { name: "Start investigation" }),
     );
+
     await waitFor(() => expect(api.find("POST", START)).toHaveLength(1));
+    const now = new Date();
+    const day = (d: Date) =>
+      `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}T00:00:00Z`;
+    const tomorrow = new Date(
+      now.getFullYear(),
+      now.getMonth(),
+      now.getDate() + 1,
+    );
     expect(
-      (api.find("POST", START)[0].body as { datasource_id: string })
-        .datasource_id,
-    ).toBe("ds-2");
+      (
+        api.find("POST", START)[0].body as {
+          brief: { scope: { time_window: unknown } };
+        }
+      ).brief.scope.time_window,
+    ).toEqual({ from: day(now), to: day(tomorrow) });
   });
 
   it("starts the run and lands on its new issue", async () => {
@@ -195,11 +270,21 @@ describe("Investigate…", () => {
 
     await user.click(within(dialog).getByLabelText("Symptom"));
     await user.paste("Null spike in orders.email");
-    await user.click(within(dialog).getByLabelText("Scope: tables"));
-    await user.paste("public.orders, public.customers");
+    await user.click(within(dialog).getByLabelText("Table"));
+    await user.paste("public.orders");
+    await user.click(
+      within(dialog).getByRole("button", { name: "Add another table" }),
+    );
+    await user.click(within(dialog).getAllByLabelText("Table")[1]);
+    await user.paste("public.customers");
     await user.selectOptions(within(dialog).getByLabelText("Depth"), "deep");
+    // A run investigates one datasource, so every table row shows it
     await waitFor(() =>
-      expect(within(dialog).getByLabelText("Datasource")).toHaveValue("ds-1"),
+      expect(
+        within(dialog)
+          .getAllByLabelText("Datasource")
+          .map((select) => (select as HTMLSelectElement).value),
+      ).toEqual(["ds-1", "ds-1"]),
     );
     await user.click(
       within(dialog).getByRole("button", { name: "Start investigation" }),
@@ -246,7 +331,7 @@ describe("Investigate…", () => {
 
     await user.click(within(dialog).getByLabelText("Symptom"));
     await user.paste("Null spike in orders.email");
-    await user.click(within(dialog).getByLabelText("Scope: tables"));
+    await user.click(within(dialog).getByLabelText("Table"));
     await user.paste("public.orders");
     await user.click(
       within(dialog).getByRole("button", { name: "Start investigation" }),
@@ -255,7 +340,6 @@ describe("Investigate…", () => {
     expect(
       await within(dialog).findByText(/Pick the one to investigate/),
     ).toBeInTheDocument();
-    expect(within(dialog).getByLabelText("Datasource")).toHaveFocus();
     expect(toast.error).toHaveBeenCalledWith(
       "Couldn't start the investigation",
       {
@@ -272,7 +356,7 @@ describe("Investigate…", () => {
 
     await user.click(within(dialog).getByLabelText("Symptom"));
     await user.paste("Null spike");
-    await user.click(within(dialog).getByLabelText("Scope: tables"));
+    await user.click(within(dialog).getByLabelText("Table"));
     await user.paste("public.nope");
     await user.click(
       within(dialog).getByRole("button", { name: "Start investigation" }),
@@ -296,7 +380,7 @@ describe("Investigate…", () => {
     });
     const { dialog } = await openDialog();
 
-    expect(within(dialog).getByLabelText("Scope: tables")).toHaveValue(
+    expect(within(dialog).getByLabelText("Table")).toHaveValue(
       "analytics.orders",
     );
     await within(dialog).findByRole("option", { name: /lake/ });

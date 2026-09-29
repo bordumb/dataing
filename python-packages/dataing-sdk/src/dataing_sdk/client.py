@@ -899,6 +899,8 @@ class DataingClient:
             investigation_id=str(data["investigation_id"]),
             main_branch_id=str(data["main_branch_id"]),
             status=data.get("status", "queued"),
+            issue_id=str(data["issue_id"]) if data.get("issue_id") else None,
+            issue_number=data.get("issue_number"),
         )
 
     async def async_start_investigation(
@@ -976,6 +978,8 @@ class DataingClient:
             investigation_id=str(data["investigation_id"]),
             main_branch_id=str(data["main_branch_id"]),
             status=data.get("status", "queued"),
+            issue_id=str(data["issue_id"]) if data.get("issue_id") else None,
+            issue_number=data.get("issue_number"),
         )
 
     def get_investigation(self, investigation_id: str) -> Any:

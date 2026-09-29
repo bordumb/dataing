@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   listDatasourceDatasetsApiV1DatasourcesDatasourceIdDatasetsGet,
+  listDatasourcesApiV1DatasourcesGet,
   syncDatasourceSchemaApiV1DatasourcesDatasourceIdSyncPost,
 } from "./generated/datasources/datasources";
 import {
@@ -75,6 +76,39 @@ export function useDatasetInvestigations(datasetId: string | null) {
       );
     },
     enabled: !!datasetId,
+  });
+}
+
+/**
+ * The catalog dataset for a table's native path, such as an issue's dataset,
+ * or null when no datasource has synced it. Searches each datasource's
+ * datasets for an exact match.
+ */
+export async function findDatasetByPath(
+  nativePath: string,
+  signal?: AbortSignal,
+): Promise<DatasetSummary | null> {
+  const { items: datasources } =
+    await listDatasourcesApiV1DatasourcesGet(signal);
+  for (const datasource of datasources) {
+    const { datasets } =
+      await listDatasourceDatasetsApiV1DatasourcesDatasourceIdDatasetsGet(
+        datasource.id,
+        { search: nativePath, limit: 50 },
+        signal,
+      );
+    const match = datasets.find((d) => d.native_path === nativePath);
+    if (match) return match;
+  }
+  return null;
+}
+
+export function useDatasetByPath(nativePath: string | null | undefined) {
+  return useQuery({
+    queryKey: ["/api/v1/datasets/by-path", nativePath ?? ""] as const,
+    queryFn: ({ signal }) => findDatasetByPath(nativePath!, signal),
+    enabled: !!nativePath,
+    staleTime: 5 * 60 * 1000,
   });
 }
 

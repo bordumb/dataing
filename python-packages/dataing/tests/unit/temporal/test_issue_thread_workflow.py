@@ -37,6 +37,10 @@ class Turns:
         self.release = asyncio.Event()
         self.block: set[str] = set()
         self.fail: set[str] = set()
+        # Message ids whose turn raises this error; errors mark_turn_failed recorded
+        self.raises: dict[str, BaseException] = {}
+        self.errors: dict[str, str] = {}
+        self.attempts: dict[str, int] = {}
 
     def activities(self) -> list[Any]:
         """Return fake run_agent_turn and mark_turn_failed activities."""
@@ -44,6 +48,9 @@ class Turns:
         @activity.defn(name="run_agent_turn")
         async def run_agent_turn(request: dict[str, Any]) -> dict[str, Any]:
             message_id = request["message_id"]
+            self.attempts[message_id] = self.attempts.get(message_id, 0) + 1
+            if message_id in self.raises:
+                raise self.raises[message_id]
             if message_id in self.fail:
                 raise RuntimeError("model unavailable")
             if message_id in self.block:
@@ -61,6 +68,7 @@ class Turns:
         @activity.defn(name="mark_turn_failed")
         async def mark_turn_failed(request: dict[str, Any]) -> None:
             self.failed.append(request["message_id"])
+            self.errors[request["message_id"]] = request["error"]
 
         return [run_agent_turn, run_brief_draft, mark_turn_failed]
 
@@ -216,6 +224,36 @@ async def test_failed_turn_is_marked_and_the_queue_moves_on(env: WorkflowEnviron
             await _wait_for(lambda: turns.ran == ["b"], timeout=30)
 
     assert turns.failed == ["a"]
+
+
+async def test_a_rejected_key_fails_the_turn_once_with_what_to_fix(
+    env: WorkflowEnvironment,
+) -> None:
+    """A model error no retry can fix isn't retried; the reply says what to fix."""
+    from fixtures.llm_errors import anthropic_error
+
+    from dataing.agents.errors import classify_llm_error
+    from dataing.temporal.errors import llm_activity_error
+
+    failure = classify_llm_error(anthropic_error(401))
+    assert failure is not None
+    turns = Turns()
+    thread_id = str(uuid.uuid4())
+    turns.raises["a"] = llm_activity_error(failure)
+    async with Worker(
+        env.client,
+        workflow_runner=workflow_runner(),
+        task_queue=TASK_QUEUE,
+        workflows=[IssueThreadWorkflow],
+        activities=turns.activities(),
+    ):
+        with env.auto_time_skipping_disabled():
+            await _enqueue(env.client, thread_id, "a")
+            await _wait_for(lambda: turns.failed == ["a"], timeout=30)
+
+    assert turns.attempts["a"] == 1
+    # The message, not "LLMRejected: ..." or the raw ModelHTTPError text
+    assert turns.errors["a"] == failure.message
 
 
 async def test_brief_requests_run_the_draft_activity(env: WorkflowEnvironment) -> None:

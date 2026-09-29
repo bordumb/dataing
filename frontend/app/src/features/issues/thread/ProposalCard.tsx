@@ -36,6 +36,8 @@ const STEER_KINDS = new Set<string>([
 
 interface ProposalCardProps {
   proposal: SteerProposal;
+  /** The proposal's run, numbered among the issue's runs, when known. */
+  runNumber?: number;
   /** The agent reply carrying the proposal: sending it twice is a no-op. */
   replyId: string;
   canWrite: boolean;
@@ -46,6 +48,7 @@ interface ProposalCardProps {
 
 export function ProposalCard({
   proposal,
+  runNumber,
   replyId,
   canWrite,
   sent,
@@ -117,7 +120,11 @@ export function ProposalCard({
         <span className="font-semibold">Proposed steer</span> ·{" "}
         {kindLabel.toLowerCase()}
         {proposal.hypothesis_id ? ` ${proposal.hypothesis_id}` : ""}
-        {runId ? ` · investigation ${runId.slice(0, 8)}` : ""}
+        {runNumber
+          ? ` · #${runNumber}`
+          : runId
+            ? ` · investigation ${runId.slice(0, 8)}`
+            : ""}
       </p>
       {editing ? (
         <Textarea

@@ -95,8 +95,16 @@ export interface InvestigationLiveStatus {
   pending_steers?: { steer_id: string; kind: string }[] | null;
 }
 
+/** Why a run failed (spec 0001 §7.12): what broke, where, and what to fix. */
+export interface RunError {
+  code: string;
+  message: string;
+  step?: string | null;
+}
+
 /** The outcome a finished run posts to the thread (publish_investigation_outcome). */
 export interface InvestigationOutcome {
+  /** "completed", or "failed" with `error` and no root cause. */
   status?: string;
   root_cause?: string | null;
   confidence?: number | null;
@@ -104,6 +112,13 @@ export interface InvestigationOutcome {
   supporting_evidence?: unknown[];
   hypotheses?: HypothesisState[];
   counter_analysis?: unknown;
+  error?: RunError | null;
+}
+
+export function isFailedOutcome(
+  outcome: InvestigationOutcome | null | undefined,
+): boolean {
+  return outcome?.status === "failed";
 }
 
 export function isRunning(status: InvestigationLiveStatus | undefined) {

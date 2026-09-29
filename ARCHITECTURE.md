@@ -488,7 +488,7 @@ Environment variables (`.env` or system):
 # Application
 ANTHROPIC_API_KEY=sk-...           # Required for LLM
 DATABASE_URL=postgresql://...       # App database
-LLM_MODEL=claude-sonnet-4-20250514  # Model selection
+LLM_MODEL=claude-sonnet-5-5  # Investigation model; defaults live in dataing/config.py
 
 # Security
 SECRET_KEY=...                      # JWT signing

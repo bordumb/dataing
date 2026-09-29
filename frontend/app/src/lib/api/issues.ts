@@ -12,10 +12,10 @@ import {
   useListIssueWatchersApiV1IssuesIssueIdWatchersGet,
   useAddIssueWatcherApiV1IssuesIssueIdWatchPost,
   useRemoveIssueWatcherApiV1IssuesIssueIdWatchDelete,
-  useListInvestigationRunsApiV1IssuesIssueIdInvestigationRunsGet,
   useSpawnInvestigationApiV1IssuesIssueIdInvestigationRunsPost,
 } from "./generated/issues/issues";
 import type {
+  InvestigationRunResponse as GeneratedInvestigationRunResponse,
   IssueResponse as GeneratedIssueResponse,
   IssueListResponse as GeneratedIssueListResponse,
   IssueCreate as GeneratedIssueCreate,
@@ -28,11 +28,27 @@ import { queryKeys } from "./query-keys";
 export type {
   WatcherResponse,
   WatcherListResponse,
-  InvestigationRunResponse,
-  InvestigationRunListResponse,
   InvestigationRunCreate,
   ListIssuesApiV1IssuesGetParams as IssueListParams,
 } from "./model";
+
+/** How a run on an issue ended; set from its outcome (spec 0001 §7.11). */
+export type RunStatus = "running" | "completed" | "failed";
+
+/**
+ * A run on an issue. Beyond the committed schema it carries its number among
+ * the issue's runs (by start time), its status and, for a failed run, why.
+ */
+export type InvestigationRunResponse = GeneratedInvestigationRunResponse & {
+  number?: number | null;
+  status?: RunStatus | null;
+  error?: string | null;
+};
+
+export interface InvestigationRunListResponse {
+  items: InvestigationRunResponse[];
+  total: number;
+}
 
 /** Where the problem was seen, collected by the create form. */
 export interface IssueContext {
@@ -97,10 +113,66 @@ export const useIssueWatchers =
 export const useWatchIssue = useAddIssueWatcherApiV1IssuesIssueIdWatchPost;
 export const useUnwatchIssue =
   useRemoveIssueWatcherApiV1IssuesIssueIdWatchDelete;
-export const useIssueInvestigationRuns =
-  useListInvestigationRunsApiV1IssuesIssueIdInvestigationRunsGet;
 export const useSpawnInvestigation =
   useSpawnInvestigationApiV1IssuesIssueIdInvestigationRunsPost;
+
+export function listInvestigationRuns(issueId: string, signal?: AbortSignal) {
+  return customInstance<InvestigationRunListResponse>({
+    url: `${ISSUES_URL}/${issueId}/investigation-runs`,
+    method: "GET",
+    signal,
+  });
+}
+
+/** A run's status. Runs listed without one are running until they complete. */
+export function runStatus(run: InvestigationRunResponse): RunStatus {
+  if (run.status) return run.status;
+  return run.completed_at ? "completed" : "running";
+}
+
+/**
+ * Each run's number among the issue's runs, by start time. The server sends
+ * `number`; for runs without one, count them in start order.
+ */
+export function runNumbers(
+  runs: InvestigationRunResponse[],
+): Map<string, number> {
+  const ordered = [...runs].sort((a, b) =>
+    a.created_at.localeCompare(b.created_at),
+  );
+  return new Map(ordered.map((run, i) => [run.id, run.number ?? i + 1]));
+}
+
+/** The run of an issue with this run id or investigation id. */
+export function findRun(
+  runs: InvestigationRunResponse[] | undefined,
+  {
+    runId,
+    investigationId,
+  }: { runId?: string | null; investigationId?: string | null },
+): InvestigationRunResponse | undefined {
+  return runs?.find(
+    (r) =>
+      (!!runId && r.id === runId) ||
+      (!!investigationId && r.investigation_id === investigationId),
+  );
+}
+
+/** How often an issue's runs refresh while one is still running. */
+export const RUNS_POLL_MS = 10_000;
+
+/** The issue's runs, refreshed while any is running so failures show. */
+export function useIssueInvestigationRuns(issueId: string) {
+  return useQuery({
+    queryKey: queryKeys.issues.investigationRuns(issueId),
+    queryFn: ({ signal }) => listInvestigationRuns(issueId, signal),
+    enabled: !!issueId,
+    refetchInterval: (query) =>
+      query.state.data?.items.some((r) => runStatus(r) === "running")
+        ? RUNS_POLL_MS
+        : false,
+  });
+}
 
 export function useIssue(issueId: string) {
   return useQuery({
@@ -178,7 +250,7 @@ export function getStatusLabel(status: string): string {
     case "triaged":
       return "Triaged";
     case "in_progress":
-      return "In Progress";
+      return "In progress";
     case "blocked":
       return "Blocked";
     case "resolved":

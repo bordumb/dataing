@@ -1,4 +1,5 @@
 import { apiErrorMessage } from "./error-message";
+import { notifySessionExpired } from "./session-expired";
 
 // API base URL - empty for same-origin (dev), set VITE_API_URL for production
 const API_BASE_URL = import.meta.env.VITE_API_URL || "";
@@ -14,10 +15,32 @@ export interface RequestConfig {
   data?: unknown;
   headers?: Record<string, string>;
   signal?: AbortSignal;
+  /** "blob" returns the body as a Blob, for downloads. Defaults to JSON. */
+  responseType?: "json" | "blob";
+}
+
+/**
+ * A failed API response. The message is readable (apiErrorMessage); `code` is
+ * the machine-readable `detail.error` when the server sends one, such as
+ * "ambiguous_datasource".
+ */
+export class ApiError extends Error {
+  readonly status: number;
+  readonly detail: unknown;
+  readonly code: string | null;
+
+  constructor(message: string, status: number, detail: unknown) {
+    super(message);
+    this.name = "ApiError";
+    this.status = status;
+    this.detail = detail;
+    const code = (detail as { error?: unknown } | null | undefined)?.error;
+    this.code = typeof code === "string" ? code : null;
+  }
 }
 
 export const customInstance = async <T>(config: RequestConfig): Promise<T> => {
-  const { url, method, params, data, headers, signal } = config;
+  const { url, method, params, data, headers, signal, responseType } = config;
 
   // Convert params to string, filtering out null/undefined
   const queryString = params
@@ -56,6 +79,16 @@ export const customInstance = async <T>(config: RequestConfig): Promise<T> => {
   if (!response.ok) {
     const errorData = await response.json().catch(() => ({}));
 
+    // A signed-in request the API rejects means the session is over. A failed
+    // sign-in is a 401 too, so auth routes don't count.
+    if (
+      response.status === 401 &&
+      accessToken &&
+      !url.startsWith("/api/v1/auth/")
+    ) {
+      notifySessionExpired();
+    }
+
     // Check for upgrade-required errors
     if (response.status === 403 && errorData.detail?.error) {
       const detail = errorData.detail;
@@ -69,12 +102,20 @@ export const customInstance = async <T>(config: RequestConfig): Promise<T> => {
       }
     }
 
-    throw new Error(apiErrorMessage(errorData, response.status));
+    throw new ApiError(
+      apiErrorMessage(errorData, response.status),
+      response.status,
+      errorData?.detail,
+    );
   }
 
   // No Content (e.g. DELETE): there is no body to parse.
   if (response.status === 204) {
     return undefined as T;
+  }
+
+  if (responseType === "blob") {
+    return (await response.blob()) as T;
   }
 
   return response.json();

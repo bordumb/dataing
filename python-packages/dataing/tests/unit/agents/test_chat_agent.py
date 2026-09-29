@@ -152,6 +152,9 @@ class TestRunTurn:
         assert call.status == "ok"
         assert call.query_result_id is not None
         assert "1 row" in call.summary
+        # Totals for the collapsed line: "Ran 1 query · 12 ms · 1 row"
+        assert (call.duration_ms, call.row_count) == (12, 1)
+        assert call.to_payload()["duration_ms"] == 12
         assert result.text == "Only us has rows."
 
     async def test_missing_credentials_is_a_structured_tool_result(self) -> None:

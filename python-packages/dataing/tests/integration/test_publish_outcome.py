@@ -130,3 +130,56 @@ async def test_runs_without_an_issue_only_complete_the_investigation(
     )
     assert investigation is not None
     assert investigation["status"] == "completed"
+
+
+async def test_a_failed_run_is_published_with_its_reason(migrated_db: AppDatabase) -> None:
+    """A failed run ends with the reason on the investigation, the run and the thread."""
+    payload = await _issue_with_run(migrated_db)
+    failure = {
+        "code": "invalid_key",
+        "message": "Anthropic rejected the API key (401). Set a valid ANTHROPIC_API_KEY and "
+        "restart the API and the worker.",
+        "step": "generate_hypotheses",
+    }
+    del payload["synthesis"], payload["counter_analysis"]
+    payload["failure"] = failure
+    payload["hypotheses"] = []
+    publish = make_publish_investigation_outcome_activity(migrated_db)
+
+    await ActivityEnvironment().run(publish, payload)
+
+    investigation = await migrated_db.fetch_one(
+        "SELECT outcome, completed_at FROM investigations WHERE id = $1",
+        uuid.UUID(payload["investigation_id"]),
+    )
+    assert investigation is not None
+    assert json.loads(investigation["outcome"]) == {
+        "status": "failed",
+        "error": failure,
+        "hypotheses": [],
+    }
+    assert investigation["completed_at"] is not None
+
+    run = await migrated_db.fetch_one(
+        "SELECT synthesis_summary, confidence, completed_at FROM issue_investigation_runs "
+        "WHERE investigation_id = $1",
+        uuid.UUID(payload["investigation_id"]),
+    )
+    assert run is not None
+    assert (run["synthesis_summary"], run["confidence"]) == (None, None)
+    assert run["completed_at"] is not None
+
+    threads = IssueThreadRepository(migrated_db)
+    thread = await threads.ensure_shared_thread(uuid.UUID(payload["issue_id"]))
+    (card,) = (m for m in await threads.list_messages(thread["id"]) if m["kind"] == "investigation")
+    assert card["payload"]["phase"] == "outcome"
+    assert card["payload"]["outcome"]["status"] == "failed"
+    assert card["body_md"] == f"**Investigation failed**\n\n{failure['message']}"
+
+    event = await migrated_db.fetch_one(
+        "SELECT payload FROM issue_events WHERE issue_id = $1 AND event_type = "
+        "'investigation_failed'",
+        uuid.UUID(payload["issue_id"]),
+    )
+    assert event is not None
+    assert json.loads(event["payload"])["code"] == "invalid_key"

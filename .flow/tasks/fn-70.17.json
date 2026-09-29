@@ -1,14 +1,26 @@
 {
-  "assignee": null,
+  "assignee": "bordumbb@gmail.com",
   "claim_note": "",
-  "claimed_at": null,
+  "claimed_at": "2026-09-28T17:52:29.670737Z",
   "created_at": "2026-09-28T15:16:44.759472Z",
   "depends_on": [],
   "epic": "fn-70",
+  "evidence": {
+    "commits": [
+      "1a31082c"
+    ],
+    "prs": [
+      "https://github.com/bordumb/dataing/pull/211"
+    ],
+    "tests": [
+      "tests/unit/test_config.py::test_chat_agent_defaults_to_claude_opus_5_5",
+      "tests/unit/agents/test_chat_agent.py::TestBriefDrafting::test_draft_is_parsed_from_a_json_reply_without_forcing_a_tool"
+    ]
+  },
   "id": "fn-70.17",
   "priority": null,
   "spec_path": ".flow/tasks/fn-70.17.md",
-  "status": "todo",
+  "status": "done",
   "title": "Run the issue chat agent on Claude Opus 5.5",
-  "updated_at": "2026-09-28T15:16:44.762271Z"
+  "updated_at": "2026-09-28T17:52:29.952602Z"
 }

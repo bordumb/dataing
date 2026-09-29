@@ -138,7 +138,9 @@ services:
       JWT_SECRET_KEY: ${JWT_SECRET_KEY:-}
       REDIS_HOST: redis
       REDIS_PORT: 6379
-      LLM_MODEL: ${LLM_MODEL:-claude-sonnet-4-20250514}
+      # Model overrides; unset, dataing.config's defaults apply
+      LLM_MODEL: ${LLM_MODEL:-}
+      CHAT_AGENT_MODEL: ${CHAT_AGENT_MODEL:-}
     ports:
       - "8000:8000"
     depends_on:
@@ -176,7 +178,9 @@ services:
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
       REDIS_HOST: redis
       REDIS_PORT: 6379
-      LLM_MODEL: ${LLM_MODEL:-claude-sonnet-4-20250514}
+      # Model overrides; unset, dataing.config's defaults apply
+      LLM_MODEL: ${LLM_MODEL:-}
+      CHAT_AGENT_MODEL: ${CHAT_AGENT_MODEL:-}
     depends_on:
       db-migrate:
         condition: service_completed_successfully

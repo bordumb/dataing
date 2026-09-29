@@ -8,6 +8,8 @@ from typing import TYPE_CHECKING
 from pydantic_ai import Agent
 from pydantic_ai.models.anthropic import AnthropicModel
 
+from dataing.config import INVESTIGATION_MODEL
+
 from .assessment import QualityAssessment, ValidationResult
 
 if TYPE_CHECKING:
@@ -85,7 +87,7 @@ class LLMJudgeValidator:
     def __init__(
         self,
         api_key: str,
-        model: str = "claude-sonnet-4-20250514",
+        model: str = INVESTIGATION_MODEL,
         pass_threshold: float = 0.6,
     ) -> None:
         """Initialize the LLM judge validator.

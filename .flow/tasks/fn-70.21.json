@@ -1,0 +1,29 @@
+{
+  "assignee": "bordumbb@gmail.com",
+  "claim_note": "",
+  "claimed_at": "2026-09-28T18:22:06.382549Z",
+  "created_at": "2026-09-28T17:51:59.729817Z",
+  "depends_on": [
+    "fn-70.18"
+  ],
+  "epic": "fn-70",
+  "evidence": {
+    "commits": [
+      "d7522281"
+    ],
+    "prs": [],
+    "tests": [
+      "tests/integration/test_open_issue.py",
+      "tests/integration/api/test_start_investigation.py",
+      "tests/integration/api/test_issue_investigation_runs.py",
+      "dataing-ee tests/integration/core/automation/test_spawn_investigation.py",
+      "CE unit 3173, EE unit 714, CE integration 143, EE integration 16, SDK+CLI 272"
+    ]
+  },
+  "id": "fn-70.21",
+  "priority": null,
+  "spec_path": ".flow/tasks/fn-70.21.md",
+  "status": "done",
+  "title": "M5: one starter and open_issue() for every start path",
+  "updated_at": "2026-09-28T19:34:45.173067Z"
+}

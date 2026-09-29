@@ -1,11 +1,15 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { act, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { toast } from "sonner";
 
+import { notifySessionExpired } from "@/lib/api/session-expired";
 import { fakeAccessToken, storeSession } from "@/test/auth";
 import * as authApi from "./api";
 import { JwtAuthProvider, useJwtAuth } from "./jwt-context";
 import { useRole } from "./use-role";
+
+vi.mock("sonner", () => ({ toast: { info: vi.fn() } }));
 
 vi.mock("./api", async (importOriginal) => ({
   ...(await importOriginal<typeof import("./api")>()),
@@ -85,5 +89,30 @@ describe("JwtAuthProvider demo role preview", () => {
     await userEvent.click(screen.getByText("Log out"));
 
     expect(await screen.findByText("role:none")).toBeInTheDocument();
+  });
+});
+
+describe("JwtAuthProvider when the API rejects the session", () => {
+  it("signs out, once, and says why", async () => {
+    storeSession("viewer");
+    render(
+      <JwtAuthProvider>
+        <SessionProbe />
+      </JwtAuthProvider>,
+    );
+    expect(await screen.findByText(/role:viewer/)).toBeInTheDocument();
+
+    act(() => {
+      // Several requests in flight fail together
+      notifySessionExpired();
+      notifySessionExpired();
+    });
+
+    expect(await screen.findByText("role:none user:none")).toBeInTheDocument();
+    expect(localStorage.getItem("dataing_access_token")).toBeNull();
+    expect(toast.info).toHaveBeenCalledWith(
+      "Your session has ended. Sign in again.",
+      { id: "session-expired" },
+    );
   });
 });

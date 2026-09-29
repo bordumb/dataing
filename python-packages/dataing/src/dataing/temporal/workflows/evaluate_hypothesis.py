@@ -12,6 +12,7 @@ with workflow.unsafe.imports_passed_through():
         GenerateQueryInput,
         InterpretEvidenceInput,
     )
+    from dataing.temporal.errors import LLM_RETRY_POLICY
 
 
 @dataclass
@@ -60,6 +61,11 @@ class EvaluateHypothesisWorkflow:
             EvaluateHypothesisResult with evidence gathered.
         """
         hypothesis_id = input.hypothesis.get("id", f"h-{input.hypothesis_index}")
+        # With llm-failures-v1, LLM activities retry per LLM_RETRY_POLICY; a failure the
+        # model caused fails this child, and the parent fails the run
+        llm_options: dict[str, Any] = (
+            {"retry_policy": LLM_RETRY_POLICY} if workflow.patched("llm-failures-v1") else {}
+        )
 
         # Step 1: Generate SQL query to test this hypothesis
         query_input = GenerateQueryInput(
@@ -73,6 +79,7 @@ class EvaluateHypothesisWorkflow:
             "generate_query",
             query_input,
             start_to_close_timeout=timedelta(minutes=2),
+            **llm_options,
         )
 
         if query_result.get("error"):
@@ -128,6 +135,7 @@ class EvaluateHypothesisWorkflow:
             "interpret_evidence",
             interpret_input,
             start_to_close_timeout=timedelta(minutes=2),
+            **llm_options,
         )
 
         # A failed interpretation is not a refutation: report it, never use it as evidence

@@ -599,6 +599,12 @@ class TestEventDescriptions:
                 {"root_cause": "app_v2 writes COMPLETE"},
                 "Resolved with confirmed cause: app_v2 writes COMPLETE",
             ),
+            ("created", {"title": "Orders dropped"}, "Issue opened"),
+            (
+                "created",
+                {"title": "Orders dropped", "source_provider": "monte_carlo"},
+                "Issue opened from monte_carlo",
+            ),
         ],
     )
     def test_describe_event(self, event_type: str, payload: dict[str, Any], text: str) -> None:

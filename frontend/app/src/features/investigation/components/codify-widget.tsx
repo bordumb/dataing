@@ -1,5 +1,6 @@
 /**
- * CodifyWidget - Generate regression tests from investigation synthesis.
+ * CodifyWidget - "Add as check": turn a confirmed finding into a regression
+ * test (checks as code §7.6).
  */
 
 import { useState } from "react";
@@ -17,7 +18,10 @@ import {
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
-import { useCodifyInvestigation } from "@/lib/api/investigations";
+import {
+  codifyBlocker,
+  useCodifyInvestigation,
+} from "@/lib/api/investigations";
 
 type OutputFormat = "gx" | "dbt" | "soda" | "sql";
 
@@ -44,6 +48,8 @@ interface CodifyWidgetProps {
   investigationId: string;
   confidence: number;
   isComplete: boolean;
+  /** The run's review: a confirmed cause can become a check at any confidence. */
+  verdict?: string | null;
 }
 
 interface CodifyModalProps {
@@ -117,9 +123,7 @@ export function CodifyModal({
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <FlaskConical className="h-5 w-5 text-primary" />
-                <CardTitle className="text-lg">
-                  Codify as Regression Test
-                </CardTitle>
+                <CardTitle className="text-lg">Add as check</CardTitle>
               </div>
               <Button variant="ghost" size="icon" onClick={onClose}>
                 <X className="h-4 w-4" />
@@ -250,11 +254,11 @@ export function CodifyWidget({
   investigationId,
   confidence,
   isComplete,
+  verdict,
 }: CodifyWidgetProps) {
   const [isModalOpen, setIsModalOpen] = useState(false);
 
-  // Only show for completed investigations with high confidence
-  if (!isComplete || confidence < 0.6) {
+  if (!isComplete || codifyBlocker(confidence, verdict)) {
     return null;
   }
 
@@ -262,11 +266,12 @@ export function CodifyWidget({
     <>
       <Button
         variant="outline"
-        className="gap-2"
+        size="sm"
+        className="gap-1.5"
         onClick={() => setIsModalOpen(true)}
       >
         <FlaskConical className="h-4 w-4" />
-        Codify Test
+        Add as check
       </Button>
       <CodifyModal
         isOpen={isModalOpen}

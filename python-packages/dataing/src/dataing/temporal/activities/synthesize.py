@@ -7,6 +7,9 @@ from typing import TYPE_CHECKING, Any
 
 from temporalio import activity
 
+from dataing.agents.errors import classify_llm_error
+from dataing.temporal.errors import llm_activity_error
+
 if TYPE_CHECKING:
     from dataing.temporal.adapters import TemporalAgentAdapter
 
@@ -69,6 +72,9 @@ def make_synthesize_activity(
                 ruled_out_hypotheses=input.ruled_out_hypotheses,
             )
         except Exception as e:
+            failure = classify_llm_error(e)
+            if failure is not None:
+                raise llm_activity_error(failure) from e
             return SynthesizeResult(
                 root_cause="",
                 confidence=0.0,

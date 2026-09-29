@@ -116,6 +116,11 @@ async def test_spawn_starts_an_investigation_on_a_valid_anomaly_alert(
     assert (row["tenant_id"], row["status"]) == (tenant_id, "active")
     alert_data = json.loads(row["alert"])
     assert alert_data.pop("datasource_id") == str(datasource_id)
+    # Linked to the issue, so the outcome is written back to its thread
+    assert alert_data.pop("issue_id") == str(issue["id"])
+    assert alert_data.pop("brief")["symptom"] == (
+        "customer_id is null on a quarter of today's orders"
+    )
     alert = AnomalyAlert.model_validate(alert_data)
     assert alert.model_dump(mode="json") == alert_data
     assert alert.dataset_ids == ["public.orders"]
@@ -125,6 +130,17 @@ async def test_spawn_starts_an_investigation_on_a_valid_anomaly_alert(
     assert [(w["investigation_id"], w["datasource_id"]) for w in temporal.started] == [
         (str(investigation_id), str(datasource_id))
     ]
+    card = await migrated_db.fetch_one(
+        """
+        SELECT m.author_kind, m.payload FROM issue_thread_messages m
+        JOIN issue_threads t ON t.id = m.thread_id
+        WHERE t.issue_id = $1 AND m.kind = 'investigation'
+        """,
+        issue["id"],
+    )
+    assert card is not None
+    assert card["author_kind"] == "system"
+    assert json.loads(card["payload"])["investigation_id"] == str(investigation_id)
 
 
 async def test_spawn_links_the_issue_and_reuses_its_investigation(

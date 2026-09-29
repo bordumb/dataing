@@ -1,14 +1,17 @@
 /**
- * The card for an investigation started from the issue: its brief, live
- * phase and the manager's hypotheses as its subagents test them.
+ * The card for an investigation on the issue ("Investigation #N"): its brief,
+ * live phase and the manager's hypotheses as its subagents test them. A run
+ * that failed says why (spec 0001 §8.1).
  */
 
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { ArrowRight } from "lucide-react";
+import { RotateCcw } from "lucide-react";
 
+import { Button } from "@/components/ui/Button";
 import {
   asBrief,
+  isFailedOutcome,
   isRunning,
   useLiveStatus,
   useSteers,
@@ -17,7 +20,10 @@ import {
   type InvestigationOutcome,
 } from "@/lib/api/investigation-runs";
 import type { ThreadMessage } from "@/lib/api/issue-threads";
+import { runStatus, type InvestigationRunResponse } from "@/lib/api/issues";
 
+import { useIssueHub } from "../hub/hub-context";
+import { LINK_CLASS } from "./message-parts";
 import { Pill, type PillTone } from "./Pill";
 import { Steering } from "./Steering";
 
@@ -54,6 +60,32 @@ const ENDED: Record<string, { tone: PillTone; label: string }> = {
   terminated: { tone: "neutral", label: "stopped" },
   timed_out: { tone: "bad", label: "timed out" },
 };
+
+const BRIEF_ITEM_MAX = 80;
+
+function clipped(text: string): string {
+  return text.length > BRIEF_ITEM_MAX
+    ? `${text.slice(0, BRIEF_ITEM_MAX - 1)}…`
+    : text;
+}
+
+/**
+ * The brief in one line, as the mockup writes it: "Brief: completed orders
+ * −30% on 09-14 · only app_v2 · ruled out: region · lead: app_v2 deploy".
+ */
+export function briefLine(brief: InvestigationBrief): string {
+  const parts = [brief.symptom];
+  for (const finding of brief.findings ?? []) {
+    parts.push(clipped(finding.statement));
+  }
+  const ruledOut = (brief.ruled_out ?? []).map((c) => clipped(c.statement));
+  if (ruledOut.length > 0) parts.push(`ruled out: ${ruledOut.join(", ")}`);
+  const leads = (brief.leads ?? []).filter(Boolean).map(clipped);
+  if (leads.length > 0) {
+    parts.push(`${leads.length === 1 ? "lead" : "leads"}: ${leads.join(", ")}`);
+  }
+  return parts.join(" · ");
+}
 
 export function BriefSummary({ brief }: { brief: InvestigationBrief }) {
   const sections: [string, string[]][] = [
@@ -98,6 +130,10 @@ export interface InvestigationCardProps {
   message: ThreadMessage;
   /** The outcome the run posted, once it finished. */
   outcome?: InvestigationOutcome | null;
+  /** The issue's record of this run, once the runs list has loaded. */
+  run?: InvestigationRunResponse;
+  /** The run's number among the issue's runs. */
+  number?: number;
   canWrite: boolean;
   nameOf: (userId: string | null | undefined) => string;
 }
@@ -105,17 +141,29 @@ export interface InvestigationCardProps {
 export function InvestigationCard({
   message,
   outcome,
+  run,
+  number,
   canWrite,
   nameOf,
 }: InvestigationCardProps) {
   const payload = message.payload as InvestigationPayload;
   const investigationId = payload.investigation_id ?? null;
   const brief = asBrief(payload.brief);
+  const hub = useIssueHub();
   const [showBrief, setShowBrief] = useState(false);
   const live = useLiveStatus(investigationId);
   const status = live.data;
-  const running = isRunning(status);
+  const failedOutcome = isFailedOutcome(outcome);
+  const running = !failedOutcome && isRunning(status);
   const steers = useSteers(investigationId, running);
+  const failed =
+    failedOutcome ||
+    (!running &&
+      (status?.workflow_status === "failed" ||
+        (!!run && runStatus(run) === "failed")));
+  const failure = failed
+    ? (outcome?.error?.message ?? run?.error ?? null)
+    : null;
 
   // A finished run's status has no hypotheses; its outcome does.
   const hypotheses: HypothesisState[] =
@@ -130,6 +178,8 @@ export function InvestigationCard({
       tone: "agent",
       label: `running · ${phaseLabel(status?.current_step)}`,
     };
+  } else if (failed) {
+    pill = ENDED.failed;
   } else if (status) {
     pill = ENDED[status.workflow_status] ?? {
       tone: "neutral",
@@ -150,15 +200,21 @@ export function InvestigationCard({
   const fromScratch =
     !!payload.source_thread_id &&
     payload.source_thread_id !== message.thread_id;
+  // A failed outcome in the thread carries its own Retry.
+  const canRetry = failed && !failedOutcome && canWrite && !!hub && !!brief;
 
   return (
     <div
-      className="mt-1 rounded-lg border border-border px-3 py-2.5"
+      className="mt-2 rounded-[10px] border border-border px-3 py-2.5"
       aria-label="Investigation"
     >
       <div className="flex flex-wrap items-center gap-2">
-        <h4 className="text-sm font-semibold">
-          {payload.parent_run_id ? "Follow-up investigation" : "Investigation"}
+        <h4 className="text-[13.5px] font-semibold">
+          {number
+            ? `Investigation #${number}`
+            : payload.parent_run_id
+              ? "Follow-up investigation"
+              : "Investigation"}
         </h4>
         <Pill tone={pill.tone}>{pill.label}</Pill>
         {payload.execution_profile && <Pill>{payload.execution_profile}</Pill>}
@@ -166,33 +222,50 @@ export function InvestigationCard({
         {investigationId && (
           <Link
             to={`/investigations/${investigationId}`}
-            className="ml-auto inline-flex items-center gap-1 text-xs text-primary hover:underline"
+            className={`ml-auto text-xs ${LINK_CLASS}`}
           >
-            Open
-            <ArrowRight className="h-3 w-3" />
+            details →
           </Link>
         )}
       </div>
 
       {brief && (
-        <div className="mt-1 text-xs text-muted-foreground">
-          Brief: {brief.symptom}
-          {(brief.findings?.length ?? 0) > 0 &&
-            ` · ${brief.findings!.length} finding${brief.findings!.length === 1 ? "" : "s"}`}
-          {(brief.ruled_out?.length ?? 0) > 0 &&
-            ` · ${brief.ruled_out!.length} ruled out`}
-          {(brief.leads?.length ?? 0) > 0 &&
-            ` · ${brief.leads!.length} lead${brief.leads!.length === 1 ? "" : "s"}`}
-          .{" "}
+        <div className="mt-1 text-[12.5px] text-muted-foreground">
+          Brief: {briefLine(brief)}.{" "}
           <button
             type="button"
-            className="text-primary hover:underline"
+            className={LINK_CLASS}
             aria-expanded={showBrief}
             onClick={() => setShowBrief((s) => !s)}
           >
             {showBrief ? "hide brief" : "view brief"}
           </button>
           {showBrief && <BriefSummary brief={brief} />}
+        </div>
+      )}
+
+      {failed && (
+        <div className="mt-2 space-y-2">
+          <p className="text-sm text-red-700 dark:text-red-400">
+            {failure ?? "The run failed before it could finish."}
+          </p>
+          {canRetry && (
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-7 gap-1 text-xs"
+              onClick={() =>
+                hub.openBriefEditor({
+                  kind: "brief",
+                  brief: brief!,
+                  sourceThreadId: payload.source_thread_id ?? message.thread_id,
+                })
+              }
+            >
+              <RotateCcw className="h-3 w-3" />
+              Retry
+            </Button>
+          )}
         </div>
       )}
 

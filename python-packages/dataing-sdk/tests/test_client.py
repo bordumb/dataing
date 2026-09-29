@@ -204,11 +204,14 @@ class TestDataingClientEndpointPaths:
             "investigation_id": "test-inv-123",
             "main_branch_id": "test-branch-123",
             "status": "queued",
+            "run_id": "test-run-1",
+            "issue_id": "test-issue-7",
+            "issue_number": 7,
         }
         mock_response.status_code = 200
 
         with patch.object(client, "_request", return_value=mock_response) as mock_request:
-            client.start_investigation(
+            investigation = client.start_investigation(
                 dataset="main.orders",
                 anomaly_type="null_rate",
                 goal="test investigation",
@@ -219,6 +222,8 @@ class TestDataingClientEndpointPaths:
             call_args = mock_request.call_args
             assert call_args[0][0] == "POST"
             assert call_args[0][1] == "/api/v1/investigations"
+        # Every run lives in an issue; its thread is where to follow it
+        assert (investigation.issue_id, investigation.issue_number) == ("test-issue-7", 7)
 
     def test_stream_run_uses_v1_investigations_events_endpoint(self) -> None:
         """Test that stream_run() uses /api/v1/investigations/{id}/events endpoint."""

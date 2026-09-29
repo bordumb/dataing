@@ -101,26 +101,25 @@ GRANT ROLE dataing_role TO USER dataing_user;
 
 ## Example Investigation
 
+Start an investigation with the Python SDK. Every run opens an issue, and its
+thread is where the team follows and steers it.
+
 ```python
-import asyncio
-from dataing.core.investigation.service import InvestigationService
-from dataing.core.domain_types import AnomalyAlert
+from dataing_sdk import DataingClient
 
-async def investigate_null_spike():
-    alert = AnomalyAlert(
-        table="orders",
-        column="user_id",
-        metric="null_rate",
-        anomaly_type="spike",
-        description="NULL rate increased from 1% to 15%"
-    )
+client = DataingClient(base_url="https://dataing.example.com", api_key="dd_...")
 
-    service = InvestigationService()
-    result = await service.investigate(alert)
+investigation = client.start_investigation(
+    dataset="analytics.public.orders",
+    anomaly_type="null_rate",
+    goal="NULL rate of user_id rose from 1% to 15%",
+    column="user_id",
+    expected_value=0.01,
+    actual_value=0.15,
+    datasource_id="<your Snowflake datasource id>",
+)
 
-    print(f"Root cause: {result.synthesis.root_cause}")
-
-asyncio.run(investigate_null_spike())
+print(f"Follow it in issue #{investigation.issue_number}")
 ```
 
 ---

@@ -7,6 +7,9 @@ from typing import TYPE_CHECKING, Any
 
 from temporalio import activity
 
+from dataing.agents.errors import classify_llm_error
+from dataing.temporal.errors import llm_activity_error
+
 if TYPE_CHECKING:
     from dataing.temporal.adapters import TemporalAgentAdapter
 
@@ -52,6 +55,9 @@ def make_counter_analyze_activity(adapter: TemporalAgentAdapter) -> Any:
                 hypotheses=input.hypotheses,
             )
         except Exception as e:
+            failure = classify_llm_error(e)
+            if failure is not None:
+                raise llm_activity_error(failure) from e
             return CounterAnalyzeResult(
                 alternative_explanations=[],
                 weaknesses=[],

@@ -27,6 +27,12 @@ export const queryKeys = {
     types: ["/api/v1/datasources/types"] as const,
   },
 
+  // A person's own login for a datasource
+  credentials: {
+    status: (datasourceId: string) =>
+      [`/api/v1/datasources/${datasourceId}/credentials`] as const,
+  },
+
   // Lineage
   lineage: {
     upstream: (datasetId: string, depth?: number) =>
@@ -54,6 +60,11 @@ export const queryKeys = {
         : ([`/api/v1/lineage/datasets`] as const),
     search: (query: string) => [`/api/v1/lineage/search`, { query }] as const,
     providers: ["/api/v1/lineage/providers"] as const,
+  },
+
+  // System health
+  system: {
+    llm: ["/api/v1/system/llm"] as const,
   },
 
   // Dashboard

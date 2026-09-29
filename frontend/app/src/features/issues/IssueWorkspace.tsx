@@ -1,202 +1,65 @@
+/**
+ * The issue page, laid out like 0001_issue_chat_mockup.html (spec 0001 §8.1):
+ * a one-row top bar, then the shared thread (1fr) beside one sidebar panel
+ * (300px), stacked on narrow screens.
+ */
+
 import { useParams, Link } from "react-router-dom";
-import type { UseQueryResult } from "@tanstack/react-query";
-import { ArrowLeft, RefreshCw, Loader2, Search } from "lucide-react";
-import {
-  useIssue,
-  useIssueInvestigationRuns,
-  getStatusVariant,
-  getStatusLabel,
-  getPriorityVariant,
-  getSeverityVariant,
-} from "@/lib/api/issues";
-import type {
-  IssueResponse,
-  InvestigationRunResponse,
-  InvestigationRunListResponse,
-} from "@/lib/api/issues";
-import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/Card";
-import { Badge } from "@/components/ui/Badge";
+import { ArrowLeft, RefreshCw } from "lucide-react";
+
+import { useIssue, getStatusLabel } from "@/lib/api/issues";
+import type { IssueResponse } from "@/lib/api/issues";
+import { Card, CardContent } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
-import { AsyncBoundary } from "@/components/async-boundary";
-import { Markdown } from "@/components/markdown";
-import { formatDate } from "@/lib/utils";
 
 import { IssueSidebar } from "./IssueSidebar";
 import { IssueHubProvider } from "./hub/IssueHub";
-import { useIssueHub } from "./hub/hub-context";
 import { IssueThread } from "./thread/IssueThread";
-import { ScratchChatsSection } from "./scratch/ScratchChatsSection";
-import { Pill } from "./thread/Pill";
+import { Pill, issueStatusTone } from "./thread/Pill";
 
-/** The symptom a run's brief states, for its one-line label. */
-function briefSymptom(run: InvestigationRunResponse): string {
-  const symptom = run.brief?.symptom;
-  return typeof symptom === "string" ? symptom : "";
-}
-
-function RunState({ run }: { run: InvestigationRunResponse }) {
-  if (run.outcome_verdict === "confirmed") {
-    return <Pill tone="ok">confirmed</Pill>;
-  }
-  if (run.outcome_verdict === "rejected") {
-    return <Pill tone="bad">rejected</Pill>;
-  }
-  if (run.completed_at) {
-    return (
-      <Pill tone="ok">
-        done
-        {typeof run.confidence === "number"
-          ? ` · ${run.confidence.toFixed(2)}`
-          : ""}
-      </Pill>
-    );
-  }
-  return <Pill tone="agent">running</Pill>;
-}
-
-function InvestigationRunsSection({ issueId }: { issueId: string }) {
-  const query = useIssueInvestigationRuns(issueId);
-  const hub = useIssueHub();
-
+/** "#42 · title · In progress · P1 ········· dataset analytics.public.orders" */
+function IssueTopBar({ issue }: { issue: IssueResponse }) {
   return (
-    <Card>
-      <CardHeader className="pb-3">
-        <div className="flex items-center justify-between">
-          <CardTitle className="flex items-center gap-2 text-base">
-            <Search className="h-4 w-4" />
-            Investigations
-          </CardTitle>
-          {hub?.canWrite && hub.sharedThreadId && (
-            <Button
-              size="sm"
-              variant="outline"
-              disabled={hub.isRequestingDraft}
-              onClick={() => void hub.investigateFrom(hub.sharedThreadId!)}
-            >
-              {hub.isRequestingDraft && (
-                <Loader2 className="mr-1 h-4 w-4 animate-spin" />
-              )}
-              Investigate…
-            </Button>
-          )}
-        </div>
-      </CardHeader>
-      <CardContent>
-        <AsyncBoundary
-          query={
-            query as unknown as UseQueryResult<
-              InvestigationRunListResponse,
-              Error
-            >
-          }
-        >
-          {(data) => (
-            <div className="space-y-2">
-              {data.items.length === 0 ? (
-                <p className="text-sm text-muted-foreground">
-                  No investigations yet. Investigate… hands the thread to one.
-                </p>
-              ) : (
-                data.items.map((run: InvestigationRunResponse) => (
-                  <Link
-                    key={run.id}
-                    to={`/investigations/${run.investigation_id}`}
-                    className="block rounded-lg bg-muted/50 p-3 transition-colors hover:bg-muted"
-                  >
-                    <div className="mb-1 flex items-center justify-between gap-2">
-                      <span className="truncate text-sm font-medium">
-                        {briefSymptom(run) || "Investigation"}
-                      </span>
-                      <RunState run={run} />
-                    </div>
-                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                      <span>{formatDate(run.created_at)}</span>
-                      <span>· {run.execution_profile}</span>
-                      {run.parent_run_id && <span>· follow-up</span>}
-                    </div>
-                  </Link>
-                ))
-              )}
-            </div>
-          )}
-        </AsyncBoundary>
-      </CardContent>
-    </Card>
+    <header className="flex flex-wrap items-center gap-x-3 gap-y-1.5 border-b border-border bg-card px-5 py-3">
+      <Link
+        to="/issues"
+        aria-label="Back to issues"
+        className="-ml-1.5 rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+      >
+        <ArrowLeft className="h-4 w-4" />
+      </Link>
+      <Pill>#{issue.number}</Pill>
+      <h1 className="min-w-0 text-base font-semibold">{issue.title}</h1>
+      <Pill tone={issueStatusTone(issue.status)}>
+        {getStatusLabel(issue.status)}
+      </Pill>
+      {issue.priority && <Pill>{issue.priority}</Pill>}
+      {issue.dataset_id && (
+        <span className="ml-auto text-sm text-muted-foreground">
+          dataset{" "}
+          <code className="rounded bg-muted px-1.5 py-0.5 font-mono text-xs text-foreground">
+            {issue.dataset_id}
+          </code>
+        </span>
+      )}
+    </header>
   );
 }
 
-interface IssueWorkspaceContentProps {
-  issue: IssueResponse;
-}
-
-function IssueWorkspaceContent({ issue }: IssueWorkspaceContentProps) {
+function IssueWorkspaceContent({ issue }: { issue: IssueResponse }) {
   return (
     <IssueHubProvider
       issueId={issue.id}
       issueTitle={issue.title}
       datasetId={issue.dataset_id ?? null}
     >
-      <div className="space-y-6">
-        {/* Header */}
-        <div className="flex items-start gap-4">
-          <Link to="/issues">
-            <Button variant="ghost" size="icon" aria-label="Back to issues">
-              <ArrowLeft className="h-4 w-4" />
-            </Button>
-          </Link>
-          <div className="min-w-0">
-            <div className="mb-1 flex items-center gap-2">
-              <span className="font-mono text-muted-foreground">
-                #{issue.number}
-              </span>
-              <h1 className="text-2xl font-bold">{issue.title}</h1>
-            </div>
-            <div className="flex items-center gap-2">
-              <Badge variant={getStatusVariant(issue.status)}>
-                {getStatusLabel(issue.status)}
-              </Badge>
-              {issue.priority && (
-                <Badge variant={getPriorityVariant(issue.priority)}>
-                  {issue.priority}
-                </Badge>
-              )}
-              {issue.severity && (
-                <Badge variant={getSeverityVariant(issue.severity)}>
-                  {issue.severity}
-                </Badge>
-              )}
-            </div>
-          </div>
-        </div>
-
-        <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
-          {/* Thread column */}
-          <div className="min-w-0 space-y-6">
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-base">Description</CardTitle>
-              </CardHeader>
-              <CardContent>
-                {issue.description ? (
-                  <Markdown>{issue.description}</Markdown>
-                ) : (
-                  <p className="text-sm italic text-muted-foreground">
-                    No description provided.
-                  </p>
-                )}
-              </CardContent>
-            </Card>
-
-            <IssueThread issueId={issue.id} />
-          </div>
-
-          {/* Sidebar */}
-          <div className="space-y-4">
-            <IssueSidebar issue={issue} />
-            <InvestigationRunsSection issueId={issue.id} />
-            <ScratchChatsSection issueId={issue.id} />
-          </div>
-        </div>
+      {/* The top bar runs edge to edge under the app header. */}
+      <div className="-mx-6 -mt-6">
+        <IssueTopBar issue={issue} />
+      </div>
+      <div className="mx-auto mt-4 grid max-w-[1200px] gap-4 lg:grid-cols-[minmax(0,1fr)_300px]">
+        <IssueThread issueId={issue.id} />
+        <IssueSidebar issue={issue} />
       </div>
     </IssueHubProvider>
   );

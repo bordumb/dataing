@@ -3,12 +3,10 @@
  */
 
 import { useState } from "react";
-import { format, isToday } from "date-fns";
 import { AlertCircle, FileText, Loader2, Square } from "lucide-react";
 import { toast } from "sonner";
 
 import { Markdown } from "@/components/markdown";
-import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Textarea } from "@/components/ui/textarea";
 import {
@@ -22,15 +20,29 @@ import {
 import { errorText } from "@/lib/api/error-message";
 import {
   asBrief,
+  isFailedOutcome,
+  type InvestigationBrief,
   type InvestigationOutcome,
 } from "@/lib/api/investigation-runs";
-import { cn } from "@/lib/utils";
+import {
+  findRun,
+  runNumbers,
+  useIssueInvestigationRuns,
+} from "@/lib/api/issues";
 
 import { useIssueHub } from "../hub/hub-context";
 import {
   InvestigationCard,
   type InvestigationPayload,
 } from "./InvestigationCard";
+import { IssueOpenedMessage, isIssueOpenedEvent } from "./IssueOpened";
+import {
+  Avatar,
+  Meta,
+  SYSTEM_AVATAR,
+  colorFor,
+  formatTime,
+} from "./message-parts";
 import { OutcomeCard } from "./OutcomeCard";
 import { Pill } from "./Pill";
 import { ProposalCard, type SentProposal } from "./ProposalCard";
@@ -48,24 +60,33 @@ export interface ThreadViewer {
 export interface ThreadFacts {
   /** Each finished run's outcome, by investigation id. */
   outcomes: Map<string, InvestigationOutcome>;
+  /** The brief each run started with, by investigation id. */
+  briefs: Map<string, InvestigationBrief>;
   /** Steers people sent from agent proposals, by the proposing reply's id. */
   sentProposals: Map<string, SentProposal[]>;
 }
 
 export const EMPTY_FACTS: ThreadFacts = {
   outcomes: new Map(),
+  briefs: new Map(),
   sentProposals: new Map(),
 };
 
 /** Collect the facts messages need from the thread's messages. */
 export function threadFacts(messages: ThreadMessage[]): ThreadFacts {
   const outcomes = new Map<string, InvestigationOutcome>();
+  const briefs = new Map<string, InvestigationBrief>();
   const sentProposals = new Map<string, SentProposal[]>();
   for (const m of messages) {
-    if (m.kind === "investigation" && m.payload.phase === "outcome") {
-      const id = m.payload.investigation_id;
-      if (typeof id === "string" && m.payload.outcome) {
-        outcomes.set(id, m.payload.outcome as InvestigationOutcome);
+    const id = m.payload.investigation_id;
+    if (m.kind === "investigation" && typeof id === "string") {
+      if (m.payload.phase === "outcome") {
+        if (m.payload.outcome) {
+          outcomes.set(id, m.payload.outcome as InvestigationOutcome);
+        }
+      } else {
+        const brief = asBrief(m.payload.brief);
+        if (brief) briefs.set(id, brief);
       }
     }
     const replyId = m.payload.proposal_message_id;
@@ -79,7 +100,7 @@ export function threadFacts(messages: ThreadMessage[]): ThreadFacts {
       sentProposals.set(String(replyId), sent);
     }
   }
-  return { outcomes, sentProposals };
+  return { outcomes, briefs, sentProposals };
 }
 
 /** The steer already sent for a proposal, matched by kind and hypothesis. */
@@ -102,45 +123,6 @@ interface MessageProps {
   threadId: string;
   viewer: ThreadViewer;
   facts?: ThreadFacts;
-}
-
-function formatTime(iso: string): string {
-  const date = new Date(iso);
-  if (Number.isNaN(date.getTime())) return "";
-  return isToday(date) ? format(date, "HH:mm") : format(date, "MMM d, HH:mm");
-}
-
-const AVATAR_COLORS = [
-  "bg-sky-500",
-  "bg-orange-500",
-  "bg-emerald-500",
-  "bg-rose-500",
-  "bg-amber-500",
-  "bg-indigo-500",
-];
-
-function colorFor(key: string): string {
-  let hash = 0;
-  for (const ch of key) hash = (hash * 31 + ch.charCodeAt(0)) | 0;
-  return AVATAR_COLORS[Math.abs(hash) % AVATAR_COLORS.length];
-}
-
-function Avatar({ label, className }: { label: string; className: string }) {
-  return (
-    <div
-      aria-hidden
-      className={cn(
-        "grid h-7 w-7 flex-none place-items-center rounded-full text-xs font-bold text-white",
-        className,
-      )}
-    >
-      {label}
-    </div>
-  );
-}
-
-function Meta({ children }: { children: React.ReactNode }) {
-  return <div className="mb-0.5 text-xs text-muted-foreground">{children}</div>;
 }
 
 // ----------------------------------------------------------------------------
@@ -232,18 +214,18 @@ function CommentMessage({ message, issueId, threadId, viewer }: MessageProps) {
               </Button>
             </div>
           </div>
+        ) : message.asks_agent ? (
+          // "@agent is it every region?", with the pill inline as in the mockup.
+          <div className="flex items-start gap-1.5">
+            <Pill tone="agent" className="mt-0.5 flex-none">
+              @agent
+            </Pill>
+            <div className="min-w-0 flex-1">
+              <Markdown>{message.body_md}</Markdown>
+            </div>
+          </div>
         ) : (
-          <>
-            {message.asks_agent && (
-              <Badge
-                variant="outline"
-                className="mb-1 border-transparent bg-violet-100 text-violet-700 dark:bg-violet-950 dark:text-violet-300"
-              >
-                @agent
-              </Badge>
-            )}
-            <Markdown>{message.body_md}</Markdown>
-          </>
+          <Markdown>{message.body_md}</Markdown>
         )}
         {!deleted && !editing && (isAuthor || viewer.isAdmin) && (
           <div className="mt-1 flex gap-1">
@@ -279,6 +261,43 @@ function CommentMessage({ message, issueId, threadId, viewer }: MessageProps) {
 // ----------------------------------------------------------------------------
 // Agent replies
 // ----------------------------------------------------------------------------
+
+/** The steers a reply proposes, naming each run by its number ("#7"). */
+function Proposals({
+  proposals,
+  message,
+  issueId,
+  viewer,
+  facts,
+}: {
+  proposals: SteerProposal[];
+  message: ThreadMessage;
+  issueId: string;
+  viewer: ThreadViewer;
+  facts: ThreadFacts;
+}) {
+  const runs = useIssueInvestigationRuns(issueId);
+  const allRuns = runs.data?.items ?? [];
+  const numbers = runNumbers(allRuns);
+  return (
+    <>
+      {proposals.map((proposal, i) => {
+        const run = findRun(allRuns, { investigationId: proposal.run_id });
+        return (
+          <ProposalCard
+            key={i}
+            proposal={proposal}
+            runNumber={run ? numbers.get(run.id) : undefined}
+            replyId={message.id}
+            canWrite={viewer.canWrite}
+            sent={sentFor(facts.sentProposals.get(message.id), proposal)}
+            nameOf={viewer.nameOf}
+          />
+        );
+      })}
+    </>
+  );
+}
 
 function AgentReplyMessage({
   message,
@@ -345,17 +364,15 @@ function AgentReplyMessage({
 
         <ToolCalls calls={toolCalls} issueId={issueId} threadId={threadId} />
 
-        {message.status === "complete" &&
-          proposals.map((proposal, i) => (
-            <ProposalCard
-              key={i}
-              proposal={proposal}
-              replyId={message.id}
-              canWrite={viewer.canWrite}
-              sent={sentFor(facts.sentProposals.get(message.id), proposal)}
-              nameOf={viewer.nameOf}
-            />
-          ))}
+        {message.status === "complete" && proposals.length > 0 && (
+          <Proposals
+            proposals={proposals}
+            message={message}
+            issueId={issueId}
+            viewer={viewer}
+            facts={facts}
+          />
+        )}
 
         {canCancel && (
           <Button
@@ -421,19 +438,22 @@ function CardMessage({ message, viewer }: MessageProps) {
 function AuthorAvatar({
   message,
   author,
+  system = false,
 }: {
   message: ThreadMessage;
   author: string;
+  /** Attributed to dataing itself, whatever the author kind. */
+  system?: boolean;
 }) {
-  if (message.author_kind === "agent") {
+  if (message.author_kind === "agent" && !system) {
     return <Avatar label="AI" className="bg-violet-600" />;
   }
   return (
     <Avatar
       label={author.charAt(0).toUpperCase()}
       className={
-        message.author_kind === "system"
-          ? "bg-zinc-500"
+        system || message.author_kind === "system"
+          ? SYSTEM_AVATAR
           : colorFor(message.author_user_id ?? author)
       }
     />
@@ -453,19 +473,29 @@ function InvestigationMessage({
   facts = EMPTY_FACTS,
 }: MessageProps) {
   const isOutcome = message.payload.phase === "outcome";
-  const payload = message.payload as InvestigationPayload;
-  const author = authorName(message, viewer);
+  const payload = message.payload as InvestigationPayload & {
+    outcome?: InvestigationOutcome;
+  };
+  const investigationId = payload.investigation_id ?? null;
+  const runs = useIssueInvestigationRuns(issueId);
+  const allRuns = runs.data?.items ?? [];
+  const run = findRun(allRuns, { runId: payload.run_id, investigationId });
+  const number = run ? runNumbers(allRuns).get(run.id) : undefined;
+  // A run nobody started by hand (the API, a webhook, a check) is dataing's.
+  const headless = !isOutcome && message.author_user_id == null;
+  const author = headless ? "dataing" : authorName(message, viewer);
   const fromScratch =
     !!payload.source_thread_id &&
     payload.source_thread_id !== message.thread_id;
+  const which = number ? `investigation #${number}` : "investigation";
   return (
     <div className="flex gap-2.5 py-2.5">
-      <AuthorAvatar message={message} author={author} />
+      <AuthorAvatar message={message} author={author} system={headless} />
       <div className="min-w-0 flex-1">
         <Meta>
           <span className="font-semibold text-foreground">{author}</span> ·{" "}
           {isOutcome
-            ? "investigation finished"
+            ? `${which} ${isFailedOutcome(payload.outcome) ? "failed" : "finished"}`
             : payload.parent_run_id
               ? "continued investigating"
               : fromScratch
@@ -477,18 +507,24 @@ function InvestigationMessage({
           <OutcomeCard
             message={message}
             issueId={issueId}
+            run={run}
+            number={number}
+            brief={
+              (investigationId ? facts.briefs.get(investigationId) : null) ??
+              asBrief(run?.brief)
+            }
             canWrite={viewer.canWrite}
             nameOf={viewer.nameOf}
           />
         ) : (
           <InvestigationCard
             message={message}
+            run={run}
+            number={number}
             canWrite={viewer.canWrite}
             nameOf={viewer.nameOf}
             outcome={
-              payload.investigation_id
-                ? facts.outcomes.get(payload.investigation_id)
-                : null
+              investigationId ? facts.outcomes.get(investigationId) : null
             }
           />
         )}
@@ -597,7 +633,11 @@ function renderMessage(props: MessageProps) {
     case "agent_reply":
       return <AgentReplyMessage {...props} />;
     case "event":
-      return <EventMessage message={props.message} />;
+      return isIssueOpenedEvent(props.message) ? (
+        <IssueOpenedMessage {...props} />
+      ) : (
+        <EventMessage message={props.message} />
+      );
     case "investigation":
       return <InvestigationMessage {...props} />;
     case "brief":

@@ -5,11 +5,9 @@ import {
 } from "@/lib/api/investigations";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
-import { Button } from "@/components/ui/Button";
 import { AsyncBoundary } from "@/components/async-boundary";
-import { useRole } from "@/lib/auth";
+import { InvestigateButton } from "@/features/issues/brief/StartInvestigation";
 import { formatDate } from "@/lib/utils";
-import { Plus } from "lucide-react";
 
 function getStatusVariant(status: string) {
   switch (status) {
@@ -30,18 +28,12 @@ function InvestigationListContent({
 }: {
   investigations: InvestigationListItem[];
 }) {
-  const { isMember } = useRole();
-
   if (investigations.length === 0) {
     return (
       <Card>
         <CardContent className="py-12 text-center">
           <p className="text-muted-foreground">No investigations yet.</p>
-          {isMember && (
-            <Link to="/investigations/new">
-              <Button className="mt-4">Create your first investigation</Button>
-            </Link>
-          )}
+          <InvestigateButton className="mt-4" />
         </CardContent>
       </Card>
     );
@@ -77,20 +69,12 @@ function InvestigationListContent({
 
 export function InvestigationList() {
   const query = useInvestigations();
-  const { isMember } = useRole();
 
   return (
     <div>
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-3xl font-bold">Investigations</h1>
-        {isMember && (
-          <Link to="/investigations/new">
-            <Button>
-              <Plus className="h-4 w-4 mr-2" />
-              New Investigation
-            </Button>
-          </Link>
-        )}
+        <InvestigateButton />
       </div>
 
       <AsyncBoundary query={query}>

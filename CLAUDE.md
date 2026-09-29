@@ -82,7 +82,7 @@ The repo is open-core:
 ## Backend Architecture (CE)
 
 Core domain: `python-packages/dataing/src/dataing/core/`
-- `investigation/` - Domain entities, repository, collaboration service
+- `investigation/` - The investigation brief (what an issue thread hands to the manager)
 - `auth/`, `rbac/`, `entitlements/` - Identity and feature gating
 - `quality/` - LLM-as-judge quality validation
 - `state.py`, `domain_types.py`, `interfaces.py` - Event-sourced state + protocols

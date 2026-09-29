@@ -1052,12 +1052,16 @@ class Investigation(BaseModel):
         investigation_id: Unique identifier for the investigation.
         main_branch_id: ID of the main investigation branch.
         status: Current status (queued, running, completed, failed).
+        issue_id: The issue the run lives in; its thread is where to follow it.
+        issue_number: That issue's number.
         run_id: Alias for investigation_id (for compatibility with Run type).
     """
 
     investigation_id: str = Field(..., description="Unique investigation identifier")
     main_branch_id: str = Field(..., description="Main branch identifier")
     status: str = Field(default="queued", description="Current investigation status")
+    issue_id: str | None = Field(default=None, description="The issue the run lives in")
+    issue_number: int | None = Field(default=None, description="That issue's number")
 
     @property
     def run_id(self) -> str:

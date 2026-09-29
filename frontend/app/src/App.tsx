@@ -9,6 +9,7 @@ import {
 import { AppSidebar } from "@/components/layout/app-sidebar";
 import { Separator } from "@/components/ui/separator";
 import { ModeToggle } from "@/components/mode-toggle";
+import { LlmStatusBanner } from "@/components/llm-status-banner";
 import {
   ErrorBoundary,
   FeatureErrorBoundary,
@@ -26,10 +27,10 @@ import {
 import { DashboardPage } from "@/features/dashboard/dashboard-page";
 import { InvestigationList } from "@/features/investigation/InvestigationList";
 import { InvestigationDetail } from "@/features/investigation/InvestigationDetail";
-import { NewInvestigation } from "@/features/investigation/NewInvestigation";
 import { DataSourcePage } from "@/features/datasources/datasource-page";
 import { DatasetListPage, DatasetDetailPage } from "@/features/datasets";
 import { SettingsPage } from "@/features/settings/settings-page";
+import { DatasourceCredentialsPage } from "@/features/settings/datasource-credentials-page";
 import { UsagePage } from "@/features/usage/usage-page";
 import { NotificationsPage } from "@/features/notifications";
 import { AdminRoute } from "@/features/admin";
@@ -85,6 +86,8 @@ function AppLayout({ children }: { children: React.ReactNode }) {
             <ModeToggle />
           </div>
         </header>
+        {/* A broken LLM key or model is visible on every page. */}
+        <LlmStatusBanner />
         <main className="flex-1 p-6">{children}</main>
       </SidebarInset>
     </SidebarProvider>
@@ -142,19 +145,6 @@ function AppWithEntitlements() {
                     element={
                       <FeatureErrorBoundary feature="investigations">
                         <InvestigationList />
-                      </FeatureErrorBoundary>
-                    }
-                  />
-                  <Route
-                    path="investigations/new"
-                    element={
-                      <FeatureErrorBoundary feature="new investigation">
-                        <RoleGuard
-                          minRole="member"
-                          redirectTo="/investigations"
-                        >
-                          <NewInvestigation />
-                        </RoleGuard>
                       </FeatureErrorBoundary>
                     }
                   />
@@ -237,6 +227,15 @@ function AppWithEntitlements() {
                     element={
                       <FeatureErrorBoundary feature="settings">
                         <SettingsPage />
+                      </FeatureErrorBoundary>
+                    }
+                  />
+                  {/* The issue agent links here when a question needs your login */}
+                  <Route
+                    path="settings/datasources/:datasourceId/credentials"
+                    element={
+                      <FeatureErrorBoundary feature="settings">
+                        <DatasourceCredentialsPage />
                       </FeatureErrorBoundary>
                     }
                   />

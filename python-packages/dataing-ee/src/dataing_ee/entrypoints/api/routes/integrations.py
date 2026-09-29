@@ -15,17 +15,20 @@ import secrets
 from collections.abc import Awaitable, Callable
 from datetime import UTC, datetime
 from typing import Annotated, Any
-from uuid import UUID, uuid4
+from uuid import UUID
 
 import httpx
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request, Response, status
 from pydantic import BaseModel, Field
 
 from dataing.adapters.db.app_db import AppDatabase
+from dataing.adapters.db.issues import open_issue
 from dataing.adapters.db.team_policy_repository import PolicyAction, TeamPolicyRepository
+from dataing.core.domain_types import AnomalyAlert
 from dataing.core.json_utils import to_json_string
 from dataing.entrypoints.api.deps import get_app_db, resolve_datasource_id
 from dataing.entrypoints.api.middleware.auth import ApiKeyContext, require_scope, verify_api_key
+from dataing.services.investigation import InvestigationStarterService
 from dataing.services.policy import IssueContext, PolicyService
 from dataing_ee.adapters.integrations.base import IntegrationAdapter, IssueData, WebhookRequest
 from dataing_ee.adapters.integrations.registry import get_adapter
@@ -731,64 +734,26 @@ async def _process_webhook_event(
     # Create issue
     tenant_id = integration["tenant_id"]
 
-    # Get next issue number
-    number_row = await db.fetch_one(
-        "SELECT next_issue_number($1) as num",
-        tenant_id,
+    issue_row = await open_issue(
+        db,
+        tenant_id=tenant_id,
+        title=str(issue_data["title"]),
+        description=issue_data.get("description"),
+        priority=issue_data.get("priority"),
+        severity=issue_data.get("severity"),
+        dataset_id=issue_data.get("dataset_id"),
+        labels=issue_data.get("labels", []),
+        author_type="integration",
+        source_provider=provider,
+        source_external_id=idempotency_key,
+        event_payload={
+            "source": "webhook",
+            "provider": provider,
+            "integration_id": str(integration_id),
+        },
     )
-    issue_number = number_row["num"] if number_row else 1
-
-    issue_row = await db.fetch_one(
-        """
-        INSERT INTO issues (
-            tenant_id, number, title, description, status,
-            priority, severity, dataset_id,
-            author_type, source_provider, source_external_id
-        )
-        VALUES ($1, $2, $3, $4, 'open', $5, $6, $7, 'integration', $8, $9)
-        RETURNING id, number
-        """,
-        tenant_id,
-        issue_number,
-        issue_data.get("title"),
-        issue_data.get("description"),
-        issue_data.get("priority"),
-        issue_data.get("severity"),
-        issue_data.get("dataset_id"),
-        provider,
-        idempotency_key,
-    )
-
-    if not issue_row:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to create issue from webhook",
-        )
     issue_id = issue_row["id"]
-
-    # Add labels if present
-    labels = issue_data.get("labels", [])
-    for label in labels:
-        await db.execute(
-            "INSERT INTO issue_labels (issue_id, label) VALUES ($1, $2)",
-            issue_id,
-            label,
-        )
-
-    # Record creation event
-    event_payload = {
-        "source": "webhook",
-        "provider": provider,
-        "integration_id": str(integration_id),
-    }
-    await db.execute(
-        """
-        INSERT INTO issue_events (issue_id, event_type, actor_user_id, payload)
-        VALUES ($1, 'created', NULL, $2)
-        """,
-        issue_id,
-        to_json_string(event_payload),
-    )
+    issue_number = issue_row["number"]
 
     # Evaluate policy and start auto-investigation if applicable
     investigation_id = await _evaluate_and_start_investigation(
@@ -979,8 +944,6 @@ async def _evaluate_and_start_investigation(
             "source_alert_id": idempotency_key,
         }
 
-    investigation_id = uuid4()
-
     # Resolve the tenant's own datasource. There is no fallback ID: a fixed ID
     # would point the investigation at a datasource owned by another tenant.
     try:
@@ -992,58 +955,29 @@ async def _evaluate_and_start_investigation(
         )
         return None
 
-    # Add issue_id to alert data for back-linking
-    alert_data["issue_id"] = str(issue_id)
-    alert_data["datasource_id"] = str(datasource_id)
-
+    starter = InvestigationStarterService(db=db, temporal_client=temporal_client)
     try:
-        # Create investigation record
-        await db.execute(
-            """
-            INSERT INTO investigations (id, tenant_id, alert)
-            VALUES ($1, $2, $3)
-            """,
-            investigation_id,
-            tenant_id,
-            json.dumps(alert_data),
+        started = await starter.start(
+            tenant_id=tenant_id,
+            datasource_id=datasource_id,
+            trigger_type="webhook",
+            alert=AnomalyAlert.model_validate(alert_data),
+            issue_id=issue_id,
+            trigger_ref={
+                "source": "auto_policy",
+                "provider": provider,
+                "idempotency_key": idempotency_key,
+            },
         )
-
-        # Start Temporal workflow
-        alert_summary = f"Auto investigation: {issue_data.get('title', 'Webhook alert')}"
-        await temporal_client.start_investigation(
-            investigation_id=str(investigation_id),
-            tenant_id=str(tenant_id),
-            datasource_id=str(datasource_id),
-            alert_data=alert_data,
-            alert_summary=alert_summary,
-        )
-
-        # Record investigation started event on issue
-        await db.execute(
-            """
-            INSERT INTO issue_events (issue_id, event_type, actor_user_id, payload)
-            VALUES ($1, 'investigation_started', NULL, $2)
-            """,
-            issue_id,
-            to_json_string(
-                {
-                    "investigation_id": str(investigation_id),
-                    "trigger": "auto_policy",
-                    "source_system": provider,
-                }
-            ),
-        )
-
-        logger.info(
-            f"Auto investigation started: investigation={investigation_id}, "
-            f"issue={issue_id}, provider={provider}"
-        )
-
-        return investigation_id
-
     except Exception as e:
         logger.error(f"Failed to start auto investigation for issue={issue_id}: {e}")
         return None
+
+    logger.info(
+        f"Auto investigation started: investigation={started.investigation_id}, "
+        f"issue={issue_id}, provider={provider}"
+    )
+    return started.investigation_id
 
 
 def _extract_idempotency_key(payload: dict[str, Any], provider: str, request: Request) -> str:

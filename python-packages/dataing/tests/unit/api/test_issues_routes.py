@@ -393,7 +393,10 @@ class TestInvestigationRunSchemas:
             synthesis_summary=None,
             created_at=datetime.now(UTC),
             completed_at=None,
+            number=1,
+            status="running",
         )
+        assert (data.number, data.status, data.error) == (1, "running", None)
         assert data.trigger_type == "human"
         assert data.execution_profile == "standard"
         assert data.approval_status is None

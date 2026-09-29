@@ -4,6 +4,12 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { customInstance } from "./client";
+import type {
+  ExecutionProfile,
+  HypothesisStatus,
+  InvestigationBrief,
+  RunError,
+} from "./investigation-runs";
 import { queryKeys } from "./query-keys";
 
 // Types
@@ -33,11 +39,34 @@ export interface BranchState {
   parent_branch_id: string | null;
 }
 
+/** A hypothesis the manager proposed, and how testing it ended. */
+export interface RunHypothesis {
+  id: string;
+  title: string;
+  status: HypothesisStatus | string;
+  reasoning: string | null;
+}
+
 export interface InvestigationState {
   investigation_id: string;
   status: string;
   main_branch: BranchState;
   user_branch: BranchState | null;
+  /**
+   * The issue the run belongs to, and the run's number among its runs.
+   * Null for imported snapshots, which have no issue (spec 0001 §7.11).
+   */
+  issue_id?: string | null;
+  issue_number?: number | null;
+  issue_title?: string | null;
+  run_number?: number | null;
+  brief?: InvestigationBrief | null;
+  execution_profile?: string | null;
+  /** Why the run failed, when it did. */
+  error?: RunError | null;
+  hypotheses?: RunHypothesis[] | null;
+  /** How a person reviewed the root cause, once someone has. */
+  outcome_verdict?: "confirmed" | "rejected" | null;
 }
 
 export interface InvestigationListItem {
@@ -47,29 +76,23 @@ export interface InvestigationListItem {
   dataset_id: string;
 }
 
-export interface AlertData {
-  dataset_ids: string[];
-  metric_spec: {
-    metric_type: string;
-    expression: string;
-    display_name: string;
-    columns_referenced: string[];
-    source_url?: string;
-  };
-  anomaly_type: string;
-  expected_value: number;
-  actual_value: number;
-  deviation_pct: number;
-  anomaly_date: string;
-  severity?: string;
-  source_system?: string;
-  source_alert_id?: string;
-  source_url?: string;
-  metadata?: Record<string, unknown>;
+/**
+ * Start a run from a brief (spec 0001 §7.11). Without `issue_id` the server
+ * opens an issue for it, titled with the symptom.
+ */
+export interface StartInvestigationBody {
+  brief: InvestigationBrief;
+  execution_profile: ExecutionProfile;
+  datasource_id?: string | null;
+  issue_id?: string | null;
 }
 
 export interface StartInvestigationResponse {
   investigation_id: string;
+  run_id: string;
+  issue_id: string;
+  issue_number: number;
+  status: string;
   main_branch_id: string;
 }
 
@@ -108,13 +131,22 @@ async function getInvestigation(
   });
 }
 
-async function startInvestigation(
-  alert: AlertData,
+export async function startInvestigation(
+  body: StartInvestigationBody,
 ): Promise<StartInvestigationResponse> {
   return customInstance<StartInvestigationResponse>({
     url: API_BASE,
     method: "POST",
-    data: { alert },
+    data: body,
+  });
+}
+
+/** The run as a snapshot archive (tar.gz), for replay or sharing. */
+export async function fetchSnapshot(investigationId: string): Promise<Blob> {
+  return customInstance<Blob>({
+    url: `${API_BASE}/${investigationId}/snapshot`,
+    method: "GET",
+    responseType: "blob",
   });
 }
 
@@ -138,6 +170,21 @@ export function useInvestigations() {
   });
 }
 
+/** Workflow statuses a run doesn't leave. */
+export const TERMINAL_STATUSES = new Set([
+  "completed",
+  "failed",
+  "cancelled",
+  "inconclusive",
+  "terminated",
+  "timed_out",
+]);
+
+/** Whether the run has ended, by its status or a recorded failure. */
+export function hasEnded(state: Pick<InvestigationState, "status" | "error">) {
+  return TERMINAL_STATUSES.has(state.status) || !!state.error;
+}
+
 export function useInvestigation(investigationId: string | undefined) {
   return useQuery({
     queryKey: queryKeys.investigations.detail(investigationId ?? ""),
@@ -145,13 +192,7 @@ export function useInvestigation(investigationId: string | undefined) {
     enabled: !!investigationId,
     refetchInterval: (query) => {
       const data = query.state.data;
-      if (
-        ["completed", "failed", "cancelled", "inconclusive"].includes(
-          data?.status ?? "",
-        )
-      ) {
-        return false;
-      }
+      if (query.state.error || (data && hasEnded(data))) return false;
       return 2000;
     },
   });
@@ -163,9 +204,37 @@ export function useStartInvestigation() {
   return useMutation({
     mutationFn: startInvestigation,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.investigations.all });
+      void queryClient.invalidateQueries({
+        queryKey: queryKeys.investigations.all,
+      });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.issues.all });
     },
   });
+}
+
+/** Below this confidence, a root cause becomes a check only once a person confirms it. */
+const CODIFY_MIN_CONFIDENCE = 0.6;
+
+/**
+ * Why a run's root cause can't become a check yet, or null when it can. A
+ * person's review outranks the model's confidence: a confirmed cause can become
+ * a check at any confidence, and a rejected one never can (spec 0001 §7.10).
+ * The server applies the same rule.
+ */
+export function codifyBlocker(
+  confidence: number | null,
+  verdict: string | null | undefined,
+): string | null {
+  if (verdict === "rejected")
+    return "This root cause was rejected, so it can't become a check.";
+  if (verdict === "confirmed") return null;
+  if (confidence !== null && confidence >= CODIFY_MIN_CONFIDENCE) return null;
+  if (confidence === null)
+    return "Confirm the root cause to add it as a check.";
+  return (
+    `The root cause's confidence (${Math.round(confidence * 100)}%) is ` +
+    "below 60%. Confirm it to add it as a check."
+  );
 }
 
 export function useCodifyInvestigation() {

@@ -6,7 +6,9 @@
 
 import * as React from "react";
 import { useNavigate, useLocation } from "react-router-dom";
+import { toast } from "sonner";
 
+import { subscribeToSessionExpired } from "@/lib/api/session-expired";
 import * as authApi from "./api";
 import type {
   AuthState,
@@ -246,6 +248,19 @@ export function JwtAuthProvider({ children }: { children: React.ReactNode }) {
       accessToken: null,
     });
   }, [clearStorage]);
+
+  // The API rejected the session (expired, or issued by another deployment):
+  // sign out, which sends the person to the login page, and say why once.
+  React.useEffect(
+    () =>
+      subscribeToSessionExpired(() => {
+        logout();
+        toast.info("Your session has ended. Sign in again.", {
+          id: "session-expired",
+        });
+      }),
+    [logout],
+  );
 
   const switchOrg = React.useCallback(
     async (orgId: string, orgName?: string, orgSlug?: string) => {

@@ -151,13 +151,6 @@ class FakeLifespanDatabase:
         """Pretend to close the pool."""
 
 
-class FakeAgentClient:
-    """AgentClient stand-in that skips LLM provider setup."""
-
-    def __init__(self, api_key: str, model: str) -> None:
-        """Initialize the fake agent client."""
-
-
 async def fake_temporal_connect(**kwargs: Any) -> object:
     """Stand in for TemporalInvestigationClient.connect."""
     return object()
@@ -178,7 +171,6 @@ class TestLifespanSecrets:
         monkeypatch.setenv("DATADR_ENCRYPTION_KEY", encryption_key)
         monkeypatch.delenv("DATADR_DEMO_MODE", raising=False)
         monkeypatch.setattr(deps, "AppDatabase", FakeLifespanDatabase)
-        monkeypatch.setattr(deps, "AgentClient", FakeAgentClient)
         monkeypatch.setattr(TemporalInvestigationClient, "connect", fake_temporal_connect)
         app = FastAPI()
 

@@ -19,10 +19,10 @@ import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
+from dataing.adapters.db import issues as issues_adapter
 from dataing.core.auth.jwt import create_access_token
 from dataing.core.auth.types import OrgRole
 from dataing.entrypoints.api.deps import get_app_db
-from dataing.entrypoints.api.routes import issues as issues_module
 from dataing.entrypoints.api.routes.issues import router, transition_options
 
 TENANT_ID = uuid.uuid4()
@@ -162,7 +162,7 @@ class FakeThreadRepository:
 @pytest.fixture
 def db(monkeypatch: pytest.MonkeyPatch) -> FakeIssueDb:
     """Return the fake database, with thread event copies disabled."""
-    monkeypatch.setattr(issues_module, "IssueThreadRepository", FakeThreadRepository)
+    monkeypatch.setattr(issues_adapter, "IssueThreadRepository", FakeThreadRepository)
     return FakeIssueDb()
 
 

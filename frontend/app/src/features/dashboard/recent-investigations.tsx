@@ -5,7 +5,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { formatDate } from "@/lib/utils";
 import { EmptyState } from "@/components/shared/empty-state";
 import { Search } from "lucide-react";
-import { Button } from "@/components/ui/Button";
+import { InvestigateButton } from "@/features/issues/brief/StartInvestigation";
 import { useRole } from "@/lib/auth";
 
 function getStatusVariant(status: string) {
@@ -55,14 +55,8 @@ export function RecentInvestigations() {
       <EmptyState
         icon={Search}
         title="No investigations yet"
-        description="Start by creating your first investigation to analyze data quality issues."
-        action={
-          isMember ? (
-            <Button asChild>
-              <Link to="/investigations/new">Create Investigation</Link>
-            </Button>
-          ) : undefined
-        }
+        description="Say what looks wrong and the agent investigates it. Each run opens an issue your team can follow."
+        action={isMember ? <InvestigateButton /> : undefined}
       />
     );
   }

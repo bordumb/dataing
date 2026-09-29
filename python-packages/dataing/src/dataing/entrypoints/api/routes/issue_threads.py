@@ -26,10 +26,11 @@ from sse_starlette.sse import EventSourceResponse
 
 from dataing.adapters.db.app_db import AppDatabase
 from dataing.adapters.db.issue_threads import IssueThreadRepository
+from dataing.adapters.db.issues import record_issue_event
 from dataing.core.json_utils import to_json_string
 from dataing.entrypoints.api.deps import get_app_db
 from dataing.entrypoints.api.middleware.auth import ApiKeyContext, require_scope, verify_api_key
-from dataing.entrypoints.api.routes.issues import _record_issue_event, _verify_issue_access
+from dataing.entrypoints.api.routes.issues import _verify_issue_access
 
 logger = logging.getLogger(__name__)
 
@@ -340,7 +341,7 @@ async def post_message(
         reply_to_id=body.reply_to_id,
     )
     if thread["kind"] == "shared":
-        await _record_issue_event(
+        await record_issue_event(
             db, issue_id, "comment_added", user_id, {"message_id": str(row["id"])}
         )
         await db.execute("UPDATE issues SET updated_at = NOW() WHERE id = $1", issue_id)

@@ -1,15 +1,15 @@
 /**
- * The tools an agent reply used, collapsed to one line ("Ran 2 queries ▸").
+ * The tools an agent reply used, collapsed to one line with the totals
+ * ("▸ Ran 1 query · 212 ms · 4 rows", spec 0001 §8.1).
  *
- * Expanded, each query shows the SQL with a copy button and the snapshot of
- * rows the agent saw, fetched from the query-results endpoint on demand.
+ * Expanded, each query shows the SQL and the snapshot of rows the agent saw,
+ * fetched from the query-results endpoint on demand, with a Copy SQL link.
  */
 
 import { useState } from "react";
-import { Check, ChevronDown, ChevronRight, Copy, Loader2 } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
-import { Button } from "@/components/ui/Button";
 import {
   useQueryResult,
   type QueryResult,
@@ -17,20 +17,49 @@ import {
 } from "@/lib/api/issue-threads";
 import { cn } from "@/lib/utils";
 
+import { LINK_CLASS } from "./message-parts";
+
 const QUERY_TOOL = "run_query";
 
 function plural(n: number, word: string, pluralWord = `${word}s`): string {
   return `${n} ${n === 1 ? word : pluralWord}`;
 }
 
+function count(n: number): string {
+  return n.toLocaleString("en-US");
+}
+
+function isNumber(value: unknown): value is number {
+  return typeof value === "number" && Number.isFinite(value);
+}
+
+function total(values: number[]): number {
+  return values.reduce((sum, v) => sum + v, 0);
+}
+
+/**
+ * "Ran 2 queries · 480 ms · 21 rows". Durations and row counts come from the
+ * tool-call record; older messages without them fall back to "Ran 2 queries".
+ */
 export function toolCallsSummary(calls: ToolCall[]): string {
-  const queries = calls.filter((c) => c.tool === QUERY_TOOL).length;
-  const others = calls.length - queries;
+  const queries = calls.filter((c) => c.tool === QUERY_TOOL);
+  const others = calls.length - queries.length;
   const parts: string[] = [];
-  if (queries > 0) parts.push(`Ran ${plural(queries, "query", "queries")}`);
+  if (queries.length > 0) {
+    parts.push(`Ran ${plural(queries.length, "query", "queries")}`);
+    if (queries.every((q) => isNumber(q.duration_ms))) {
+      parts.push(`${count(total(queries.map((q) => q.duration_ms!)))} ms`);
+    }
+    // A query that failed returned no rows.
+    const answered = queries.filter((q) => q.status !== "error");
+    if (answered.length > 0 && answered.every((q) => isNumber(q.row_count))) {
+      const rows = total(answered.map((q) => q.row_count!));
+      parts.push(`${count(rows)} ${rows === 1 ? "row" : "rows"}`);
+    }
+  }
   if (others > 0) {
     parts.push(
-      queries > 0
+      queries.length > 0
         ? plural(others, "other tool call")
         : `Used ${plural(others, "tool")}`,
     );
@@ -44,7 +73,8 @@ function formatCell(value: unknown): string {
   return String(value);
 }
 
-function CopyButton({ text }: { text: string }) {
+/** The footer's "Copy SQL", a link-style button like the mockup's. */
+function CopySql({ text }: { text: string }) {
   const [copied, setCopied] = useState(false);
   const copy = async () => {
     try {
@@ -56,16 +86,9 @@ function CopyButton({ text }: { text: string }) {
     }
   };
   return (
-    <Button
-      type="button"
-      variant="ghost"
-      size="sm"
-      className="h-6 gap-1 px-2 text-xs"
-      onClick={copy}
-    >
-      {copied ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
+    <button type="button" className={LINK_CLASS} onClick={() => void copy()}>
       {copied ? "Copied" : "Copy SQL"}
-    </Button>
+    </button>
   );
 }
 
@@ -159,12 +182,9 @@ function QueryCall({
       {purpose && (
         <p className="px-3 pt-2 text-xs text-muted-foreground">{purpose}</p>
       )}
-      <div className="flex items-start justify-between gap-2 border-b border-border px-3 py-2">
-        <pre className="min-w-0 flex-1 whitespace-pre-wrap font-mono text-xs">
-          {result.sql}
-        </pre>
-        <CopyButton text={result.sql} />
-      </div>
+      <pre className="whitespace-pre-wrap border-b border-border px-3 py-2 font-mono text-xs">
+        {result.sql}
+      </pre>
       {result.error ? (
         <p className="px-3 py-2 text-xs text-destructive">{result.error}</p>
       ) : (
@@ -175,7 +195,8 @@ function QueryCall({
         {result.truncated
           ? ` · showing the first ${plural(result.rows.length, "row")}`
           : ""}{" "}
-        · {result.duration_ms} ms · {result.dialect}
+        · {result.duration_ms} ms · {result.dialect} · Snapshot saved with this
+        message · <CopySql text={result.sql} />
       </p>
     </div>
   );
@@ -209,18 +230,16 @@ interface ToolCallsProps {
 export function ToolCalls({ calls, issueId, threadId }: ToolCallsProps) {
   const [open, setOpen] = useState(false);
   if (calls.length === 0) return null;
-  const Chevron = open ? ChevronDown : ChevronRight;
 
   return (
-    <div className="mt-2 overflow-hidden rounded-md border border-border">
+    <div className="mt-1.5 overflow-hidden rounded-lg border border-border">
       <button
         type="button"
-        className="flex w-full items-center gap-1 bg-muted px-3 py-1.5 text-left text-xs text-muted-foreground hover:text-foreground"
+        className="flex w-full items-center gap-1.5 bg-muted px-2.5 py-1.5 text-left text-xs text-muted-foreground hover:text-foreground"
         aria-expanded={open}
         onClick={() => setOpen((v) => !v)}
       >
-        <Chevron className="h-3 w-3" />
-        {toolCallsSummary(calls)}
+        <span aria-hidden>{open ? "▾" : "▸"}</span> {toolCallsSummary(calls)}
       </button>
       {open && (
         <div className="divide-y divide-border">

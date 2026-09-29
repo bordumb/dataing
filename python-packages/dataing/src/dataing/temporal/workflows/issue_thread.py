@@ -22,7 +22,10 @@ from typing import Any
 
 from temporalio import workflow
 from temporalio.common import RetryPolicy
-from temporalio.exceptions import ActivityError
+from temporalio.exceptions import ActivityError, ApplicationError
+
+with workflow.unsafe.imports_passed_through():
+    from dataing.temporal.errors import LLM_REJECTED, LLM_UNAVAILABLE
 
 TURN_TIMEOUT = timedelta(minutes=5)
 TURN_HEARTBEAT_TIMEOUT = timedelta(seconds=30)
@@ -138,9 +141,21 @@ class IssueThreadWorkflow:
             workflow.logger.warning(f"Turn failed: {self._current}: {e}")
             await workflow.execute_activity(
                 "mark_turn_failed",
-                {**request, "error": str(e.cause or e)},
+                {**request, "error": _failure_text(e)},
                 start_to_close_timeout=timedelta(seconds=30),
             )
         finally:
             self._current = None
             self._current_turn = None
+
+
+def _failure_text(error: ActivityError) -> str:
+    """Return why a turn failed, as the person reading the thread needs it.
+
+    A model failure's message says what to fix (docs/specs/0001_issue_chat.md §7.12);
+    anything else keeps its error type.
+    """
+    cause = error.cause
+    if isinstance(cause, ApplicationError) and cause.type in (LLM_REJECTED, LLM_UNAVAILABLE):
+        return cause.message
+    return str(cause or error)

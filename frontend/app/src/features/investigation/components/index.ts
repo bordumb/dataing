@@ -2,8 +2,7 @@ export { SchemaViewer } from "./schema-viewer";
 export { LineagePanel } from "./lineage-panel";
 export { DatasetEntry, SOURCE_ICONS } from "./dataset-entry";
 
-// Phase 3: Visualization components
-export { StepTimeline } from "./step-timeline";
+// The run's details page
 export { PatternBadge, PatternList } from "./pattern-badge";
-export { EvidenceCard, EvidenceList } from "./evidence-card";
+export { SupportBadge, evidenceFields, type EvidenceFields } from "./evidence";
 export { CodifyWidget } from "./codify-widget";

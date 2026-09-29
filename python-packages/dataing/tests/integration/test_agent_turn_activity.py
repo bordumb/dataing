@@ -389,3 +389,66 @@ async def test_brief_draft_from_a_scratch_chat_reads_both_threads(
     assert scratch_claim["message_id"] == str(scratch_note["id"])
     assert scratch_claim["query_result_id"] == str(scratch_result)
     assert brief["ruled_out"][0]["message_id"] == str(scratch_reply["id"])
+
+
+INVALID_KEY = (
+    "Anthropic rejected the API key (401). Set a valid ANTHROPIC_API_KEY and "
+    "restart the API and the worker."
+)
+
+
+async def test_a_rejected_key_fails_the_turn_with_what_to_fix(migrated_db: AppDatabase) -> None:
+    """The reply shows what to fix, not the raw ModelHTTPError, and isn't retried."""
+    from pydantic_ai.exceptions import ModelHTTPError
+    from temporalio.exceptions import ApplicationError
+
+    from dataing.agents.chat import build_chat_agent
+
+    async def reject(messages: list[ModelMessage], info: AgentInfo) -> Any:
+        raise ModelHTTPError(status_code=401, model_name="claude-opus-5-5", body=None)
+        yield  # an async generator, as stream functions are
+
+    request = await _thread_with_question(migrated_db)
+    activity_fn = make_run_agent_turn_activity(
+        migrated_db, lambda: build_chat_agent(FunctionModel(stream_function=reject)), FakeQueries()
+    )
+
+    with pytest.raises(ApplicationError) as caught:
+        await ActivityEnvironment().run(activity_fn, request)
+
+    assert (caught.value.type, caught.value.non_retryable) == ("LLMRejected", True)
+    assert caught.value.message == INVALID_KEY
+
+
+async def test_a_rejected_key_fails_the_brief_draft_with_what_to_fix(
+    migrated_db: AppDatabase,
+) -> None:
+    """Drafting a brief fails the same way: the reason, once."""
+    from pydantic_ai.exceptions import ModelHTTPError
+    from pydantic_ai.messages import ModelResponse
+    from temporalio.exceptions import ApplicationError
+
+    from dataing.agents.chat import build_brief_agent
+    from dataing.temporal.activities.agent_turn import make_run_brief_draft_activity
+
+    def reject(messages: list[ModelMessage], info: AgentInfo) -> ModelResponse:
+        raise ModelHTTPError(status_code=401, model_name="claude-opus-5-5", body=None)
+
+    request = await _thread_with_question(migrated_db)
+    brief_msg = await IssueThreadRepository(migrated_db).append_message(
+        uuid.UUID(request["thread_id"]),
+        author_kind="agent",
+        kind="brief",
+        requested_by_user_id=uuid.UUID(request["requested_by"]),
+        status="queued",
+    )
+    activity_fn = make_run_brief_draft_activity(
+        migrated_db, lambda: build_brief_agent(FunctionModel(reject)), FakeQueries()
+    )
+
+    with pytest.raises(ApplicationError) as caught:
+        await ActivityEnvironment().run(
+            activity_fn, {**request, "message_id": str(brief_msg["id"]), "kind": "draft_brief"}
+        )
+
+    assert (caught.value.type, caught.value.message) == ("LLMRejected", INVALID_KEY)

@@ -46,6 +46,9 @@ def _decode_message(row: dict[str, Any]) -> dict[str, Any]:
 
 def describe_event(event_type: str, payload: dict[str, Any]) -> str:
     """Return a one-line, human-readable description of an issue event."""
+    if event_type == "created":
+        provider = payload.get("source_provider")
+        return f"Issue opened from {provider}" if provider else "Issue opened"
     if event_type == "status_changed":
         return f"Status changed from {payload.get('from', '?')} to {payload.get('to', '?')}"
     if event_type in ("assigned", "assignee_changed"):

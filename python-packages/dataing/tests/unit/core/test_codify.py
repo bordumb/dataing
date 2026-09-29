@@ -531,13 +531,13 @@ class TestExtractTestsFromSynthesis:
 
     @pytest.fixture
     def mock_synthesis_low_confidence(self) -> MagicMock:
-        """Create a mock synthesis response with low confidence."""
+        """Create a mock synthesis response whose confidence is below 60%."""
         from unittest.mock import MagicMock
 
         synthesis = MagicMock()
-        synthesis.root_cause = "Some issue detected"
-        synthesis.confidence = 0.5  # Below threshold
-        synthesis.causal_chain = ["Step 1", "Step 2"]
+        synthesis.root_cause = "NULL values in orders.user_id since app_v2 shipped"
+        synthesis.confidence = 0.35
+        synthesis.causal_chain = ["app_v2 shipped", "orders.user_id has NULL values"]
         synthesis.supporting_evidence = []
         return synthesis
 
@@ -633,10 +633,10 @@ class TestExtractTestsFromSynthesis:
         assert len(unique_tests) == 1
         assert unique_tests[0].column == "order_id"
 
-    def test_no_tests_below_confidence_threshold(
+    def test_extracts_tests_at_any_confidence(
         self, investigation_id: "uuid4", mock_synthesis_low_confidence: MagicMock
     ) -> None:
-        """Test that no tests are generated below confidence threshold."""
+        """Extraction ignores confidence: a person can confirm a low-confidence cause."""
         from dataing.core.codify import extract_tests_from_synthesis
 
         tests = extract_tests_from_synthesis(
@@ -645,7 +645,9 @@ class TestExtractTestsFromSynthesis:
             table="orders",
         )
 
-        assert len(tests) == 0
+        assert [(t.assertion_type, t.column) for t in tests] == [
+            (AssertionType.NOT_NULL, "user_id")
+        ]
 
     def test_extract_accepted_values_test(
         self, investigation_id: "uuid4", mock_synthesis_unexpected_values: MagicMock
@@ -801,3 +803,33 @@ class TestHelperFunctions:
 
         column = _extract_column_from_synthesis(synthesis)
         assert column == "status"
+
+
+class TestCodifyRefusal:
+    """A person's review outranks the model's confidence (spec 0001 §7.10)."""
+
+    @pytest.mark.parametrize(
+        ("confidence", "verdict", "allowed"),
+        [
+            (0.85, None, True),
+            (0.6, None, True),
+            (0.35, None, False),
+            (0.35, "confirmed", True),
+            (0.95, "rejected", False),
+        ],
+    )
+    def test_whether_a_root_cause_can_become_a_check(
+        self, confidence: float, verdict: str | None, allowed: bool
+    ) -> None:
+        """Confirmed causes always can, rejected ones never; otherwise 60% decides."""
+        from dataing.core.codify import codify_refusal
+
+        assert (codify_refusal(confidence, verdict) is None) is allowed
+
+    def test_says_how_to_add_a_low_confidence_cause(self) -> None:
+        """The reason tells the person what to do."""
+        from dataing.core.codify import codify_refusal
+
+        assert codify_refusal(0.35, None) == (
+            "The root cause's confidence (35%) is below 60%. Confirm it to add it as a check."
+        )

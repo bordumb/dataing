@@ -3,13 +3,14 @@
 from __future__ import annotations
 
 import uuid
+from types import SimpleNamespace
 from typing import Any
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
+from fastapi import HTTPException
 
 from dataing.core.domain_types import AnomalyAlert, MetricSpec
-from dataing.core.investigation.service import BranchState, InvestigationState
 from dataing.entrypoints.api.middleware.auth import ApiKeyContext
 
 
@@ -46,28 +47,6 @@ def sample_alert() -> dict[str, Any]:
     }
 
 
-@pytest.fixture
-def mock_service() -> AsyncMock:
-    """Create mock investigation service."""
-    service = AsyncMock()
-    investigation_id = uuid.uuid4()
-    branch_id = uuid.uuid4()
-
-    service.start_investigation.return_value = (investigation_id, branch_id)
-    service.get_state.return_value = InvestigationState(
-        investigation_id=investigation_id,
-        status="active",
-        main_branch=BranchState(
-            branch_id=branch_id,
-            status="active",
-            current_step="gather_context",
-        ),
-    )
-    service.send_message.return_value = branch_id
-
-    return service
-
-
 class TestStartInvestigationRoute:
     """Tests for POST /investigations."""
 
@@ -78,8 +57,33 @@ class TestStartInvestigationRoute:
         )
 
         request = StartInvestigationRequest(alert=sample_alert)
-        assert request.alert["dataset_ids"] == ["analytics.events"]
-        assert request.alert["anomaly_type"] == "null_rate"
+        assert request.alert is not None
+        assert request.alert.dataset_ids == ["analytics.events"]
+        assert request.alert.anomaly_type == "null_rate"
+        assert (request.execution_profile, request.issue_id) == ("standard", None)
+
+    @pytest.mark.parametrize(
+        "body",
+        [
+            pytest.param({}, id="neither"),
+            pytest.param({"brief": {"symptom": "Orders dropped"}, "alert": None}, id="brief-only"),
+        ],
+    )
+    def test_request_needs_exactly_one_of_brief_and_alert(
+        self, body: dict[str, Any], sample_alert: dict[str, Any]
+    ) -> None:
+        """A run starts from a brief or from an alert, never both or neither."""
+        from pydantic import ValidationError
+
+        from dataing.entrypoints.api.routes.investigations import StartInvestigationRequest
+
+        if "brief" in body:
+            assert StartInvestigationRequest.model_validate(body).brief is not None
+            with pytest.raises(ValidationError):
+                StartInvestigationRequest.model_validate({**body, "alert": sample_alert})
+        else:
+            with pytest.raises(ValidationError):
+                StartInvestigationRequest.model_validate(body)
 
     def test_response_model(self) -> None:
         """Test response model structure."""
@@ -90,13 +94,22 @@ class TestStartInvestigationRoute:
         investigation_id = uuid.uuid4()
         branch_id = uuid.uuid4()
 
+        issue_id = uuid.uuid4()
         response = StartInvestigationResponse(
             investigation_id=investigation_id,
             main_branch_id=branch_id,
+            run_id=uuid.uuid4(),
+            issue_id=issue_id,
+            issue_number=42,
         )
 
         assert response.investigation_id == investigation_id
         assert response.main_branch_id == branch_id
+        assert (response.issue_id, response.issue_number, response.status) == (
+            issue_id,
+            42,
+            "queued",
+        )
 
 
 class TestGetInvestigationRoute:
@@ -322,8 +335,8 @@ class TestRouterConfiguration:
         assert "investigations" in router.tags
 
 
-class TestInvestigationServiceIntegration:
-    """Integration tests for route handlers with mocked service."""
+class TestStartInvestigationRequestParsing:
+    """POST /investigations parses an SDK alert into an AnomalyAlert."""
 
     @pytest.mark.asyncio
     async def test_start_investigation_parses_alert(
@@ -338,78 +351,14 @@ class TestInvestigationServiceIntegration:
 
         request = StartInvestigationRequest(alert=sample_alert)
 
-        # Verify the request parsing works
-        alert = AnomalyAlert(
-            dataset_ids=request.alert["dataset_ids"],
-            metric_spec=MetricSpec(
-                metric_type=request.alert["metric_spec"]["metric_type"],
-                expression=request.alert["metric_spec"]["expression"],
-                display_name=request.alert["metric_spec"]["display_name"],
-                columns_referenced=request.alert["metric_spec"].get("columns_referenced", []),
-            ),
-            anomaly_type=request.alert["anomaly_type"],
-            expected_value=request.alert["expected_value"],
-            actual_value=request.alert["actual_value"],
-            deviation_pct=request.alert["deviation_pct"],
-            anomaly_date=request.alert["anomaly_date"],
-            severity=request.alert["severity"],
-        )
-
+        alert = request.alert
+        assert isinstance(alert, AnomalyAlert)
         assert alert.dataset_id == "analytics.events"
-        assert alert.metric_spec.display_name == "NULL rate"
-
-    @pytest.mark.asyncio
-    async def test_get_investigation_returns_state(
-        self,
-        mock_auth_context: ApiKeyContext,
-        mock_service: AsyncMock,
-    ) -> None:
-        """Test that get_investigation returns proper state."""
-        investigation_id = uuid.uuid4()
-        branch_id = uuid.uuid4()
-
-        mock_service.get_state.return_value = InvestigationState(
-            investigation_id=investigation_id,
-            status="active",
-            main_branch=BranchState(
-                branch_id=branch_id,
-                status="active",
-                current_step="generate_hypotheses",
-            ),
-        )
-
-        state = await mock_service.get_state(
-            investigation_id=investigation_id,
-            user_id=mock_auth_context.user_id,
-        )
-
-        assert state.investigation_id == investigation_id
-        assert state.main_branch.current_step == "generate_hypotheses"
-
-    @pytest.mark.asyncio
-    async def test_send_message_triggers_resume(
-        self,
-        mock_auth_context: ApiKeyContext,
-        mock_service: AsyncMock,
-    ) -> None:
-        """Test that send_message triggers branch resume."""
-        investigation_id = uuid.uuid4()
-        branch_id = uuid.uuid4()
-        message = "Please investigate the upstream ETL job"
-
-        mock_service.send_message.return_value = branch_id
-
-        result_branch_id = await mock_service.send_message(
-            investigation_id=investigation_id,
-            user_id=mock_auth_context.user_id,
-            message=message,
-        )
-
-        assert result_branch_id == branch_id
-        mock_service.send_message.assert_called_once_with(
-            investigation_id=investigation_id,
-            user_id=mock_auth_context.user_id,
-            message=message,
+        assert alert.metric_spec == MetricSpec(
+            metric_type="column",
+            expression="user_id",
+            display_name="NULL rate",
+            columns_referenced=["user_id"],
         )
 
 
@@ -490,3 +439,104 @@ class TestSnapshotModels:
             snapshots=[],
         )
         assert len(response.snapshots) == 0
+
+
+def _finished_run(confidence: float) -> MagicMock:
+    """A Temporal client whose run found NULL user_ids with the given confidence."""
+    synthesis = {
+        "root_cause": "NULL values in orders.user_id since app_v2 shipped",
+        "confidence": confidence,
+        "causal_chain": ["app_v2 shipped", "orders.user_id has NULL values"],
+        "supporting_evidence": ["12% of orders since 09:00 have no user_id"],
+        "recommendations": ["Roll back app_v2"],
+        "metadata": {"dataset": "public.orders"},
+    }
+    client = MagicMock()
+    client.get_status = AsyncMock(
+        return_value=SimpleNamespace(
+            workflow_status="completed",
+            current_step="complete",
+            hypotheses=[],
+            result=SimpleNamespace(synthesis=synthesis, evidence=[], hypotheses=[]),
+        )
+    )
+    return client
+
+
+def _reviewed(verdict: str | None) -> MagicMock:
+    """An app database whose run has the given review."""
+    db = MagicMock()
+    db.fetch_one = AsyncMock(return_value={"outcome": None, "outcome_verdict": verdict})
+    db.execute = AsyncMock()
+    return db
+
+
+class TestCodifyRoute:
+    """POST /investigations/{id}/codify follows the run's review (spec 0001 §7.10)."""
+
+    async def test_a_confirmed_cause_becomes_a_check_at_any_confidence(
+        self, mock_auth_context: ApiKeyContext
+    ) -> None:
+        """Confirming the cause lifts the 60% confidence bar."""
+        from dataing.entrypoints.api.routes.investigations import (
+            CodifyRequest,
+            codify_investigation,
+        )
+
+        response = await codify_investigation(
+            auth=mock_auth_context,
+            investigation_id=uuid.uuid4(),
+            request=CodifyRequest(),
+            db=_reviewed("confirmed"),
+            temporal_client=_finished_run(0.35),
+        )
+
+        assert [(t.test_type, t.column) for t in response.tests] == [("not_null", "user_id")]
+
+    @pytest.mark.parametrize(
+        ("confidence", "verdict", "reason"),
+        [
+            (
+                0.35,
+                None,
+                "The root cause's confidence (35%) is below 60%. Confirm it to add it as a check.",
+            ),
+            (0.95, "rejected", "This root cause was rejected, so it can't become a check."),
+        ],
+    )
+    async def test_refuses_an_unconfirmed_weak_or_rejected_cause(
+        self,
+        mock_auth_context: ApiKeyContext,
+        confidence: float,
+        verdict: str | None,
+        reason: str,
+    ) -> None:
+        """The refusal says why, and what the person can do about it."""
+        from dataing.entrypoints.api.routes.investigations import (
+            CodifyRequest,
+            codify_investigation,
+        )
+
+        with pytest.raises(HTTPException) as refused:
+            await codify_investigation(
+                auth=mock_auth_context,
+                investigation_id=uuid.uuid4(),
+                request=CodifyRequest(),
+                db=_reviewed(verdict),
+                temporal_client=_finished_run(confidence),
+            )
+
+        assert (refused.value.status_code, refused.value.detail) == (400, reason)
+
+    async def test_the_details_page_gets_the_review(self, mock_auth_context: ApiKeyContext) -> None:
+        """GET /investigations/{id} carries the verdict, so the page can offer the check."""
+        from dataing.entrypoints.api.routes.investigations import get_investigation
+
+        state = await get_investigation(
+            investigation_id=uuid.uuid4(),
+            auth=mock_auth_context,
+            db=_reviewed("confirmed"),
+            temporal_client=_finished_run(0.35),
+        )
+
+        assert state.outcome_verdict == "confirmed"

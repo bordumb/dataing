@@ -17,21 +17,16 @@ from dataing.adapters.audit import AuditRepository
 from dataing.adapters.auth.recovery_admin import AdminContactRecoveryAdapter
 from dataing.adapters.auth.recovery_console import ConsoleRecoveryAdapter
 from dataing.adapters.auth.recovery_email import EmailPasswordRecoveryAdapter
-from dataing.adapters.context import ContextEngine
 from dataing.adapters.datasource import BaseAdapter, get_registry
 from dataing.adapters.db.app_db import AppDatabase
-from dataing.adapters.db.investigation_repository import PostgresInvestigationRepository
 from dataing.adapters.entitlements import DatabaseEntitlementsAdapter
-from dataing.adapters.investigation.pattern_adapter import InMemoryPatternRepository
 from dataing.adapters.investigation_feedback import InvestigationFeedbackAdapter
 from dataing.adapters.lineage import BaseLineageAdapter, LineageAdapter, get_lineage_registry
 from dataing.adapters.notifications.email import EmailConfig, EmailNotifier
-from dataing.agents import AgentClient
 from dataing.config import settings
 from dataing.core.auth.recovery import PasswordRecoveryAdapter
-from dataing.core.investigation.collaboration import CollaborationService
-from dataing.core.investigation.service import InvestigationService
 from dataing.core.json_utils import to_json_string
+from dataing.services.llm_status import LLMStatusChecker
 from dataing.services.usage import UsageTracker
 
 if TYPE_CHECKING:
@@ -47,10 +42,19 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     """Application lifespan - setup and teardown.
 
     This context manager handles:
+    - The Anthropic key and model check, in the background
     - Database connection pool setup
-    - LLM client initialization
-    - Orchestrator configuration
+    - The Temporal client that starts and steers investigations
     """
+    # Check the Anthropic key and models in the background; the app's banner reads
+    # the result (docs/specs/0001_issue_chat.md §7.12)
+    llm_status = LLMStatusChecker(
+        api_key=settings.anthropic_api_key,
+        models=[settings.llm_model, settings.chat_agent_model],
+    )
+    llm_status.start()
+    app.state.llm_status = llm_status
+
     # Setup application database
     app_db = AppDatabase(settings.app_database_url)
     await app_db.connect()
@@ -63,33 +67,11 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     entitlements_adapter = DatabaseEntitlementsAdapter(pool=app_db.pool)
     app.state.entitlements_adapter = entitlements_adapter
 
-    llm = AgentClient(
-        api_key=settings.anthropic_api_key,
-        model=settings.llm_model,
-    )
-
-    # Create context engine
-    context_engine = ContextEngine()
-
     # Initialize investigation feedback adapter
     feedback_adapter = InvestigationFeedbackAdapter(db=app_db)
 
     # Initialize usage tracker
     usage_tracker = UsageTracker(db=app_db)
-
-    # Initialize unified investigation service (v2 API)
-    investigation_repository = PostgresInvestigationRepository(db=app_db)
-    collaboration_service = CollaborationService(repository=investigation_repository)
-    pattern_repository = InMemoryPatternRepository()
-    investigation_service = InvestigationService(
-        repository=investigation_repository,
-        collaboration=collaboration_service,
-        agent_client=llm,
-        context_engine=context_engine,
-        pattern_repository=pattern_repository,
-        usage_tracker=usage_tracker,
-        app_db=app_db,
-    )
 
     # Initialize email notifier (optional, needed for email recovery)
     email_notifier: EmailNotifier | None = None
@@ -156,11 +138,8 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
     # Store in app state
     app.state.app_db = app_db
-    app.state.llm = llm
-    app.state.context_engine = context_engine
     app.state.feedback_adapter = feedback_adapter
     app.state.usage_tracker = usage_tracker
-    app.state.investigation_service = investigation_service  # Unified investigation service (v2)
     app.state.email_notifier = email_notifier
     app.state.recovery_adapter = recovery_adapter
     app.state.frontend_url = settings.frontend_url
@@ -210,7 +189,8 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
     yield
 
-    # Teardown - close all cached adapters
+    # Teardown - stop the key check if it is still running, close all cached adapters
+    await llm_status.aclose()
     for cache_key, adapter in app.state.adapter_cache.items():
         try:
             await adapter.disconnect()
@@ -575,35 +555,6 @@ async def get_tenant_lineage_adapter(
     except Exception as e:
         logger.error(f"Failed to create composite lineage adapter for tenant {tenant_id}: {e}")
         return None
-
-
-def get_context_engine_for_tenant(
-    request: Request,
-    lineage_adapter: LineageAdapter | None = None,
-) -> ContextEngine:
-    """Get a context engine with optional lineage adapter.
-
-    Args:
-        request: The current request.
-        lineage_adapter: Optional lineage adapter for the tenant.
-
-    Returns:
-        A ContextEngine configured with the lineage adapter.
-    """
-    # Get base context engine components from app state
-    base_engine: ContextEngine = request.app.state.context_engine
-
-    # If no lineage adapter, return the base engine
-    if lineage_adapter is None:
-        return base_engine
-
-    # Create a new context engine with the lineage adapter
-    return ContextEngine(
-        schema_builder=base_engine.schema_builder,
-        anomaly_ctx=base_engine.anomaly_ctx,
-        correlation_ctx=base_engine.correlation_ctx,
-        lineage_adapter=lineage_adapter,
-    )
 
 
 def get_feedback_adapter(request: Request) -> InvestigationFeedbackAdapter:

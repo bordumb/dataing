@@ -36,7 +36,7 @@ def build_chat_model(model_name: str, api_key: str, effort: str | None) -> Model
     """Return the Anthropic model for chat turns with prompt caching turned on.
 
     Args:
-        model_name: Anthropic model id, e.g. "claude-opus-5-5".
+        model_name: Anthropic model id (settings.chat_agent_model).
         api_key: Anthropic API key.
         effort: "low", "medium" or "high"; empty or None leaves the model default.
     """
@@ -130,7 +130,8 @@ def build_brief_agent(model: Model | str) -> Agent[None, BriefDraft]:
     """Return the agent that drafts an investigation brief from a thread.
 
     The draft comes back as JSON text rather than through an output tool: an output
-    tool makes pydantic-ai force tool_choice, which Claude Opus 5.5 rejects.
+    tool makes pydantic-ai force tool_choice, which recent Claude models (Opus 5.5)
+    reject; JSON text works on every model.
     """
     return Agent(
         model,

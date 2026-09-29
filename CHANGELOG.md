@@ -1,3 +1,10 @@
+# [1.26.0](https://github.com/bordumb/dataing/compare/v1.25.5...v1.26.0) (2026-09-29)
+
+
+### Features
+
+* **core:** every investigation starts in an issue (spec 0001 M5) ([#233](https://github.com/bordumb/dataing/issues/233)) ([0002152](https://github.com/bordumb/dataing/commit/00021522ad705bb1e609214bc7a2b03d0ff337b7)), closes [#211](https://github.com/bordumb/dataing/issues/211) [#221](https://github.com/bordumb/dataing/issues/221) [#N](https://github.com/bordumb/dataing/issues/N) [#N](https://github.com/bordumb/dataing/issues/N) [#42](https://github.com/bordumb/dataing/issues/42)
+
 ## [1.25.5](https://github.com/bordumb/dataing/compare/v1.25.4...v1.25.5) (2026-09-29)
 
 
